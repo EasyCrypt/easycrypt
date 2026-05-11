@@ -68,21 +68,19 @@ proof. by split=> [/asint_inj|->//]. qed.
 (* [theory ZModule]); the [instance comring with zmod] below proves the *)
 (* axioms with [exact:] on these named lemmas.                          *)
 (* -------------------------------------------------------------------- *)
-op zmod_zero       = inzmod 0.
-op zmod_one        = inzmod 1.
 op zmod_opp x      = inzmod (- asint x).
 op zmod_add x y    = inzmod (asint x + asint y).
 op zmod_mul x y    = inzmod (asint x * asint y).
 
-op zmod_unit x     = exists y, zmod_mul y x = zmod_one.
-op zmod_inv  x     = choiceb (fun y => zmod_mul y x = zmod_one) x.
+op zmod_unit x     = exists y, zmod_mul y x = inzmod 1.
+op zmod_inv  x     = choiceb (fun y => zmod_mul y x = inzmod 1) x.
 
 (* -------------------------------------------------------------------- *)
-lemma zmod_zeroE: asint zmod_zero = 0.
-proof. by rewrite /zmod_zero inzmodK mod0z. qed.
+lemma inzmod0E: asint (inzmod 0) = 0.
+proof. by rewrite inzmodK mod0z. qed.
 
-lemma zmod_oneE: asint zmod_one = 1.
-proof. by rewrite /zmod_one inzmodK modz_small; smt(ge2_p). qed.
+lemma inzmod1E: asint (inzmod 1) = 1.
+proof. by rewrite inzmodK modz_small; smt(ge2_p). qed.
 
 lemma zmod_oppE (x : zmod): asint (zmod_opp x) = (- (asint x)) %% p.
 proof. by rewrite /zmod_opp /inzmod /asint /= Sub.insubdK; smt(ge2_p). qed.
@@ -106,19 +104,19 @@ proof. by apply/asint_inj; rewrite !zmod_addE modzDml modzDmr addzA. qed.
 lemma zmod_addrC (x y : zmod): zmod_add x y = zmod_add y x.
 proof. by apply/asint_inj; rewrite !zmod_addE addzC. qed.
 
-lemma zmod_add0r (x : zmod): zmod_add zmod_zero x = x.
+lemma zmod_add0r (x : zmod): zmod_add (inzmod 0) x = x.
 proof.
-by apply/asint_inj; rewrite !(zmod_addE, zmod_zeroE) add0z;
+by apply/asint_inj; rewrite !(zmod_addE, inzmod0E) add0z;
    smt(rg_asint pmod_small ge2_p).
 qed.
 
-lemma zmod_addrN (x : zmod): zmod_add x (zmod_opp x) = zmod_zero.
+lemma zmod_addrN (x : zmod): zmod_add x (zmod_opp x) = inzmod 0.
 proof.
-apply/asint_inj; rewrite !(zmod_zeroE, zmod_addE, zmod_oppE).
+apply/asint_inj; rewrite !(inzmod0E, zmod_addE, zmod_oppE).
 by rewrite modzDmr addzN.
 qed.
 
-lemma zmod_oner_neq0 : zmod_one <> zmod_zero.
+lemma zmod_oner_neq0 : inzmod 1 <> inzmod 0.
 proof. by rewrite -eq_inzmod #smt:(ge2_p). qed.
 
 lemma zmod_mulrA (x y z : zmod):
@@ -128,9 +126,9 @@ proof. by apply/asint_inj; rewrite !zmod_mulE modzMml modzMmr mulzA. qed.
 lemma zmod_mulrC (x y : zmod): zmod_mul x y = zmod_mul y x.
 proof. by apply/asint_inj; rewrite !zmod_mulE mulzC. qed.
 
-lemma zmod_mul1r (x : zmod): zmod_mul zmod_one x = x.
+lemma zmod_mul1r (x : zmod): zmod_mul (inzmod 1) x = x.
 proof.
-by apply/asint_inj; rewrite !(zmod_mulE, zmod_oneE) mul1z; smt(rg_asint).
+by apply/asint_inj; rewrite !(zmod_mulE, inzmod1E) mul1z; smt(rg_asint).
 qed.
 
 lemma zmod_mulrDl (x y z : zmod):
@@ -140,10 +138,10 @@ apply/asint_inj; rewrite !(zmod_addE, zmod_mulE).
 by rewrite !(modzMml, modzMmr, modzDml, modzDmr) mulzDl.
 qed.
 
-lemma zmod_mulVr x : zmod_unit x => zmod_mul (zmod_inv x) x = zmod_one.
+lemma zmod_mulVr x : zmod_unit x => zmod_mul (zmod_inv x) x = inzmod 1.
 proof. by move/choicebP=> /(_ x). qed.
 
-lemma zmod_unitP x y : zmod_mul y x = zmod_one => zmod_unit x.
+lemma zmod_unitP x y : zmod_mul y x = inzmod 1 => zmod_unit x.
 proof. by move=> eq; exists y. qed.
 
 lemma zmod_unitout x : ! zmod_unit x => zmod_inv x = x.
@@ -159,10 +157,10 @@ qed.
 (* lives in [ZModField] below.                                          *)
 (* -------------------------------------------------------------------- *)
 instance comring with zmod reducible
-  op idm   = zmod_zero
+  op idm   = (inzmod 0)
   op (+)   = zmod_add
   op [-]   = zmod_opp
-  op oner  = zmod_one
+  op oner  = (inzmod 1)
   op ( * ) = zmod_mul
   op invr  = zmod_inv
   op unit  = zmod_unit
@@ -181,7 +179,7 @@ instance comring with zmod reducible
   proof unitout    by exact: zmod_unitout.
 
 (* Spacer: flush deferred-proof state before downstream uses.          *)
-op _spacer1 : zmod = zmod_zero.
+op _spacer1 : zmod = inzmod 0.
 
 (* ==================================================================== *)
 (* inzmod/asint corollaries — these are the user-facing identities      *)
@@ -223,8 +221,8 @@ proof. by rewrite -inzmod_mod inzmodB. qed.
 lemma zmodcgrP (i j : int) : zmodcgr i j <=> p %| (i - j).
 proof. by rewrite dvdzE -[0](mod0z p) !eq_inzmod inzmodB subr_eq0. qed.
 
-lemma inzmod_eq0P (i : int) : inzmod i = zmod_zero <=> p %| i.
-proof. by rewrite -[zmod_zero]asintK zmod_zeroE -eq_inzmod zmodcgrP. qed.
+lemma inzmod_eq0P (i : int) : inzmod i = inzmod 0 <=> p %| i.
+proof. by rewrite -[inzmod 0]asintK inzmod0E -eq_inzmod zmodcgrP. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma inzmodW (P : zmod -> bool) :
@@ -281,32 +279,32 @@ clone include ZModRing with
   op    p <- p
   proof ge2_p by smt(gt1_prime prime_p).
 
-lemma unitE (x : zmod) : zmod_unit x <=> x <> zmod_zero.
+lemma unitE (x : zmod) : zmod_unit x <=> x <> inzmod 0.
 proof.
 split; first by apply: contraL => ->; smt(zmod_mulrC zmod_mul1r choicebP).
 move=> nz_x; exists (inzmod (invm (asint x) p)).
-apply: asint_inj; rewrite zmod_oneE zmod_mulE inzmodK.
+apply: asint_inj; rewrite inzmod1E zmod_mulE inzmodK.
 rewrite (@modzE (invm _ _)) -mulNr mulrDl mulrAC modzMDr mulrC.
 apply/mulmV; first by apply/prime_p.
-by move: nz_x; rewrite -asint_eq zmod_zeroE pmod_small // rg_asint.
+by move: nz_x; rewrite -asint_eq inzmod0E pmod_small // rg_asint.
 qed.
 
 lemma zmod_mulrV (x : zmod) :
-  x <> zmod_zero => zmod_mul x (zmod_inv x) = zmod_one.
+  x <> inzmod 0 => zmod_mul x (zmod_inv x) = inzmod 1.
 proof.
 move=> nz_x; rewrite zmod_mulrC; apply: zmod_mulVr; rewrite unitE //.
 qed.
 
 lemma zmod_mulf_eq0 (x y : zmod) :
-  zmod_mul x y = zmod_zero <=> x = zmod_zero \/ y = zmod_zero.
+  zmod_mul x y = inzmod 0 <=> x = inzmod 0 \/ y = inzmod 0.
 proof.
 split; last first.
 - by case=> ->; apply/asint_inj;
-    rewrite zmod_mulE zmod_zeroE; smt(zmod_zeroE rg_asint).
-move/(congr1 asint); rewrite zmod_mulE zmod_zeroE => /dvdzE dvd.
+    rewrite zmod_mulE inzmod0E; smt(inzmod0E rg_asint).
+move/(congr1 asint); rewrite zmod_mulE inzmod0E => /dvdzE dvd.
 have [dvd'|dvd'] : p %| asint x \/ p %| asint y by smt(prime_p).
-- by left; apply/asint_inj; rewrite zmod_zeroE; smt(rg_asint dvdzE).
-- by right; apply/asint_inj; rewrite zmod_zeroE; smt(rg_asint dvdzE).
+- by left; apply/asint_inj; rewrite inzmod0E; smt(rg_asint dvdzE).
+- by right; apply/asint_inj; rewrite inzmod0E; smt(rg_asint dvdzE).
 qed.
 
 (* Comring (and ancestors) inherited from ZModRing's instance via the
@@ -319,7 +317,7 @@ instance field with zmod reducible
   proof unitfP by exact: unitE.
 
 (* Spacer. *)
-op _spacer2 : zmod = zmod_zero.
+op _spacer2 : zmod = inzmod 0.
 
 (* ==================================================================== *)
 (* Field-specific exp/Fermat corollaries. Mirrors the tail of legacy   *)
@@ -334,7 +332,7 @@ op _spacer2 : zmod = zmod_zero.
    general comring lemma is automatic over a field except at [x = 0],
    handled separately below. *)
 lemma exp_mod (x : zmod) (n k : int) :
-  x <> zmod_zero => exp x k = zmod_one =>
+  x <> inzmod 0 => exp x k = inzmod 1 =>
   exp x n = exp x (n %% k).
 proof.
 by move=> nz_x; apply: exp_mod_unit; apply/unitE.
@@ -342,10 +340,10 @@ qed.
 
 (* Fermat's little theorem: every unit raised to [p - 1] is one.       *)
 lemma exp_sub_p_1 (x : zmod) :
-  unit x => exp x (p - 1) = zmod_one.
+  unit x => exp x (p - 1) = inzmod 1.
 proof.
 move=> ux.
-have nz_x: x <> zmod_zero by apply/unitE.
+have nz_x: x <> inzmod 0 by apply/unitE.
 have N_p_div_x: !(p %| asint x).
 + rewrite -inzmod_eq0P; move: nz_x.
   by rewrite -{1}(@asintK x).
@@ -355,7 +353,7 @@ have lift_exp : forall i, 0 <= i =>
 + elim=> [|i ge0_i ih]; first by rewrite !expr0.
   by rewrite !exprS // ih inzmodM asintK.
 rewrite -{1}(@asintK x) lift_exp //.
-rewrite -[zmod_one]asintK zmod_oneE -eq_inzmod.
+rewrite -[inzmod 1]asintK inzmod1E -eq_inzmod.
 by rewrite zmodcgrP &(Fermat_little) // prime_p.
 qed.
 

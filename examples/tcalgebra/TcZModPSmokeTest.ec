@@ -18,7 +18,7 @@ lemma test_asint_inzmod (n : int) :
 proof. by move=> rg; rewrite inzmodK pmod_small. qed.
 
 (* Concrete arithmetic. *)
-lemma test_one_plus_one : zmod_add Z5.zmod_one Z5.zmod_one = inzmod 2.
+lemma test_one_plus_one : zmod_add (Z5.inzmod 1) (Z5.inzmod 1) = inzmod 2.
 proof. by rewrite -inzmodD //. qed.
 
 (* Class lemma at the carrier zmod. *)
@@ -42,12 +42,12 @@ clone import ZModField as Z5F with
 
 (* unit ↔ nonzero (field-only). *)
 lemma test_unitE (x : Z5F.zmod) :
-  Z5F.zmod_unit x <=> x <> Z5F.zmod_zero.
+  Z5F.zmod_unit x <=> x <> (Z5F.inzmod 0).
 proof. by apply Z5F.unitE. qed.
 
 (* Fermat: x^4 = 1 for every unit in Z/5Z. *)
 lemma test_exp_p_minus_1 (x : Z5F.zmod) :
-  x <> Z5F.zmod_zero => exp x 4 = Z5F.zmod_one.
+  x <> (Z5F.inzmod 0) => exp x 4 = (Z5F.inzmod 1).
 proof.
 move=> nz_x.
 have ->: (4 = 5 - 1) by trivial.
