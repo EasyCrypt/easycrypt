@@ -1769,11 +1769,8 @@ tyci_args:
    { (c, p) }
 
 tyci_op:
-| OP x=oident EQ tg=qoident
-    { (x, ([], tg)) }
-
-| OP x=oident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
-    { (x, (tvi, tg)) }
+| OP x=oident EQ body=sform
+    { (x, body) }
 
 tyci_ax:
 | PROOF x=ident BY tg=tactic_core

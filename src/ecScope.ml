@@ -1917,42 +1917,20 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env tcty ops reqs =
-    let ue  = EcUnify.UniEnv.create (Some (fst tcty)) in
-
+    (* Each binding [op X = body] is elaborated as a form at the type
+       the class declares for [X] (after substituting the instance's
+       tparams). The body can be anything well-typed at that type — a
+       bare op path, a literal, a lambda — not just a [pqsymbol]. *)
     let ops =
-      let tt1 m (x, (tvi, op)) =
+      let tt1 m (x, body) =
         if not (Mstr.mem (unloc x) reqs) then
           hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
-
-        let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
-        let tvi = List.map (fun ty -> (Some ty, None)) tvi in
-        let selected =
-          EcUnify.select_op ~filter:(fun _ -> EcDecl.is_oper)
-            (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue []
-        in
-        let op =
-          match selected with
-          | [] -> hierror ~loc:op.pl_loc "unknown operator"
-          | op1 :: op2 :: _ ->
-              hierror ~loc:op.pl_loc
-                "ambiguous operator (%s / %s)"
-                (EcPath.tostring (fst (proj4_1 op1)))
-                (EcPath.tostring (fst (proj4_1 op2)))
-          | [((p, opparams), opty, subue, _)] ->
-              let subst    = Tuni.subst
-                ~tw_uni:(EcUnify.UniEnv.tw_assubst subue)
-                (EcUnify.UniEnv.assubst subue) in
-              let opty     = ty_subst subst opty in
-              let opparams = List.map (EcCoreSubst.etyarg_subst subst) opparams in
-              ((p, opparams), opty)
-
-        in
-          Mstr.change
-            (function
-            | None   -> Some (x.pl_loc, op)
+        Mstr.change
+          (function
+            | None   -> Some (x.pl_loc, body)
             | Some _ -> hierror ~loc:(x.pl_loc)
               "duplicated operator name: `%s'" (unloc x))
-            (unloc x) m
+          (unloc x) m
       in
         List.fold_left tt1 Mstr.empty ops
     in
@@ -1965,21 +1943,23 @@ module Ty = struct
         (fun x (_, ty) m ->
            match Mstr.find_opt x ops with
            | None -> m
-           | Some (loc, ((p, opparams), opty)) ->
-               if not (EcReduction.EqTest.for_type env ty opty) then begin
-                 let ppe = EcPrinting.PPEnv.ofenv env in
+           | Some (loc, body) ->
+               let ue = EcUnify.UniEnv.create (Some (fst tcty)) in
+               let f =
+                 try TT.trans_form env ue body ty
+                 with TT.TyError (loc, env, e) ->
+                   hierror ~loc "%a"
+                     (EcUserMessages.TypingError.pp_tyerror env) e
+               in
+               if not (EcUnify.UniEnv.closed ue) then
                  hierror ~loc
-"invalid type for operator `%s':@\n\
-\  - expected: %a@\n\
-\  - got     : %a"
-                   x (EcPrinting.pp_type ppe) ty (EcPrinting.pp_type ppe) opty
-               end;
-               (* Wrap the (path, etyargs) into a form. This is Phase 1
-                  of moving instance op-bindings to a form-valued symbol
-                  map; future phases will let the RHS be an arbitrary
-                  form so a literal [Fint 0] can directly realise an
-                  additive identity. *)
-               Mstr.add x (EcCoreFol.f_op_tc p opparams opty) m)
+                   "the body of operator `%s' contains free type variables" x;
+               let subst =
+                 Tuni.subst
+                   ~tw_uni:(EcUnify.UniEnv.tw_assubst ue)
+                   (EcUnify.UniEnv.assubst ue) in
+               let f = Fsubst.f_subst subst f in
+               Mstr.add x f m)
         reqs Mstr.empty
 
   (* ------------------------------------------------------------------ *)

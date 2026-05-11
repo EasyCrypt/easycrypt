@@ -1158,7 +1158,11 @@ type ptycinstance = {
   pti_tc        : ptcparam;
   pti_name      : psymbol option;
   pti_type      : ptyparams * pty;
-  pti_ops       : (psymbol * (pty list * pqsymbol)) list;
+  (* Each [op X = body] binding parses [body] as an arbitrary form. For
+     existing instances the body is a bare op application (e.g.
+     [CoreInt.zero]), which is a degenerate form; the elaborator
+     handles it uniformly via [trans_form]. *)
+  pti_ops       : (psymbol * pformula) list;
   pti_axs       : (psymbol * ptactic_core) list;
   pti_args      : [`Ring of (zint option * zint option)] option;
   pti_loca      : is_local;
