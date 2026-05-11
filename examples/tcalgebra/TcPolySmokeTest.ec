@@ -70,8 +70,7 @@ proof. by apply polyM_mulf_eq0. qed.
 lemma test_polyM_at_0 :
   (polyM<:int> (polyD X (polyC 1)) (polyD X (polyC (-1)))).[0] = -1.
 proof.
-rewrite polyME big_int1 /=.
-by rewrite !(polyDE, polyXE, polyCE) /= !(mul0r, mulr0, addr0, mul1r, add0r).
+by rewrite polyME big_int1 /= !(polyDE, polyXE, polyCE) /=.
 qed.
 
 (* -------------------------------------------------------------------- *)
