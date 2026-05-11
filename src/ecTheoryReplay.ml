@@ -1017,7 +1017,8 @@ and replay_instance
            `General (tc, syms)
     in
 
-    let tci = { tci with tci_params; tci_type; tci_instance; } in
+    let tci_parents = List.map forpath tci.tci_parents in
+    let tci = { tci with tci_params; tci_type; tci_instance; tci_parents; } in
 
     let scope =
       ove.ovre_hooks.hadd_item scope ~import (Th_instance (x, tci))
