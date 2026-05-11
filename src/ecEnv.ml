@@ -2777,18 +2777,45 @@ module Op = struct
       (List.combine (List.map fst op.op_tparams) tys)
       form
 
-  let tc_core_reduce ?(strict = false) (env : env) (p : path) (tys : etyarg list) =
+  (* Resolve a TC class op application to the form that realises it on
+     the witness's carrier. Returns the substituted form (carrier
+     tparams instantiated at the witness's etyargs). Internal helper:
+     [tc_reduce] is the public wrapper that handles the abstract-rename
+     fallback. *)
+  let tc_core_reduce ?(strict = false) (env : env) (p : path) (tys : etyarg list)
+      : form
+  =
     let op = by_path p env in
 
     if not (is_tc_op op) then
       raise NotReducible;
 
-    (* Last type application if the TC parameter. We extract the type-class  *
-     * information from the witness.                                         *)
+    let opname = snd (EcDecl.operator_as_tc op) in
+
+    (* Last type application is the TC parameter. We extract the
+       type-class information from the witness. *)
     let _, (_, tcw) = List.betail tys in
 
+    let finalise (tci_target : tcinstance) (symbols : form Mstr.t) : form =
+      let body = Mstr.find opname symbols in
+      let subst =
+        List.fold_left
+          (fun subst (a, ety) ->
+            let ety = EcSubst.subst_etyarg subst ety in
+            EcSubst.add_tyvar subst a ety)
+          EcSubst.empty
+          (List.combine
+             (List.map fst tci_target.tci_params)
+             (let tciargs =
+                match tcw with
+                | [TCIConcrete { etyargs; _ }] -> etyargs
+                | _ -> []
+              in tciargs))
+      in EcSubst.subst_form subst body
+    in
+
     match as_seq1 tcw with
-    | TCIConcrete { path = tcipath; etyargs = tciargs; lift } -> begin
+    | TCIConcrete { path = tcipath; lift; _ } -> begin
       let tci = TcInstance.by_path tcipath env in
 
       (* The witness's [lift] is a path through the parent DAG: each
@@ -2865,14 +2892,13 @@ module Op = struct
       | Some (tci_target, symbols) ->
         if strict && not tci_target.tci_reducible then
           raise NotReducible;
-        (EcDecl.operator_as_tc op,
-         (tciargs, (tci_target.tci_params, symbols)))
+        finalise tci_target symbols
       | None ->
         match tci.tci_instance with
         | `General (_, Some symbols) ->
           if strict && not tci.tci_reducible then
             raise NotReducible;
-          (EcDecl.operator_as_tc op, (tciargs, (tci.tci_params, symbols)))
+          finalise tci symbols
         | _ -> raise NotReducible
       end
 
@@ -2969,19 +2995,7 @@ module Op = struct
       Option.is_some (tc_reduce_abstract_via_rename env p tys)
 
   let tc_reduce ?(strict = false) (env : env) (p : path) (tys : etyarg list) =
-    try
-      let ((_, opname), (tciargs, (tciparams, symbols))) =
-        tc_core_reduce ~strict env p tys in
-      let subst =
-        List.fold_left
-          (fun subst (a, ety) ->
-            let ety = EcSubst.subst_etyarg subst ety in
-            EcSubst.add_tyvar subst a ety)
-          EcSubst.empty
-          (List.combine (List.map fst tciparams) tciargs)
-      in
-      let body = EcMaps.Mstr.find opname symbols in
-      EcSubst.subst_form subst body
+    try tc_core_reduce ~strict env p tys
     with NotReducible ->
       if strict then raise NotReducible
       else match tc_reduce_abstract_via_rename env p tys with
