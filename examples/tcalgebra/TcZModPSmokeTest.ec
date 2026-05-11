@@ -33,3 +33,14 @@ proof. by apply zmod_addrA. qed.
 
 lemma test_mulrC (x y : zmod) : zmod_mul x y = zmod_mul y x.
 proof. by apply zmod_mulrC. qed.
+
+(* -------------------------------------------------------------------- *)
+(* ZModField at p := 5 (prime). Exercises the field instance.           *)
+clone import ZModField as Z5F with
+  op p <- 5
+  proof prime_p by admit.
+
+(* unit ↔ nonzero (field-only). *)
+lemma test_unitE (x : Z5F.zmod) :
+  Z5F.zmod_unit x <=> x <> Z5F.zmod_zero.
+proof. by apply Z5F.unitE. qed.

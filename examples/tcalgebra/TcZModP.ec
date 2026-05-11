@@ -312,19 +312,11 @@ qed.
 (* Comring (and ancestors) inherited from ZModRing's instance via the
    clone include. Two refinements stack on top: idomain adds mulf_eq0,
    then field adds unitfP. *)
-(* TODO: register [instance field with zmod] for prime [p].
-   Blocked by an EC infrastructure issue: [instance field with zmod]
-   after [clone include ZModRing] fails with "no definition for
-   operator `add'" because the chain-registration code's
-   [existing_anc_symbols] returns a sym-map keyed by class-op symbols
-   (e.g. [idm], [+]) while the consuming iteration in
-   [add_generic_instance] queries by anc_decl op names (e.g. [add],
-   [opp]). The mismatch only surfaces when refining an instance whose
-   parent chain was built via theory-replay (clone include) — direct
-   declarations of the parent chain in the same scope use a sym-map
-   keyed by the anc-decl names. See memory entry for the analysis. *)
 instance idomain with zmod reducible
   proof mulf_eq0 by exact: zmod_mulf_eq0.
+
+instance field with zmod reducible
+  proof unitfP by exact: unitE.
 
 (* Spacer. *)
 op _spacer2 : zmod = zmod_zero.
