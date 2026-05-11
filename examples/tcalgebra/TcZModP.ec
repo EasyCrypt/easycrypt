@@ -156,7 +156,7 @@ qed.
 (* [idomain] for non-prime [p] (zero divisors exist). Field instance    *)
 (* lives in [ZModField] below.                                          *)
 (* -------------------------------------------------------------------- *)
-instance comring with zmod reducible
+instance comring with zmod
   op idm   = (inzmod 0)
   op (+)   = zmod_add
   op [-]   = zmod_opp
@@ -310,10 +310,10 @@ qed.
 (* Comring (and ancestors) inherited from ZModRing's instance via the
    clone include. Two refinements stack on top: idomain adds mulf_eq0,
    then field adds unitfP. *)
-instance idomain with zmod reducible
+instance idomain with zmod
   proof mulf_eq0 by exact: zmod_mulf_eq0.
 
-instance field with zmod reducible
+instance field with zmod
   proof unitfP by exact: unitE.
 
 (* Spacer. *)
