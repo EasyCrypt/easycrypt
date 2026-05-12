@@ -2905,102 +2905,12 @@ module Op = struct
     | _ ->
       raise NotReducible
 
-  (* Try to unfold a TC op via a factory rename when the witness is
-     [TCIAbstract]. Walks the parent-DAG path defined by [(offset, lift)]
-     looking for an edge whose rename maps [basename p] to a different
-     name. If found, returns the renamed op-path with a witness lifted
-     up to (but not including) that edge. The renamed op is a class op
-     declared in the child class of the renaming edge.                  *)
-  let tc_reduce_abstract_via_rename
-    (env : env) (p : path) (tys : etyarg list)
-    : form option
-  =
-    match by_path_opt p env with
-    | None -> None
-    | Some op when not (EcDecl.is_tc_op op) -> None
-    | Some _op ->
-      let prefix_tys, last_ety = List.betail tys in
-      let _, tcws = last_ety in
-      match tcws with
-      | [TCIAbstract { support; offset; lift }] -> begin
-        let opname = EcPath.basename p in
-        let tcs_opt =
-          match support with
-          | `Abs ap -> begin
-              match Ty.by_path_opt ap env with
-              | Some { tyd_type = `Abstract tcs; _ } -> Some tcs
-              | _ -> None
-            end
-          | `Var _ -> None in
-        match tcs_opt with
-        | None -> None
-        | Some tcs ->
-          if offset >= List.length tcs then None
-          else
-          let start = List.nth tcs offset in
-          let rec walk cur acc_lift_rev = function
-            | [] -> None
-            | i :: rest ->
-              let decl = TypeClass.by_path cur.tc_name env in
-              match List.nth_opt decl.tc_prts i with
-              | None -> None
-              | Some (parent, _edge_lbl, edge_ren) ->
-                let subst =
-                  List.fold_left2
-                    (fun s (a, _) ety -> Mid.add a ety s)
-                    Mid.empty decl.tc_tparams cur.tc_args in
-                let parent = EcCoreSubst.Tvar.subst_tc subst parent in
-                match walk parent (i :: acc_lift_rev) rest with
-                | Some _ as r -> r
-                | None ->
-                  match List.assoc_opt opname edge_ren with
-                  | Some new_name when new_name <> opname ->
-                    Some (cur, new_name, List.rev acc_lift_rev)
-                  | _ -> None in
-          match walk start [] lift with
-          | None -> None
-          | Some (cur_class, new_name, new_lift) ->
-            (* Class ops live at the THEORY level (sibling of the class
-               declaration), not under the class's own path. Strip one
-               component and append the renamed op-name. *)
-            let theory_prefix =
-              match EcPath.prefix cur_class.tc_name with
-              | Some pr -> pr
-              | None -> cur_class.tc_name in
-            let new_path = EcPath.pqname theory_prefix new_name in
-            match by_path_opt new_path env with
-            | None -> None
-            | Some new_op ->
-              let new_witness =
-                TCIAbstract { support; offset; lift = new_lift } in
-              let new_etyargs =
-                prefix_tys @ [(fst last_ety, [new_witness])] in
-              let tysubst =
-                EcCoreSubst.Tvar.init
-                  (List.combine
-                     (List.map fst new_op.op_tparams)
-                     new_etyargs) in
-              let new_ty = EcCoreSubst.Tvar.subst tysubst new_op.op_ty in
-              Some (f_op_tc new_path new_etyargs new_ty)
-        end
-      | _ -> None
-
   let tc_reducible ?(strict = false) (env : env) (p : path) (tys : etyarg list) =
     try ignore (tc_core_reduce ~strict env p tys); true
-    with NotReducible ->
-      (* Abstract-rename folding is a structural unfolding through a
-         factory rename. Strict mode (= "only fold through reducible-
-         marked instances") skips it. *)
-      (not strict) &&
-      Option.is_some (tc_reduce_abstract_via_rename env p tys)
+    with NotReducible -> false
 
   let tc_reduce ?(strict = false) (env : env) (p : path) (tys : etyarg list) =
-    try tc_core_reduce ~strict env p tys
-    with NotReducible ->
-      if strict then raise NotReducible
-      else match tc_reduce_abstract_via_rename env p tys with
-      | Some f -> f
-      | None -> raise NotReducible
+    tc_core_reduce ~strict env p tys
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -3013,65 +2923,6 @@ module Op = struct
   let is_tc_op env p =
     try  EcDecl.is_tc_op (by_path p env)
     with LookupFailure _ -> false
-
-  (* Returns the canonical origin of a TC op: the (class_path, op_name)
-     pair where the op was originally introduced. For auto-imported
-     renamed ops (e.g. [addmonoid.zero] auto-imported from
-     [monoid.idm]), follows [tc_ops_origin] to the source. For
-     user-declared ops, returns the op's own class and name. Returns
-     [None] if [p] is not a TC op. *)
-  let tc_op_canonical_origin (env : env) (p : path)
-    : (path * EcSymbols.symbol) option
-  =
-    try
-      let op = by_path p env in
-      if not (EcDecl.is_tc_op op) then None
-      else
-        let class_path, op_name = EcDecl.operator_as_tc op in
-        match TypeClass.by_path_opt class_path env with
-        | None -> Some (class_path, op_name)
-        | Some decl ->
-          match List.assoc_opt op_name decl.EcDecl.tc_ops_origin with
-          | Some origin -> Some origin
-          | None -> Some (class_path, op_name)
-    with LookupFailure _ -> None
-
-  (* Two TC ops are equivalent iff they share the same canonical
-     origin AND one's class is an ancestor of the other's (so they're
-     related along a single inheritance chain, not sibling renames of
-     a common origin). For example, [monoid.idm] and [addmonoid.zero]
-     are equivalent (addmonoid extends monoid, with rename
-     [idm = zero]). But [addmonoid.(+)] and [mulmonoid.( * )] are
-     NOT equivalent — both have origin [monoid.mop] but neither's
-     class is an ancestor of the other's. *)
-  let tc_ops_same_origin (env : env) (p1 : path) (p2 : path) : bool =
-    let same_origin =
-      match tc_op_canonical_origin env p1, tc_op_canonical_origin env p2 with
-      | Some o1, Some o2 ->
-        EcPath.p_equal (fst o1) (fst o2) && snd o1 = snd o2
-      | _ -> false in
-    if not same_origin then false
-    else
-      let class_of p =
-        try
-          let op = by_path p env in
-          if EcDecl.is_tc_op op then Some (fst (EcDecl.operator_as_tc op))
-          else None
-        with LookupFailure _ -> None in
-      match class_of p1, class_of p2 with
-      | Some c1, Some c2 when EcPath.p_equal c1 c2 -> true
-      | Some c1, Some c2 ->
-        (* Check whether c1 is an ancestor of c2 or vice versa.
-           Walk via [tc_prts]. *)
-        let rec is_ancestor src tgt =
-          if EcPath.p_equal src tgt then true
-          else match TypeClass.by_path_opt src env with
-          | None -> false
-          | Some decl ->
-            List.exists (fun (parent, _, _) ->
-              is_ancestor parent.EcAst.tc_name tgt) decl.EcDecl.tc_prts in
-        is_ancestor c1 c2 || is_ancestor c2 c1
-      | _ -> false
 
   let tc_op_realised_by (env : env) (tcop : path) (concrete : path) =
     if not (is_tc_op env tcop) then false

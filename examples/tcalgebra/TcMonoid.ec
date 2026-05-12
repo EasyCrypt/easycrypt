@@ -49,6 +49,10 @@ end section.
 (* ==================================================================== *)
 type class addmonoid <: (monoid with idm = zero, mop = (+)) = {}.
 
+(* Manual abbrevs replace the auto-imported renamed ops. *)
+abbrev (+)  ['a <: addmonoid] = mop<:'a>.
+abbrev zero ['a <: addmonoid] = idm<:'a>.
+
 section.
 declare type t <: addmonoid.
 
@@ -80,6 +84,9 @@ end section.
    names and [1m] for left-identity. Unambiguous at [`a <: mulmonoid]. *)
 (* ==================================================================== *)
 type class mulmonoid <: (monoid with idm = oner, mop = ( * )) = {}.
+
+abbrev ( * ) ['a <: mulmonoid] = mop<:'a>.
+abbrev oner  ['a <: mulmonoid] = idm<:'a>.
 
 section.
 declare type t <: mulmonoid.

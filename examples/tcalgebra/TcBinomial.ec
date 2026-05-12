@@ -159,13 +159,19 @@ rewrite -{2}(@oppzK c) fromintN mulrN -h 1:/#.
 by rewrite mulrNz opprK.
 qed.
 
-lemma binomial_r (x y : real) n : 0 <= n => (x + y) ^ n =
-  bigiA predT (fun i => (bin n i)%r * (x ^ i * y ^ (n - i))) 0 (n + 1).
+(* The TC abbrev [(^) ['a <: comring]] and the legacy [(^) : real ->
+   int -> real] are both in scope here (the latter from [Real.ec] via
+   [AllCore]); they overlap at the [real] carrier. Until the legacy
+   algebra hierarchy is removed, write [exp] explicitly to pin the
+   TC version — required for [exact h] to align with [binomial<:real>]'s
+   TC [exp]. *)
+lemma binomial_r (x y : real) n : 0 <= n => exp (x + y) n =
+  bigiA predT (fun i => (bin n i)%r * (exp x i * exp y (n - i))) 0 (n + 1).
 proof.
 move=> ge0_n.
 have h := binomial<:real> x y n ge0_n.
-rewrite (_ : (x + y) ^ n =
-  bigiA predT (fun i => intmul (x ^ i * y ^ (n - i)) (bin n i)) 0 (n + 1));
+rewrite (_ : exp (x + y) n =
+  bigiA predT (fun i => intmul (exp x i * exp y (n - i)) (bin n i)) 0 (n + 1));
   first by exact h.
 by apply: eq_bigr => /= k _; rewrite intmulr_real mulrC mulrA.
 qed.

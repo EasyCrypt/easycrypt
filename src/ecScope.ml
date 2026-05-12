@@ -2034,21 +2034,13 @@ module Ty = struct
         List.map (fun (n, ty, renamed, origin) ->
           (EcIdent.create n, n, ty, renamed, origin))
           inherited_ops in
-      let scenv =
-        (* Only bind RENAMED inherited ops as body-locals. Non-renamed
-           ops are already resolvable via the global namespace (their
-           ancestor class published an [OP_TC] global at the
-           ancestor's path), so locally binding them would create
-           parallel [Flocal] references that can't be substituted to
-           the global at env-bind time (they're not in [tc_ops]),
-           leading to axiom-body ops that fail to match use-site
-           [Fop] references. *)
-        let inherited_locals =
-          List.filter_map
-            (fun (id, _n, ty, renamed, _) ->
-              if renamed then Some (id, ty) else None)
-            inherited_idents in
-        EcEnv.Var.bind_locals inherited_locals scenv in
+      (* With auto-import disabled, we no longer bind body-locals for
+         renamed inherited ops — they shouldn't be needed (the abbrev
+         declared at the theory level resolves the renamed name) and
+         binding them creates [Flocal] references that aren't
+         substituted at env-bind time (since inherited_tc_ops is now
+         empty), leaving dangling locals in axiom bodies. *)
+      let _ = inherited_idents in
 
       (* Check operators types *)
       let operators =
@@ -2092,30 +2084,14 @@ module Ty = struct
         in
           tcd.ptc_axs |> List.map check1 in
 
-      (* Promote auto-imported inherited ops to first-class entries of
-         [tc_ops]. They are placed before user-declared ops; collisions
-         have already been rejected. This makes inherited ops
-         externally visible (the env-level [bind_typeclass] loop in
-         [ecEnv.ml] creates one global [OP_TC] per [tc_ops] entry) and
-         requires each instance to supply a realisation under the
-         (possibly renamed) local name — which the instance-side
-         [tcsyms] walk already demands via the chain's rename. *)
-      (* Only RENAMED inherited ops are promoted to [tc_ops]. Non-renamed
-         inherited ops remain accessible via the chain walk (the resolver
-         walks [tc_prts] and finds them in the ancestor's [tc_ops]);
-         re-emitting them under the current class's path would create a
-         duplicate global [OP_TC] symbol and clash with the ancestor's
-         own global op. Renamed ops have no ancestor-side global under
-         the new name, so we must emit one. The ident is shared with
-         the body-local binding (see [inherited_idents] above) so that
-         axiom bodies elaborated against the local get correctly
-         substituted to the global by the env-bind machinery. *)
-      let inherited_tc_ops, inherited_origins =
-        let promoted =
-          inherited_idents
-          |> List.filter_map (fun (id, n, ty, renamed, origin) ->
-               if renamed then Some ((id, ty), (n, origin)) else None) in
-        List.split promoted in
+      (* Renamed inherited ops are NOT promoted to new global [OP_TC]
+         entries. The rename clause is pure metadata on the parent
+         edge; ergonomic local names are wired up at the theory level
+         via manual [abbrev] declarations that expand at typing time
+         to the parent's canonical op name (the resolver picks the
+         correct chain leg from the carrier's TC bound).               *)
+      let inherited_tc_ops, inherited_origins = ([], []) in
+      let _ = inherited_idents in
       (* User-declared ops get origin [(mypath, name)] — they are the
          canonical source for that op (within this class hierarchy). *)
       let user_origins =

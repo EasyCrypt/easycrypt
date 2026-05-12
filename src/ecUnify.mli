@@ -111,6 +111,5 @@ type select_t =
 val drop_subsumed_tc                : EcEnv.env -> select_t -> select_t
 val drop_shadowed_notation          : EcEnv.env -> select_t -> select_t
 val drop_subsumed_by_post_inline_head : EcEnv.env -> select_t -> select_t
-val drop_tc_bounded_notation        : EcEnv.env -> select_t -> select_t
 
 val canonicalize : EcEnv.env -> select_t -> select_t

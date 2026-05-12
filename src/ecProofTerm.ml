@@ -342,11 +342,10 @@ let pf_find_occurence
     | Fop (p, tys) -> begin
         match EcEnv.Op.tc_reduce env_for_kmatch p tys with
         | exception EcEnv.NotReducible -> None
-        | reduced -> begin
-            match (fst (destr_app reduced)).f_node with
-            | Fop (p', _) -> Some p'
-            | _ -> None
-          end
+        | reduced ->
+          match (fst (destr_app reduced)).f_node with
+          | Fop (p', _) -> Some p'
+          | _ -> None
       end
     | _ -> None in
   (* Reverse-instance lookup: given a TC class op [tcop] and a
@@ -387,7 +386,22 @@ let pf_find_occurence
     | `Var  _, _           -> false
   in
 
-  let keycheck tp key = not occmode.k_keyed || kmatch key tp in
+  let keycheck tp key =
+    let r = not occmode.k_keyed || kmatch key tp in
+    if Sys.getenv_opt "EC_DBG_KEY" <> None then begin
+      let dump_key = function
+        | `NoKey -> "NoKey"
+        | `Path p -> "Path " ^ EcPath.tostring p
+        | `Var v -> "Var " ^ EcIdent.name v in
+      let dump_head f =
+        match (destr_app f) with
+        | { f_node = Fop (p, _); _ }, _ -> "Fop " ^ EcPath.tostring p
+        | { f_node = Flocal id; _ }, _ -> "Flocal " ^ EcIdent.name id
+        | _ -> "<o>" in
+      Format.eprintf "[keycheck] key=%s head=%s -> %b@."
+        (dump_key key) (dump_head tp) r
+    end;
+    r in
 
   (* Extract key from pattern. For a TC-op pattern, take the *reduced*
      head as the key when [tc_reduce] yields a concrete op at the

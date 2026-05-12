@@ -397,13 +397,13 @@ op poly_one  ['c <: comring] : 'c poly = polyC oner<:'c>.
 (* polymorphic over [addmonoid] applies at carrier ['c poly].           *)
 (* ==================================================================== *)
 instance addgroup with ['c <: comring] ('c poly)
-  op idm   = poly_zero<:'c>
+  op zero  = poly_zero<:'c>
   op (+)   = polyD<:'c>
   op [-]   = polyN<:'c>
 
-  proof addmA by apply polyD_addrA
-  proof addmC by apply polyD_addrC
-  proof add0m by (move=> p; rewrite -/(poly_zero<:'c>); apply polyD_add0r)
+  proof mopA<:addmonoid> by apply polyD_addrA
+  proof mopC<:addmonoid> by apply polyD_addrC
+  proof mop0<:addmonoid> by (move=> p; rewrite -/(poly_zero<:'c>); apply polyD_add0r)
   proof addrN by (move=> p; rewrite polyD_addrC -/(poly_zero<:'c>); apply polyD_addNr).
 
 (* ==================================================================== *)
@@ -423,7 +423,7 @@ op poly_invr ['c <: comring] (p : 'c poly) : 'c poly =
   choiceb (fun q => polyM q p = poly_one<:'c>) p.
 
 instance comring with ['c <: comring] ('c poly)
-  op idm   = poly_zero<:'c>
+  op zero  = poly_zero<:'c>
   op (+)   = polyD<:'c>
   op [-]   = polyN<:'c>
   op oner  = poly_one<:'c>
@@ -431,14 +431,14 @@ instance comring with ['c <: comring] ('c poly)
   op invr  = poly_invr<:'c>
   op unit  = poly_unit<:'c>
 
-  proof addmA      by apply polyD_addrA
-  proof addmC      by apply polyD_addrC
-  proof add0m      by (move=> p; rewrite -/(poly_zero<:'c>); apply polyD_add0r)
-  proof addrN      by (move=> p; rewrite polyD_addrC -/(poly_zero<:'c>); apply polyD_addNr)
-  proof oner_neq0  by (rewrite -/(poly_one<:'c>) -/(poly_zero<:'c>); apply polyM_oner_neq0)
-  proof mulrA      by apply polyM_mulrA
-  proof mulrC      by apply polyM_mulrC
-  proof mul1r      by (move=> p; rewrite -/(poly_one<:'c>); apply polyM_mul1r)
+  proof mopA<:addmonoid> by apply polyD_addrA
+  proof mopC<:addmonoid> by apply polyD_addrC
+  proof mop0<:addmonoid> by (move=> p; rewrite -/(poly_zero<:'c>); apply polyD_add0r)
+  proof addrN           by (move=> p; rewrite polyD_addrC -/(poly_zero<:'c>); apply polyD_addNr)
+  proof oner_neq0       by (rewrite -/(poly_one<:'c>) -/(poly_zero<:'c>); apply polyM_oner_neq0)
+  proof mopA<:mulmonoid> by apply polyM_mulrA
+  proof mopC<:mulmonoid> by apply polyM_mulrC
+  proof mop0<:mulmonoid> by (move=> p; rewrite -/(poly_one<:'c>); apply polyM_mul1r)
   proof mulrDl     by apply polyM_mulrDl
   proof mulVr      by (move=> p hu; rewrite /poly_invr<:'c>;
                        have := choicebP (fun q => polyM q p = poly_one<:'c>) p hu;

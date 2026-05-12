@@ -495,16 +495,25 @@ module Unify = struct
               (fun i tc' ->
                 List.map (fun (p, ren) -> (i, p, ren)) (with_lift tc'))
               tcs) in
-          (* Op-name-aware variant: when [pb_op] is set, drop paths
-             whose cumulative renaming clobbers the op name. *)
+          (* Op-name-aware variant: when [pb_op] is set AND multiple
+             paths exist, prefer paths whose cumulative renaming
+             preserves the op name. With a single path (no ambiguity),
+             use it even when the op was renamed: the parent op is
+             still semantically accessible via that path, just under
+             a different local name at the leaf class. Filtering it
+             would make [mop<:'a>] unresolvable at ['a <: addmonoid]
+             when there's no other monoid view. *)
           let match_tc_offsets (tcs : typeclass list) =
             let cands = match_tc_offsets_all tcs in
             match pb_op with
             | None -> cands
+            | Some _ when List.length cands < 2 -> cands
             | Some n ->
-              List.filter
-                (fun (_, _, ren) -> EcTypeClass.op_preserved ren n)
-                cands in
+              let preserved =
+                List.filter
+                  (fun (_, _, ren) -> EcTypeClass.op_preserved ren n)
+                  cands in
+              if preserved = [] then cands else preserved in
           let rens_equal r1 r2 =
             List.length r1 = List.length r2
             && List.for_all (fun (a, b) ->
@@ -1761,23 +1770,6 @@ let drop_subsumed_by_post_inline_head (env : EcEnv.env) (ops : select_t)
 (* Drop a TC-bounded notation candidate (an abbrev whose tparams have
    non-empty TC bounds) when a same-basename candidate with no
    TC-bounded tparams is also present. *)
-let drop_tc_bounded_notation (env : EcEnv.env) (ops : select_t) : select_t =
-  let is_tc_bounded_nott p =
-    match EcEnv.Op.by_path_opt p env with
-    | Some { op_kind = OB_nott _; op_tparams = tparams } ->
-      List.exists (fun (_, tcs) -> tcs <> []) tparams
-    | _ -> false in
-  let has_unbounded_with_name n =
-    List.exists (fun ((p, _), _, _, _) ->
-      EcPath.basename p = n
-      && match EcEnv.Op.by_path_opt p env with
-         | Some { op_tparams = tparams } ->
-           not (List.exists (fun (_, tcs) -> tcs <> []) tparams)
-         | None -> false) ops in
-  List.filter (fun ((p, _), _, _, _) ->
-    if is_tc_bounded_nott p
-    then not (has_unbounded_with_name (EcPath.basename p))
-    else true) ops
 
 (* Run the candidate-deduplication chain. Each filter is followed by
    the [keep-all-on-empty] safeguard so a filter that would prune
@@ -1789,5 +1781,4 @@ let canonicalize (env : EcEnv.env) (ops : select_t) : select_t =
   ops
   |> step drop_subsumed_tc
   |> step drop_shadowed_notation
-  |> step drop_tc_bounded_notation
   |> step drop_subsumed_by_post_inline_head

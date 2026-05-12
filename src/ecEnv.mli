@@ -348,16 +348,6 @@ module Op : sig
      unification that makes the bridge sound.                       *)
   val tc_op_realised_by : env -> path -> path -> bool
 
-  (* Canonical origin of a TC op (follows [tc_ops_origin] for
-     auto-imported renamed ops). Returns [None] for non-TC ops. *)
-  val tc_op_canonical_origin :
-    env -> path -> (path * EcSymbols.symbol) option
-
-  (* [tc_ops_same_origin env p1 p2] is true iff [p1] and [p2] are TC
-     ops with the same canonical origin (i.e. aliases for the same
-     underlying op, possibly via auto-imported chain renames). *)
-  val tc_ops_same_origin : env -> path -> path -> bool
-
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
   val is_dtype_ctor  : ?nargs:int -> env -> path -> bool
