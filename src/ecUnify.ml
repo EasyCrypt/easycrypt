@@ -967,8 +967,132 @@ module UniEnv = struct
           tcs
       in (tv, tcs)) params
 
+  (* Resolve a user-supplied [witness_selector] against a target type
+     [ty] and a tparam bound [tc], producing a [tcwitness] when the
+     selector identifies a unique instance. Returns [None] for empty
+     selectors (let the resolver decide). Requires [env] to look up
+     instances and walk class chains; if [env = None] and a non-empty
+     selector is supplied, raises [InvalidSelector]. *)
+  exception InvalidSelector of string
+
+  let resolve_witness_selector
+    (env : EcEnv.env option) (ty : ty) (tc : typeclass)
+    (sel : witness_selector) : tcwitness option
+  =
+    if ws_is_empty sel then None
+    else
+      let env =
+        match env with
+        | Some e -> e
+        | None ->
+          raise (InvalidSelector
+            "witness selector supplied but env is not available at this site") in
+      (* Common: lookup an instance by path, validate its class and
+         carrier match [tc] and [ty]. *)
+      let validate_and_build (path : EcPath.path) : tcwitness =
+        let tci =
+          match EcEnv.TcInstance.by_path_opt path env with
+          | Some t -> t
+          | None ->
+            raise (InvalidSelector
+              (Printf.sprintf "no instance at path %s"
+                 (EcPath.tostring path))) in
+        let tci_class =
+          match tci.EcTheory.tci_instance with
+          | `General (tcp, _) -> tcp.tc_name
+          | `Ring _ -> raise (InvalidSelector
+            "via/labels on Ring instance not supported")
+          | `Field _ -> raise (InvalidSelector
+            "via/labels on Field instance not supported")
+        in
+        if not (EcPath.p_equal tci_class tc.tc_name) then
+          raise (InvalidSelector
+            (Printf.sprintf
+               "instance %s is for class %s, but selector targets bound %s"
+               (EcPath.tostring path)
+               (EcPath.tostring tci_class)
+               (EcPath.tostring tc.tc_name)));
+        if not (EcAst.ty_equal tci.EcTheory.tci_type ty) then
+          raise (InvalidSelector
+            (Printf.sprintf
+               "instance %s has carrier %s, target type does not match"
+               (EcPath.tostring path)
+               (EcTypes.dump_ty tci.EcTheory.tci_type)));
+        let etyargs = EcDecl.etyargs_of_tparams tci.EcTheory.tci_params in
+        TCIConcrete { path; etyargs; lift = [] }
+      in
+
+      (* Label-based search: enumerate all instances at [ty] of [tc],
+         filter by label-path containing the user's labels as a
+         contiguous subsequence. *)
+      let label_search (labels : EcSymbols.symbol list) : EcPath.path =
+        let labels_match (qual : string list) (path_lbls : string list) =
+          let qlen = List.length qual in
+          let llen = List.length path_lbls in
+          let rec scan i =
+            if i + qlen > llen then false
+            else
+              let slice =
+                List.filteri (fun j _ -> j >= i && j < i + qlen) path_lbls in
+              if slice = qual then true else scan (i + 1)
+          in qlen = 0 || scan 0 in
+        let candidates =
+          List.filter_map (fun (path_opt, tci) ->
+            match path_opt with
+            | None -> None
+            | Some p ->
+              let class_ok =
+                match tci.EcTheory.tci_instance with
+                | `General (tcp, _) -> EcPath.p_equal tcp.tc_name tc.tc_name
+                | _ -> false in
+              let carrier_ok = EcAst.ty_equal tci.EcTheory.tci_type ty in
+              let labels_ok =
+                match tci.EcTheory.tci_chain_labels with
+                | None -> List.is_empty labels  (* legacy instance, no labels *)
+                | Some lbls -> labels_match labels lbls in
+              if class_ok && carrier_ok && labels_ok then Some p else None)
+            (EcEnv.TcInstance.get_all env) in
+        match candidates with
+        | [p] -> p
+        | [] ->
+          raise (InvalidSelector
+            (Printf.sprintf
+               "no instance of class %s at carrier %s matching label \
+                path [%s]"
+               (EcPath.tostring tc.tc_name)
+               (EcTypes.dump_ty ty)
+               (String.concat "/" labels)))
+        | ps ->
+          raise (InvalidSelector
+            (Printf.sprintf
+               "ambiguous label path [%s] for class %s at carrier %s: \
+                %d candidates (%s)"
+               (String.concat "/" labels)
+               (EcPath.tostring tc.tc_name)
+               (EcTypes.dump_ty ty)
+               (List.length ps)
+               (String.concat ", " (List.map EcPath.tostring ps))))
+      in
+
+      match sel.ws_via, sel.ws_labels with
+      | Some path, [] -> Some (validate_and_build path)
+      | None, (_ :: _ as labels) ->
+        let path = label_search labels in
+        Some (validate_and_build path)
+      | Some path, (_ :: _ as labels) ->
+        (* Combined: the via-path must match the label-derived path. *)
+        let lpath = label_search labels in
+        if not (EcPath.p_equal path lpath) then
+          raise (InvalidSelector
+            (Printf.sprintf
+               "explicit `via %s' disagrees with label-derived path %s"
+               (EcPath.tostring path) (EcPath.tostring lpath)));
+        Some (validate_and_build path)
+      | None, [] -> None  (* unreachable: ws_is_empty caught this *)
+
   let opentvi
     ?(op_name : EcSymbols.symbol option)
+    ?(env : EcEnv.env option)
     (ue : unienv) (params : ty_params) (tvi : tvi) : opened =
     let tvi =
       match tvi with
@@ -978,11 +1102,36 @@ module UniEnv = struct
           ) params
 
       | Some (TVIunamed lt) ->
-          let combine (v, tc) (ty, tcw, _sel) =
-            (* TODO Phase B: resolve [_sel] against [ty] and [tc] to
-               produce a [tcwitness option list]. Currently selectors
-               are accepted syntactically but dropped here; the
-               resolver picks the witness as before. *)
+          (* Apply the user's [witness_selector] to construct a
+             [tcwitness option list] for this tparam's bounds. V1:
+             only handle single-bound tparams; multi-bound + selector
+             requires per-bound syntax (future work). *)
+          let apply_selector (tc : typeclass list) (ty : ty option)
+              (sel : witness_selector)
+            : tcwitness option list option =
+            if ws_is_empty sel then None
+            else
+              match tc, ty with
+              | [tc1], Some ty ->
+                (match resolve_witness_selector env ty tc1 sel with
+                 | None -> None
+                 | Some w -> Some [Some w])
+              | _ :: _ :: _, _ ->
+                raise (InvalidSelector
+                  "witness selector on a tparam with multiple bounds is \
+                   not yet supported (per-bound syntax needed)")
+              | _, None ->
+                raise (InvalidSelector
+                  "witness selector requires an explicit type")
+              | [], _ ->
+                raise (InvalidSelector
+                  "witness selector on a tparam with no bounds")
+          in
+          let combine (v, tc) (ty, tcw, sel) =
+            let tcw =
+              match tcw with
+              | Some _ -> tcw
+              | None -> apply_selector tc ty sel in
             let tctcw =
               match tcw with
               | None ->
@@ -994,11 +1143,36 @@ module UniEnv = struct
           List.map2 combine params lt
 
       | Some (TVInamed lt) ->
+          let apply_selector (tc : typeclass list) (ty : ty option)
+              (sel : witness_selector)
+            : tcwitness option list option =
+            if ws_is_empty sel then None
+            else
+              match tc, ty with
+              | [tc1], Some ty ->
+                (match resolve_witness_selector env ty tc1 sel with
+                 | None -> None
+                 | Some w -> Some [Some w])
+              | _ :: _ :: _, _ ->
+                raise (InvalidSelector
+                  "witness selector on a tparam with multiple bounds is \
+                   not yet supported (per-bound syntax needed)")
+              | _, None ->
+                raise (InvalidSelector
+                  "witness selector requires an explicit type")
+              | [], _ ->
+                raise (InvalidSelector
+                  "witness selector on a tparam with no bounds")
+          in
           List.map (fun (v, tc) ->
-            let ty, tcw, _sel =
+            let ty, tcw, sel =
                  List.assoc_opt (EcIdent.name v) lt
               |> Option.value ~default:(None, None, ws_empty) in
 
+            let tcw =
+              match tcw with
+              | Some _ -> tcw
+              | None -> apply_selector tc ty sel in
             let tcw =
               match tcw with
               | None ->
@@ -1287,7 +1461,7 @@ let select_op
 
     try
       let UniEnv.{ subst = tip_full; args; params = oparams } =
-        UniEnv.opentvi ~op_name:(EcPath.basename path)
+        UniEnv.opentvi ~op_name:(EcPath.basename path) ~env
           subue op.D.op_tparams tvi in
       let tip = f_subst_init ~tv:(Mid.map fst tip_full) () in
 

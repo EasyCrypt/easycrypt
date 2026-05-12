@@ -44,6 +44,10 @@ type tvi = tvar_inst option
 val tvi_unamed : etyarg list -> tvar_inst
 
 module UniEnv : sig
+  (* Raised when a user-supplied witness selector ([/Lbl+] or [via P]
+     inside [<:T ...>]) cannot be resolved to a unique TC witness. *)
+  exception InvalidSelector of string
+
   type opened = {
     subst  : etyarg Mid.t;
     params : (ty * typeclass list) list;
@@ -58,7 +62,7 @@ module UniEnv : sig
   val fresh      : ?ty:ty -> unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t
   val repr       : unienv -> ty -> ty
-  val opentvi    : ?op_name:symbol -> unienv -> ty_params -> tvi -> opened
+  val opentvi    : ?op_name:symbol -> ?env:EcEnv.env -> unienv -> ty_params -> tvi -> opened
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * opened 
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * opened
   val closed     : unienv -> bool

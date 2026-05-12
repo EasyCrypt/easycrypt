@@ -592,7 +592,11 @@ let process_named_pterm pe (tvi, fp) =
 
   PT.pf_check_tvi env pe.pte_pe typ tvi;
 
-  let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
+  let fs  =
+    try EcUnify.UniEnv.opentvi ~env pe.pte_ue typ tvi
+    with EcUnify.UniEnv.InvalidSelector msg ->
+      tc_error pe.pte_pe "invalid witness selector: %s" msg
+  in
   let ax  = Fsubst.f_subst_tvar ~freshen:false fs.subst ax in
 
   (p, (fs.args, ax))
