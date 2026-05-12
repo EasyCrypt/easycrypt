@@ -138,7 +138,9 @@ type pmodule_type = pqsymbol
 
 (* -------------------------------------------------------------------- *)
 type ptcparam  = pqsymbol * pty list
-type ptyparam  = psymbol * ptcparam list
+(* A class bound: class instantiation + optional label + rename clause. *)
+type ptcbound  = ptcparam * psymbol option * (psymbol * psymbol) list
+type ptyparam  = psymbol * ptcbound list
 type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
@@ -150,7 +152,7 @@ type ptydecl = {
 }
 
 and ptydbody =
-  | PTYD_Abstract of ptcparam list
+  | PTYD_Abstract of ptcbound list
   | PTYD_Alias    of pty
   | PTYD_Record   of precord
   | PTYD_Datatype of pdatatype
@@ -1148,7 +1150,7 @@ type prealize = {
 type ptypeclass = {
   ptc_name   : psymbol;
   ptc_params : ptyparams option;
-  ptc_inth   : (ptcparam * psymbol option * (psymbol * psymbol) list) list;
+  ptc_inth   : ptcbound list;
   ptc_ops    : (psymbol * pty) list;
   ptc_axs    : (psymbol * pformula) list;
   ptc_loca   : is_local;

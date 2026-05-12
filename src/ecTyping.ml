@@ -1064,9 +1064,26 @@ let transtyvars (env : EcEnv.env) (loc, (tparams : ptyparams option)) =
   | Some tparams ->
     let ue = UE.create (Some []) in
 
-    let for1 ({ pl_desc = x }, tc) =
+    let for1 ({ pl_desc = x } as xloc, tc) =
       let x  = EcIdent.create x in
-      let tc = List.map (transtc env ue) tc in
+      (* For Phase A.0/A.1: tparam bounds may carry [as Lbl] and [with]
+         renames in the parsetree. They are accepted syntactically and
+         dropped here (Phase A.0). Phase A.1 will plumb them into the
+         tparam's recorded bounds. *)
+      (* Reject duplicate bound labels (default label = parent class
+         bare name) on the same tparam. Forces explicit [as] when the
+         user genuinely wants two bounds to the same class. *)
+      let seen = ref Sstr.empty in
+      List.iter (fun ((tc_name, _), lbl_opt, _) ->
+        let lbl =
+          match lbl_opt with
+          | Some l -> unloc l
+          | None -> snd (unloc tc_name) in
+        if Sstr.mem lbl !seen then
+          tyerror xloc.pl_loc env
+            (DuplicatedField ("tparam bound `" ^ lbl ^ "'"));
+        seen := Sstr.add lbl !seen) tc;
+      let tc = List.map (fun (p, _lbl, _ren) -> transtc env ue p) tc in
       UE.push (x, tc) ue in
     if not (List.is_unique (List.map (fst |- unloc) tparams)) then
       tyerror loc env DuplicatedTyVar;

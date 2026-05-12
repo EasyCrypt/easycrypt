@@ -1648,18 +1648,23 @@ signature_item:
 %inline is_local:
 | lc=loc(locality) { locality_as_local lc }
 
+(* A TC class instantiation: type args + class name. Used inside
+   [tc_bound] (the bare-or-parenthesized class-bound form). *)
 tcparam:
 | tys=ioption(type_args) x=lqident
     { (x, odfl [] tys) }
 
-tc_parent:
+(* A class bound: optionally labeled and/or renamed. Used uniformly
+   in class-declaration parents, type-declaration tparams, and
+   op/lemma-signature tparams. *)
+tc_bound:
 | p=tcparam
     { (p, None, []) }
-| LPAREN p=tcparam AS lbl=lident RPAREN
+| LPAREN p=tcparam AS lbl=ident RPAREN
     { (p, Some lbl, []) }
 | LPAREN p=tcparam WITH ren=plist1(tc_rename, COMMA) RPAREN
     { (p, None, ren) }
-| LPAREN p=tcparam AS lbl=uident WITH ren=plist1(tc_rename, COMMA) RPAREN
+| LPAREN p=tcparam AS lbl=ident WITH ren=plist1(tc_rename, COMMA) RPAREN
     { (p, Some lbl, ren) }
 
 tc_rename:
@@ -1667,7 +1672,7 @@ tc_rename:
 
 typaram:
 | x=tident { (x, []) }
-| x=tident LTCOLON tc=plist1(tcparam, AMP) { (x, tc) }
+| x=tident LTCOLON tc=plist1(tc_bound, AMP) { (x, tc) }
 
 typarams:
 | empty
@@ -1700,7 +1705,7 @@ typedecl:
 | locality=locality TYPE td=rlist1(tyd_name, COMMA)
     { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
 
-| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, AMP)
+| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tc_bound, AMP)
     { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
 
 | locality=locality TYPE td=tyd_name EQ te=loc(type_exp)
@@ -1716,7 +1721,7 @@ typedecl:
 (* Type classes                                                         *)
 typeclass:
 | loca=is_local TYPE CLASS  tya=tyvars_decl? x=lident
-  inth=prefix(LTCOLON, plist1(tc_parent, AMP))?
+  inth=prefix(LTCOLON, plist1(tc_bound, AMP))?
   EQ LBRACE body=tc_body RBRACE {
     { ptc_name   = x;
       ptc_params = tya;
@@ -1779,7 +1784,7 @@ tyci_op:
 tyci_ax:
 | PROOF x=ident BY tg=tactic_core
     { (x, None, tg) }
-| PROOF x=ident LTCOLON lbls=plist1(lident, SLASH) GT BY tg=tactic_core
+| PROOF x=ident LTCOLON lbls=plist1(ident, SLASH) GT BY tg=tactic_core
     { (x, Some lbls, tg) }
 
 (* -------------------------------------------------------------------- *)

@@ -1767,7 +1767,26 @@ module Ty = struct
       match body with
       | PTYD_Abstract tcs ->
         let ue = TT.transtyvars env (loc, Some args) in
-        let tcs = List.map (TT.transtc env ue) tcs in
+        (* Reject duplicate bound labels on the same type declaration.
+           Default label = parent class bare name. *)
+        let () =
+          let seen = ref Sstr.empty in
+          List.iter (fun ((tc_name, _), lbl_opt, _) ->
+            let lbl =
+              match lbl_opt with
+              | Some l -> unloc l
+              | None -> snd (unloc tc_name) in
+            if Sstr.mem lbl !seen then
+              hierror ~loc
+                "class bound label `%s' is used by more than one bound \
+                 on this type. Disambiguate with an explicit \
+                 [(<class> as <Label>)] clause."
+                lbl;
+            seen := Sstr.add lbl !seen) tcs in
+        (* Phase A.0: drop label and rename clauses on type-decl
+           class bounds. Phase A.1 will plumb them through. *)
+        let tcs = List.map
+          (fun (p, _lbl, _ren) -> TT.transtc env ue p) tcs in
         let tp = EcUnify.UniEnv.tparams ue in
         tp, `Abstract tcs
 
