@@ -1048,10 +1048,28 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if i <> j then failure () else doit env ilc f1 f2
 
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
-          if not (EcPath.p_equal op1 op2) then
-            failure ();
-          try  List.iter2 (EcUnify.unify_etyarg env ue) tys1 tys2
-          with EcUnify.UnificationFailure _ -> failure ()
+          let same_op =
+            EcPath.p_equal op1 op2
+            (* Auto-imported renamed alias along a single inheritance
+               chain (e.g. addmonoid.zero ↔ monoid.idm via the
+               [idm = zero] rename on addmonoid's parent edge). The
+               two paths refer to the same underlying op viewed from
+               different classes in the chain. *)
+            || EcEnv.Op.tc_ops_same_origin env op1 op2 in
+          if not same_op then failure ();
+          if EcPath.p_equal op1 op2 then
+            (try List.iter2 (EcUnify.unify_etyarg env ue) tys1 tys2
+             with EcUnify.UnificationFailure _ -> failure ())
+          else
+            (* Different paths but related-by-chain origin: the
+               tparams' typeclass constraints differ ([<:monoid>] vs
+               [<:addmonoid>]). Unify only the carrier types; the
+               witnesses remain independent and TC inference will
+               resolve them through the appropriate chain view. *)
+            (try List.iter2 (fun (t1, _) (t2, _) ->
+                   EcUnify.unify env ue t1 t2)
+                   tys1 tys2
+             with EcUnify.UnificationFailure _ -> failure ())
       end
 
       | FhoareF hf1, FhoareF hf2 -> begin

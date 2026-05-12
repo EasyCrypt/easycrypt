@@ -22,7 +22,9 @@ proof. by rewrite big_split. qed.
 (* -------------------------------------------------------------------- *)
 lemma sumrN ['a] (P : 'a -> bool) (F : 'a -> t) (r : 'a list) :
   - (big P F r) = big P (fun x => -(F x)) r.
-proof. by apply/(big_endo oppr0 opprD). qed.
+proof.
+apply/(big_endo oppr0 opprD).
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma sumrB ['a] (P : 'a -> bool) (F1 F2 : 'a -> t) (r : 'a list) :
