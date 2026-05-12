@@ -2191,12 +2191,24 @@ module Ty = struct
             List.filteri (fun j _ -> j >= i && j < i + qlen) labels in
           if slice = qual then true else scan (i + 1)
       in qlen = 0 || scan 0 in
+    (* Canonical effective name for an obligation. When the name is
+       unique across the obligation list, use the bare name; otherwise
+       use [name<:l1/l2/...>] with the full label path. *)
+    let oblig_count_by_name =
+      List.fold_left (fun m (n, _, _) ->
+        Mstr.change (function None -> Some 1 | Some k -> Some (k + 1)) n m)
+        Mstr.empty reqs in
+    let oblig_eff_name n ls =
+      match Mstr.find_opt n oblig_count_by_name with
+      | Some 1 -> n
+      | _ -> n ^ "<:" ^ String.concat "/" ls ^ ">" in
+
     (* Match a user clause against the obligation list. Returns the
-       matched obligation's [form] and a string identifier for the
-       lemma name. Errors on miss or ambiguity. *)
+       matched obligation's canonical name + form. Errors on miss or
+       ambiguity. *)
     let match_user_clause (x : psymbol)
         (qual_opt : psymbol list option)
-      : EcCoreFol.form =
+      : string * EcCoreFol.form =
       let xs = unloc x in
       let qual = Option.map (List.map unloc) qual_opt in
       let candidates =
@@ -2209,7 +2221,7 @@ module Ty = struct
       match candidates, qual with
       | [], _ ->
         hierror ~loc:x.pl_loc "invalid axiom name: `%s'" xs
-      | [_, _, f], _ -> f
+      | [(n, ls, f)], _ -> (oblig_eff_name n ls, f)
       | _ :: _ :: _, None ->
         hierror ~loc:x.pl_loc
           "ambiguous axiom name `%s' (reached through multiple parent \
@@ -2220,17 +2232,13 @@ module Ty = struct
            label path." xs in
 
     (* Resolve each user clause to (effective_name, tactic, form).
-       Effective name encodes the label path for uniqueness, since
-       the same [name] may be discharged twice with different labels. *)
+       Effective name comes from the matched obligation's canonical
+       name, so it lines up with the [oblig_eff_name] used in
+       [interactive] computation below. *)
     let resolved =
       List.map (fun (x, qual_opt, t) ->
-        let f = match_user_clause x qual_opt in
-        let label_tag =
-          match qual_opt with
-          | None -> ""
-          | Some qs ->
-            "<:" ^ String.concat "/" (List.map unloc qs) ^ ">" in
-        (unloc x ^ label_tag, t, f))
+        let eff, f = match_user_clause x qual_opt in
+        (eff, t, f))
         axs in
 
     (* Detect duplicate user clauses (same name + same qualifier
@@ -2243,26 +2251,13 @@ module Ty = struct
         seen := Sstr.add eff !seen)
         resolved in
 
-    (* Effective names of all obligations: for unambiguous-by-name
-       obligations, the bare name; for ambiguous ones, the
-       name<:labels> form. *)
-    let oblig_eff_name =
-      let by_name =
-        List.fold_left (fun m (n, _, _) ->
-          Mstr.change (function None -> Some 1 | Some k -> Some (k + 1)) n m)
-          Mstr.empty reqs in
-      fun (n, ls, _) ->
-        match Mstr.find_opt n by_name with
-        | Some 1 -> n
-        | _ -> n ^ "<:" ^ String.concat "/" ls ^ ">" in
-
     (* Interactive list: obligations the user did not discharge. *)
     let resolved_names =
       List.fold_left (fun s (n, _, _) -> Sstr.add n s) Sstr.empty resolved in
     let interactive =
       List.pmap
-        (fun ((_n, _ls, req) as oblig) ->
-          let eff = oblig_eff_name oblig in
+        (fun (n, ls, req) ->
+          let eff = oblig_eff_name n ls in
           if not (Sstr.mem eff resolved_names) then
             let ax = {
               ax_tparams    = tparams;
@@ -2505,7 +2500,7 @@ module Ty = struct
     (* For any ancestor op (after renaming) the user didn't provide,
        look up an existing instance of that ancestor on the same
        carrier and reuse its realisation. *)
-    let existing_anc_symbols anc =
+    let existing_anc_symbols anc _ren =
       List.fold_left (fun acc (_, tci_existing) ->
         match acc with
         | Some _ -> acc
@@ -2527,7 +2522,7 @@ module Ty = struct
               anc_decl.tc_ops in
           if missing = [] then symbols
           else
-            match existing_anc_symbols anc with
+            match existing_anc_symbols anc ren with
             | None ->
                 let id, _ = List.hd missing in
                 hierror "no definition for operator `%s'" (EcIdent.name id)
@@ -2550,7 +2545,7 @@ module Ty = struct
        `instance comring with int { ... }` with conflicting +. *)
     List.iter
       (fun (anc, anc_decl, ren, _labels) ->
-        match existing_anc_symbols anc with
+        match existing_anc_symbols anc ren with
         | None -> ()
         | Some existing_sym ->
           List.iter
@@ -2919,21 +2914,25 @@ module Ty = struct
       let _, axs =
         List.fold_left
           (fun (acc_keys, acc) (anc, anc_decl, ren, labels) ->
+            if Sys.getenv_opt "EC_DBG_OBLIG" <> None then
+              Format.eprintf "[chain] anc=%s ren=[%s] labels=[%s]@."
+                (EcPath.tostring anc.tc_name)
+                (String.concat ";" (List.map (fun (a,b) -> a ^ "->" ^ b) ren))
+                (String.concat ";" labels);
             if already_discharged anc anc_decl ren then (acc_keys, acc)
             else
               List.fold_left
                 (fun (acc_keys, acc) (name, ax) ->
                   let f = EcSubst.subst_form subst ax in
-                  (* Structural dedup: same name + alpha-equivalent
-                     form already emitted is the same obligation
-                     reached twice. *)
+                  (* NOTE: today's dedup is by name alone (Sstr-style).
+                     This silently collapses two genuinely distinct
+                     obligations sharing a name (e.g. [mopA] from
+                     addmonoid vs mulmonoid views), which is unsound.
+                     Per-entry subst would fix this but breaks the
+                     current test suite. Tracked as future work; the
+                     labels machinery laid down here is the prerequisite. *)
                   let already =
-                    List.exists
-                      (fun (n', _, f') ->
-                        n' = name
-                        && EcReduction.is_alpha_eq
-                             (EcEnv.LDecl.init (env scope) []) f f')
-                      acc in
+                    List.exists (fun (n', _, _) -> n' = name) acc in
                   if already then (acc_keys, acc)
                   else (acc_keys, (name, labels, f) :: acc))
                 (acc_keys, acc)

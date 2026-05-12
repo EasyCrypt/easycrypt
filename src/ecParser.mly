@@ -1655,7 +1655,7 @@ tcparam:
 tc_parent:
 | p=tcparam
     { (p, None, []) }
-| LPAREN p=tcparam AS lbl=uident RPAREN
+| LPAREN p=tcparam AS lbl=lident RPAREN
     { (p, Some lbl, []) }
 | LPAREN p=tcparam WITH ren=plist1(tc_rename, COMMA) RPAREN
     { (p, None, ren) }
@@ -1779,7 +1779,7 @@ tyci_op:
 tyci_ax:
 | PROOF x=ident BY tg=tactic_core
     { (x, None, tg) }
-| PROOF x=ident LTCOLON lbls=plist1(uident, SLASH) GT BY tg=tactic_core
+| PROOF x=ident LTCOLON lbls=plist1(lident, SLASH) GT BY tg=tactic_core
     { (x, Some lbls, tg) }
 
 (* -------------------------------------------------------------------- *)
