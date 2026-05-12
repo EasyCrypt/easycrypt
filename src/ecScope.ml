@@ -2176,21 +2176,21 @@ module Ty = struct
      contains [qual] (if [qual = None], require unique match by
      name). Ambiguous = error; missing = error. *)
   let check_tci_axioms ?(tparams = []) scope mode axs reqs lc =
-    (* Sub-path containment: [qual] is contained in [labels] if it
-       appears as a contiguous subsequence ending at the deepest
-       label. Equivalent: [labels] ends with [qual]. *)
+    (* Sub-path containment: [qual] matches [labels] if [qual] occurs
+       as a contiguous subsequence of [labels]. A single-element
+       qualifier matches any obligation whose path contains that
+       label anywhere; multi-element qualifiers match a contiguous
+       run. *)
     let labels_match (qual : string list) (labels : string list) =
-      let is_suffix qs ls =
-        match qs, ls with
-        | [], _ -> true
-        | _, [] -> false
-        | _ ->
-          if List.length qs > List.length ls then false
-          else
-            let drop = List.length ls - List.length qs in
-            let tail = List.filteri (fun i _ -> i >= drop) ls in
-            tail = qs
-      in is_suffix qual labels in
+      let qlen = List.length qual in
+      let llen = List.length labels in
+      let rec scan i =
+        if i + qlen > llen then false
+        else
+          let slice =
+            List.filteri (fun j _ -> j >= i && j < i + qlen) labels in
+          if slice = qual then true else scan (i + 1)
+      in qlen = 0 || scan 0 in
     (* Match a user clause against the obligation list. Returns the
        matched obligation's [form] and a string identifier for the
        lemma name. Errors on miss or ambiguity. *)
