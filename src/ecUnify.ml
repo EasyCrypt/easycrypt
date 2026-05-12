@@ -1168,7 +1168,12 @@ module UniEnv = struct
           Some (`Var id, bounds)
         | Tconstr (p, _) ->
           (match EcEnv.Ty.by_path_opt p env with
-           | Some { tyd_type = `Abstract tcs; _ } -> Some (`Abs p, tcs)
+           | Some { tyd_type = `Abstract (_ :: _ as tcs); _ } ->
+             (* Declared-abstract type WITH class bounds (e.g.,
+                [declare type t <: comring]). Empty bound list means
+                a primitive concrete type (e.g. [int]); use the
+                concrete env-instance path instead. *)
+             Some (`Abs p, tcs)
            | _ -> None)
         | _ -> None
       in
@@ -1570,8 +1575,16 @@ let select_op
 
     try
       let UniEnv.{ subst = tip_full; args; params = oparams } =
-        UniEnv.opentvi ~op_name:(EcPath.basename path) ~env
-          subue op.D.op_tparams tvi in
+        try
+          UniEnv.opentvi ~op_name:(EcPath.basename path) ~env
+            subue op.D.op_tparams tvi
+        with UniEnv.InvalidSelector _ ->
+          (* Treat selector mismatches as a candidate-rejection signal:
+             the user's selector simply doesn't apply to this op. Other
+             candidates may still match. The error surfaces later only
+             if no candidate is acceptable. *)
+          raise E.Failure
+      in
       let tip = f_subst_init ~tv:(Mid.map fst tip_full) () in
 
       let top = EcCoreSubst.ty_subst tip op.D.op_ty in
