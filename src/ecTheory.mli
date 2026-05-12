@@ -51,6 +51,7 @@ and tcinstance = {
   tci_parents   : EcPath.path list;
   tci_reducible : bool;
   tci_chain_rename : (EcSymbols.symbol * EcSymbols.symbol) list option;
+  tci_chain_labels : EcSymbols.symbol list option;
 }
 
 and tcibody = [

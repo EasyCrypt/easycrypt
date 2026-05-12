@@ -3492,7 +3492,7 @@ let pp_tparams ppe fmt tparams =
 let pp_prts ppe fmt = function
   | [] -> ()
   | tcs ->
-    let pp_one fmt (p, _ren) = pp_typeclass ppe fmt p in
+    let pp_one fmt (p, _lbl, _ren) = pp_typeclass ppe fmt p in
     Format.fprintf fmt " <: %a"
       (pp_list "@ & " pp_one) tcs
 

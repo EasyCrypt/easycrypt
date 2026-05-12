@@ -57,6 +57,19 @@ val ancestors : env -> typeclass -> typeclass list
 val ancestors_with_renaming :
   env -> typeclass -> (typeclass * (EcSymbols.symbol * EcSymbols.symbol) list) list
 
+(* Like [ancestors_with_renaming], but also returns the label path
+   traversed from [tc] down to each ancestor. The label path is
+   outermost-first: [["comring"; "Mul"; "monoid"]] for the walk
+   [boolring -> comring -> mulmonoid (as Mul) -> monoid]. Empty
+   label path for [tc] itself. *)
+val ancestors_with_labels :
+     env
+  -> typeclass
+  -> (typeclass
+      * (EcSymbols.symbol * EcSymbols.symbol) list
+      * EcSymbols.symbol list)
+     list
+
 (* -------------------------------------------------------------------- *)
 (* Compose two cumulative renamings. [outer] is the renaming on a
    parent edge (grandparent op → parent op); [inner] is the

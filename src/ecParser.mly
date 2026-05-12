@@ -1654,9 +1654,13 @@ tcparam:
 
 tc_parent:
 | p=tcparam
-    { (p, []) }
+    { (p, None, []) }
+| LPAREN p=tcparam AS lbl=uident RPAREN
+    { (p, Some lbl, []) }
 | LPAREN p=tcparam WITH ren=plist1(tc_rename, COMMA) RPAREN
-    { (p, ren) }
+    { (p, None, ren) }
+| LPAREN p=tcparam AS lbl=uident WITH ren=plist1(tc_rename, COMMA) RPAREN
+    { (p, Some lbl, ren) }
 
 tc_rename:
 | src=oident EQ tgt=oident { (src, tgt) }

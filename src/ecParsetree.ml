@@ -1148,7 +1148,7 @@ type prealize = {
 type ptypeclass = {
   ptc_name   : psymbol;
   ptc_params : ptyparams option;
-  ptc_inth   : (ptcparam * (psymbol * psymbol) list) list;
+  ptc_inth   : (ptcparam * psymbol option * (psymbol * psymbol) list) list;
   ptc_ops    : (psymbol * pty) list;
   ptc_axs    : (psymbol * pformula) list;
   ptc_loca   : is_local;

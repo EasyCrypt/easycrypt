@@ -2860,7 +2860,7 @@ module Op = struct
                   let decl = TypeClass.by_path tc.tc_name env in
                   match List.nth_opt decl.tc_prts i with
                   | None -> None
-                  | Some (parent, _ren) ->
+                  | Some (parent, _lbl, _ren) ->
                     let subst =
                       List.fold_left2
                         (fun s (a, _) etyarg -> Mid.add a etyarg s)
@@ -2944,7 +2944,7 @@ module Op = struct
               let decl = TypeClass.by_path cur.tc_name env in
               match List.nth_opt decl.tc_prts i with
               | None -> None
-              | Some (parent, edge_ren) ->
+              | Some (parent, _edge_lbl, edge_ren) ->
                 let subst =
                   List.fold_left2
                     (fun s (a, _) ety -> Mid.add a ety s)

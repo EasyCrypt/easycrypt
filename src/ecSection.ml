@@ -399,7 +399,7 @@ let on_tydecl (cb : cb) (tyd : tydecl) =
      List.iter (on_form cb) [dt.tydt_schelim; dt.tydt_schcase]
 
 let on_tcdecl cb tc =
-  List.iter (fun (p, _ren) -> on_typeclass cb p) tc.tc_prts;
+  List.iter (fun (p, _lbl, _ren) -> on_typeclass cb p) tc.tc_prts;
   List.iter (fun (_,ty) -> on_ty cb ty) tc.tc_ops;
   List.iter (fun (_,f)  -> on_form cb f) tc.tc_axs
 

@@ -1819,16 +1819,38 @@ module Ty = struct
       let uptcs =
         let parent_ue = EcUnify.UniEnv.copy ue in
         let uptcs = List.map
-          (fun (p, ren) ->
-            (TT.transtc scenv parent_ue p,
+          (fun (p, lbl, ren) ->
+            let tcp = TT.transtc scenv parent_ue p in
+            (* Default label is the parent class's bare name. *)
+            let lbl =
+              match lbl with
+              | Some l -> unloc l
+              | None -> EcPath.basename tcp.tc_name in
+            (tcp, lbl,
              List.map (fun (s, t) -> (unloc s, unloc t)) ren))
           tcd.ptc_inth in
         let subst = Tuni.subst
           ~tw_uni:(EcUnify.UniEnv.tw_assubst parent_ue)
           (EcUnify.UniEnv.close parent_ue) in
-        List.map (fun (tcp, ren) ->
+        List.map (fun (tcp, lbl, ren) ->
           ({ tcp with tc_args = List.map (EcCoreSubst.etyarg_subst subst) tcp.tc_args },
-           ren))
+           lbl, ren))
+          uptcs in
+
+      (* Reject duplicate edge labels at the same level. If a user
+         writes [<: monoid & monoid], both default to label [monoid]
+         and ambiguity is unavoidable for any future [proof X<:monoid>]
+         clause — force them to disambiguate via explicit [as]. *)
+      let () =
+        let seen = ref Sstr.empty in
+        List.iter (fun (_, lbl, _) ->
+          if Sstr.mem lbl !seen then
+            hierror ~loc
+              "parent edge label `%s' is used by more than one parent \
+               of class `%s'. Disambiguate with an explicit \
+               [(<parent> as <Label>)] clause."
+              lbl (unloc tcd.ptc_name);
+          seen := Sstr.add lbl !seen)
           uptcs in
 
       (* The carrier's [tcs] should reference the class being declared
@@ -1894,7 +1916,7 @@ module Ty = struct
               self_carrier
             | _ -> EcTypes.ty_map aux t
           in aux ty in
-        let collect_from_parent (parent_tc, parent_ren) =
+        let collect_from_parent (parent_tc, _parent_lbl, parent_ren) =
           (* All ancestors of [parent_tc] (including itself, with empty rename) *)
           let anc_list = EcTypeClass.ancestors_with_renaming scenv parent_tc in
           let anc_paths =
@@ -2243,7 +2265,8 @@ module Ty = struct
       ; tci_local        = (tci.pti_loca :> locality)
       ; tci_parents      = []
       ; tci_reducible    = tci.pti_reducible
-      ; tci_chain_rename = None } in
+      ; tci_chain_rename = None
+      ; tci_chain_labels = None } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2289,7 +2312,8 @@ module Ty = struct
       ; tci_local        = (tci.pti_loca :> locality)
       ; tci_parents      = []
       ; tci_reducible    = tci.pti_reducible
-      ; tci_chain_rename = None } in
+      ; tci_chain_rename = None
+      ; tci_chain_labels = None } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2353,11 +2377,11 @@ module Ty = struct
        each ancestor op [n] maps to a local op [n]. Renamings on parent
        edges (declared via [<: P with { ... }]) compose along the path,
        so a renamed grandparent op resolves to a local op. *)
-    let chain = EcTypeClass.ancestors_with_renaming (env scope) tcp in
+    let chain = EcTypeClass.ancestors_with_labels (env scope) tcp in
     let chain_decls =
       List.map
-        (fun (anc, ren) ->
-          (anc, EcEnv.TypeClass.by_path anc.tc_name (env scope), ren))
+        (fun (anc, ren, labels) ->
+          (anc, EcEnv.TypeClass.by_path anc.tc_name (env scope), ren, labels))
         chain in
 
     let lookup_ren ren n = odfl n (Mstr.find_opt n (Mstr.of_list ren)) in
@@ -2370,12 +2394,12 @@ module Ty = struct
     let tcsyms =
       match chain_decls with
       | [] -> assert false
-      | (tcp_self, tc_self, _) :: rest ->
+      | (tcp_self, tc_self, _, _) :: rest ->
         let immediate = symbols_of_tc (env scope) ty (tcp_self, tc_self) in
         let immediate_set = Sstr.of_list (List.map fst immediate) in
         let parents =
           List.concat_map
-            (fun (anc, anc_decl, ren) ->
+            (fun (anc, anc_decl, ren, _labels) ->
               symbols_of_tc (env scope) ty (anc, anc_decl)
               |> List.map (fun (n, (_, opty)) ->
                    (lookup_ren ren n, (false, opty))))
@@ -2405,7 +2429,7 @@ module Ty = struct
         None (EcEnv.TcInstance.get_all (env scope)) in
     let symbols =
       List.fold_left
-        (fun symbols (anc, anc_decl, ren) ->
+        (fun symbols (anc, anc_decl, ren, _labels) ->
           let missing =
             List.filter (fun (id, _) ->
               not (Mstr.mem (lookup_ren ren (EcIdent.name id)) symbols))
@@ -2434,7 +2458,7 @@ module Ty = struct
        declares `instance addgroup with int { ... }` and later
        `instance comring with int { ... }` with conflicting +. *)
     List.iter
-      (fun (anc, anc_decl, ren) ->
+      (fun (anc, anc_decl, ren, _labels) ->
         match existing_anc_symbols anc with
         | None -> ()
         | Some existing_sym ->
@@ -2538,7 +2562,7 @@ module Ty = struct
         (EcEnv.TcInstance.get_all (env scope)) in
     let chain_paths_pre =
       List.mapi
-        (fun idx (anc, anc_decl, ren) ->
+        (fun idx (anc, anc_decl, ren, _labels) ->
           match find_existing_chain_entry anc anc_decl ren with
           | Some existing_path -> (None, existing_path)
           | None ->
@@ -2563,7 +2587,7 @@ module Ty = struct
          different renamings). [add_tydef] asserts no double-binding,
          so we track which TC names we've already added and skip. *)
       List.fold_lefti
-        (fun (subst, seen) idx (anc, anc_decl, ren) ->
+        (fun (subst, seen) idx (anc, anc_decl, ren, _labels) ->
           let seen, subst =
             if EcPath.Sp.mem anc.tc_name seen then (seen, subst)
             else
@@ -2659,7 +2683,7 @@ module Ty = struct
         (List.map (fun (_, p) -> Some p) chain_paths_pre) in
     let scope =
       List.fold_lefti
-        (fun scope rev_idx (anc, anc_decl, ren) ->
+        (fun scope rev_idx (anc, anc_decl, ren, labels) ->
           let idx = (List.length chain_decls) - 1 - rev_idx in
           let name_opt, _ = List.nth chain_paths_pre idx in
           match name_opt with
@@ -2684,11 +2708,11 @@ module Ty = struct
              has the same TC and the renaming composed with [ren]. *)
           let parents =
             List.map
-              (fun (p_tc, p_ren) ->
+              (fun (p_tc, _p_lbl, p_ren) ->
                 let target_ren = compose_ren ~outer:p_ren ~inner:ren in
                 let rec find i = function
                   | [] -> None
-                  | (a, _, r) :: rest ->
+                  | (a, _, r, _l) :: rest ->
                     if EcPath.p_equal a.EcAst.tc_name p_tc.EcAst.tc_name
                        && ren_eq r target_ren
                     then chain_paths.(i)
@@ -2708,7 +2732,11 @@ module Ty = struct
                  filter to disambiguate multiple monoid views at a
                  concrete carrier (e.g. comring's addmonoid vs
                  mulmonoid-renamed paths to monoid).                 *)
-            ; tci_chain_rename = Some ren } in
+            ; tci_chain_rename = Some ren
+              (* Label path: how we reached this ancestor from the leaf
+                 class along the chain. Used by the obligation collector
+                 at downstream instance time to disambiguate axioms. *)
+            ; tci_chain_labels = Some labels } in
           let item = EcTheory.Th_instance (Some name, instance) in
           let item = EcTheory.mkitem ~import item in
           { scope with sc_env = EcSection.add_item item scope.sc_env })
@@ -2788,7 +2816,7 @@ module Ty = struct
     let axioms =
       let _, axs =
         List.fold_left
-          (fun (seen, acc) (anc, anc_decl, ren) ->
+          (fun (seen, acc) (anc, anc_decl, ren, _labels) ->
             if already_discharged anc anc_decl ren then (seen, acc)
             else
               List.fold_left

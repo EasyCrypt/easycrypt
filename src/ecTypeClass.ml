@@ -174,7 +174,7 @@ and lift_to_tc (env : EcEnv.env) (tc' : typeclass) (tc : typeclass) : int list o
           Mid.empty decl.tc_tparams t.tc_args in
       let rec try_parents i = function
         | [] -> None
-        | (parent, _ren) :: rest ->
+        | (parent, _lbl, _ren) :: rest ->
           let parent = EcCoreSubst.Tvar.subst_tc subst parent in
           (match walk parent (i :: path) with
            | Some _ as r -> r
@@ -294,7 +294,7 @@ let ancestors (env : EcEnv.env) (tc : typeclass) : typeclass list =
       List.fold_left2
         (fun s (a, _) etyarg -> Mid.add a etyarg s)
         Mid.empty decl.tc_tparams tc.tc_args in
-    List.map (fun (p, _ren) -> EcCoreSubst.Tvar.subst_tc subst p) decl.tc_prts in
+    List.map (fun (p, _lbl, _ren) -> EcCoreSubst.Tvar.subst_tc subst p) decl.tc_prts in
   let same (a : typeclass) (b : typeclass) =
     EcPath.p_equal a.tc_name b.tc_name in
   let rec bfs (frontier : typeclass list) (acc : typeclass list) =
@@ -376,7 +376,7 @@ let ancestors_with_renaming
         (fun s (a, _) etyarg -> Mid.add a etyarg s)
         Mid.empty decl.tc_tparams tc.tc_args in
     List.map
-      (fun (p, ren) -> (EcCoreSubst.Tvar.subst_tc subst p, ren))
+      (fun (p, _lbl, ren) -> (EcCoreSubst.Tvar.subst_tc subst p, ren))
       decl.tc_prts in
   (* Compose two renamings.
      [outer] is declared on a parent edge: maps grandparent op names
@@ -411,3 +411,47 @@ let ancestors_with_renaming
             (parents tc) in
         bfs (rest @ next) ((tc, ren) :: acc)
   in bfs [(tc, [])] []
+
+(* -------------------------------------------------------------------- *)
+(* Variant of [ancestors_with_renaming] that ALSO tracks the label
+   path traversed from [tc] down to each ancestor. The label path is
+   the list of edge labels in OUTERMOST-FIRST order: e.g. walking
+   [boolring -> comring -> mulmonoid (as Mul) -> monoid] yields the
+   label path [["comring"; "Mul"; "monoid"]] (each step's label,
+   including the immediate parent edge's label).
+
+   For [tc] itself (the empty walk) the label path is [[]]. *)
+let ancestors_with_labels
+  (env : EcEnv.env) (tc : typeclass)
+  : (typeclass
+     * (EcSymbols.symbol * EcSymbols.symbol) list
+     * EcSymbols.symbol list) list
+=
+  let parents tc =
+    let decl = EcEnv.TypeClass.by_path tc.tc_name env in
+    let subst =
+      List.fold_left2
+        (fun s (a, _) etyarg -> Mid.add a etyarg s)
+        Mid.empty decl.tc_tparams tc.tc_args in
+    List.map
+      (fun (p, lbl, ren) -> (EcCoreSubst.Tvar.subst_tc subst p, lbl, ren))
+      decl.tc_prts in
+  let compose = compose_renaming in
+  let ren_eq r1 r2 =
+    List.length r1 = List.length r2
+    && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in
+  let same (a, ra, la) (b, rb, lb) =
+    EcPath.p_equal a.tc_name b.tc_name && ren_eq ra rb && la = lb in
+  let rec bfs frontier acc =
+    match frontier with
+    | [] -> List.rev acc
+    | (tc, ren, lpath) :: rest ->
+      if List.exists (same (tc, ren, lpath)) acc then bfs rest acc
+      else
+        let next =
+          List.map
+            (fun (p, p_lbl, p_ren) ->
+              (p, compose ~outer:p_ren ~inner:ren, lpath @ [p_lbl]))
+            (parents tc) in
+        bfs (rest @ next) ((tc, ren, lpath) :: acc)
+  in bfs [(tc, [], [])] []

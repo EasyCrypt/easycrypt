@@ -76,7 +76,7 @@ let walk_path (env : EcEnv.env) (start : typeclass) (lift : int list)
       let decl = EcEnv.TypeClass.by_path tc.tc_name env in
       match List.nth_opt decl.tc_prts i with
       | None -> None
-      | Some (parent, p_ren) ->
+      | Some (parent, _p_lbl, p_ren) ->
         let subst =
           List.fold_left2
             (fun s (a, _) etyarg -> EcIdent.Mid.add a etyarg s)
@@ -121,7 +121,7 @@ let canonical_table
           EcIdent.Mid.empty decl.tc_tparams tc.tc_args in
       let next =
         List.mapi
-          (fun i (parent, p_ren) ->
+          (fun i (parent, _p_lbl, p_ren) ->
             let parent = EcCoreSubst.Tvar.subst_tc subst parent in
             let ren' = compose_renaming ~outer:p_ren ~inner:ren in
             (parent, ren', offset, i :: rev_lift))

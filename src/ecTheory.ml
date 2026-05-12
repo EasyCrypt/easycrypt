@@ -75,6 +75,17 @@ and tcinstance = {
      to disambiguate [( + )<:zmod>] between the addmonoid view
      ([+] preserved) and the mulmonoid view ([+] renamed to [*]). *)
   tci_chain_rename : (EcSymbols.symbol * EcSymbols.symbol) list option;
+  (* When this instance was synthesised by [add_generic_instance] via
+     the parent chain, the LABEL PATH from the leaf class down to the
+     ancestor of this instance. Outermost-first: e.g. the synthesised
+     [mulmonoid] instance reached from a [comring] declaration with
+     edge [(mulmonoid as Mul)] has label path [["Mul"; "monoid"]]
+     (Mul = comring's label for its mulmonoid parent; monoid =
+     mulmonoid's default label for its monoid parent).
+     [None] for manually-declared instances. Used by the obligation
+     collector to disambiguate axioms reached via multiple parent
+     paths of the same ancestor class. *)
+  tci_chain_labels : EcSymbols.symbol list option;
 }
 
 and tcibody = [

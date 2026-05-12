@@ -1142,7 +1142,8 @@ let subst_field (s : subst) cr =
 let subst_tc (s : subst) tc =
   let s, tc_tparams = fresh_tparams s tc.tc_tparams in
   let tc_prts =
-    List.map (fun (p, ren) -> (subst_typeclass s p, ren)) tc.tc_prts in
+    List.map (fun (p, lbl, ren) -> (subst_typeclass s p, lbl, ren))
+      tc.tc_prts in
   let tc_ops = List.map (snd_map (subst_ty s)) tc.tc_ops in
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
   let tc_ops_origin =
@@ -1173,9 +1174,10 @@ let subst_tcinstance (s : subst) (tci : tcinstance) =
   (* [tci_chain_rename] holds environment-independent symbol pairs; no
      substitution needed, just propagate. *)
   let tci_chain_rename = tci.tci_chain_rename in
+  let tci_chain_labels = tci.tci_chain_labels in
 
   { tci_params; tci_type; tci_instance; tci_local; tci_parents;
-    tci_reducible; tci_chain_rename; }
+    tci_reducible; tci_chain_rename; tci_chain_labels; }
 
 
 (* -------------------------------------------------------------------- *)

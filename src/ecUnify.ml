@@ -477,7 +477,7 @@ module Unify = struct
                     (fun s (a, _) etyarg -> Mid.add a etyarg s)
                     Mid.empty decl.tc_tparams tc.tc_args in
                 List.fold_lefti
-                  (fun acc i (parent, p_ren) ->
+                  (fun acc i (parent, _p_lbl, p_ren) ->
                     let parent = EcCoreSubst.Tvar.subst_tc subst parent in
                     let ren' =
                       EcTypeClass.compose_renaming ~outer:p_ren ~inner:ren in
@@ -1149,7 +1149,7 @@ let disambiguate_op_witnesses
             (fun s (a, _) etyarg -> Mid.add a etyarg s)
             Mid.empty decl.tc_tparams tc.tc_args in
         List.fold_lefti
-          (fun acc i (parent, p_ren) ->
+          (fun acc i (parent, _p_lbl, p_ren) ->
             let parent = EcCoreSubst.Tvar.subst_tc subst parent in
             let ren' =
               EcTypeClass.compose_renaming ~outer:p_ren ~inner:ren in

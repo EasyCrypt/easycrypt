@@ -310,7 +310,12 @@ let operator_of_exception (ex: exception_) =
    operator names. Empty list = plain inheritance. *)
 type tc_decl = {
   tc_tparams : ty_params;
-  tc_prts    : (typeclass * (EcSymbols.symbol * EcSymbols.symbol) list) list;
+  (* Per parent-edge: the typeclass instantiation, an optional label
+     (defaulting to the parent's bare class name), and the rename
+     clause. The label disambiguates obligations reaching the
+     instance through multiple parent edges of the same class. *)
+  tc_prts    : (typeclass * EcSymbols.symbol
+                * (EcSymbols.symbol * EcSymbols.symbol) list) list;
   tc_ops     : (EcIdent.t * EcTypes.ty) list;
   tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
   tc_loca    : is_local;
