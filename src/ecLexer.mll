@@ -210,6 +210,7 @@
     "Pr"          , PR         ;        (* KW: global *)
     "clone"       , CLONE      ;        (* KW: global *)
     "with"        , WITH       ;        (* KW: global *)
+    "via"         , VIA        ;        (* KW: global *)
     "rename"      , RENAME     ;        (* KW: global *)
     "reducible"   , REDUCIBLE  ;        (* KW: global *)
     "prover"      , PROVER     ;        (* KW: global *)

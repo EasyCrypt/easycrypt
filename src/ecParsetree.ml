@@ -107,9 +107,22 @@ type pty_r =
   | PTglob   of pmsymbol located
 and pty = pty_r located
 
+(* Optional witness selector for a type-instantiation entry. Combines
+   label-suffix [/Lbl1/Lbl2/...] and path-via [via P] forms. Empty
+   means: let TC inference pick the witness as before. Parser accepts
+   any combination; the typer rejects irrelevant mixtures. *)
+type pwitness_selector = {
+  pws_labels : psymbol list;
+  pws_via    : pqsymbol option;
+}
+
+let pws_none : pwitness_selector = { pws_labels = []; pws_via = None; }
+let pws_is_empty (s : pwitness_selector) =
+  List.is_empty s.pws_labels && Option.is_none s.pws_via
+
 type ptyannot_r =
-  | TVIunamed of pty list
-  | TVInamed  of (psymbol * pty) list
+  | TVIunamed of (pty * pwitness_selector) list
+  | TVInamed  of (psymbol * pty * pwitness_selector) list
 
 and ptyannot  = ptyannot_r  located
 

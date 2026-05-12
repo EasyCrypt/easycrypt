@@ -1196,12 +1196,14 @@ let transpattern env ue (p : EcParsetree.plpattern) =
 let transtvi env ue tvi =
   match tvi.pl_desc with
   | TVIunamed lt ->
-      let tys = List.map (transty tp_relax env ue) lt in
+      (* For Phase A.2: parse selectors but drop them here.
+         Phase B will plumb them into the tcwitness override. *)
+      let tys = List.map (fun (ty, _sel) -> transty tp_relax env ue ty) lt in
       let tvi = List.map (fun ty -> (Some ty, None)) tys in
       EcUnify.TVIunamed tvi
 
   | TVInamed lst ->
-      let add locals (s, t) =
+      let add locals (s, t, _sel) =
         if List.exists (fun (s', _) -> unloc s = unloc s') locals then
           tyerror tvi.pl_loc env DuplicatedTyVar;
         (s, transty tp_relax env ue t) :: locals

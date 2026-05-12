@@ -599,6 +599,7 @@
 %token WHILE
 %token WHY3
 %token WITH
+%token VIA
 %token WLOG
 %token WP
 %token ZETA
@@ -906,11 +907,28 @@ lp_field:
 (* -------------------------------------------------------------------- *)
 (* Expressions: program expression, real expression                     *)
 
+(* Optional witness selector trailing a type-instantiation entry.
+   Accepts any combination of [/Lbl+] and [via P]. *)
+witness_selector:
+| (* empty *)
+    { pws_none }
+| SLASH lbls=plist1(ident, SLASH)
+    { { pws_labels = lbls; pws_via = None; } }
+| VIA p=qident
+    { { pws_labels = []; pws_via = Some p; } }
+| SLASH lbls=plist1(ident, SLASH) VIA p=qident
+    { { pws_labels = lbls; pws_via = Some p; } }
+| VIA p=qident SLASH lbls=plist1(ident, SLASH)
+    { { pws_labels = lbls; pws_via = Some p; } }
+
+tyvar_unnamed1:
+| ty=loc(type_exp) sel=witness_selector { (ty, sel) }
+
 tyvar_byname1:
-| x=tident EQ ty=loc(type_exp) { (x, ty) }
+| x=tident EQ ty=loc(type_exp) sel=witness_selector { (x, ty, sel) }
 
 tyvar_annot:
-| lt = plist1(loc(type_exp), COMMA) { TVIunamed lt }
+| lt = plist1(tyvar_unnamed1, COMMA) { TVIunamed lt }
 | lt = plist1(tyvar_byname1, COMMA) { TVInamed lt }
 
 %inline tvars_app:
