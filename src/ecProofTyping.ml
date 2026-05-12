@@ -286,7 +286,7 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
           "wrong number of type parameters (%d, expecting %d)"
           (List.length tyargs) (List.length typ);
       let _ : etyarg Mid.t =
-        List.fold_left2 (fun subst (id, tcs) (ty_opt, _) ->
+        List.fold_left2 (fun subst (id, tcs) (ty_opt, _, _) ->
           Option.iter (check_constraints subst tcs) ty_opt;
           match ty_opt with
           | Some ty -> Mid.add id (ty, []) subst
@@ -304,7 +304,7 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
       let _ : etyarg Mid.t =
         List.fold_left (fun subst (id, tcs) ->
           match List.assoc_opt (EcIdent.name id) tyargs with
-          | Some (Some ty, _) ->
+          | Some (Some ty, _, _) ->
             check_constraints subst tcs ty;
             Mid.add id (ty, []) subst
           | _ -> subst

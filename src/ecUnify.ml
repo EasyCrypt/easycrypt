@@ -859,7 +859,19 @@ type unienv_r = {
 
 type unienv = unienv_r ref
 
-type petyarg = ty option * tcwitness option list option
+(* Optional user-supplied witness selector for a tvi entry. Resolved
+   against the tparam's bound class at [opentvi] time to construct a
+   [tcwitness]. Empty when the user didn't write [/Lbl+] or [via P]. *)
+type witness_selector = {
+  ws_labels : EcSymbols.symbol list;
+  ws_via    : EcPath.path option;
+}
+
+let ws_empty : witness_selector = { ws_labels = []; ws_via = None; }
+let ws_is_empty (s : witness_selector) =
+  List.is_empty s.ws_labels && Option.is_none s.ws_via
+
+type petyarg = ty option * tcwitness option list option * witness_selector
 
 type tvar_inst =
 | TVIunamed of petyarg list
@@ -869,7 +881,8 @@ type tvi = tvar_inst option
 
 let tvi_unamed (ety : etyarg list) : tvar_inst =
   TVIunamed (List.map
-    (fun (ty, tcw) -> Some ty, Some (List.map Option.some tcw))
+    (fun (ty, tcw) ->
+       (Some ty, Some (List.map Option.some tcw), ws_empty))
     ety
   )
 
@@ -965,7 +978,11 @@ module UniEnv = struct
           ) params
 
       | Some (TVIunamed lt) ->
-          let combine (v, tc) (ty, tcw) =
+          let combine (v, tc) (ty, tcw, _sel) =
+            (* TODO Phase B: resolve [_sel] against [ty] and [tc] to
+               produce a [tcwitness option list]. Currently selectors
+               are accepted syntactically but dropped here; the
+               resolver picks the witness as before. *)
             let tctcw =
               match tcw with
               | None ->
@@ -978,9 +995,9 @@ module UniEnv = struct
 
       | Some (TVInamed lt) ->
           List.map (fun (v, tc) ->
-            let ty, tcw =
+            let ty, tcw, _sel =
                  List.assoc_opt (EcIdent.name v) lt
-              |> Option.value ~default:(None, None) in
+              |> Option.value ~default:(None, None, ws_empty) in
 
             let tcw =
               match tcw with
@@ -988,7 +1005,7 @@ module UniEnv = struct
                 List.map (fun _ -> None) tc
               | Some tcw ->
                 tcw in
-            
+
             (v, (ty, List.map2 (fun x y -> (x, y)) tc tcw))
           ) params
     in
@@ -1248,7 +1265,7 @@ let select_op
               let tparams = op.D.op_tparams in
               List.length tparams = len &&
               List.for_all2
-                (fun (_, tcs) (_, tcw) ->
+                (fun (_, tcs) (_, tcw, _sel) ->
                   match tcw with
                   | None -> true
                   | Some tcw -> List.length tcs = List.length tcw)

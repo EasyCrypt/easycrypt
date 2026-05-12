@@ -25,7 +25,15 @@ exception AmbiguousTcInstance of typeclass * EcPath.path list
 
 type unienv
 
-type petyarg = ty option * tcwitness option list option
+type witness_selector = {
+  ws_labels : EcSymbols.symbol list;
+  ws_via    : EcPath.path option;
+}
+
+val ws_empty : witness_selector
+val ws_is_empty : witness_selector -> bool
+
+type petyarg = ty option * tcwitness option list option * witness_selector
 
 type tvar_inst =
 | TVIunamed of petyarg list

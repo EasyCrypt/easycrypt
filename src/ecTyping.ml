@@ -1193,25 +1193,46 @@ let transpattern env ue (p : EcParsetree.plpattern) =
         (EcEnv.Var.bind_locals xs env, p, ty)
 
 (* -------------------------------------------------------------------- *)
+(* Translate a user-supplied witness selector from the parsetree into
+   the unifier's representation. Resolves [via P] paths to TC-instance
+   paths; labels are passed through verbatim (resolved later in
+   [opentvi] against the tparam's bound class). *)
+let transwsel (env : EcEnv.env) (sel : pwitness_selector) : EcUnify.witness_selector =
+  let ws_labels = List.map unloc sel.pws_labels in
+  let ws_via =
+    Option.map (fun p ->
+      match EcEnv.TcInstance.lookup_opt (unloc p) env with
+      | Some (path, _) -> path
+      | None ->
+        tyerror p.pl_loc env
+          (DuplicatedField ("unknown TC instance: `" ^
+                            EcSymbols.string_of_qsymbol (unloc p) ^ "'")))
+      sel.pws_via in
+  EcUnify.{ ws_labels; ws_via; }
+
+(* -------------------------------------------------------------------- *)
 let transtvi env ue tvi =
   match tvi.pl_desc with
   | TVIunamed lt ->
-      (* For Phase A.2: parse selectors but drop them here.
-         Phase B will plumb them into the tcwitness override. *)
-      let tys = List.map (fun (ty, _sel) -> transty tp_relax env ue ty) lt in
-      let tvi = List.map (fun ty -> (Some ty, None)) tys in
-      EcUnify.TVIunamed tvi
+      let mk1 (ty, sel) =
+        let ty = transty tp_relax env ue ty in
+        let sel = transwsel env sel in
+        (Some ty, None, sel) in
+      EcUnify.TVIunamed (List.map mk1 lt)
 
   | TVInamed lst ->
-      let add locals (s, t, _sel) =
-        if List.exists (fun (s', _) -> unloc s = unloc s') locals then
+      let add locals (s, t, sel) =
+        if List.exists (fun (s', _, _) -> unloc s = unloc s') locals then
           tyerror tvi.pl_loc env DuplicatedTyVar;
-        (s, transty tp_relax env ue t) :: locals
+        let ty = transty tp_relax env ue t in
+        let sel = transwsel env sel in
+        (s, ty, sel) :: locals
       in
 
       let tvi = List.fold_left add [] lst in
-      let tvi = List.map (snd_map (fun ty -> (Some ty, None))) tvi in
-      EcUnify.TVInamed (List.rev_map (fun (s, t) -> unloc s, t) tvi)
+      let tvi = List.map (fun (s, ty, sel) ->
+        (unloc s, (Some ty, None, sel))) tvi in
+      EcUnify.TVInamed (List.rev tvi)
 
 let rec destr_tfun env ue tf =
   match tf.ty_node with
@@ -1385,7 +1406,7 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
         EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
         let ctorty =
-          let tvi = Some (EcUnify.TVIunamed (List.map (fun (ty, w) -> (Some ty, Some (List.map (fun x -> Some x) w))) tvi)) in
+          let tvi = Some (EcUnify.TVIunamed (List.map (fun (ty, w) -> (Some ty, Some (List.map (fun x -> Some x) w), EcUnify.ws_empty)) tvi)) in
             fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
         let pty = EcUnify.UniEnv.fresh ue in
 
