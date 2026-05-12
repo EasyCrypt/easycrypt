@@ -976,7 +976,7 @@ module UniEnv = struct
   exception InvalidSelector of string
 
   let resolve_witness_selector
-    (env : EcEnv.env option) (ty : ty) (tc : typeclass)
+    (env : EcEnv.env option) (ue : unienv) (ty : ty) (tc : typeclass)
     (sel : witness_selector) : tcwitness option
   =
     if ws_is_empty sel then None
@@ -1074,21 +1074,130 @@ module UniEnv = struct
                (String.concat ", " (List.map EcPath.tostring ps))))
       in
 
-      match sel.ws_via, sel.ws_labels with
-      | Some path, [] -> Some (validate_and_build path)
-      | None, (_ :: _ as labels) ->
-        let path = label_search labels in
-        Some (validate_and_build path)
-      | Some path, (_ :: _ as labels) ->
-        (* Combined: the via-path must match the label-derived path. *)
-        let lpath = label_search labels in
-        if not (EcPath.p_equal path lpath) then
+      (* Parametric / abstract carrier branch: when [ty] is [Tvar id]
+         or [Tconstr p] with [p] an abstract type carrying class
+         bounds, the witness is [TCIAbstract { support = …; offset;
+         lift }]. Walk the carrier's declared bounds via BFS,
+         tracking (offset, lift_rev, label_path_rev). *)
+      let abstract_search
+          (support : [ `Var of EcIdent.t | `Abs of EcPath.path ])
+          (bounds : typeclass list)
+          (labels : EcSymbols.symbol list)
+        : tcwitness =
+        let labels_match (qual : string list) (path_lbls : string list) =
+          let qlen = List.length qual in
+          let llen = List.length path_lbls in
+          let rec scan i =
+            if i + qlen > llen then false
+            else
+              let slice =
+                List.filteri (fun j _ -> j >= i && j < i + qlen) path_lbls in
+              if slice = qual then true else scan (i + 1)
+          in qlen = 0 || scan 0 in
+        if bounds = [] then
           raise (InvalidSelector
             (Printf.sprintf
-               "explicit `via %s' disagrees with label-derived path %s"
-               (EcPath.tostring path) (EcPath.tostring lpath)));
-        Some (validate_and_build path)
-      | None, [] -> None  (* unreachable: ws_is_empty caught this *)
+               "no bounds found for carrier `%s'"
+               (match support with
+                | `Var v -> EcIdent.name v
+                | `Abs p -> EcPath.tostring p)));
+        (* BFS: each frontier entry is (tc, label_path_rev, offset, lift_rev). *)
+        let matches = ref [] in
+        let visited = ref [] in
+        let already (tcn, lpath) =
+          List.exists
+            (fun (p, l) -> EcPath.p_equal p tcn && l = lpath) !visited in
+        let rec bfs frontier =
+          match frontier with
+          | [] -> ()
+          | (cur, lpath_rev, offset, lift_rev) :: rest ->
+            let lpath = List.rev lpath_rev in
+            if already (cur.tc_name, lpath) then bfs rest
+            else begin
+              visited := (cur.tc_name, lpath) :: !visited;
+              if EcPath.p_equal cur.tc_name tc.tc_name
+                 && labels_match labels lpath
+              then
+                matches := (offset, List.rev lift_rev) :: !matches;
+              let decl = EcEnv.TypeClass.by_path cur.tc_name env in
+              let next =
+                List.mapi (fun i (parent, p_lbl, _p_ren) ->
+                  (parent, p_lbl :: lpath_rev, offset, i :: lift_rev))
+                  decl.tc_prts in
+              bfs (rest @ next)
+            end in
+        let initial =
+          List.mapi (fun i tc -> (tc, [], i, [])) bounds in
+        bfs initial;
+        let support_name () =
+          match support with
+          | `Var v -> EcIdent.name v
+          | `Abs p -> EcPath.tostring p in
+        match !matches with
+        | [(offset, lift)] ->
+          TCIAbstract { support; offset; lift }
+        | [] ->
+          raise (InvalidSelector
+            (Printf.sprintf
+               "no bound of carrier `%s' reaches class %s via \
+                label path [%s]"
+               (support_name ())
+               (EcPath.tostring tc.tc_name)
+               (String.concat "/" labels)))
+        | ms ->
+          raise (InvalidSelector
+            (Printf.sprintf
+               "ambiguous label path [%s]: %d matches for class %s on \
+                carrier `%s'"
+               (String.concat "/" labels)
+               (List.length ms)
+               (EcPath.tostring tc.tc_name)
+               (support_name ())))
+      in
+
+      (* Dispatch: identify whether the carrier is abstract (a type
+         variable or a [`Abstract]-bounded type alias) or concrete
+         (a fully-defined type). Abstract carriers want a
+         [TCIAbstract] witness with [support] = `Var or `Abs;
+         concrete carriers want a [TCIConcrete] witness derived
+         from an env-level instance. *)
+      let abstract_support () : (_ * typeclass list) option =
+        match ty.ty_node with
+        | Tvar id ->
+          let bounds = odfl [] (Mid.find_opt id (!ue).ue_uc.tvtc) in
+          Some (`Var id, bounds)
+        | Tconstr (p, _) ->
+          (match EcEnv.Ty.by_path_opt p env with
+           | Some { tyd_type = `Abstract tcs; _ } -> Some (`Abs p, tcs)
+           | _ -> None)
+        | _ -> None
+      in
+      match abstract_support () with
+      | Some (support, bounds) ->
+        (match sel.ws_via, sel.ws_labels with
+         | Some _, _ ->
+           raise (InvalidSelector
+             "`via` selector requires a concrete carrier; for type \
+              variables or abstract types use [/Lbl+] only")
+         | None, (_ :: _ as labels) ->
+           Some (abstract_search support bounds labels)
+         | None, [] -> None)
+      | None ->
+        match sel.ws_via, sel.ws_labels with
+        | Some path, [] -> Some (validate_and_build path)
+        | None, (_ :: _ as labels) ->
+          let path = label_search labels in
+          Some (validate_and_build path)
+        | Some path, (_ :: _ as labels) ->
+          (* Combined: the via-path must match the label-derived path. *)
+          let lpath = label_search labels in
+          if not (EcPath.p_equal path lpath) then
+            raise (InvalidSelector
+              (Printf.sprintf
+                 "explicit `via %s' disagrees with label-derived path %s"
+                 (EcPath.tostring path) (EcPath.tostring lpath)));
+          Some (validate_and_build path)
+        | None, [] -> None  (* unreachable: ws_is_empty caught this *)
 
   let opentvi
     ?(op_name : EcSymbols.symbol option)
@@ -1113,7 +1222,7 @@ module UniEnv = struct
             else
               match tc, ty with
               | [tc1], Some ty ->
-                (match resolve_witness_selector env ty tc1 sel with
+                (match resolve_witness_selector env ue ty tc1 sel with
                  | None -> None
                  | Some w -> Some [Some w])
               | _ :: _ :: _, _ ->
@@ -1150,7 +1259,7 @@ module UniEnv = struct
             else
               match tc, ty with
               | [tc1], Some ty ->
-                (match resolve_witness_selector env ty tc1 sel with
+                (match resolve_witness_selector env ue ty tc1 sel with
                  | None -> None
                  | Some w -> Some [Some w])
               | _ :: _ :: _, _ ->
