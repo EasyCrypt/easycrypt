@@ -187,6 +187,7 @@ type tc_decl = {
   tc_ops     : (EcIdent.t * EcTypes.ty) list;
   tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
   tc_loca    : is_local;
+  tc_ops_origin : (EcSymbols.symbol * (EcPath.path * EcSymbols.symbol)) list;
 }
 
 (* -------------------------------------------------------------------- *)

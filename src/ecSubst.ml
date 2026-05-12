@@ -1145,7 +1145,10 @@ let subst_tc (s : subst) tc =
     List.map (fun (p, ren) -> (subst_typeclass s p, ren)) tc.tc_prts in
   let tc_ops = List.map (snd_map (subst_ty s)) tc.tc_ops in
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
-  { tc_tparams; tc_prts; tc_ops; tc_axs; tc_loca = tc.tc_loca }
+  let tc_ops_origin =
+    List.map (fun (n, (p, op)) -> (n, (subst_path s p, op)))
+      tc.tc_ops_origin in
+  { tc_tparams; tc_prts; tc_ops; tc_axs; tc_loca = tc.tc_loca; tc_ops_origin }
 
 (* -------------------------------------------------------------------- *)
 let subst_tcibody (s : subst) (tci : tcibody) =

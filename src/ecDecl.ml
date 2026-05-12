@@ -314,6 +314,14 @@ type tc_decl = {
   tc_ops     : (EcIdent.t * EcTypes.ty) list;
   tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
   tc_loca    : is_local;
+  (* Origin tracking for [tc_ops]: maps each op's local name to its
+     "canonical source" — the (ancestor class path, original op name)
+     pair where this op was first introduced. User-declared ops have
+     origin [(self_path, local_name)]; auto-promoted renamed ops
+     inherit origin from the ancestor whose op they alias. Used by
+     downstream classes' auto-import to dedupe ops reached via
+     multiple inheritance paths. *)
+  tc_ops_origin : (EcSymbols.symbol * (EcPath.path * EcSymbols.symbol)) list;
 }
 
 (* -------------------------------------------------------------------- *)

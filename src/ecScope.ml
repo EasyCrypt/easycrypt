@@ -1844,6 +1844,7 @@ module Ty = struct
         tc_ops     = [];
         tc_axs     = [];
         tc_loca    = lc;
+        tc_ops_origin = [];
       } in
       let scenv =
         EcEnv.TypeClass.rebind name stub_tc scenv in
@@ -1859,6 +1860,102 @@ module Ty = struct
           tyd_subtype = None; } in
       let scenv = EcEnv.Ty.bind name asty scenv in
 
+      (* ----------------------------------------------------------------
+         Compute the renamed parent ops auto-imported into this class's
+         body scope. For each parent edge [(parent_tc, parent_ren)] in
+         [uptcs], walk the parent's ancestor DAG via
+         [ancestors_with_renaming], compose each ancestor's renaming
+         with [parent_ren], and apply the cumulative rename to the
+         ancestor's [tc_ops] names. The ancestor's op types use the
+         ancestor's tparams; substitute them through to the current
+         class's carrier via the chain of [tc_args].
+
+         When the same local name arises from more than one parent
+         path (or from independent ancestor ops on the same path),
+         reject — the user must add an explicit [with X = Y] rename
+         to disambiguate.
+         ---------------------------------------------------------------- *)
+      let inherited_ops :
+        (EcSymbols.symbol * EcTypes.ty * bool
+         * (EcPath.path * EcSymbols.symbol)) list =
+        (* Current-class carrier as seen from within the body. *)
+        let self_carrier =
+          EcTypes.tconstr_tc mypath
+            (EcDecl.etyargs_of_tparams stub_tc.tc_tparams) in
+        (* Rewrite every [Tconstr(anc_path, _)] occurrence to the
+           current class's carrier. Ancestor classes are abstract type
+           aliases whose only inhabitant is the carrier, so any
+           [Tconstr(anc.tc_name, ...)] in a parent op type refers to
+           that ancestor's carrier and must be translated to [self]. *)
+        let rewrite_carrier (anc_paths : EcPath.Sp.t) (ty : EcTypes.ty) : EcTypes.ty =
+          let rec aux t =
+            match t.EcAst.ty_node with
+            | EcAst.Tconstr (p, _) when EcPath.Sp.mem p anc_paths ->
+              self_carrier
+            | _ -> EcTypes.ty_map aux t
+          in aux ty in
+        let collect_from_parent (parent_tc, parent_ren) =
+          (* All ancestors of [parent_tc] (including itself, with empty rename) *)
+          let anc_list = EcTypeClass.ancestors_with_renaming scenv parent_tc in
+          let anc_paths =
+            List.fold_left (fun s (anc, _) -> EcPath.Sp.add anc.tc_name s)
+              EcPath.Sp.empty anc_list in
+          List.concat_map (fun (anc, anc_to_parent_ren) ->
+            let cumul =
+              EcTypeClass.compose_renaming
+                ~outer:parent_ren ~inner:anc_to_parent_ren in
+            let anc_decl = EcEnv.TypeClass.by_path anc.tc_name scenv in
+            let subst =
+              List.fold_left2
+                (fun s (a, _) etyarg -> Mid.add a etyarg s)
+                Mid.empty anc_decl.tc_tparams anc.tc_args in
+            List.map (fun (op_id, op_ty) ->
+              let orig_name = EcIdent.name op_id in
+              let local_name, renamed =
+                match List.assoc_opt orig_name cumul with
+                | Some n' when n' <> orig_name -> (n', true)
+                | _ -> (orig_name, false) in
+              let op_ty = EcCoreSubst.Tvar.subst subst op_ty in
+              let op_ty = rewrite_carrier anc_paths op_ty in
+              (* Origin: the canonical "source of truth" for this op.
+                 If the ancestor itself auto-promoted this op from a
+                 grandparent, [tc_ops_origin] tells us the deeper
+                 origin; we follow it so that ops reached via different
+                 inheritance paths (one through the ancestor's
+                 [tc_ops], one through a direct walk of the
+                 grandparent) get the same origin and dedupe silently.
+                 Falls back to [(ancestor_path, op_name)] for ops the
+                 ancestor declared itself. *)
+              let origin =
+                match List.assoc_opt orig_name anc_decl.tc_ops_origin with
+                | Some o -> o
+                | None -> (anc.tc_name, orig_name) in
+              (local_name, op_ty, renamed, origin)
+            ) anc_decl.tc_ops
+          ) anc_list in
+        let all = List.concat_map collect_from_parent uptcs in
+        (* Dedup by (local_name, origin). Same op reached through
+           multiple inheritance paths in the DAG (same origin =
+           (ancestor_path, orig_op_name)) is silently merged. Same
+           local_name with DIFFERENT origins is a genuine cross-class
+           name collision: reject. *)
+        let by_name = Msym.empty in
+        let by_name =
+          List.fold_left (fun acc (n, ty, renamed, origin) ->
+            match Msym.find_opt n acc with
+            | None -> Msym.add n (ty, renamed, origin) acc
+            | Some (_, _, origin') when origin = origin' -> acc
+            | Some _ ->
+              hierror ~loc
+                "auto-imported parent op `%s' collides with another \
+                 inherited op of the same name (different origin). Add \
+                 an explicit rename clause [<: P with %s = …] to \
+                 disambiguate."
+                n n)
+            by_name all in
+        Msym.bindings by_name
+        |> List.map (fun (n, (ty, renamed, origin)) -> (n, ty, renamed, origin)) in
+
       (* Check for duplicated field names *)
       Msym.odup unloc (List.map fst tcd.ptc_ops)
         |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
@@ -1866,6 +1963,51 @@ module Ty = struct
       Msym.odup unloc (List.map fst tcd.ptc_axs)
         |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
                     "duplicated axiom name: `%s'" x.pl_desc);
+
+      (* Reject explicit user-declared ops that shadow auto-imported
+         inherited ops with the same name. The user must either use the
+         inherited op (no redeclaration) or rename it via a [with]
+         clause on the parent. *)
+      List.iter (fun (x, _) ->
+        let xs = unloc x in
+        if List.exists (fun (n, _, _, _) -> n = xs) inherited_ops then
+          hierror ~loc:x.pl_loc
+            "operator `%s' is already provided by a parent class (via \
+             inheritance); remove the redundant declaration, or rename \
+             the inherited op via a [with %s = …] clause on the parent."
+            xs xs
+      ) tcd.ptc_ops;
+
+      (* Pre-allocate idents for inherited ops. RENAMED inherited ops
+         must share their ident between the body-local binding (used
+         during body elaboration) and the [tc_ops] entry (which the
+         env-bind machinery uses to build the final substitution that
+         rewrites local references into global [OP_TC] references in
+         stored axioms). If we used distinct idents, axiom bodies
+         elaborated to [Flocal id_local] would NOT match the global
+         [Fop (OP_TC mypath name)] emitted at instance-use time, and
+         rewrites would fail. Non-renamed inherited ops only appear
+         as body-locals (no [tc_ops] entry, since their global lives
+         under the ancestor path). *)
+      let inherited_idents =
+        List.map (fun (n, ty, renamed, origin) ->
+          (EcIdent.create n, n, ty, renamed, origin))
+          inherited_ops in
+      let scenv =
+        (* Only bind RENAMED inherited ops as body-locals. Non-renamed
+           ops are already resolvable via the global namespace (their
+           ancestor class published an [OP_TC] global at the
+           ancestor's path), so locally binding them would create
+           parallel [Flocal] references that can't be substituted to
+           the global at env-bind time (they're not in [tc_ops]),
+           leading to axiom-body ops that fail to match use-site
+           [Fop] references. *)
+        let inherited_locals =
+          List.filter_map
+            (fun (id, _n, ty, renamed, _) ->
+              if renamed then Some (id, ty) else None)
+            inherited_idents in
+        EcEnv.Var.bind_locals inherited_locals scenv in
 
       (* Check operators types *)
       let operators =
@@ -1909,9 +2051,41 @@ module Ty = struct
         in
           tcd.ptc_axs |> List.map check1 in
 
+      (* Promote auto-imported inherited ops to first-class entries of
+         [tc_ops]. They are placed before user-declared ops; collisions
+         have already been rejected. This makes inherited ops
+         externally visible (the env-level [bind_typeclass] loop in
+         [ecEnv.ml] creates one global [OP_TC] per [tc_ops] entry) and
+         requires each instance to supply a realisation under the
+         (possibly renamed) local name — which the instance-side
+         [tcsyms] walk already demands via the chain's rename. *)
+      (* Only RENAMED inherited ops are promoted to [tc_ops]. Non-renamed
+         inherited ops remain accessible via the chain walk (the resolver
+         walks [tc_prts] and finds them in the ancestor's [tc_ops]);
+         re-emitting them under the current class's path would create a
+         duplicate global [OP_TC] symbol and clash with the ancestor's
+         own global op. Renamed ops have no ancestor-side global under
+         the new name, so we must emit one. The ident is shared with
+         the body-local binding (see [inherited_idents] above) so that
+         axiom bodies elaborated against the local get correctly
+         substituted to the global by the env-bind machinery. *)
+      let inherited_tc_ops, inherited_origins =
+        let promoted =
+          inherited_idents
+          |> List.filter_map (fun (id, n, ty, renamed, origin) ->
+               if renamed then Some ((id, ty), (n, origin)) else None) in
+        List.split promoted in
+      (* User-declared ops get origin [(mypath, name)] — they are the
+         canonical source for that op (within this class hierarchy). *)
+      let user_origins =
+        List.map (fun (id, _ty) ->
+          let n = EcIdent.name id in (n, (mypath, n))) operators in
+
       (* Construct actual type-class *)
       { tc_prts = uptcs; tc_tparams = EcUnify.UniEnv.tparams ue;
-        tc_ops = operators; tc_axs = axioms; tc_loca = lc; }
+        tc_ops = inherited_tc_ops @ operators;
+        tc_axs = axioms; tc_loca = lc;
+        tc_ops_origin = inherited_origins @ user_origins; }
     in
       bindclass scope (name, tclass)
 

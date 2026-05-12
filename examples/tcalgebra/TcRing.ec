@@ -214,8 +214,9 @@ end section.
    available under conventional ring-theoretic names downstream.      *)
 (* ==================================================================== *)
 type class comring <: addgroup & (mulmonoid with idm = oner, (+) = ( * )) = {
-  op oner  : comring
-  op ( * ) : comring -> comring -> comring
+  (* [oner] and [( * )] are auto-imported from the mulmonoid edge
+     via the [with idm = oner, (+) = ( * )] rename. No need to
+     re-declare them here. *)
   op invr  : comring -> comring
   op unit  : comring -> bool
 
