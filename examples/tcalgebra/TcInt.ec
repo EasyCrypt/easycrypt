@@ -22,7 +22,7 @@ op int_invr (z : int) : int  = z.
    with int] — declaring both would create duplicate comring witnesses
    for [int] and break op-name resolution downstream.                  *)
 instance idomain with int reducible
-  op idm   = 0
+  op zero  = 0
   op (+)   = CoreInt.add
   op [-]   = CoreInt.opp
   op oner  = 1
@@ -30,19 +30,19 @@ instance idomain with int reducible
   op invr  = int_invr
   op unit  = int_unit
 
-  proof addmA      by smt()
-  proof addmC      by smt()
-  proof add0m      by smt()
-  proof addrN      by smt()
-  proof oner_neq0  by smt()
-  proof mulrA      by smt()
-  proof mulrC      by smt()
-  proof mul1r      by smt()
-  proof mulrDl     by smt()
-  proof mulVr      by smt(@CoreInt)
-  proof unitP      by smt()
-  proof unitout    by smt()
-  proof mulf_eq0   by smt().
+  proof mopA<:addmonoid>  by smt()
+  proof mopC<:addmonoid>  by smt()
+  proof mop0<:addmonoid>  by smt()
+  proof addrN             by smt()
+  proof oner_neq0         by smt()
+  proof mopA<:mulmonoid>  by smt()
+  proof mopC<:mulmonoid>  by smt()
+  proof mop0<:mulmonoid>  by smt()
+  proof mulrDl            by smt()
+  proof mulVr             by smt(@CoreInt)
+  proof unitP             by smt()
+  proof unitout           by smt()
+  proof mulf_eq0          by smt().
 
 op _spacer1 : int = 0.
 

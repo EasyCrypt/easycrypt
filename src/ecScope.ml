@@ -2519,7 +2519,10 @@ module Ty = struct
     (* For any ancestor op (after renaming) the user didn't provide,
        look up an existing instance of that ancestor on the same
        carrier and reuse its realisation. *)
-    let existing_anc_symbols anc _ren =
+    let ren_eq_strict r1 r2 =
+      List.length r1 = List.length r2
+      && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in
+    let existing_anc_symbols anc ren =
       List.fold_left (fun acc (_, tci_existing) ->
         match acc with
         | Some _ -> acc
@@ -2528,7 +2531,10 @@ module Ty = struct
           | `General (tgp, Some sym)
             when EcPath.p_equal tgp.tc_name anc.tc_name
               && EcReduction.EqTest.for_type
-                   (env scope) tci_existing.EcTheory.tci_type (snd ty) ->
+                   (env scope) tci_existing.EcTheory.tci_type (snd ty)
+              && (match tci_existing.EcTheory.tci_chain_rename with
+                  | None -> true
+                  | Some r -> ren_eq_strict r ren) ->
               Some sym
           | _ -> None)
         None (EcEnv.TcInstance.get_all (env scope)) in
@@ -2940,18 +2946,38 @@ module Ty = struct
                 (String.concat ";" labels);
             if already_discharged anc anc_decl ren then (acc_keys, acc)
             else
+              (* Per-entry substitution: start from the globally-built
+                 [subst] (which carries tydef bindings for self-references
+                 in axiom bodies) and OVERLAY this chain entry's own
+                 Flocal bindings for [anc]'s ops. Using a per-entry
+                 overlay avoids the global [subst]'s last-writer-wins
+                 problem when the same ancestor appears in the chain
+                 multiple times with different renames (e.g. [monoid]
+                 reached via both addmonoid and mulmonoid paths under
+                 different op renamings). *)
+              let entry_subst =
+                List.fold_left
+                  (fun subst (opname, _ty) ->
+                    let local = lookup_ren ren (EcIdent.name opname) in
+                    let body = Mstr.find local symbols in
+                    let op = EcSubst.subst_form subst body in
+                    EcSubst.add_flocal subst opname op)
+                  subst anc_decl.tc_ops in
               List.fold_left
                 (fun (acc_keys, acc) (name, ax) ->
-                  let f = EcSubst.subst_form subst ax in
-                  (* NOTE: today's dedup is by name alone (Sstr-style).
-                     This silently collapses two genuinely distinct
-                     obligations sharing a name (e.g. [mopA] from
-                     addmonoid vs mulmonoid views), which is unsound.
-                     Per-entry subst would fix this but breaks the
-                     current test suite. Tracked as future work; the
-                     labels machinery laid down here is the prerequisite. *)
+                  let f = EcSubst.subst_form entry_subst ax in
+                  (* Structural dedup: same (name, alpha-equivalent form)
+                     reached via multiple paths in a diamond is the SAME
+                     obligation. Different forms with the same name are
+                     GENUINELY distinct (e.g. [mopA] from addmonoid vs
+                     mulmonoid views) and must both be discharged. *)
                   let already =
-                    List.exists (fun (n', _, _) -> n' = name) acc in
+                    List.exists
+                      (fun (n', _, f') ->
+                        n' = name
+                        && EcReduction.is_alpha_eq
+                             (EcEnv.LDecl.init (env scope) []) f f')
+                      acc in
                   if already then (acc_keys, acc)
                   else (acc_keys, (name, labels, f) :: acc))
                 (acc_keys, acc)

@@ -20,7 +20,7 @@ op real_unit (x : real) : bool = x <> 0%r.
 
 (* -------------------------------------------------------------------- *)
 instance idomain with real reducible
-  op idm   = 0%r
+  op zero  = 0%r
   op (+)   = CoreReal.add
   op [-]   = CoreReal.opp
   op oner  = 1%r
@@ -28,19 +28,19 @@ instance idomain with real reducible
   op invr  = CoreReal.inv
   op unit  = real_unit
 
-  proof addmA      by smt()
-  proof addmC      by smt()
-  proof add0m      by smt()
-  proof addrN      by smt()
-  proof oner_neq0  by smt()
-  proof mulrA      by smt()
-  proof mulrC      by smt()
-  proof mul1r      by smt()
-  proof mulrDl     by smt()
-  proof mulVr      by smt()
-  proof unitP      by smt()
-  proof unitout    by smt()
-  proof mulf_eq0   by smt().
+  proof mopA<:addmonoid>  by smt()
+  proof mopC<:addmonoid>  by smt()
+  proof mop0<:addmonoid>  by smt()
+  proof addrN             by smt()
+  proof oner_neq0         by smt()
+  proof mopA<:mulmonoid>  by smt()
+  proof mopC<:mulmonoid>  by smt()
+  proof mop0<:mulmonoid>  by smt()
+  proof mulrDl            by smt()
+  proof mulVr             by smt()
+  proof unitP             by smt()
+  proof unitout           by smt()
+  proof mulf_eq0          by smt().
 
 (* -------------------------------------------------------------------- *)
 (* Order and field structure on top of [idomain with real]. Mirrors

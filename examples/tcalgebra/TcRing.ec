@@ -213,17 +213,19 @@ end section.
    / [mul1r]) are kept as axioms in the class body so they're
    available under conventional ring-theoretic names downstream.      *)
 (* ==================================================================== *)
-type class comring <: addgroup & (mulmonoid with idm = oner, (+) = ( * )) = {
-  (* [oner] and [( * )] are auto-imported from the mulmonoid edge
-     via the [with idm = oner, (+) = ( * )] rename. No need to
-     re-declare them here. *)
+type class comring <: addgroup & mulmonoid = {
+  (* Additive structure inherited from [addgroup -> addmonoid ->
+     (monoid with idm = zero, mop = (+))].
+     Multiplicative structure inherited from
+     [mulmonoid -> (monoid with idm = oner, mop = ( * ))].
+     The monoid axioms [mopA] / [mopC] / [mop0] are obligations of
+     BOTH chain paths; at instance-declaration time discharge them
+     twice with label-disambiguated [proof mopA<:addmonoid>] and
+     [proof mopA<:mulmonoid>] clauses. *)
   op invr  : comring -> comring
   op unit  : comring -> bool
 
   axiom oner_neq0 : oner <> zero<:comring>
-  axiom mulrA     : associative ( * )
-  axiom mulrC     : commutative ( * )
-  axiom mul1r     : left_id oner ( * )
   axiom mulrDl    : left_distributive ( * ) (+)<:comring>
   axiom mulVr     : left_inverse_in unit oner invr ( * )
   axiom unitP     : forall (x y : comring), y * x = oner => unit x
@@ -235,6 +237,19 @@ section.
 declare type t <: comring.
 
 abbrev (/) (x y : t) = x * (invr y).
+
+(* Re-export the inherited mulmonoid-view monoid lemmas under
+   the conventional ring-theoretic names. Going through
+   [mulm*] (defined at `'a <: mulmonoid`) avoids the comring-level
+   ambiguity between the addmonoid and mulmonoid views. *)
+lemma mulrA: associative ( * )<:t>.
+proof. by apply: mulmA. qed.
+
+lemma mulrC: commutative ( * )<:t>.
+proof. by apply: mulmC. qed.
+
+lemma mul1r: left_id oner<:t> ( * )<:t>.
+proof. by apply: mul1m. qed.
 
 lemma mulr1: right_id oner<:t> ( * ).
 proof. by move=> x; rewrite mulrC mul1r. qed.

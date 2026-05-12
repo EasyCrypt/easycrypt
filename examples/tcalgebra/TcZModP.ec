@@ -167,7 +167,7 @@ qed.
 (* lives in [ZModField] below.                                          *)
 (* -------------------------------------------------------------------- *)
 instance comring with zmod
-  op idm   = (inzmod 0)
+  op zero  = (inzmod 0)
   op (+)   = zmod_add
   op [-]   = zmod_opp
   op oner  = (inzmod 1)
@@ -175,18 +175,18 @@ instance comring with zmod
   op invr  = zmod_inv
   op unit  = zmod_unit
 
-  proof addmA      by exact: zmod_addrA
-  proof addmC      by exact: zmod_addrC
-  proof add0m      by exact: zmod_add0r
-  proof addrN      by exact: zmod_addrN
-  proof oner_neq0  by exact: zmod_oner_neq0
-  proof mulrA      by exact: zmod_mulrA
-  proof mulrC      by exact: zmod_mulrC
-  proof mul1r      by exact: zmod_mul1r
-  proof mulrDl     by exact: zmod_mulrDl
-  proof mulVr      by exact: zmod_mulVr
-  proof unitP      by exact: zmod_unitP
-  proof unitout    by exact: zmod_unitout.
+  proof mopA<:addmonoid>  by exact: zmod_addrA
+  proof mopC<:addmonoid>  by exact: zmod_addrC
+  proof mop0<:addmonoid>  by exact: zmod_add0r
+  proof addrN             by exact: zmod_addrN
+  proof oner_neq0         by exact: zmod_oner_neq0
+  proof mopA<:mulmonoid>  by exact: zmod_mulrA
+  proof mopC<:mulmonoid>  by exact: zmod_mulrC
+  proof mop0<:mulmonoid>  by exact: zmod_mul1r
+  proof mulrDl            by exact: zmod_mulrDl
+  proof mulVr             by exact: zmod_mulVr
+  proof unitP             by exact: zmod_unitP
+  proof unitout           by exact: zmod_unitout.
 
 (* Spacer: flush deferred-proof state before downstream uses.          *)
 op _spacer1 : zmod = inzmod 0.

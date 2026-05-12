@@ -10,9 +10,16 @@ require import AllCore List Ring TcMonoid.
 section.
 declare type t <: monoid.
 
+(* Section-local infix [+] for [mop] at carrier [t]. Defined as a direct
+   alias for [mop<:t>] (NOT [fun x y => mop x y]) so that partial
+   applications like [(+) x] keep their curried-op shape rather than
+   becoming a [fun y => ...] lambda. Inside section only; downstream
+   code sees abstract [mop]. *)
+local abbrev (+) = mop<:t>.
+
 (* -------------------------------------------------------------------- *)
 op big (P : 'a -> bool) (F : 'a -> t) (r : 'a list) =
-  foldr (+) idm (map F (filter P r)).
+  foldr mop idm (map F (filter P r)).
 
 (* -------------------------------------------------------------------- *)
 abbrev bigi (P : int -> bool) (F : int -> t) i j =
@@ -114,14 +121,14 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_seq1 (F : 'a -> t) x: big predT F [x] = F x.
-proof. by rewrite big_cons big_nil addm0. qed.
+proof. by rewrite big_cons big_nil mop0m. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_mkcond (P : 'a -> bool) (F : 'a -> t) s:
   big P F s = big predT (fun i => if P i then F i else idm) s.
 proof.
   elim: s=> // x s ih; rewrite !big_cons -ih /predT /=.
-  by case (P x)=> //; rewrite add0m.
+  by case (P x)=> //; rewrite mop0.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -226,25 +233,25 @@ lemma big_cat (P : 'a -> bool) (F : 'a -> t) s1 s2:
   big P F (s1 ++ s2) = big P F s1 + big P F s2.
 proof.
   rewrite !(@big_mkcond P); elim: s1 => /= [|i s1 ih].
-    by rewrite (@big_nil P F) add0m.
-  by rewrite !big_cons /(predT i) /= ih addmA.
+    by rewrite (@big_nil P F) mop0.
+  by rewrite !big_cons /(predT i) /= ih mopA.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_catl (P : 'a -> bool) (F : 'a -> t) s1 s2: !has P s2 =>
   big P F (s1 ++ s2) = big P F s1.
-proof. by rewrite big_cat => /big_hasC ->; rewrite addm0. qed.
+proof. by rewrite big_cat => /big_hasC ->; rewrite mop0m. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_catr (P : 'a -> bool) (F : 'a -> t) s1 s2: !has P s1 =>
   big P F (s1 ++ s2) = big P F s2.
-proof. by rewrite big_cat => /big_hasC ->; rewrite add0m. qed.
+proof. by rewrite big_cat => /big_hasC ->; rewrite mop0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_rcons (P : 'a -> bool) (F : 'a -> t) s x:
   big P F (rcons s x) = if P x then big P F s + F x else big P F s.
 proof.
-  by rewrite -cats1 big_cat big_cons big_nil; case: (P x); rewrite !addm0.
+  by rewrite -cats1 big_cat big_cons big_nil; case: (P x); rewrite !mop0m.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -258,7 +265,7 @@ proof.
   have r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 #smt:(count_ge0).
   have/splitPr [s3 s4] ->> := r2i.
   rewrite big_cat !big_cons /(predT i) /=.
-  rewrite addmCA; congr; rewrite -big_cat; apply/ih1=> a.
+  rewrite mopCAm; congr; rewrite -big_cat; apply/ih1=> a.
   by have := eq_s12 a; rewrite !count_cat /= addzCA => /addzI.
 qed.
 
@@ -303,7 +310,7 @@ qed.
 lemma bigD1_cond_if P (F : 'a -> t) s x: uniq s => big P F s =
   (if mem s x /\ P x then F x else idm) + big (predI P (predC1 x)) F s.
 proof.
-case: (mem s x /\ P x) => [[Px sx]|Nsx]; rewrite ?add0m /=.
+case: (mem s x /\ P x) => [[Px sx]|Nsx]; rewrite ?mop0 /=.
   by apply/bigD1_cond.
 move=> uqs; rewrite big_seq_cond eq_sym big_seq_cond; apply/eq_bigl=> i /=.
 by case: (i = x) => @/predC1 @/predI [->>|].
@@ -313,9 +320,9 @@ qed.
 lemma big_split (P : 'a -> bool) (F1 F2 : 'a -> t) s:
   big P (fun i => F1 i + F2 i) s = big P F1 s + big P F2 s.
 proof.
-  elim: s=> /= [|x s ih]; 1: by rewrite !big_nil addm0.
+  elim: s=> /= [|x s ih]; 1: by rewrite !big_nil mop0m.
   rewrite !big_cons ih; case: (P x) => // _.
-  by rewrite addmCA -!addmA addmCA.
+  by rewrite mopCAm -!mopA mopCAm.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -323,7 +330,7 @@ lemma bigID (P : 'a -> bool) (F : 'a -> t) (a : 'a -> bool) s:
   big P F s = big (predI P a) F s + big (predI P (predC a)) F s.
 proof.
 rewrite !(@big_mkcond _ F) -big_split; apply/eq_bigr => i _ /=.
-by rewrite /predI /predC; case: (a i); rewrite ?addm0 ?add0m.
+by rewrite /predI /predC; case: (a i); rewrite ?mop0m ?mop0.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -376,7 +383,7 @@ lemma big1_eq (P : 'a -> bool) s: big P (fun (x : 'a) => idm) s = idm.
 proof.
   rewrite big_const; elim/natind: (count _ _)=> n.
     by move/iter0<:t> => ->.
-  by move/iterS<:t> => -> ->; rewrite addm0.
+  by move/iterS<:t> => -> ->; rewrite mop0m.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -393,7 +400,7 @@ proof. by move=> eqF1; rewrite big_seq_cond big_andbC big1. qed.
 lemma big_eq_idm_filter ['a] (P : 'a -> bool) (F : 'a -> t) s :
   (forall (x : 'a), !P x => F x = idm) => big predT F s = big P F s.
 proof.
-by move=> eq1; rewrite (@bigEM P) (@big1 (predC _)) // addm0.
+by move=> eq1; rewrite (@bigEM P) (@big1 (predC _)) // mop0m.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -460,7 +467,7 @@ rewrite big_cons; case: (P x) => /= [Px|PxN]; last first.
   by apply/eq_bigr=> i _ /=; rewrite big_cons /= PxN.
 have := hm x; rewrite Px /= => -[s'_px Qpx]; apply/eq_sym.
 rewrite (@bigD1_cond _ _ _ (px x)) //= big_cons /= Px /=.
-rewrite -addmA; congr; apply/eq_sym; rewrite ih.
+rewrite -mopA; congr; apply/eq_sym; rewrite ih.
   by move=> y y_xs; apply/hm; rewrite y_xs.
 rewrite (@bigD1_cond _ _ _ (px x)) //=; congr.
 apply/eq_bigr=> /= i [Qi @/predC1]; rewrite eq_sym => ne_pxi.
@@ -531,7 +538,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_int1 n (F : int -> t): bigi predT F n (n+1) = F n.
-proof. by rewrite big_ltn 1:/# big_geq // addm0. qed.
+proof. by rewrite big_ltn 1:/# big_geq // mop0m. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_cat_int (n m p : int) P (F : int -> t): m <= n => n <= p =>
