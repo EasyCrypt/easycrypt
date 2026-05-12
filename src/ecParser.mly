@@ -1778,7 +1778,9 @@ tyci_op:
 
 tyci_ax:
 | PROOF x=ident BY tg=tactic_core
-    { (x, tg) }
+    { (x, None, tg) }
+| PROOF x=ident LTCOLON lbls=plist1(uident, SLASH) GT BY tg=tactic_core
+    { (x, Some lbls, tg) }
 
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)

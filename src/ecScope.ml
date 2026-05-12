@@ -2159,30 +2159,119 @@ module Ty = struct
         reqs Mstr.empty
 
   (* ------------------------------------------------------------------ *)
-  let check_tci_axioms ?(tparams = []) scope mode axs reqs lc =
-    let rmap = Mstr.of_list reqs in
-    let symbs, axs =
-      List.map_fold
-        (fun m (x, t) ->
-          if not (Mstr.mem (unloc x) rmap) then
-            hierror ~loc:x.pl_loc "invalid axiom name: `%s'" (unloc x);
-          if Sstr.mem (unloc x) m then
-            hierror ~loc:(x.pl_loc) "duplicated axiom name: `%s'" (unloc x);
-          (Sstr.add (unloc x) m, (unloc x, t, Mstr.find (unloc x) rmap)))
-        Sstr.empty axs in
+  (* [reqs] is the obligation list: each entry is [(name, labels, form)]
+     where [labels] is the label-path from the leaf class to the
+     ancestor class introducing this axiom. Multiple obligations may
+     share the same [name] if reached through distinct chain paths
+     (different [labels]) — typical for [mopA] reached through both
+     addmonoid and mulmonoid views.
 
+     [axs] is the user's proof list: each entry is
+     [(name, label_qualifier option, tactic)]. The qualifier is a
+     [(non-empty) label list] that must appear as a sub-path of an
+     obligation's [labels] to match.
+
+     Matching: a user clause [(name, qual, tac)] is matched against
+     obligations whose [name] matches and whose [labels] suffix-
+     contains [qual] (if [qual = None], require unique match by
+     name). Ambiguous = error; missing = error. *)
+  let check_tci_axioms ?(tparams = []) scope mode axs reqs lc =
+    (* Sub-path containment: [qual] is contained in [labels] if it
+       appears as a contiguous subsequence ending at the deepest
+       label. Equivalent: [labels] ends with [qual]. *)
+    let labels_match (qual : string list) (labels : string list) =
+      let is_suffix qs ls =
+        match qs, ls with
+        | [], _ -> true
+        | _, [] -> false
+        | _ ->
+          if List.length qs > List.length ls then false
+          else
+            let drop = List.length ls - List.length qs in
+            let tail = List.filteri (fun i _ -> i >= drop) ls in
+            tail = qs
+      in is_suffix qual labels in
+    (* Match a user clause against the obligation list. Returns the
+       matched obligation's [form] and a string identifier for the
+       lemma name. Errors on miss or ambiguity. *)
+    let match_user_clause (x : psymbol)
+        (qual_opt : psymbol list option)
+      : EcCoreFol.form =
+      let xs = unloc x in
+      let qual = Option.map (List.map unloc) qual_opt in
+      let candidates =
+        List.filter (fun (n, ls, _) ->
+          n = xs
+          && (match qual with
+              | None -> true
+              | Some qs -> labels_match qs ls))
+          reqs in
+      match candidates, qual with
+      | [], _ ->
+        hierror ~loc:x.pl_loc "invalid axiom name: `%s'" xs
+      | [_, _, f], _ -> f
+      | _ :: _ :: _, None ->
+        hierror ~loc:x.pl_loc
+          "ambiguous axiom name `%s' (reached through multiple parent \
+           paths). Disambiguate with [<:Label>]." xs
+      | _ :: _ :: _, Some _ ->
+        hierror ~loc:x.pl_loc
+          "ambiguous label qualifier for axiom `%s'. Try a longer \
+           label path." xs in
+
+    (* Resolve each user clause to (effective_name, tactic, form).
+       Effective name encodes the label path for uniqueness, since
+       the same [name] may be discharged twice with different labels. *)
+    let resolved =
+      List.map (fun (x, qual_opt, t) ->
+        let f = match_user_clause x qual_opt in
+        let label_tag =
+          match qual_opt with
+          | None -> ""
+          | Some qs ->
+            "<:" ^ String.concat "/" (List.map unloc qs) ^ ">" in
+        (unloc x ^ label_tag, t, f))
+        axs in
+
+    (* Detect duplicate user clauses (same name + same qualifier
+       matching the same obligation) by checking effective names. *)
+    let () =
+      let seen = ref Sstr.empty in
+      List.iter (fun (eff, _, _) ->
+        if Sstr.mem eff !seen then
+          hierror "duplicated proof clause: `%s'" eff;
+        seen := Sstr.add eff !seen)
+        resolved in
+
+    (* Effective names of all obligations: for unambiguous-by-name
+       obligations, the bare name; for ambiguous ones, the
+       name<:labels> form. *)
+    let oblig_eff_name =
+      let by_name =
+        List.fold_left (fun m (n, _, _) ->
+          Mstr.change (function None -> Some 1 | Some k -> Some (k + 1)) n m)
+          Mstr.empty reqs in
+      fun (n, ls, _) ->
+        match Mstr.find_opt n by_name with
+        | Some 1 -> n
+        | _ -> n ^ "<:" ^ String.concat "/" ls ^ ">" in
+
+    (* Interactive list: obligations the user did not discharge. *)
+    let resolved_names =
+      List.fold_left (fun s (n, _, _) -> Sstr.add n s) Sstr.empty resolved in
     let interactive =
       List.pmap
-        (fun (x, req) ->
-           if not (Mstr.mem x symbs) then
-             let ax = {
-               ax_tparams    = tparams;
-               ax_spec       = req;
-               ax_kind       = `Lemma;
-               ax_loca       = lc;
-               ax_smt = false;
-             } in Some ((None, ax), EcPath.psymbol x, scope.sc_env)
-           else None)
+        (fun ((_n, _ls, req) as oblig) ->
+          let eff = oblig_eff_name oblig in
+          if not (Sstr.mem eff resolved_names) then
+            let ax = {
+              ax_tparams    = tparams;
+              ax_spec       = req;
+              ax_kind       = `Lemma;
+              ax_loca       = lc;
+              ax_smt = false;
+            } in Some ((None, ax), EcPath.psymbol eff, scope.sc_env)
+          else None)
         reqs in
       List.iter
         (fun (x, pt, f) ->
@@ -2207,7 +2296,7 @@ module Ty = struct
           let escope = Tactics.proof escope in
           let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
             ignore (Ax.save_r escope))
-        axs;
+        resolved;
       interactive
 
   (* ------------------------------------------------------------------ *)
@@ -2255,6 +2344,7 @@ module Ty = struct
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
     let cr      = ring_of_symmap env (snd ty) kind symbols in
     let axioms  = EcAlgTactic.ring_axioms env cr in
+    let axioms  = List.map (fun (n, f) -> (n, [], f)) axioms in
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
@@ -2302,6 +2392,7 @@ module Ty = struct
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
     let cr      = field_of_symmap env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms env cr in
+    let axioms  = List.map (fun (n, f) -> (n, [], f)) axioms in
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in
 
@@ -2813,21 +2904,41 @@ module Ty = struct
        chain entries) and check the user's tactics against it, now
        that the chain instances are bound in the env so [tc_reduce]
        can walk through their pre-computed paths. *)
+    (* Obligation collection: each chain entry contributes its axioms
+       under the entry's [labels] path. We DO NOT name-dedupe across
+       different label paths — two axioms reaching the same local name
+       through distinct paths (e.g. [mopA] from addmonoid view vs
+       mulmonoid view) are genuinely distinct obligations and must
+       both be discharged.
+
+       Same-(name, form) reached through multiple paths IS deduped
+       structurally (alpha-equivalence) — typical when the same
+       ancestor sits below multiple intermediate classes in a
+       diamond. *)
     let axioms =
       let _, axs =
         List.fold_left
-          (fun (seen, acc) (anc, anc_decl, ren, _labels) ->
-            if already_discharged anc anc_decl ren then (seen, acc)
+          (fun (acc_keys, acc) (anc, anc_decl, ren, labels) ->
+            if already_discharged anc anc_decl ren then (acc_keys, acc)
             else
               List.fold_left
-                (fun (seen, acc) (name, ax) ->
-                  if Sstr.mem name seen then (seen, acc)
-                  else
-                    (Sstr.add name seen,
-                     (name, EcSubst.subst_form subst ax) :: acc))
-                (seen, acc)
+                (fun (acc_keys, acc) (name, ax) ->
+                  let f = EcSubst.subst_form subst ax in
+                  (* Structural dedup: same name + alpha-equivalent
+                     form already emitted is the same obligation
+                     reached twice. *)
+                  let already =
+                    List.exists
+                      (fun (n', _, f') ->
+                        n' = name
+                        && EcReduction.is_alpha_eq
+                             (EcEnv.LDecl.init (env scope) []) f f')
+                      acc in
+                  if already then (acc_keys, acc)
+                  else (acc_keys, (name, labels, f) :: acc))
+                (acc_keys, acc)
                 anc_decl.tc_axs)
-          (Sstr.empty, []) chain_decls in
+          ((), []) chain_decls in
       List.rev axs in
     let inter = check_tci_axioms ~tparams:(fst ty) scope mode tci.pti_axs axioms lc in
 

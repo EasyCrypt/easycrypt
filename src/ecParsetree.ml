@@ -1163,7 +1163,7 @@ type ptycinstance = {
      [CoreInt.zero]), which is a degenerate form; the elaborator
      handles it uniformly via [trans_form]. *)
   pti_ops       : (psymbol * pformula) list;
-  pti_axs       : (psymbol * ptactic_core) list;
+  pti_axs       : (psymbol * psymbol list option * ptactic_core) list;
   pti_args      : [`Ring of (zint option * zint option)] option;
   pti_loca      : is_local;
   pti_reducible : bool;
