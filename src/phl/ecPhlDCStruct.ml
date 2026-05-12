@@ -360,66 +360,39 @@ let t_dc_frame_r theta tc =
 let t_dc_frame theta = FApi.t_low0 "dc-frame" (t_dc_frame_r theta)
 
 (* -------------------------------------------------------------------- *)
-(* Indep:
+(* Congr:
      { phi | R1xR2 } C1 ~ C2 { psi | S1xS2 }
-     Write(Ci) ⊥ Read(Ti)    Read(Ci) ⊥ Write(Ti)
-     --------------------------------------------- Indep
-     { phi | R1;T1 x R2;T2 } C1 ~ C2 { psi | S1;T1 x S2;T2 }
+     --------------------------------------------- Congr
+     { phi | R1 x R2 } C1;T1 ~ C2;T2 { psi | S1;T1 x S2;T2 }
 
    T_i is identified by its length: the user supplies [nl] (left)
    and [nr] (right) so that T1 = suffix-of-length-[nl] of R1 = of S1,
-   and similarly on the right. The tactic then checks Read/Write
-   disjointness via EcPV.                                              *)
+   and similarly on the right. *)
 let t_dc_indep_r ~nl ~nr tc =
   let es = tc1_as_dcEquivS tc in
   let env = FApi.tc1_env tc in
 
-  let (rl_pre, t1_from_r) =
-    split_suffix ~who:"dc indep" tc nl es.dces_rl in
+  let (cl_pre, t1_from_c) =
+    split_suffix ~who:"dc indep" tc nl es.dces_cl in
   let (sl_pre, t1_from_s) =
     split_suffix ~who:"dc indep" tc nl es.dces_sl in
-  if not (EcAst.s_equal t1_from_r t1_from_s) then
+  if not (EcReduction.EqTest.for_stmt env t1_from_c t1_from_s) then
     tc_error !!tc ~who:"dc indep"
       "the suffix of R1 must equal the suffix of S1 (of length %d)" nl;
 
-  let (rr_pre, t2_from_r) =
-    split_suffix ~who:"dc indep" tc nr es.dces_rr in
+  let (cr_pre, t2_from_c) =
+    split_suffix ~who:"dc indep" tc nr es.dces_cr in
   let (sr_pre, t2_from_s) =
     split_suffix ~who:"dc indep" tc nr es.dces_sr in
-  if not (EcAst.s_equal t2_from_r t2_from_s) then
+  if not (EcReduction.EqTest.for_stmt env t2_from_c t2_from_s) then
     tc_error !!tc ~who:"dc indep"
       "the suffix of R2 must equal the suffix of S2 (of length %d)" nr;
-
-  let t1 = t1_from_r in
-  let t2 = t2_from_r in
-
-  let wc1 = EcPV.s_write env es.dces_cl in
-  let rc1 = EcPV.s_read  env es.dces_cl in
-  let wt1 = EcPV.s_write env t1 in
-  let rt1 = EcPV.s_read  env t1 in
-  let wc2 = EcPV.s_write env es.dces_cr in
-  let rc2 = EcPV.s_read  env es.dces_cr in
-  let wt2 = EcPV.s_write env t2 in
-  let rt2 = EcPV.s_read  env t2 in
-
-  if not (EcPV.PV.indep env wc1 rt1) then
-    tc_error !!tc ~who:"dc indep"
-      "Write(C1) and Read(T1) are not disjoint";
-  if not (EcPV.PV.indep env rc1 wt1) then
-    tc_error !!tc ~who:"dc indep"
-      "Read(C1) and Write(T1) are not disjoint";
-  if not (EcPV.PV.indep env wc2 rt2) then
-    tc_error !!tc ~who:"dc indep"
-      "Write(C2) and Read(T2) are not disjoint";
-  if not (EcPV.PV.indep env rc2 wt2) then
-    tc_error !!tc ~who:"dc indep"
-      "Read(C2) and Write(T2) are not disjoint";
 
   let concl =
     f_dcEquivS
       (snd es.dces_ml) (snd es.dces_mr)
       (dces_pr es)
-      rl_pre rr_pre es.dces_cl es.dces_cr
+      es.dces_rl es.dces_rr cl_pre cr_pre
       (dces_po es) sl_pre sr_pre
   in
   FApi.xmutate1 tc `DCIndep [concl]
@@ -474,3 +447,12 @@ let t_dc_trans_r p12 q12 p23 q23 m r2 c2 s2 tc =
 
 let t_dc_trans p12 q12 p23 q23 m r2 c2 s2 =
   FApi.t_low0 "dc-indep" (t_dc_trans_r p12 q12 p23 q23 m r2 c2 s2)
+
+let t_dc_exfalso_r tc =
+    let es = tc1_as_dcEquivS tc in
+    let cond = f_forall_mems [es.dces_ml; es.dces_mr] (f_imp (dces_pr es).inv f_false) in
+    FApi.xmutate1 tc `DCExfalso [cond]
+
+let t_dc_exfalso =
+  FApi.t_low0 "dc-exfalso" t_dc_exfalso_r
+

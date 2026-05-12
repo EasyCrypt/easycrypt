@@ -379,6 +379,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pundelay                  -> EcPhlDCDelay.t_undelay
     | Pdc_delay side            -> process_dc_delay side
     | Pdc_delaystar (side, pre) -> process_dc_delay_star side pre
+    | Pdc_exfalso               -> EcPhlDCStruct.t_dc_exfalso
     | Pdc_pop (side, n)         -> process_dc_pop side n
     | Pdc_push (side, n)        -> process_dc_push side n
     | Pdc_conseq (pre, post)    -> process_dc_conseq pre post
@@ -388,9 +389,6 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pdc_trans (p12, q12, p23, q23, bnds, r2, c2, s2) -> process_dc_trans p12 q12 p23 q23 bnds r2 c2 s2 
     | Pdc_skip                  -> EcPhlDCCore.t_dc_skip
     | Pdc_seq (nl, nr, theta, ts) -> process_dc_seq nl nr theta ts
-    | Pdc_wp                    -> EcPhlDCCore.t_dc_wp None
-    | Pdc_wp_side side          ->
-        fun tc -> EcPhlDCCore.t_dc_wp_side ~side tc
     | Pdc_asgn_side side          ->
         fun tc -> EcPhlDCCore.t_dc_asgn_side side tc
     | Pdc_if None               -> EcPhlDCCore.t_dc_if

@@ -2950,6 +2950,8 @@ dcoupl_tac:
 | DELAY STAR s=side pre=option(sform)
     { Pdc_delaystar (s, pre) }
 
+| EXFALSO { Pdc_exfalso }
+
 | POP s=option(side) n=option(word)
     { Pdc_pop (s, n) }
 
@@ -2980,12 +2982,6 @@ dcoupl_tac:
 | SEQ nl=word nr=word theta=sform
     WITH LPAREN tl=stmt TILD tr=stmt RPAREN
     { Pdc_seq (nl, nr, theta, Some (tl, tr)) }
-
-| WP
-    { Pdc_wp }
-
-| WP s=side
-    { Pdc_wp_side s }
 
 | ASGN s=side
     { Pdc_asgn_side s }

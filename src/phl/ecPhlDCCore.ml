@@ -86,52 +86,6 @@ let t_dc_seq ~nl ~nr ?ts theta =
   FApi.t_low0 "dc-seq" (t_dc_seq_r ~nl ~nr ?ts theta)
 
 (* -------------------------------------------------------------------- *)
-(* WP: weakest-precondition for a suffix of each body (assignments,
-   random samplings, conditionals over pure vars). Does not touch R or
-   S contexts, only transforms the post and body. Sound because
-   dcoupl's post ranges over witness memories and WP is semantic.      *)
-let t_dc_wp_r ?(uselet=true)
-    (ij : (EcMatching.Position.codegap1 * EcMatching.Position.codegap1) option)
-    tc =
-  let hyps = FApi.tc1_hyps tc in
-  let env = EcEnv.LDecl.toenv hyps in
-  let es = tc1_as_dcEquivS tc in
-  let ml, mr = fst es.dces_ml, fst es.dces_mr in
-  let i = Option.map fst ij and j = Option.map snd ij in
-  let (s_hdl, s_wpl) = o_split env i es.dces_cl in
-  let (s_hdr, s_wpr) = o_split env j es.dces_cr in
-  let s_wpl = EcAst.stmt s_wpl in
-  let s_wpr = EcAst.stmt s_wpr in
-  let post = dces_po es in
-  let (s_wpl, post) =
-    EcPhlWp.wp ~mc:(ml, mr) ~uselet hyps es.dces_ml s_wpl
-      (EcAst.POE.empty post.inv)
-  in
-  let (s_wpr, post) =
-    EcPhlWp.wp ~mc:(ml, mr) ~uselet hyps es.dces_mr s_wpr
-      (EcAst.POE.empty post)
-  in
-  if EcUtils.is_some i && not (List.is_empty s_wpl) then
-    tc_error !!tc "wp left remaining %d instruction(s)"
-      (List.length s_wpl);
-  if EcUtils.is_some j && not (List.is_empty s_wpr) then
-    tc_error !!tc "wp right remaining %d instruction(s)"
-      (List.length s_wpr);
-  let cl = EcAst.stmt (s_hdl @ s_wpl) in
-  let cr = EcAst.stmt (s_hdr @ s_wpr) in
-  let concl =
-    f_dcEquivS (snd es.dces_ml) (snd es.dces_mr)
-      (dces_pr es)
-      es.dces_rl es.dces_rr cl cr
-      { ml; mr; inv = post }
-      es.dces_sl es.dces_sr
-  in
-  FApi.xmutate1 tc `DCWp [concl]
-
-let t_dc_wp ?uselet ij =
-  FApi.t_low0 "dc-wp" (t_dc_wp_r ?uselet ij)
-
-(* -------------------------------------------------------------------- *)
 (* Helpers: coerce a program-expression test [e] into a ts_inv
    formula that references the given memory and is generalized to the
    other side.                                                          *)
@@ -531,40 +485,6 @@ let t_dc_if_side_r ~side tc =
     ; build (else_l, else_r) pre_else ]
 
 let t_dc_if_side ~side = FApi.t_low0 "dc-if-side" (t_dc_if_side_r ~side)
-
-(* -------------------------------------------------------------------- *)
-(* One-sided WP: applies WP on the chosen side's body only.             *)
-let t_dc_wp_side_r ?(uselet=true) ~side tc =
-  let hyps = FApi.tc1_hyps tc in
-  let es = tc1_as_dcEquivS tc in
-  let ml, mr = fst es.dces_ml, fst es.dces_mr in
-  let (mem, body) =
-    match side with
-    | `Left  -> (es.dces_ml, es.dces_cl)
-    | `Right -> (es.dces_mr, es.dces_cr)
-  in
-  let post = dces_po es in
-  let (s_rest, post_new) =
-    EcPhlWp.wp ~mc:(ml, mr) ~uselet hyps mem body
-      (EcAst.POE.empty post.inv)
-  in
-  let body_new = EcAst.stmt s_rest in
-  let (cl, cr) =
-    match side with
-    | `Left  -> (body_new, es.dces_cr)
-    | `Right -> (es.dces_cl, body_new)
-  in
-  let concl =
-    f_dcEquivS (snd es.dces_ml) (snd es.dces_mr)
-      (dces_pr es)
-      es.dces_rl es.dces_rr cl cr
-      { ml; mr; inv = post_new }
-      es.dces_sl es.dces_sr
-  in
-  FApi.xmutate1 tc `DCWpSide [concl]
-
-let t_dc_wp_side ?uselet ~side =
-  FApi.t_low0 "dc-wp-side" (t_dc_wp_side_r ?uselet ~side)
 
 let t_dc_asgn_side_r side tc =
   let env = FApi.tc1_env tc in

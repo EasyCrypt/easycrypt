@@ -28,6 +28,8 @@ val t_dc_delay_side : side:[`Left | `Right] -> FApi.backward
 
 val t_dc_delay_star : side:[`Left | `Right] -> ?inv:ss_inv -> FApi.backward
 
+val t_dc_exfalso : FApi.backward
+
 (* Conseq: weakens pre and strengthens post by user-provided formulas. *)
 val t_dc_conseq :
   pre:EcAst.ts_inv -> post:EcAst.ts_inv -> FApi.backward

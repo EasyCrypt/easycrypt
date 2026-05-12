@@ -20,14 +20,6 @@ val t_dc_seq :
   -> EcAst.form
   -> FApi.backward
 
-(* WP: applies the weakest-precondition on a suffix of each body. An
-   optional split position [(i, j)] bounds the prefix on each side
-   (use [None] to wp the entire body). *)
-val t_dc_wp :
-     ?uselet:bool
-  -> (EcMatching.Position.codegap1 * EcMatching.Position.codegap1) option
-  -> FApi.backward
-
 (* If: the body on each side must be a single [if] instruction. Three
    subgoals are produced (test equivalence, then-branch, else-branch).
    Side condition: [Write(R_i)] disjoint from [Fv(e_i)] (checked). *)
@@ -58,12 +50,6 @@ val t_dc_sym : FApi.backward
 
 (* One-sided If. *)
 val t_dc_if_side : side:[`Left | `Right] -> FApi.backward
-
-(* One-sided WP (applies WP to chosen side's body only). *)
-val t_dc_wp_side :
-     ?uselet:bool
-  -> side:[`Left | `Right]
-  -> FApi.backward
 
 (* One-sided Assign (other-side body must be empty). *)
 val t_dc_asgn_side : [`Left | `Right] -> FApi.backward
