@@ -73,10 +73,17 @@ type w3absmod = {
    See [[tc-smt-encoding-dict]] memory: encoding is dictionary-passing
    for soundness; every TC op application becomes a dict-field projection. *)
 type w3_class_field = {
-  wcf_name    : EcSymbols.symbol;   (* leaf-level (renamed) name *)
-  wcf_origin  : EcPath.path;        (* class where this op was declared *)
-  wcf_orig_name : EcSymbols.symbol; (* op name at its origin class *)
-  wcf_proj    : WTerm.lsymbol;      (* why3 field projection *)
+  wcf_name      : EcSymbols.symbol;   (* leaf-level (renamed) name *)
+  wcf_origin    : EcPath.path;        (* class where this op was declared *)
+  wcf_orig_name : EcSymbols.symbol;   (* op name at its origin class *)
+  wcf_proj      : WTerm.lsymbol;      (* first-order field projection *)
+  mutable wcf_proj_ho :
+    [ `TODO of string  (* full base name, used to lazily emit the _ho *)
+    | `DONE of WTerm.lsymbol ];
+    (* HO wrapper for partial-application uses (passing the op as a
+       function value). Materialised on-demand by Phase D when the
+       Fop is not fully applied, mirroring [trans_op]'s [mk_highorder_func]
+       pattern. *)
 }
 
 type w3_class_decl = {
@@ -583,6 +590,30 @@ let w3op_ho_lsymbol genv wop =
   | `HO_FIX (ls, _, _, r) ->
       r := true; ls
 
+(* HO wrapper for a class-field projection [field.wcf_proj], emitted
+   lazily on first partial-application use. Same shape as
+   [w3op_ho_lsymbol] for regular ops — a function-typed constant
+   [fld_X_ho] of the same type as [proj_ls] would be when fully
+   curried, with a spec axiom linking it to the first-order apply. *)
+let w3op_proj_ho_lsymbol (genv : tenv) (field : w3_class_field) : WTerm.lsymbol =
+  match field.wcf_proj_ho with
+  | `DONE ls -> ls
+  | `TODO base ->
+    let proj_ls = field.wcf_proj in
+    let dom = proj_ls.WTerm.ls_args in
+    let codom = proj_ls.WTerm.ls_value in
+    let ls, decl, decl_s =
+      mk_highorder_func base dom codom (WTerm.t_app proj_ls) in
+    genv.te_task <- WTask.add_decl genv.te_task decl;
+    genv.te_task <- WTask.add_decl genv.te_task decl_s;
+    field.wcf_proj_ho <- `DONE ls;
+    ls
+
+let ho_ls_type (ls : WTerm.lsymbol) : WTy.ty =
+  match ls.WTerm.ls_value with
+  | Some t -> t
+  | None -> Why3.Ty.ty_bool
+
 (* -------------------------------------------------------------------- *)
 let rec highorder_type targs tres =
   match targs with
@@ -823,12 +854,38 @@ and try_dict_proj
             match Hashtbl.find_opt w3cd.wcd_by_leaf leaf_name with
             | None -> None
             | Some field ->
-              (* HO projection: [proj_ls : dict -> field_ty]. Apply to
-                 dict, then use [apply_highorder] for args (which uses
-                 why3's [@] for function-typed values). Works for full,
-                 partial, AND over-application uniformly. *)
-              let fv = WTerm.t_app_infer field.wcf_proj [dict_term] in
-              Some (apply_highorder fv args)
+              let proj_ls = field.wcf_proj in
+              let n_op_args = List.length proj_ls.WTerm.ls_args - 1 in
+              let n_args    = List.length args in
+              if n_args = n_op_args then
+                (* Full application: first-order [proj_ls dict args]
+                   yields the result directly. No [@] needed — SMT
+                   bridges of the same shape match without HO work. *)
+                Some (WTerm.t_app_infer proj_ls (dict_term :: args))
+              else if n_args > n_op_args then
+                (* Over-application: apply [n_op_args] flat args first,
+                   then [apply_highorder] for the surplus. *)
+                let first, rest = List.takedrop n_op_args args in
+                let head =
+                  WTerm.t_app_infer proj_ls (dict_term :: first) in
+                Some (apply_highorder head rest)
+              else
+                (* Partial application: get the HO wrapper of [proj_ls]
+                   (lazily emitted as a function-typed constant with a
+                   spec axiom linking it to [proj_ls]), then apply via
+                   [@] to the supplied args. The wrapper plays the same
+                   role as [trans_op]'s [mk_highorder_func]. The
+                   wrapper's type is polymorphic in [w3cd.wcd_tparam];
+                   instantiate at the actual carrier. *)
+                let carrier_ec_ty = fst (List.last etyargs) in
+                let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
+                let mtv =
+                  WTy.Mtv.singleton w3cd.wcd_tparam carrier_w3_ty in
+                let inst t = WTy.ty_inst mtv t in
+                let ho_ls = w3op_proj_ho_lsymbol genv field in
+                let fty = inst (ho_ls_type ho_ls) in
+                let head = WTerm.fs_app ho_ls [] fty in
+                Some (apply_highorder head (dict_term :: args))
         in
         let find_dict (key : dict_carrier) (offset : int) =
           List.find_opt
@@ -1365,29 +1422,36 @@ let trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
         | (self_id, _) :: _ ->
         let lenv =
           { empty_lenv with le_tv = Mid.add self_id alpha_ty Mid.empty } in
-        (* Higher-order projection [proj_ls : dict -> field_ty]. The
-           field's type may be a function (e.g. mop : 'a -> 'a -> 'a);
-           applications then use why3's [@] operator. This is the only
-           shape that handles ALL of full, partial, and over-application
-           consistently without lambdas — partial uses become bare
-           [proj_ls dict] (an function-typed value), which Alt-Ergo
-           can pass around as a closure. *)
-        let wty = trans_ty (genv, lenv) bound_op.EcDecl.op_ty in
-        let proj_id =
-          let safe =
-            String.map (fun c ->
-              if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                 || (c >= '0' && c <= '9') || c = '_'
-              then c else '_'
-            ) leaf_name in
-          WIdent.id_fresh (Printf.sprintf "fld_%s" safe) in
+        (* First-order projection [proj_ls : dict -> arg_tys -> codom].
+           Mirrors [trans_op]'s strategy: keep applications first-order
+           so SMT bridges (which apply [proj_ls dict args]) connect
+           directly to concrete realisations, without HO [@] reasoning.
+           For partial-application uses (the op passed as a function
+           value), Phase D will lazily build an [_ho] wrapper via
+           [mk_highorder_func]-style — see [wcf_proj_ho]. *)
+        let dom, codom =
+          EcEnv.Ty.signature genv.te_env bound_op.EcDecl.op_ty in
+        let wdom = List.map (trans_ty (genv, lenv)) dom in
+        let wcodom =
+          if   EcReduction.EqTest.is_bool genv.te_env codom
+          then None
+          else Some (trans_ty (genv, lenv) codom) in
+        let safe =
+          String.map (fun c ->
+            if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+               || (c >= '0' && c <= '9') || c = '_'
+            then c else '_'
+          ) leaf_name in
+        let proj_base = Printf.sprintf "fld_%s" safe in
+        let proj_id = WIdent.id_fresh proj_base in
         let proj_ls =
-          WTerm.create_lsymbol proj_id [dict_ty] (Some wty) in
+          WTerm.create_lsymbol proj_id (dict_ty :: wdom) wcodom in
         let field = {
           wcf_name      = leaf_name;
           wcf_origin    = anc.EcAst.tc_name;
           wcf_orig_name = orig_name;
           wcf_proj      = proj_ls;
+          wcf_proj_ho   = `TODO proj_base;
         } in
         by_name := EcMaps.Mstr.add leaf_name field !by_name;
         ordered := field :: !ordered
@@ -1509,6 +1573,12 @@ let trans_hyp ((genv, lenv) as env) (x, ty) =
      axiom name : forall ('a : ty) (d : C_dict 'a),
        C_axioms 'a d -> <body using d's projections>
 *)
+let sanitize_for_id s =
+  String.map (fun c ->
+    if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+       || (c >= '0' && c <= '9') || c = '_'
+    then c else '_') s
+
 let trans_axiom genv (p, ax) =
   let lenv, _wparams = lenv_of_tparams ax.ax_tparams in
   (* Collect (tparam_id, offset, class, tparam_ty) entries for each TC
@@ -1556,7 +1626,47 @@ let trans_axiom genv (p, ax) =
         (List.map (fun (vs, _, _) -> vs) dict_vss) [] w_body in
     let pr = WDecl.create_prsymbol (preid_p p) in
     let decl = WDecl.create_prop_decl WDecl.Paxiom pr w_body in
-    genv.te_task <- WTask.add_decl genv.te_task decl
+    genv.te_task <- WTask.add_decl genv.te_task decl;
+    (* Additionally emit a SPECIALIZED version at each registered
+       instance whose class matches a TC binder. With the dict
+       universally quantified at the polymorphic level, SMT often
+       fails to instantiate at a concrete carrier — especially when
+       the body contains nested polymorphic ops (like [intmul] inside
+       [mulrNz]). The specialized version substitutes the tparam to
+       the instance's carrier, the dict-var to a TCIConcrete witness
+       on the instance, then [delta_tc]-reduces — yielding a pure
+       concrete fact that SMT uses directly. *)
+    if List.length tc_binders = 1 then begin
+      let (tparam_id, _offset, tc, _) = List.hd tc_binders in
+      List.iter (fun (path_opt, tci) ->
+        match path_opt, tci.EcTheory.tci_instance with
+        | Some inst_path, `General (anc, Some _)
+          when tci.EcTheory.tci_params = []
+               && EcPath.p_equal anc.EcAst.tc_name tc.EcAst.tc_name
+               && tci.EcTheory.tci_reducible -> begin
+          let inst_etyargs =
+            EcDecl.etyargs_of_tparams tci.EcTheory.tci_params in
+          let our_etyarg : EcAst.etyarg =
+            (tci.EcTheory.tci_type,
+             [EcAst.TCIConcrete
+                { path = inst_path; etyargs = inst_etyargs; lift = [] }]) in
+          let subst_map = Mid.singleton tparam_id our_etyarg in
+          let axform' =
+            EcCoreSubst.Fsubst.f_subst_tvar ~freshen:true subst_map ax.ax_spec in
+          let axform' =
+            let ri = { EcReduction.no_red with delta_tc = true } in
+            let ldecl = EcEnv.LDecl.init genv.te_env [] in
+            EcReduction.simplify ri ldecl axform' in
+          let spec_pid =
+            WIdent.id_fresh
+              (Printf.sprintf "%s_at_%s"
+                 (EcPath.basename p)
+                 (sanitize_for_id (EcPath.tostring inst_path))) in
+          add_axiom (genv, empty_lenv) spec_pid axform'
+        end
+        | _ -> ()
+      ) (EcEnv.TcInstance.get_all genv.te_env)
+    end
   end
 
 (* Phase B — for ONE registered chain-instance path, lazily emit:
@@ -1572,12 +1682,6 @@ let trans_axiom genv (p, ax) =
    Lazy emission keeps the why3 task small: instances unrelated to
    the current goal are never emitted, so SMT solvers aren't slowed
    by a forest of irrelevant dict types + bridges + axhold facts. *)
-let sanitize_for_id s =
-  String.map (fun c ->
-    if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-       || (c >= '0' && c <= '9') || c = '_'
-    then c else '_') s
-
 (* Chain walker variant of [ancestors_with_renaming] that ALSO returns
    the [lift] (path indices into tc_prts) used to reach each ancestor.
    Used by Phase B/C to instantiate ancestor axioms at the right chain
@@ -2363,10 +2467,7 @@ let init hyps_ld concl =
      Fops like [Top.TcMonoid.mop<:int + addmonoid leg>] reduce to
      [CoreInt.add] directly — they NEVER hit Phase D's dict projection
      path, so concrete-carrier goals translate as if they had no TC
-     content. Phase D still handles abstract-carrier Fops (which stay
-     unreduced). This keeps obligation-discharge proofs working
-     soundly: the goal is in concrete terms, matched by the concrete
-     bridges/realisations that Phase B emits. *)
+     content. Phase D still handles abstract-carrier Fops. *)
   let concl =
     let ri = { EcReduction.no_red with delta_tc = true } in
     EcReduction.simplify ri hyps_ld concl in
