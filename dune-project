@@ -12,10 +12,11 @@
  (name easycrypt)
  (sites (lib theories) (libexec commands) (lib doc) (lib config))
  (depends
-  (ocaml (>= 4.08.0))
+  (ocaml (>= 4.14.0))
   (batteries (>= 3))
   (camlp-streams (>= 5))
   camlzip
+  cmarkit
   dune
   dune-build-info
   dune-site
