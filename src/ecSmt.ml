@@ -815,12 +815,46 @@ let walk_dict_lift
      [le_tdict] / [te_absdict].
    Returns [None] for unresolved unification witnesses or missing
    registrations. *)
+(* Walk [lift] from [path] through each tci_parents step, returning the
+   final synth instance's path (and consumed-lift suffix). If any step
+   has no [tci_parents] entry (manually-declared parent with no synthesis
+   tracking, or non-synth chain), stops at the deepest reached step and
+   returns the unconsumed lift remainder for chain-projection fallback.
+   This is the analogue of [ecEnv.ml]'s [resolve_lifted] but tracks how
+   far we got so the caller can compose what's left via chain projections. *)
+let walk_lift_via_tci_parents
+    (env : EcEnv.env) (path : EcPath.path) (lift : int list)
+  : EcPath.path * int list
+=
+  let rec aux path = function
+    | [] -> (path, [])
+    | i :: rest ->
+      match EcEnv.TcInstance.by_path_opt path env with
+      | None -> (path, i :: rest)
+      | Some tci ->
+        match List.nth_opt tci.EcTheory.tci_parents i with
+        | None -> (path, i :: rest)
+        | Some parent_path -> aux parent_path rest
+  in aux path lift
+
 let rec resolve_witness
     (genv : tenv) (lenv : lenv) (witness : EcAst.tcwitness)
   : (WTerm.term * w3_class_decl * int list) option
 =
   match witness with
   | EcAst.TCIConcrete { path; etyargs; lift } -> begin
+      (* For monomorphic instance witnesses, prefer the synth chain
+         instance reached by walking [lift] through [tci_parents] over
+         applying chain projections. The two produce semantically equal
+         dicts, but only the direct-instance form matches bridge axioms
+         like [bridge_inst_X_<op>] in the why3 task — chain projections
+         go through [_to_]-axioms that SMT may not chain across more
+         than one hop. *)
+      let target_path, remaining_lift =
+        walk_lift_via_tci_parents genv.te_env path lift in
+      match !emit_instance_dict_ref genv target_path with
+      | Some (dt, w3cd) -> Some (dt, w3cd, remaining_lift)
+      | None ->
       match !emit_instance_dict_ref genv path with
       | Some (dt, w3cd) -> Some (dt, w3cd, lift)
       | None ->
@@ -1764,7 +1798,7 @@ and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
      we feed an [alpha_tv]-typed dict in. *)
   let class_decl = EcEnv.TypeClass.by_path cp genv.te_env in
   let src_ty = WTy.ty_app dict_ts [alpha_ty] in
-  List.iteri (fun edge_idx (parent_tc, _label, _edge_ren) ->
+  List.iteri (fun edge_idx (parent_tc, _label, edge_ren) ->
     let parent_w3cd = trans_class genv parent_tc.EcAst.tc_name in
     let dst_ty = WTy.ty_app parent_w3cd.wcd_ts [alpha_ty] in
     let proj_name =
@@ -1777,18 +1811,28 @@ and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
         [src_ty] (Some dst_ty) in
     genv.te_task <- WTask.add_param_decl genv.te_task proj_ls;
     Hashtbl.add w3cd.wcd_chain_projs edge_idx (proj_ls, parent_w3cd);
-    (* Spec: for each parent field f_P, find the matching cp field
-       f_C (same wcf_origin + wcf_orig_name) and assert that
-       [P_<f> (proj d) args...] equals [C_<f> d args...]. Using
-       [t_app_infer] throughout lets why3 infer the type
-       instantiations from the bound [d : cp_dict alpha_tv]. *)
-    let cp_by_origin = Hashtbl.create 17 in
+    (* Spec: for each parent field f_P (keyed by leaf-name [n_P] in
+       [parent_w3cd]), find the matching cp field whose leaf-name is
+       [lookup_ren edge_ren n_P] — the child-side name the parent's op
+       acquires when projected along THIS edge. Keying by leaf-name
+       (after edge-rename application) instead of [(wcf_origin,
+       wcf_orig_name)] is critical for diamond ancestors: at [comring],
+       monoid's [idm] is reached BOTH via the addgroup leg (renamed
+       to [zero]) and via the mulmonoid leg (renamed to [oner]); both
+       child fields share [(origin=monoid, orig_name=idm)] and an
+       origin-keyed lookup picks one arbitrarily, producing the
+       wrong spec axiom (e.g. [mulmonoid_oner (comring_to_mulmonoid_1
+       d) = comring_zero d]). Leaf-name keying selects the correct
+       leg per edge. *)
+    let cp_by_leaf = Hashtbl.create 17 in
     List.iter (fun f ->
-      Hashtbl.replace cp_by_origin (f.wcf_origin, f.wcf_orig_name) f
+      Hashtbl.replace cp_by_leaf f.wcf_name f
     ) w3cd.wcd_fields;
+    let lookup_edge_ren ren n =
+      match List.assoc_opt n ren with Some n' -> n' | None -> n in
     List.iter (fun f_P ->
-      match Hashtbl.find_opt cp_by_origin
-              (f_P.wcf_origin, f_P.wcf_orig_name) with
+      let target_leaf = lookup_edge_ren edge_ren f_P.wcf_name in
+      match Hashtbl.find_opt cp_by_leaf target_leaf with
       | None -> ()
       | Some f_C ->
         let d_vs =
