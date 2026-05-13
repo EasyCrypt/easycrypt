@@ -122,7 +122,15 @@ type tenv = {
   (*---*) te_absmod     : w3absmod Hid.t;      (* abstract module     *)
   (*---*) te_class      : w3_class_decl Hp.t;  (* TC class declarations *)
   (*---*) te_idict      : (WTerm.term * w3_class_decl) Hp.t;
-    (* instance dicts, keyed by tcinstance path *)
+    (* monomorphic instance dicts ([tci_params = []]), keyed by
+       tcinstance path. Result: a dict-constant term + the ancestor
+       class decl reached. *)
+  (*---*) te_pidict     : (WTerm.lsymbol * w3_class_decl * EcDecl.ty_params)
+                          Hp.t;
+    (* polymorphic instance constructors ([tci_params <> []]), keyed by
+       tcinstance path. Result: a constructor lsymbol [arg_dicts ->
+       result_dict] + ancestor class decl + the [tci_params] needed to
+       align constructor args with witness etyargs at the call site. *)
   (*---*) te_absdict    : (EcPath.path * int, WTerm.term * w3_class_decl)
                           Hashtbl.t;
     (* declared-abstract-type dicts, keyed by (type path, bound offset).
@@ -146,6 +154,7 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_absmod     = Hid.create 0;
     te_class      = Hp.create 0;
     te_idict      = Hp.create 0;
+    te_pidict     = Hp.create 0;
     te_absdict    = Hashtbl.create 17;
   }
 
@@ -715,6 +724,15 @@ let emit_instance_dict_ref
   : (tenv -> EcPath.path -> (WTerm.term * w3_class_decl) option) ref
   = ref (fun _ _ -> None)
 
+(* Forward reference for the lazy POLYMORPHIC-instance constructor
+   emitter. Returns the constructor lsymbol, the ancestor [w3_class_decl]
+   the instance is declared at, and the instance's [tci_params] (so the
+   caller can recursively resolve inner witnesses to dict-args). *)
+let emit_polymorphic_instance_ref
+  : (tenv -> EcPath.path ->
+      (WTerm.lsymbol * w3_class_decl * EcDecl.ty_params) option) ref
+  = ref (fun _ _ -> None)
+
 (* -------------------------------------------------------------------- *)
 (* Walk [tc]'s parent chain via the [lift] indices, composing renamings
    as we go. Returns the ancestor reached and the cumulative renaming
@@ -756,6 +774,67 @@ let walk_dict_lift
         let dt' = WTerm.t_app_infer proj_ls [dt] in
         Some (dt', parent_w3cd)
   ) (Some (start_dict, start_w3cd)) lift
+
+(* -------------------------------------------------------------------- *)
+(* Resolve a [tcwitness] to a dict term + its [w3_class_decl] + the
+   remaining (unwalked) chain [lift]. The lift is returned UNWALKED so
+   each caller chooses how to consume it: [try_dict_proj] uses it
+   purely for leaf-rename lookup (EC-level [walk_lift] + dict at leaf
+   stays put); [compute_op_dicts] walks it via [walk_dict_lift] to
+   produce the dict at the projected ancestor class.
+
+   Handles three witness forms:
+   - [TCIConcrete] with a registered MONOMORPHIC instance ([te_idict]).
+   - [TCIConcrete] with a POLYMORPHIC instance ([te_pidict]): recursively
+     resolves the inner witness etyargs to inner-dict terms (walking
+     THEIR lifts via [walk_dict_lift] since the constructor expects each
+     arg at the precise inner class), then applies the constructor.
+   - [TCIAbstract] (a tparam or declared-abstract carrier): look up
+     [le_tdict] / [te_absdict].
+   Returns [None] for unresolved unification witnesses or missing
+   registrations. *)
+let rec resolve_witness
+    (genv : tenv) (lenv : lenv) (witness : EcAst.tcwitness)
+  : (WTerm.term * w3_class_decl * int list) option
+=
+  match witness with
+  | EcAst.TCIConcrete { path; etyargs; lift } -> begin
+      match !emit_instance_dict_ref genv path with
+      | Some (dt, w3cd) -> Some (dt, w3cd, lift)
+      | None ->
+        match !emit_polymorphic_instance_ref genv path with
+        | None -> None
+        | Some (ctor_ls, anc_w3cd, tci_params) ->
+          let exception Stop in
+          try
+            let paired =
+              try List.combine tci_params etyargs
+              with Invalid_argument _ -> raise Stop in
+            let inner_dicts =
+              List.concat_map (fun ((_, tcs), (_carrier_ec, ws)) ->
+                if List.length tcs <> List.length ws then raise Stop
+                else List.map (fun (_tc, w) ->
+                  match resolve_witness genv lenv w with
+                  | Some (t, w3cd, w_lift) ->
+                    (match walk_dict_lift t w3cd w_lift with
+                     | Some (t', _) -> t'
+                     | None -> raise Stop)
+                  | None -> raise Stop
+                ) (List.combine tcs ws)
+              ) paired in
+            Some (WTerm.t_app_infer ctor_ls inner_dicts, anc_w3cd, lift)
+          with Stop -> None
+    end
+  | EcAst.TCIAbstract { support = `Var x; offset; lift } ->
+      Option.map (fun (_, _, dt, w3cd) -> (dt, w3cd, lift))
+        (List.find_opt (fun (k, off', _, _) ->
+          off' = offset &&
+          (match k with DKVar a -> EcIdent.id_equal a x | _ -> false)
+        ) lenv.le_tdict)
+  | EcAst.TCIAbstract { support = `Abs t; offset; lift } ->
+      Option.map (fun (dt, w3cd) -> (dt, w3cd, lift))
+        (Hashtbl.find_opt genv.te_absdict (t, offset))
+  | EcAst.TCIUni _ -> None
 
 (* -------------------------------------------------------------------- *)
 let rec trans_kpattern env (k, (ls, wth)) f =
@@ -867,26 +946,9 @@ and compute_op_dicts
   let dict_of_witness (witness : EcAst.tcwitness)
     : (WTerm.term * w3_class_decl) option
   =
-    let start =
-      match witness with
-      | EcAst.TCIConcrete { path; _ } ->
-        !emit_instance_dict_ref genv path
-      | EcAst.TCIAbstract { support = `Var x; offset; _ } ->
-        Option.map (fun (_, _, dt, w3cd) -> (dt, w3cd))
-          (List.find_opt (fun (k, off', _, _) ->
-            off' = offset &&
-            (match k with DKVar a -> EcIdent.id_equal a x | _ -> false)
-          ) lenv.le_tdict)
-      | EcAst.TCIAbstract { support = `Abs t; offset; _ } ->
-        Hashtbl.find_opt genv.te_absdict (t, offset)
-      | _ -> None in
-    let lift = match witness with
-      | EcAst.TCIConcrete { lift; _ }
-      | EcAst.TCIAbstract { lift; _ } -> lift
-      | EcAst.TCIUni (_, lift) -> lift in
-    match start with
+    match resolve_witness genv lenv witness with
     | None -> None
-    | Some (dt, w3cd) -> walk_dict_lift dt w3cd lift
+    | Some (dt, w3cd, lift) -> walk_dict_lift dt w3cd lift
   in
   let tparams_and_etyargs =
     try List.combine op.op_tparams etyargs
@@ -978,39 +1040,17 @@ and try_dict_proj
                 let head = WTerm.fs_app ho_ls [] fty in
                 Some (apply_highorder head (dict_term :: args))
         in
-        let find_dict (key : dict_carrier) (offset : int) =
-          List.find_opt
-            (fun (k, off', _, _) ->
-              offset = off' &&
-              (match k, key with
-               | DKVar a, DKVar b -> EcIdent.id_equal a b
-               | DKAbs a, DKAbs b -> EcPath.p_equal a b
-               | _ -> false))
-            lenv.le_tdict in
-        match witness with
-        | EcAst.TCIAbstract { support = `Var x; offset; lift } -> begin
-            match find_dict (DKVar x) offset with
-            | None -> None
-            | Some (_, _, dict_term, w3cd) ->
-              try_finish dict_term w3cd lift
-          end
-        | EcAst.TCIAbstract { support = `Abs t; offset; lift } -> begin
-            (* [te_absdict] is the tenv-level table for declared-abstract
-               carriers: tenv-level so trans_axiom / trans_body (op body
-               translation) can ALSO project through it, even though
-               they build their own [lenv]s. *)
-            match Hashtbl.find_opt genv.te_absdict (t, offset) with
-            | None -> None
-            | Some (dict_term, w3cd) ->
-              try_finish dict_term w3cd lift
-          end
-        | EcAst.TCIConcrete { path; lift; _ } -> begin
-            match !emit_instance_dict_ref genv path with
-            | None -> None
-            | Some (dict_term, w3cd) ->
-              try_finish dict_term w3cd lift
-          end
-        | _ -> None
+        (* Unified resolution: [resolve_witness] handles all four
+           witness shapes — abstract [`Var]/[`Abs] from [lenv]/[te_absdict],
+           concrete monomorphic-instance from [te_idict], and concrete
+           POLYMORPHIC-instance via the constructor lsymbol applied to
+           recursively-resolved inner dicts. [try_finish] consumes the
+           returned [lift] EC-side (for leaf-rename); the dict stays at
+           the resolved class. *)
+        match resolve_witness genv lenv witness with
+        | None -> None
+        | Some (dict_term, w3cd, lift) ->
+          try_finish dict_term w3cd lift
       end
     | _ -> None
     end
@@ -2076,6 +2116,85 @@ let emit_instance_dict
   | _ -> None
 
 let () = emit_instance_dict_ref := emit_instance_dict
+
+(* -------------------------------------------------------------------- *)
+(* For a polymorphic instance ([tci_params <> []]), emit a dict
+   CONSTRUCTOR lsymbol mapping inner-tparam dicts to the outer-dict at
+   [tci.tci_type]. Cached in [te_pidict] so repeated witness-resolution
+   calls reuse the same symbol.
+
+   No bridges or axioms-hold are emitted yet — the constructor is
+   uninterpreted. This is enough for [compute_op_dicts] and Phase D to
+   produce well-typed dict terms at polymorphic-instance carriers; the
+   resulting [comring_<op> (inst_X di) xs] is unconstrained but
+   type-correct, which unblocks dict-passing of op bodies whose tparams
+   bind a polymorphic-instance carrier (e.g. inside [poly]'s lemma
+   proofs that reduce class ops at [int poly]). *)
+let emit_polymorphic_instance
+  (genv : tenv) (path : EcPath.path)
+  : (WTerm.lsymbol * w3_class_decl * EcDecl.ty_params) option
+=
+  match Hp.find_opt genv.te_pidict path with
+  | Some triple -> Some triple
+  | None ->
+  let env = genv.te_env in
+  let tci_opt =
+    List.find_opt (fun (p, _) ->
+      match p with Some p' -> EcPath.p_equal p' path | None -> false)
+      (EcEnv.TcInstance.get_all env) in
+  match tci_opt with
+  | Some (_, ({ EcTheory.tci_instance =
+                `General (anc, Some _symbols); _ } as tci))
+    when tci.EcTheory.tci_params <> [] ->
+    let anc_w3cd = trans_class genv anc.EcAst.tc_name in
+    (* lenv mapping [tci_params] ids to fresh why3 tvars. Shared by
+       all argument types AND the result type so they unify. *)
+    let lenv0, _w3tvs = lenv_of_tparams tci.EcTheory.tci_params in
+    let arg_tys =
+      List.concat_map (fun (tparam_id, tcs) ->
+        let tparam_w3ty =
+          try Mid.find tparam_id lenv0.le_tv
+          with Not_found -> assert false in
+        List.map (fun tc ->
+          let inner_w3cd = trans_class genv tc.EcAst.tc_name in
+          WTy.ty_app inner_w3cd.wcd_ts [tparam_w3ty]
+        ) tcs
+      ) tci.EcTheory.tci_params in
+    let carrier_w3_ty =
+      trans_ty (genv, lenv0) tci.EcTheory.tci_type in
+    let result_ty =
+      WTy.ty_app anc_w3cd.wcd_ts [carrier_w3_ty] in
+    (* Readable name [inst_<carrier>_<chain-labels|class>], same scheme
+       as monomorphic [emit_instance_dict] — see that function for the
+       leg-label rationale. *)
+    let carrier_name =
+      let rec head_name (ty : EcAst.ty) =
+        match ty.ty_node with
+        | Tconstr (p, _) -> EcPath.basename p
+        | Tvar id -> EcIdent.name id
+        | Tglob _ -> "glob"  | Tunivar _ -> "univ"
+        | Ttuple _ -> "tuple"
+        | Tfun (_, t) -> head_name t
+      in head_name tci.EcTheory.tci_type in
+    let class_name = EcPath.basename anc.EcAst.tc_name in
+    let tag =
+      match tci.EcTheory.tci_chain_labels with
+      | Some labels when labels <> [] ->
+        String.concat "_" (List.map sanitize_for_id labels)
+      | _ -> sanitize_for_id class_name in
+    let ctor_name =
+      Printf.sprintf "inst_%s_%s"
+        (sanitize_for_id carrier_name) tag in
+    let ctor_ls =
+      WTerm.create_lsymbol
+        (WIdent.id_fresh ctor_name) arg_tys (Some result_ty) in
+    genv.te_task <- WTask.add_param_decl genv.te_task ctor_ls;
+    let triple = (ctor_ls, anc_w3cd, tci.EcTheory.tci_params) in
+    Hp.add genv.te_pidict path triple;
+    Some triple
+  | _ -> None
+
+let () = emit_polymorphic_instance_ref := emit_polymorphic_instance
 
 (* For each typeclass constraint on a goal-context type parameter, pull
    in the typeclass axioms (and those of all its ancestors) as Why3
