@@ -1443,13 +1443,30 @@ let trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
           if   EcReduction.EqTest.is_bool genv.te_env codom
           then None
           else Some (trans_ty (genv, lenv) codom) in
-        let safe =
-          String.map (fun c ->
-            if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-               || (c >= '0' && c <= '9') || c = '_'
-            then c else '_'
-          ) leaf_name in
-        let proj_base = Printf.sprintf "fld_%s" safe in
+        (* Map the user-facing op name (which may contain operator
+           characters) to a readable why3 identifier. Special-case the
+           common arithmetic / monoid names so the task dump has
+           [comring_plus] / [comring_neg] / [comring_oner] rather than
+           [fld__1] / [fld___] / [fld_oner]. Falls back to a generic
+           character-class sanitisation for anything else. *)
+        let pretty_name s =
+          match s with
+          | "+"   -> "plus"  | "*"  -> "times" | "-"  -> "minus"
+          | "[-]" -> "neg"   | "0"  -> "zero"  | "1"  -> "one"
+          | "<"   -> "lt"    | "<=" -> "le"    | ">"  -> "gt" | ">=" -> "ge"
+          | "( * )" -> "times" | "/" -> "div" | "%" -> "mod"
+          | _ ->
+            if s <> "" && String.for_all (fun c ->
+              (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+              || (c >= '0' && c <= '9') || c = '_'
+            ) s then s
+            else String.map (fun c ->
+              if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                 || (c >= '0' && c <= '9') || c = '_'
+              then c else '_') s in
+        let proj_base =
+          Printf.sprintf "%s_%s"
+            (EcPath.basename cp) (pretty_name leaf_name) in
         let proj_id = WIdent.id_fresh proj_base in
         let proj_ls =
           WTerm.create_lsymbol proj_id (dict_ty :: wdom) wcodom in
