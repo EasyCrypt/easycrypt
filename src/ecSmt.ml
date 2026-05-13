@@ -112,6 +112,12 @@ type tenv = {
   (*---*) te_class      : w3_class_decl Hp.t;  (* TC class declarations *)
   (*---*) te_idict      : (WTerm.term * w3_class_decl) Hp.t;
     (* instance dicts, keyed by tcinstance path *)
+  (*---*) te_absdict    : (EcPath.path * int, WTerm.term * w3_class_decl)
+                          Hashtbl.t;
+    (* declared-abstract-type dicts, keyed by (type path, bound offset).
+       Abstract carriers are static (don't vary per goal/lemma), so
+       these live at tenv level so they're visible to both goal
+       translation AND lemma (trans_axiom) translation. *)
 }
 
 let empty_tenv env task (kwty, kw, kwk) =
@@ -129,6 +135,7 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_absmod     = Hid.create 0;
     te_class      = Hp.create 0;
     te_idict      = Hp.create 0;
+    te_absdict    = Hashtbl.create 17;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -831,9 +838,13 @@ and try_dict_proj
               try_finish dict_term w3cd lift
           end
         | EcAst.TCIAbstract { support = `Abs t; offset; lift } -> begin
-            match find_dict (DKAbs t) offset with
+            (* [te_absdict] is the tenv-level table for declared-abstract
+               carriers: tenv-level so trans_axiom / trans_body (op body
+               translation) can ALSO project through it, even though
+               they build their own [lenv]s. *)
+            match Hashtbl.find_opt genv.te_absdict (t, offset) with
             | None -> None
-            | Some (_, _, dict_term, w3cd) ->
+            | Some (dict_term, w3cd) ->
               try_finish dict_term w3cd lift
           end
         | EcAst.TCIConcrete { path; lift; _ } -> begin
@@ -1751,10 +1762,38 @@ let emit_one_dict
   let dict_ls = WTerm.create_lsymbol dict_id [] (Some dict_ty) in
   genv.te_task <- WTask.add_param_decl genv.te_task dict_ls;
   let dict_term = WTerm.fs_app dict_ls [] dict_ty in
+  (* Axioms-hold: assert the uninterpreted [<class>_axioms] predicate
+     holds for this dict. Without it, polymorphic lemmas pulled in via
+     [smt(...)] (whose translation has [<class>_axioms 'a d] as a
+     premise) can't be instantiated at this carrier+dict. *)
+  let hold_pid =
+    WIdent.id_fresh
+      (Printf.sprintf "axhold_%s_%s_%d"
+         carrier_name
+         (EcPath.basename tc.EcAst.tc_name)
+         offset) in
+  let hold_term = WTerm.ps_app w3cd.wcd_axioms [dict_term] in
+  let hold_pr = WDecl.create_prsymbol hold_pid in
+  let hold_decl =
+    WDecl.create_prop_decl WDecl.Paxiom hold_pr hold_term in
+  genv.te_task <- WTask.add_decl genv.te_task hold_decl;
+  (* Register the dict so Phase D's [try_dict_proj] sees it. Tparam
+     dicts live in [lenv.le_tdict] (per-goal). Declared-abstract-type
+     dicts ALSO live in [tenv.te_absdict] (tenv-level) so lemma and
+     op-body translations see them too — axiom bodies referencing a
+     section-declared `t::comring` must project through the SAME dict
+     the goal uses, or the LHS/RHS of an equation between an axiom
+     fact and a goal hypothesis won't have a common why3 symbol. *)
   let lenv' =
-    { lenv with
-      le_tdict =
-        (carrier_key, offset, dict_term, w3cd) :: lenv.le_tdict; } in
+    let lenv =
+      { lenv with
+        le_tdict =
+          (carrier_key, offset, dict_term, w3cd) :: lenv.le_tdict; } in
+    begin match carrier_key with
+    | DKAbs p -> Hashtbl.replace genv.te_absdict (p, offset) (dict_term, w3cd)
+    | DKVar _ -> ()
+    end;
+    lenv in
   (* Build the etyarg for [carrier]: this is what substitutes the
      ancestor-class's tparam in each axiom form, so all Fops in the
      axiom resolve their carrier-witness via OUR dict. *)
