@@ -1350,6 +1350,13 @@ and create_op ?(body = false) (genv : tenv) p =
           genv.te_task <- WTask.add_decl genv.te_task decl
   end;
 
+  (* Always cache the w3op in [te_op] — including for [known] ops
+     (those mapped to why3 builtins via [te_known_w3]). Without this,
+     [trans_op] re-runs [create_op] on every call for known ops, and
+     each call's [`HO_TODO]-from-scratch produces a fresh [_hoN]
+     symbol when [w3op_ho_lsymbol] fires, bloating the task with
+     dozens of redundant [(+)_hoN] / [( * )_hoN] copies + spec axioms. *)
+  OneShot.now register;
   w3op
 
 (* -------------------------------------------------------------------- *)
