@@ -735,6 +735,28 @@ let walk_lift
     (parent, ren')
   ) (tc, []) lift
 
+(* Walk a [lift] via chain-projection lsymbols, producing a dict
+   term at the target class. Each step applies the source dict's
+   [wcd_chain_projs] for the current edge index. Returns the final
+   [(dict_term, w3_class_decl)] pair — or [None] if the chain isn't
+   yet emitted at some step (which would indicate a [trans_class]
+   call was skipped for an ancestor in scope). *)
+let walk_dict_lift
+  (start_dict : WTerm.term) (start_w3cd : w3_class_decl)
+  (lift : int list)
+  : (WTerm.term * w3_class_decl) option
+=
+  List.fold_left (fun acc i ->
+    match acc with
+    | None -> None
+    | Some (dt, w3cd) ->
+      match Hashtbl.find_opt w3cd.wcd_chain_projs i with
+      | None -> None
+      | Some (proj_ls, parent_w3cd) ->
+        let dt' = WTerm.t_app_infer proj_ls [dt] in
+        Some (dt', parent_w3cd)
+  ) (Some (start_dict, start_w3cd)) lift
+
 (* -------------------------------------------------------------------- *)
 let rec trans_kpattern env (k, (ls, wth)) f =
   match kmatch k f with None -> raise CanNotTranslate | Some args ->
@@ -825,6 +847,71 @@ and trans_form_b env f = Cast.force_bool (trans_form env f)
    rather than an opaque uninterpreted symbol. Returning [None] falls
    back to the legacy translation (e.g. for ops with no in-scope dict
    yet — those should be rare once Phases B/C are wired in). *)
+(* Compute the dict terms for an op's TC-bound tparams. For each
+   [(tparam_i, tcs_i)] in [op.op_tparams] paired with its etyarg
+   [(carrier_i, witnesses_i)], emit one dict term per TC bound by
+   resolving the witness to a dict and walking any non-empty [lift]
+   via chain projections. Returns [] for OP_TC class ops (Phase D
+   intercepts them at the call site, no dict-passing needed). *)
+and compute_op_dicts
+    (genv : tenv) (lenv : lenv)
+    (op : EcDecl.operator)
+    (etyargs : EcAst.etyarg list)
+  : WTerm.term list
+=
+  let is_class_op =
+    match op.op_kind with
+    | EcDecl.OB_oper (Some (EcDecl.OP_TC _)) -> true
+    | _ -> false in
+  if is_class_op then [] else
+  let dict_of_witness (witness : EcAst.tcwitness)
+    : (WTerm.term * w3_class_decl) option
+  =
+    let start =
+      match witness with
+      | EcAst.TCIConcrete { path; _ } ->
+        !emit_instance_dict_ref genv path
+      | EcAst.TCIAbstract { support = `Var x; offset; _ } ->
+        Option.map (fun (_, _, dt, w3cd) -> (dt, w3cd))
+          (List.find_opt (fun (k, off', _, _) ->
+            off' = offset &&
+            (match k with DKVar a -> EcIdent.id_equal a x | _ -> false)
+          ) lenv.le_tdict)
+      | EcAst.TCIAbstract { support = `Abs t; offset; _ } ->
+        Hashtbl.find_opt genv.te_absdict (t, offset)
+      | _ -> None in
+    let lift = match witness with
+      | EcAst.TCIConcrete { lift; _ }
+      | EcAst.TCIAbstract { lift; _ } -> lift
+      | EcAst.TCIUni (_, lift) -> lift in
+    match start with
+    | None -> None
+    | Some (dt, w3cd) -> walk_dict_lift dt w3cd lift
+  in
+  let tparams_and_etyargs =
+    try List.combine op.op_tparams etyargs
+    with Invalid_argument _ -> [] in
+  List.concat_map (fun ((_, tcs), (carrier_ec_ty, witnesses)) ->
+    if List.length tcs <> List.length witnesses then []
+    else
+      let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
+      List.map (fun (tc, w) ->
+        match dict_of_witness w with
+        | Some (dt, _) -> dt
+        | None ->
+          (* Couldn't resolve — emit a typed opaque constant so the
+             call's arity AND types match. Result is unconstrained
+             but at least the task type-checks. *)
+          let w3cd = trans_class genv tc.EcAst.tc_name in
+          let dict_ty = WTy.ty_app w3cd.wcd_ts [carrier_w3_ty] in
+          let ls =
+            WTerm.create_lsymbol
+              (WIdent.id_fresh "missing_dict") [] (Some dict_ty) in
+          genv.te_task <- WTask.add_param_decl genv.te_task ls;
+          WTerm.fs_app ls [] dict_ty
+      ) (List.combine tcs witnesses)
+  ) tparams_and_etyargs
+
 and try_dict_proj
     ((genv, lenv) : tenv * lenv)
     (p : EcPath.path)
@@ -1374,7 +1461,7 @@ and create_op ?(body = false) (genv : tenv) p =
    Each TC op application Fop(class_op, [.. witness ..]) will translate
    in Phase D as a projection of the matching field of the dict the
    witness identifies.                                                  *)
-let rec trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
+and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
   try Hp.find genv.te_class cp with Not_found ->
 
   let class_decl = EcEnv.TypeClass.by_path cp genv.te_env in
