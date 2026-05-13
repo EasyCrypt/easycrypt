@@ -20,3 +20,5 @@
 .merlin
 *.install
 *.log
+
+/_opam
