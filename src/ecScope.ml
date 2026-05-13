@@ -2756,30 +2756,34 @@ module Ty = struct
       List.length r1 = List.length r2
       && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in
 
-    (* Register one instance per ancestor chain entry, in REVERSE
-       BFS order (leaves before children) so that when a child entry
-       is registered, its parents' paths are already known. The
-       [chain_paths] array uses the pre-computed paths from
-       [chain_paths_pre] so that proof-obligation substitutions can
-       reference them ahead of registration. We register BEFORE
-       [check_tci_axioms] so that the substituted obligation's
-       concrete witnesses (which point at these paths) resolve
-       through the env when [tc_reduce] fires. *)
+    (* Build one [tcinstance] record per chain entry in REVERSE BFS order
+       (leaves before children) — same order the registration loop used
+       to use, so [tci_parents] arrays remain consistent. We DO NOT
+       register the entries in the env yet: that would expose the
+       in-progress instance to the resolver / matcher / SMT / [tc_reduce]
+       during obligation discharge, making [check_tci_axioms] able to
+       close an obligation by appeal to the not-yet-discharged instance
+       itself (e.g. instax_inst_X_unitout matched against the unitout
+       goal). Registration happens after [check_tci_axioms] succeeds. *)
     let chain_paths =
       Array.of_list
         (List.map (fun (_, p) -> Some p) chain_paths_pre) in
-    let scope =
-      List.fold_lefti
-        (fun scope rev_idx (anc, anc_decl, ren, labels) ->
+    let chain_items =
+      (* Result is in [chain_decls] order (leaves first) — [List.mapi
+         walks reversed chain_decls but the [idx = n-1-rev_idx] maps
+         back to the [chain_decls] index; the trailing [List.rev]
+         realigns the OUTPUT list so [chain_items.(i)] corresponds
+         to [chain_decls.(i)]. *)
+      List.rev (List.mapi
+        (fun rev_idx (anc, anc_decl, ren, labels) ->
           let idx = (List.length chain_decls) - 1 - rev_idx in
           let name_opt, _ = List.nth chain_paths_pre idx in
           match name_opt with
           | None ->
-            (* Chain entry reuses an existing instance — don't register
-               a duplicate. The pre-existing instance already provides
-               this ancestor's ops + axioms, and its path is what
-               [chain_paths_pre]/[chain_paths] return for [idx].         *)
-            scope
+            (* Chain entry reuses an existing instance — nothing to
+               register; the pre-existing instance's path is what
+               [chain_paths]/[chain_paths_pre] return for [idx]. *)
+            None
           | Some name ->
           let anc_symbols =
             List.fold_left
@@ -2824,10 +2828,8 @@ module Ty = struct
                  class along the chain. Used by the obligation collector
                  at downstream instance time to disambiguate axioms. *)
             ; tci_chain_labels = Some labels } in
-          let item = EcTheory.Th_instance (Some name, instance) in
-          let item = EcTheory.mkitem ~import item in
-          { scope with sc_env = EcSection.add_item item scope.sc_env })
-        scope (List.rev chain_decls) in
+          Some (name, instance))
+        (List.rev chain_decls)) in
 
     (* Auto-skip a chain entry's axioms if a previously-declared
        instance for the same (TC name, carrier) already proves them.
@@ -2960,7 +2962,122 @@ module Ty = struct
                 anc_decl.tc_axs)
           ((), []) chain_decls in
       List.rev axs in
+    (* Pre-reduce obligation forms one chain entry at a time, in
+       topological order: when processing chain entry X, only X's
+       strict ancestors are registered in the (temporary) reduction
+       scope. X's own class ops in X's obligations are already
+       rewritten by [add_flocal] above; what remains are [Fop
+       (class_op_path, [(carrier, [TCIConcrete{chain_path; …}])])]
+       references to INHERITED ops (carriers along the chain). With
+       X's strict ancestors registered, [tc_core_reduce] inside
+       [delta_tc] simplification rewrites those Fops to their
+       concrete realisations. After pre-reduction X's obligation
+       contains no class-op Fop and no chain-path witness. The
+       reduction scope is THROWN AWAY — [check_tci_axioms] sees the
+       original scope, no chain entry registered. This matches the
+       semantics the user would get if every chain ancestor were
+       declared in a separate [instance …] block in dependency
+       order: each block's obligations are discharged in the env
+       built by the previously-discharged blocks, but no instance
+       sees itself or its descendants as already provided.        *)
+    let n = List.length chain_decls in
+    let entry_labels = Array.make n [] in
+    let entry_path = Array.make n None in
+    let entry_item = Array.make n None in
+    List.iteri
+      (fun i (((_, _, _, labels), (_, path)), item) ->
+        entry_labels.(i) <- labels;
+        entry_path.(i) <- Some path;
+        entry_item.(i) <- item)
+      (List.combine
+         (List.combine chain_decls chain_paths_pre)
+         chain_items);
+    let path_index =
+      let h = Hashtbl.create 17 in
+      Array.iteri (fun i -> function
+        | Some p -> Hashtbl.add h p i
+        | None -> ()) entry_path;
+      h in
+    (* Kahn's algorithm on the chain-internal parent graph. Edges go
+       from parent to child; we process roots (no chain-internal
+       parents) first. Entries whose [tci_parents] reference paths
+       outside the chain treat those parents as already-satisfied. *)
+    let in_deg = Array.make n 0 in
+    let dependents = Array.make n [] in
+    for i = 0 to n - 1 do
+      match entry_item.(i) with
+      | None -> ()  (* reused entry; no chain-internal parents *)
+      | Some (_, inst) ->
+        List.iter (fun p ->
+          match Hashtbl.find_opt path_index p with
+          | None -> ()  (* external parent, already in env *)
+          | Some j ->
+            in_deg.(i) <- in_deg.(i) + 1;
+            dependents.(j) <- i :: dependents.(j))
+          inst.EcTheory.tci_parents
+    done;
+    let topo = ref [] in
+    let ready = ref [] in
+    for i = n - 1 downto 0 do
+      if in_deg.(i) = 0 then ready := i :: !ready
+    done;
+    while !ready <> [] do
+      let i = List.hd !ready in
+      ready := List.tl !ready;
+      topo := i :: !topo;
+      List.iter (fun j ->
+        in_deg.(j) <- in_deg.(j) - 1;
+        if in_deg.(j) = 0 then ready := j :: !ready)
+        dependents.(i)
+    done;
+    let topo = List.rev !topo in
+    let axioms_arr = Array.of_list axioms in
+    let incremental_scope = ref scope in
+    let ri = { EcReduction.no_red with delta_tc = true } in
+    List.iter (fun i ->
+      (* Register entry [i] FIRST. Its symbol map then makes its own
+         class ops reducible via [tc_core_reduce]: [add_tydef
+         i.tc_name] injected witnesses pointing at [i]'s chain path
+         (for type-level references like [forall x : i, …]), and
+         those witnesses need [TcInstance.by_path i.chain_path] to
+         succeed during [delta_tc] simplification. Safe because:
+         pre-reduction only reads the symbol map (concrete user-
+         provided realisations), never the obligation axioms; and
+         the resulting concrete form gets discharged later against
+         the ORIGINAL scope where no chain entry is registered. *)
+      (match entry_item.(i) with
+       | None -> ()
+       | Some (name, instance) ->
+         let th = EcTheory.Th_instance (Some name, instance) in
+         let th = EcTheory.mkitem ~import th in
+         incremental_scope := {
+           !incremental_scope with
+           sc_env = EcSection.add_item th !incremental_scope.sc_env
+         });
+      let env_for_reduce = env !incremental_scope in
+      let ldecl = EcEnv.LDecl.init env_for_reduce [] in
+      let lbls = entry_labels.(i) in
+      Array.iteri (fun ai (name, labels, f) ->
+        if labels = lbls then
+          axioms_arr.(ai) <-
+            (name, labels, EcReduction.simplify ri ldecl f))
+        axioms_arr)
+      topo;
+    let axioms = Array.to_list axioms_arr in
+
     let inter = check_tci_axioms ~tparams:(fst ty) scope mode tci.pti_axs axioms lc in
+
+    (* Obligations discharged against the original scope (chain
+       entries not visible during discharge). Register them now. *)
+    let scope =
+      List.fold_left
+        (fun scope -> function
+          | None -> scope
+          | Some (name, instance) ->
+            let item = EcTheory.Th_instance (Some name, instance) in
+            let item = EcTheory.mkitem ~import item in
+            { scope with sc_env = EcSection.add_item item scope.sc_env })
+        scope chain_items in
 
     Ax.add_defer scope inter
 
