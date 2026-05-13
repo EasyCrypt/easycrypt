@@ -1681,11 +1681,27 @@ let trans_axiom genv (p, ax) =
             let ri = { EcReduction.no_red with delta_tc = true } in
             let ldecl = EcEnv.LDecl.init genv.te_env [] in
             EcReduction.simplify ri ldecl axform' in
+          let carrier_name =
+            let rec head_name (ty : EcAst.ty) =
+              match ty.ty_node with
+              | Tconstr (cp, _) -> EcPath.basename cp
+              | Tvar id -> EcIdent.name id
+              | Tglob _ -> "glob"  | Tunivar _ -> "univ"
+              | Ttuple _ -> "tuple"
+              | Tfun (_, t) -> head_name t
+            in head_name tci.EcTheory.tci_type in
+          let leg_suffix =
+            match tci.EcTheory.tci_chain_labels with
+            | Some labels when labels <> [] ->
+              "_" ^ String.concat "_" (List.map sanitize_for_id labels)
+            | _ -> "" in
           let spec_pid =
             WIdent.id_fresh
-              (Printf.sprintf "%s_at_%s"
+              (Printf.sprintf "%s_at_%s_%s%s"
                  (EcPath.basename p)
-                 (sanitize_for_id (EcPath.tostring inst_path))) in
+                 (sanitize_for_id carrier_name)
+                 (sanitize_for_id (EcPath.basename anc.EcAst.tc_name))
+                 leg_suffix) in
           add_axiom (genv, empty_lenv) spec_pid axform'
         end
         | _ -> ()
@@ -1767,17 +1783,43 @@ let emit_instance_dict
     let w3cd = trans_class genv anc.EcAst.tc_name in
     let carrier_w3_ty = trans_ty (genv, empty_lenv) tci.EcTheory.tci_type in
     let dict_ty = WTy.ty_app w3cd.wcd_ts [carrier_w3_ty] in
-    let dict_id =
-      WIdent.id_fresh
-        (Printf.sprintf "inst_%s" (sanitize_for_id (EcPath.tostring path))) in
+    (* Build a readable instance name [inst_<carrier>_<class>[_<leg>]],
+       e.g. [inst_int_comring], [inst_int_monoid_addmonoid]. The leg
+       labels (when present in [tci_chain_labels]) disambiguate
+       diamond chain entries — two monoid views of [int <: comring]
+       via the addmonoid and mulmonoid legs each need a distinct dict. *)
+    let carrier_name =
+      let rec head_name (ty : EcAst.ty) =
+        match ty.ty_node with
+        | Tconstr (p, _) -> EcPath.basename p
+        | Tvar id -> EcIdent.name id
+        | Tglob _ -> "glob"
+        | Tunivar _ -> "univ"
+        | Ttuple _ -> "tuple"
+        | Tfun (_, t) -> head_name t
+      in head_name tci.EcTheory.tci_type in
+    let class_name = EcPath.basename anc.EcAst.tc_name in
+    (* [tci_chain_labels] is a [Some] list ENDING in the class for chain
+       ancestors (e.g. [["comring"; "mulmonoid"; "monoid"]] for monoid
+       via the mulmonoid leg of comring), or [None] / empty for the
+       freshly-declared leaf instance. Use the chain labels directly
+       (already class-disambiguated and leg-aware) and fall back to the
+       class name when there isn't one. *)
+    let tag =
+      match tci.EcTheory.tci_chain_labels with
+      | Some labels when labels <> [] ->
+        String.concat "_" (List.map sanitize_for_id labels)
+      | _ -> sanitize_for_id class_name in
+    let inst_name =
+      Printf.sprintf "inst_%s_%s" (sanitize_for_id carrier_name) tag in
+    let dict_id = WIdent.id_fresh inst_name in
     let dict_ls = WTerm.create_lsymbol dict_id [] (Some dict_ty) in
     genv.te_task <- WTask.add_param_decl genv.te_task dict_ls;
     let dict_term = WTerm.fs_app dict_ls [] dict_ty in
     Hp.add genv.te_idict path (dict_term, w3cd);
     (* Axhold. *)
     let hold_pid =
-      WIdent.id_fresh
-        (Printf.sprintf "axhold_%s" (sanitize_for_id (EcPath.tostring path))) in
+      WIdent.id_fresh (Printf.sprintf "axhold_%s" inst_name) in
     let hold_term = WTerm.ps_app w3cd.wcd_axioms [dict_term] in
     let hold_pr = WDecl.create_prsymbol hold_pid in
     let hold_decl =
@@ -1811,8 +1853,8 @@ let emit_instance_dict
           EcCoreFol.f_forall
             (List.map (fun (x, ty) -> (x, EcAst.GTty ty)) xs) body in
         let name =
-          Printf.sprintf "tcbridge_%s_%s"
-            (sanitize_for_id (EcPath.tostring path)) basename in
+          Printf.sprintf "bridge_%s_%s"
+            inst_name (sanitize_for_id basename) in
         add_axiom (genv, empty_lenv) (WIdent.id_fresh name) body
       | _ -> ()
     ) symbols;
@@ -1863,8 +1905,7 @@ let emit_instance_dict
           EcReduction.simplify ri ldecl axform' in
         let ax_pid =
           WIdent.id_fresh
-            (Printf.sprintf "tcinstax_%s_%s"
-               (sanitize_for_id (EcPath.tostring path)) axname) in
+            (Printf.sprintf "instax_%s_%s" inst_name (sanitize_for_id axname)) in
         add_axiom (genv, empty_lenv) ax_pid axform'
       ) (EcEnv.TypeClass.by_path anc2.EcAst.tc_name env).EcDecl.tc_axs
     ) entries;
