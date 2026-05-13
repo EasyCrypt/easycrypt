@@ -46,11 +46,22 @@ type w3op_ho =
 type w3op = {
   (*---*) w3op_fo : w3op_fo;
   (*---*) w3op_ta : WTy.ty list ->
-                    WTy.ty list * WTy.ty option list * WTy.ty option;
-           (* The first list correspond to the type variables
-              that do not occur in the type of the operator.
-              The translation will automatically add arguments
-            *)
+                    WTy.ty list * WTy.ty list * WTy.ty option list
+                    * WTy.ty option;
+           (* Returns [(dict_doms, textra, targs, tres)] at the given
+              call-site type instantiation:
+              - [dict_doms]: dict types (one per TC bound on each
+                tparam). Set by [create_op] for non-class ops; empty
+                for class ops, known ops, and ops without TC tparams.
+              - [textra]: types for tparams that don't occur in
+                [op_ty]; [w_witness]-placeholder terms get prepended
+                to the application.
+              - [targs] / [tres]: value-arg / result types.
+
+              The lsymbol's [ls_args] is [dict_doms_at_def @
+              textra_at_def @ wdom_at_def] in that order. [apply_wop]
+              receives explicit dict_args from the caller and applies
+              them at the right place. *)
   mutable w3op_ho : w3op_ho;
 }
 
@@ -351,15 +362,16 @@ let lenv_of_tparams_for_hyp genv ts =
     List.map_fold trans_tv empty_lenv ts
 
 (* -------------------------------------------------------------------- *)
-let instantiate tparams ~textra targs tres tys =
+let instantiate tparams ?(dict_doms = []) ~textra targs tres tys =
   let mtv =
     List.fold_left2
       (fun mtv tv ty -> WTy.Mtv.add tv ty mtv)
       WTy.Mtv.empty tparams tys in
+  let dict_doms = List.map (WTy.ty_inst mtv) dict_doms in
   let textra = List.map (WTy.ty_inst mtv) textra in
   let targs = List.map (some -| WTy.ty_inst mtv) targs in
   let tres  = tres |> omap (WTy.ty_inst mtv) in
-  (textra, targs, tres)
+  (dict_doms, textra, targs, tres)
 
 (* -------------------------------------------------------------------- *)
 let plain_w3op ?(name = "x") tparams ls = {
@@ -373,7 +385,7 @@ let prop_w3op ?(name = "x") arity mkfo =
   let hdom = List.make arity WTy.ty_bool in
 
   { w3op_fo = `Internal mkfo;
-    w3op_ta = (fun _ -> [], dom, None);
+    w3op_ta = (fun _ -> [], [], dom, None);
     w3op_ho = `HO_TODO (name, hdom, None); }
 
 let w3op_as_ldecl = function
@@ -636,22 +648,32 @@ let rec highorder_type targs tres =
 let apply_highorder f args =
   List.fold_left (fun f a -> WTerm.t_func_app f (Cast.force_bool a)) f args
 
-let apply_wop genv wop tys args =
-  let (textra, targs, tres) = wop.w3op_ta tys in
+let apply_wop ?(dict_args = []) genv wop tys args =
+  let (dict_doms, textra, targs, tres) = wop.w3op_ta tys in
+  (* [dict_args] from the caller are dict TERMS aligned with
+     [dict_doms] (one per TC bound on each tparam). They prepend the
+     application so the lsymbol's signature
+     [dict_doms @ textra @ wdom -> wcodom] is honored. For ops without
+     TC tparams (or class ops translated via Phase D), both [dict_doms]
+     and [dict_args] are empty and this collapses to the original
+     behavior. *)
+  assert (List.length dict_args = List.length dict_doms);
   let eargs =
     List.map w_witness textra in
   let arity = List.length targs in
   let nargs = List.length args in
 
-  let targs = List.map some textra @ targs in
-  if nargs = arity then Cast.app (w3op_fo wop) (eargs @ args) targs tres
+  let prefix = dict_args @ eargs in
+  let targs = List.map some dict_doms @ List.map some textra @ targs in
+  if nargs = arity then Cast.app (w3op_fo wop) (prefix @ args) targs tres
   else if nargs < arity then
     let fty = highorder_type targs tres in
     let ls' = w3op_ho_lsymbol genv wop in
-    apply_highorder (WTerm.fs_app ls' [] fty) (eargs @ args)
+    apply_highorder (WTerm.fs_app ls' [] fty) (prefix @ args)
   else (* arity < nargs : too many arguments *)
     let args1,args2 = List.takedrop arity args in
-    apply_highorder (Cast.app (w3op_fo wop) (eargs @ args1) targs tres) args2
+    apply_highorder
+      (Cast.app (w3op_fo wop) (prefix @ args1) targs tres) args2
 
 
 (* -------------------------------------------------------------------- *)
@@ -950,28 +972,42 @@ and compute_op_dicts
     | None -> None
     | Some (dt, w3cd, lift) -> walk_dict_lift dt w3cd lift
   in
+  let placeholder_dict (tc : EcAst.typeclass) (carrier_w3_ty : WTy.ty) =
+    (* Emit a typed opaque constant so the call's arity AND types match
+       the lsymbol's [dict_doms]. Result is unconstrained but at least
+       the task type-checks. Used when the witness can't be resolved
+       (e.g., unresolved unification, missing instance registration)
+       OR when EC's etyargs short-circuit witness emission for ops
+       whose body doesn't reference class ops at the tparam (subtype
+       constructors like [to_poly] / [of_poly], data constructors that
+       never need a dict). *)
+    let w3cd = trans_class genv tc.EcAst.tc_name in
+    let dict_ty = WTy.ty_app w3cd.wcd_ts [carrier_w3_ty] in
+    let ls =
+      WTerm.create_lsymbol
+        (WIdent.id_fresh "missing_dict") [] (Some dict_ty) in
+    genv.te_task <- WTask.add_param_decl genv.te_task ls;
+    WTerm.fs_app ls [] dict_ty in
   let tparams_and_etyargs =
     try List.combine op.op_tparams etyargs
     with Invalid_argument _ -> [] in
   List.concat_map (fun ((_, tcs), (carrier_ec_ty, witnesses)) ->
-    if List.length tcs <> List.length witnesses then []
-    else
-      let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
-      List.map (fun (tc, w) ->
-        match dict_of_witness w with
-        | Some (dt, _) -> dt
-        | None ->
-          (* Couldn't resolve — emit a typed opaque constant so the
-             call's arity AND types match. Result is unconstrained
-             but at least the task type-checks. *)
-          let w3cd = trans_class genv tc.EcAst.tc_name in
-          let dict_ty = WTy.ty_app w3cd.wcd_ts [carrier_w3_ty] in
-          let ls =
-            WTerm.create_lsymbol
-              (WIdent.id_fresh "missing_dict") [] (Some dict_ty) in
-          genv.te_task <- WTask.add_param_decl genv.te_task ls;
-          WTerm.fs_app ls [] dict_ty
-      ) (List.combine tcs witnesses)
+    let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
+    (* Emit one dict per tc bound — ALWAYS, regardless of whether
+       the call site supplied a matching witness. Mismatch between
+       [tcs] (from op_tparams) and [witnesses] (from etyargs) is the
+       norm for ops where EC's elaboration omits class witnesses
+       (e.g. subtype generators). For each missing witness we emit a
+       placeholder dict so the lsymbol application's arity matches. *)
+    List.mapi (fun i tc ->
+      match List.nth_opt witnesses i with
+      | Some w -> begin
+          match dict_of_witness w with
+          | Some (dt, _) -> dt
+          | None -> placeholder_dict tc carrier_w3_ty
+        end
+      | None -> placeholder_dict tc carrier_w3_ty
+    ) tcs
   ) tparams_and_etyargs
 
 and try_dict_proj
@@ -1067,9 +1103,15 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       | Some w -> w
       | None ->
           let wop = trans_op genv p in
-          let ts  = List.fst ts in
-          let tys = List.map (trans_ty (genv,lenv)) ts in
-          apply_wop genv wop tys args
+          (* Compute dict arguments for the op's TC-bound tparams. For
+             ops without TC bounds (or class ops handled by
+             try_dict_proj above), [compute_op_dicts] returns []. The
+             dicts prepend the application; [apply_wop] places them
+             before [textra] / value args. *)
+          let op = EcEnv.Op.by_path p genv.te_env in
+          let dict_args = compute_op_dicts genv lenv op ts in
+          let tys = List.map (trans_ty (genv,lenv)) (List.fst ts) in
+          apply_wop ~dict_args genv wop tys args
     end
 
   | Flocal x when Hid.mem genv.te_lc x ->
@@ -1217,7 +1259,7 @@ and trans_glob ((genv, _) as env) m mem =
        let ls  = WTerm.create_lsymbol pid [ty_mem] ty in
        let w3op =
          { w3op_fo = `LDecl ls;
-           w3op_ta = (fun _tys -> [], [Some ty_mem], ty);
+           w3op_ta = (fun _tys -> [], [], [Some ty_mem], ty);
            w3op_ho = `HO_TODO (EcIdent.name m, [ty_mem], ty); } in
        genv.te_task <- WTask.add_param_decl genv.te_task ls;
        Hid.add genv.te_lc m w3op;
@@ -1400,6 +1442,56 @@ and create_op ?(body = false) (genv : tenv) p =
     then None
     else Some (trans_ty (genv, lenv) codom) in
 
+  (* DICT-PASSING: for non-class ops with TC-bound tparams, prepend one
+     dict parameter per (tparam, tc) to the lsymbol's domain. Each
+     parameter gets a vsymbol that participates in [le_tdict] when
+     translating the body — so class-op Fops in the body project
+     through the dict via Phase D rather than emitting opaque
+     [Top_<class>_<op>] symbols.
+
+     - Class ops ([OP_TC]) are EXCLUDED: try_dict_proj at the call site
+       resolves them, and dict-passing here would conflict.
+     - Known ops (those mapped to why3 builtins via [te_known_w3]) are
+       skipped via the [known] branch below — those have no TC tparams.
+     - Ops with no TC bounds produce empty [dict_doms] and behave
+       exactly as before. *)
+  let is_class_op =
+    match op.op_kind with
+    | OB_oper (Some (OP_TC _)) -> true
+    | _ -> false in
+  let dict_binders, dict_doms, lenv =
+    if is_class_op then [], [], lenv
+    else
+      let acc =
+        List.concat_map (fun (tparam_id, tcs) ->
+          let tparam_w3ty =
+            try Mid.find tparam_id lenv.le_tv
+            with Not_found -> assert false in
+          List.mapi (fun offset tc ->
+            let w3cd = trans_class genv tc.EcAst.tc_name in
+            let dict_ty = WTy.ty_app w3cd.wcd_ts [tparam_w3ty] in
+            let vs =
+              WTerm.create_vsymbol
+                (WIdent.id_fresh
+                   (Printf.sprintf "d_%s_%s_%d"
+                      (EcIdent.name tparam_id)
+                      (EcPath.basename tc.EcAst.tc_name) offset))
+                dict_ty in
+            (tparam_id, offset, w3cd, dict_ty, vs)
+          ) tcs
+        ) op.op_tparams in
+      let binders = List.map (fun (_, _, _, _, vs) -> vs) acc in
+      let doms = List.map (fun (_, _, _, ty, _) -> ty) acc in
+      let lenv' =
+        List.fold_left (fun lenv (tparam_id, offset, w3cd, _, vs) ->
+          { lenv with
+            le_tdict =
+              (DKVar tparam_id, offset, WTerm.t_var vs, w3cd)
+              :: lenv.le_tdict }
+        ) lenv acc in
+      binders, doms, lenv'
+  in
+
   (* FIXME: this is a ack for constructor, when the constructor is
    * translated before its type. Should the same be done for some
    * other kinds of operators, like projections? *)
@@ -1411,7 +1503,9 @@ and create_op ?(body = false) (genv : tenv) p =
       load_wtheory genv th; (true, ls)
 
     | None ->
-        let ls = WTerm.create_lsymbol (preid_p p) (textra@wdom) wcodom in
+        let ls =
+          WTerm.create_lsymbol
+            (preid_p p) (dict_doms @ textra @ wdom) wcodom in
         (false, ls)
   in
 
@@ -1420,14 +1514,15 @@ and create_op ?(body = false) (genv : tenv) p =
     let w3op_ho =
       if EcDecl.is_fix op then
         let ls, decl, decl_s =
-          mk_highorder_func name (textra@wdom) wcodom (WTerm.t_app ls)
+          mk_highorder_func
+            name (dict_doms @ textra @ wdom) wcodom (WTerm.t_app ls)
         in
           `HO_FIX (ls, decl, decl_s, ref false)
       else
-        `HO_TODO (name, textra@wdom, wcodom) in
+        `HO_TODO (name, dict_doms @ textra @ wdom, wcodom) in
 
     { w3op_fo = `LDecl ls;
-      w3op_ta = instantiate wparams ~textra wdom wcodom;
+      w3op_ta = instantiate wparams ~dict_doms ~textra wdom wcodom;
       w3op_ho = w3op_ho; }
   in
 
@@ -1436,6 +1531,7 @@ and create_op ?(body = false) (genv : tenv) p =
   if not known then begin
     let wextra = List.map (fun ty ->
                      WTerm.create_vsymbol (WIdent.id_fresh "_") ty) textra in
+    let dict_then_extra = dict_binders @ wextra in
     let decl =
       let default () = WDecl.create_param_decl ls in
 
@@ -1445,17 +1541,20 @@ and create_op ?(body = false) (genv : tenv) p =
         match body, op.op_kind with
         | true, OB_oper (Some (OP_Plain body)) ->
             let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
-            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+            WDecl.create_logic_decl
+              [WDecl.make_ls_defn ls (dict_then_extra @ wparams) wbody]
 
         | true, OB_oper (Some (OP_Fix body)) ->
           OneShot.now register;
           let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
           let wbody = Cast.arg wbody ls.WTerm.ls_value in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+          WDecl.create_logic_decl
+            [WDecl.make_ls_defn ls (dict_then_extra @ wparams) wbody]
 
         | true, OB_pred (Some (PR_Plain body)) ->
             let wparams, wbody = trans_body (genv, lenv) wdom None body in
-            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+            WDecl.create_logic_decl
+              [WDecl.make_ls_defn ls (dict_then_extra @ wparams) wbody]
 
         | _, _ ->
             default ()
@@ -1474,7 +1573,7 @@ and create_op ?(body = false) (genv : tenv) p =
             genv.te_task <- WTask.add_decl genv.te_task decl;
             w3op.w3op_ho <-
               let name = ls.WTerm.ls_name.WIdent.id_string in
-              `HO_TODO (name, textra@wdom, wcodom)
+              `HO_TODO (name, dict_doms @ textra @ wdom, wcodom)
           end
         end
       | _ ->
@@ -1746,7 +1845,7 @@ let trans_hyp ((genv, lenv) as env) (x, ty) =
     let ls = WTerm.create_lsymbol (preid x) wdom wcodom in
     let w3op = {
       w3op_fo = `LDecl ls;
-      w3op_ta = (fun _ -> ([], List.map some wdom, wcodom));
+      w3op_ta = (fun _ -> ([], [], List.map some wdom, wcodom));
       w3op_ho = `HO_TODO (EcIdent.name x, wdom, wcodom);
     } in
 
@@ -1775,7 +1874,7 @@ let trans_hyp ((genv, lenv) as env) (x, ty) =
       let ls =  WTerm.create_lsymbol (preid x) [] wcodom in
       let w3op = {
         w3op_fo = `LDecl ls;
-        w3op_ta = (fun _ -> ([], [], wcodom));
+        w3op_ta = (fun _ -> ([], [], [], wcodom));
         w3op_ho = `HO_TODO (EcIdent.name x, [], wcodom);
       } in
 
@@ -2521,7 +2620,8 @@ let add_core_bindings (env : tenv) =
 
     let w3o_eq = {
       w3op_fo = `Internal (fun args _ -> mk_eq (as_seq2 args));
-      w3op_ta = (fun tys -> let ty = Some (as_seq1 tys) in [], [ty;ty], None);
+      w3op_ta = (fun tys ->
+        let ty = Some (as_seq1 tys) in [], [], [ty;ty], None);
       w3op_ho = `HO_TODO ("eq", WTerm.ps_equ.WTerm.ls_args, None);
     }
 
