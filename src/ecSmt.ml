@@ -94,6 +94,10 @@ type w3_class_decl = {
   wcd_fields      : w3_class_field list; (* in record-order *)
   wcd_by_leaf     : (EcSymbols.symbol, w3_class_field) Hashtbl.t;
   wcd_axioms      : WTerm.lsymbol;     (* the axioms predicate symbol *)
+  wcd_chain_projs : (int, WTerm.lsymbol * w3_class_decl) Hashtbl.t;
+    (* For each parent-edge index [i] in this class's [tc_prts], a
+       chain projection [cp_dict 'a -> parent_dict 'a] plus the
+       parent's [w3_class_decl]. Composing these walks a [lift]. *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1370,7 +1374,7 @@ and create_op ?(body = false) (genv : tenv) p =
    Each TC op application Fop(class_op, [.. witness ..]) will translate
    in Phase D as a projection of the matching field of the dict the
    witness identifies.                                                  *)
-let trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
+let rec trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
   try Hp.find genv.te_class cp with Not_found ->
 
   let class_decl = EcEnv.TypeClass.by_path cp genv.te_env in
@@ -1511,15 +1515,87 @@ let trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
   List.iter (fun f -> Hashtbl.replace by_leaf f.wcf_name f) fields;
 
   let w3cd = {
-    wcd_path     = cp;
-    wcd_tparam   = alpha_tv;
-    wcd_ts       = dict_ts;
-    wcd_ctor     = ctor_ls;
-    wcd_fields   = fields;
-    wcd_by_leaf  = by_leaf;
-    wcd_axioms   = axioms_ls;
+    wcd_path        = cp;
+    wcd_tparam      = alpha_tv;
+    wcd_ts          = dict_ts;
+    wcd_ctor        = ctor_ls;
+    wcd_fields      = fields;
+    wcd_by_leaf     = by_leaf;
+    wcd_axioms      = axioms_ls;
+    wcd_chain_projs = Hashtbl.create 7;
   } in
   Hp.add genv.te_class cp w3cd;
+  (* Emit one chain projection [cp_dict 'a -> parent_dict 'a] per
+     parent edge in [cp.tc_prts], plus spec axioms linking each
+     parent field projection of the parent dict (post-projection) to
+     the corresponding field of this dict. We do this AFTER caching
+     [w3cd] so recursive [trans_class] calls (for parents) terminate.
+
+     Type variables: we reuse [w3cd.wcd_tparam = alpha_tv] consistently.
+     Source dict type: [cp_dict alpha_tv]. Destination: [parent_dict
+     alpha_tv]. The parent's lsymbols are polymorphic in their own
+     internal tparam; [t_app_infer] instantiates it to [alpha_tv] when
+     we feed an [alpha_tv]-typed dict in. *)
+  let class_decl = EcEnv.TypeClass.by_path cp genv.te_env in
+  let src_ty = WTy.ty_app dict_ts [alpha_ty] in
+  List.iteri (fun edge_idx (parent_tc, _label, _edge_ren) ->
+    let parent_w3cd = trans_class genv parent_tc.EcAst.tc_name in
+    let dst_ty = WTy.ty_app parent_w3cd.wcd_ts [alpha_ty] in
+    let proj_name =
+      Printf.sprintf "%s_to_%s_%d"
+        (EcPath.basename cp)
+        (EcPath.basename parent_tc.EcAst.tc_name)
+        edge_idx in
+    let proj_ls =
+      WTerm.create_lsymbol (WIdent.id_fresh proj_name)
+        [src_ty] (Some dst_ty) in
+    genv.te_task <- WTask.add_param_decl genv.te_task proj_ls;
+    Hashtbl.add w3cd.wcd_chain_projs edge_idx (proj_ls, parent_w3cd);
+    (* Spec: for each parent field f_P, find the matching cp field
+       f_C (same wcf_origin + wcf_orig_name) and assert that
+       [P_<f> (proj d) args...] equals [C_<f> d args...]. Using
+       [t_app_infer] throughout lets why3 infer the type
+       instantiations from the bound [d : cp_dict alpha_tv]. *)
+    let cp_by_origin = Hashtbl.create 17 in
+    List.iter (fun f ->
+      Hashtbl.replace cp_by_origin (f.wcf_origin, f.wcf_orig_name) f
+    ) w3cd.wcd_fields;
+    List.iter (fun f_P ->
+      match Hashtbl.find_opt cp_by_origin
+              (f_P.wcf_origin, f_P.wcf_orig_name) with
+      | None -> ()
+      | Some f_C ->
+        let d_vs =
+          WTerm.create_vsymbol (WIdent.id_fresh "d") src_ty in
+        let d_tm = WTerm.t_var d_vs in
+        let proj_d =
+          WTerm.t_app_infer proj_ls [d_tm] in
+        let xs_tys = List.tl f_C.wcf_proj.WTerm.ls_args in
+        let xs =
+          List.mapi (fun i ty ->
+            WTerm.create_vsymbol
+              (WIdent.id_fresh (Printf.sprintf "x%d" i)) ty
+          ) xs_tys in
+        let xs_terms = List.map WTerm.t_var xs in
+        let lhs =
+          WTerm.t_app_infer f_P.wcf_proj (proj_d :: xs_terms) in
+        let rhs =
+          WTerm.t_app_infer f_C.wcf_proj (d_tm :: xs_terms) in
+        let eq =
+          match f_C.wcf_proj.WTerm.ls_value with
+          | None -> WTerm.t_iff (Cast.force_prop lhs) (Cast.force_prop rhs)
+          | Some _ -> WTerm.t_equ lhs rhs in
+        let spec =
+          WTerm.t_forall_close (d_vs :: xs) [] eq in
+        let spec_pr =
+          WDecl.create_prsymbol
+            (WIdent.id_fresh
+               (Printf.sprintf "%s_spec_%s" proj_name f_P.wcf_name)) in
+        let spec_decl =
+          WDecl.create_prop_decl WDecl.Paxiom spec_pr spec in
+        genv.te_task <- WTask.add_decl genv.te_task spec_decl
+    ) parent_w3cd.wcd_fields
+  ) class_decl.tc_prts;
   w3cd
 
 (* -------------------------------------------------------------------- *)
