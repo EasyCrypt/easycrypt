@@ -57,7 +57,7 @@ proof.
 have h: forall cp, 0 <= cp => intmul z cp = Int.( * ) z cp.
   elim=> /= [|cp ge0_cp ih]; first by rewrite mulr0z.
   by rewrite mulrS // ih /#.
-smt(opprK mulrNz opprK).
+smt(opprK<:int> mulrNz<:int>).
 qed.
 
 (* Parity of [exp x n] for [x : int] tracks parity of [x] when [n > 0]. *)
