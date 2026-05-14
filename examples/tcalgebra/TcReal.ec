@@ -14,10 +14,6 @@ require CoreReal.
    the way so a single [instance field] is enough.                     *)
 (* ==================================================================== *)
 
-(* Named wrapper for [real]'s [unit]: the TC instance form requires an
-   op-name on the rhs of [op X = …], not an inline lambda. *)
-op real_unit (x : real) : bool = x <> 0%r.
-
 (* -------------------------------------------------------------------- *)
 instance idomain with real reducible
   op zero  = 0%r
@@ -26,7 +22,7 @@ instance idomain with real reducible
   op oner  = 1%r
   op ( * ) = CoreReal.mul
   op invr  = CoreReal.inv
-  op unit  = real_unit
+  op unit  = (fun x => x <> 0%r)
 
   proof mopA<:addmonoid>  by smt()
   proof mopC<:addmonoid>  by smt()
@@ -39,7 +35,7 @@ instance idomain with real reducible
   proof mulrDl            by smt()
   proof mulVr             by smt()
   proof unitP             by smt()
-  proof unitout           by smt()
+  proof unitout           by smt(invr0)
   proof mulf_eq0          by smt().
 
 (* -------------------------------------------------------------------- *)
