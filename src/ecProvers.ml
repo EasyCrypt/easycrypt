@@ -403,6 +403,12 @@ type prover_infos = {
   pr_max       : int;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_tvi       : EcAst.ty list EcPath.Mp.t;
+    (* Per-wanted-lemma type instantiations from [smt(L<:T>)] syntax.
+       Maps the lemma's path to the resolved [ty list]. EcSmt
+       consumes this to specialize the lemma at those types (and
+       [delta_tc]-reduce) before adding it to the task. Unmentioned
+       paths inherit the default (no instantiation). *)
   pr_dumpin    : string EcLocation.located option;
   pr_selected  : bool;
   gn_debug     : bool;
@@ -420,6 +426,7 @@ let dft_prover_infos = {
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
+  pr_tvi       = EcPath.Mp.empty;
   pr_dumpin    = None;
   pr_selected  = false;
   gn_debug     = false;

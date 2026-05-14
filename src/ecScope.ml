@@ -516,6 +516,23 @@ module Prover = struct
 
   (* -------------------------------------------------------------------- *)
   let process_dbhint env db =
+    (* Returns the [hints] (path-set form, fed to the relevance filter)
+       AND the per-path type instantiations collected from
+       [smt(L<:T1, T2>)] annotations. The TVI is resolved into a
+       concrete [ty list] in the same pass — typing is local (closed
+       types in [<:int>] etc.), so a fresh [unienv] suffices. *)
+    let tvi_map = ref EcPath.Mp.empty in
+    let resolve_tvi (p : EcPath.path) (tvi : ptyannot) : unit =
+      let ue = EcUnify.UniEnv.create None in
+      let tys =
+        match (unloc tvi) with
+        | TVIunamed lt ->
+          List.map (fun (pty, _wsel) ->
+            EcTyping.transty EcTyping.tp_relax env ue pty) lt
+        | TVInamed _ ->
+          hierror ~loc:tvi.pl_loc
+            "named type instantiation not supported in smt hints" in
+      tvi_map := EcPath.Mp.add p tys !tvi_map in
     let add hints x =
       let nf kind p =
         hierror
@@ -529,20 +546,22 @@ module Prover = struct
         | None -> nf `Theory p
         | Some (p, _) -> EcProvers.Hints.addm p hflag hints
 
-      and add1 hints hflag p =
+      and add1 hints hflag p tvi =
         match EcEnv.Ax.lookup_opt (unloc p) env with
         | None -> nf `Lemma p
-        | Some (p, _) -> EcProvers.Hints.add1 p hflag hints
+        | Some (p, _) ->
+          Option.iter (resolve_tvi p) tvi;
+          EcProvers.Hints.add1 p hflag hints
       in
 
       match x.pht_kind with
       | `Theory -> addm hints x.pht_flag x.pht_name
-      | `Lemma  -> add1 hints x.pht_flag x.pht_name
+      | `Lemma  -> add1 hints x.pht_flag x.pht_name x.pht_tvi
 
     in
     let hints = EcProvers.Hints.empty in
     let hints = List.fold_left add hints db in
-    hints
+    hints, !tvi_map
 
   (* -------------------------------------------------------------------- *)
   type smt_options = {
@@ -556,6 +575,7 @@ module Prover = struct
     pl_max        : int option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
+    pl_tvi        : EcAst.ty list EcPath.Mp.t option;
     pl_dumpin     : string located option;
     pl_selected   : bool option;
     gn_debug      : bool option;
@@ -573,6 +593,7 @@ module Prover = struct
     pl_max       = None;
     pl_wanted    = None;
     pl_unwanted  = None;
+    pl_tvi       = None;
     pl_dumpin    = None;
     pl_selected  = None;
     gn_debug     = None;
@@ -611,8 +632,9 @@ module Prover = struct
         | None  , None   -> None
         | None  , Some _ -> Some 0
         end;
-      pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
-      pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
+      pl_wanted    = omap (fun d -> fst (process_dbhint env d)) ppr.plem_wanted;
+      pl_unwanted  = omap (fun d -> fst (process_dbhint env d)) ppr.plem_unwanted;
+      pl_tvi       = omap (fun d -> snd (process_dbhint env d)) ppr.plem_wanted;
       pl_dumpin    = ppr.plem_dumpin;
       pl_selected  = ppr.plem_selected;
       gn_debug     = ppr.psmt_debug;
@@ -632,6 +654,7 @@ module Prover = struct
     let pr_max       = odfl dft.pr_max options.pl_max in
     let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
+    let pr_tvi       = odfl dft.pr_tvi options.pl_tvi in
     let pr_selected  = odfl dft.pr_selected options.pl_selected in
     let pr_quorum    = max 1 (odfl dft.pr_quorum options.po_quorum) in
     let pr_dumpin    = options.pl_dumpin in
@@ -645,7 +668,8 @@ module Prover = struct
 
     { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
       pr_verbose ; pr_all     ; pr_max      ;
-      pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum   ;
+      pr_wanted  ; pr_unwanted; pr_tvi      ;
+      pr_selected ; pr_quorum   ;
       pr_dumpin  ;
       gn_debug   ; }
 

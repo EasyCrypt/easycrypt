@@ -879,6 +879,11 @@ type pdbmap1 = {
   pht_flag : include_exclude;
   pht_kind : [ `Theory  | `Lemma   ];
   pht_name : pqsymbol;
+  pht_tvi  : ptyannot option;
+    (* [smt(L<:T>)] type instantiation. [None] for [smt(L)] without
+       annotations, [Some _] when the user writes [smt(L<:T1, T2>)] —
+       the lemma is then specialized at those types (with [delta_tc]
+       reduction) before being added to the SMT task. *)
 }
 
 and pdbhint = pdbmap1 list

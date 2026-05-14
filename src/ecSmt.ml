@@ -148,6 +148,13 @@ type tenv = {
        Abstract carriers are static (don't vary per goal/lemma), so
        these live at tenv level so they're visible to both goal
        translation AND lemma (trans_axiom) translation. *)
+  mutable te_tvi        : EcAst.ty list EcPath.Mp.t;
+    (* Per-lemma type instantiations from [smt(L<:T1, T2>)] hints.
+       When [trans_axiom] processes a lemma whose path is in this map,
+       it substitutes the lemma's tparams with the given types and
+       [delta_tc]-reduces the result before emitting — producing a
+       concrete-op axiom rather than the polymorphic dict-passing
+       form. Empty by default; populated by [check] from [pi.pr_tvi]. *)
 }
 
 let empty_tenv env task (kwty, kw, kwk) =
@@ -167,6 +174,7 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_idict      = Hp.create 0;
     te_pidict     = Hp.create 0;
     te_absdict    = Hashtbl.create 17;
+    te_tvi        = EcPath.Mp.empty;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -195,11 +203,32 @@ let get_memtype lenv m =
   try Mid.find m lenv.le_mt with Not_found -> assert false
 
 (* -------------------------------------------------------------------- *)
-let str_p p =
-  WIdent.id_fresh (String.map (function '.' -> '_' | c -> c) p)
+(* Why3's source grammar uses [lident] (lowercase-first) for types,
+   functions, predicates, and constants, and [uident] for theories /
+   modules / algebraic constructors. EC paths often start with an
+   uppercase theory name (e.g. [Top.real_unit] becomes [Top_real_unit]),
+   which is fine for the why3 task pretty-printer but rejects on
+   re-parse. We normalise: [str_p] lower-cases the first letter so the
+   default output is [lident]-shaped; [str_p_ctor] preserves an upper-
+   case-first form for constructor symbols. *)
+let str_p_raw p = String.map (function '.' -> '_' | c -> c) p
+
+let str_lid s =
+  if String.length s = 0 then s
+  else String.make 1 (Char.lowercase_ascii s.[0]) ^
+       String.sub s 1 (String.length s - 1)
+
+let str_uid s =
+  if String.length s = 0 then s
+  else String.make 1 (Char.uppercase_ascii s.[0]) ^
+       String.sub s 1 (String.length s - 1)
+
+let str_p p = WIdent.id_fresh (str_lid (str_p_raw p))
+let str_p_ctor p = WIdent.id_fresh (str_uid (str_p_raw p))
 
 let preid    id = WIdent.id_fresh (EcIdent.name id)
 let preid_p  p  = str_p (EcPath.tostring p)
+let preid_p_ctor p = str_p_ctor (EcPath.tostring p)
 let preid_mp mp = str_p (EcPath.m_tostring mp)
 let preid_xp xp = str_p (EcPath.x_tostring xp)
 
@@ -212,6 +241,112 @@ let dump_tasks (tasks : WTask.task) (filename : string) =
         (Format.formatter_of_out_channel stream)
         "%a@." Why3.Pretty.print_task tasks)
       (fun () -> close_out stream)
+
+(* Companion dump producing a re-parseable Why3 source (`.why`
+   style). [Pretty.print_theory] / [Pretty.print_task] emit "use"
+   directives as comments [(* use … *)], so their output isn't
+   directly re-parseable. We extract the same information via
+   [Task.used_theories] / [Task.local_decls] and emit:
+
+     theory Task
+       use real.Real
+       use int.Int
+       ...
+       <local decls>
+       goal goal1 : <task goal>
+     end
+
+   which [why3 prove FILE.why] accepts. *)
+let dump_task_theory (task : WTask.task) (filename : string) =
+  let stream = open_out filename in
+  let buf = Buffer.create 4096 in
+  let fmt = Format.formatter_of_buffer buf in
+  EcUtils.try_finally
+    (fun () ->
+      (* Reset the pretty-printer's identifier-uniquification state.
+         Without this, names accumulate primes across successive
+         dumps (each [print_decl] call rebinds new uniques), so
+         [Real.inv] gets printed as [inv2] / [inv3] / etc. depending
+         on how many other [inv]s have been seen. [forget_all] clears
+         the state so each dump starts from source-level names. *)
+      Why3.Pretty.forget_all ();
+      let used = Why3.Task.used_theories task in
+      (* Split used theories into [from_file] (have a library path, so
+         [use real.Real] works) and [inline] (EC-internal theories
+         like [Distr] / [Witness] created via [WTheory.create_theory]
+         with no [~path] — these don't exist as [.mlw] files so
+         [why3 prove] can't find them via [use]; we inline their
+         declarations instead). *)
+      let from_file, inline =
+        Why3.Ident.Mid.fold
+          (fun _ th (ff, il) ->
+            if th.Why3.Theory.th_path = []
+            then (ff, th :: il)
+            else (th :: ff, il))
+          used ([], []) in
+      let used_syms = Why3.Task.used_symbols used in
+      let local_decls = Why3.Task.local_decls task used_syms in
+      Format.fprintf fmt "@[<v 0>theory Task@\n";
+      List.iter
+        (fun th ->
+          let qname =
+            String.concat "." th.Why3.Theory.th_path ^ "." ^
+            th.Why3.Theory.th_name.Why3.Ident.id_string in
+          Format.fprintf fmt "  use %s@\n" qname)
+        from_file;
+      Format.fprintf fmt "@\n";
+      (* Inline EC-internal theories: emit each non-Use tdecl as a
+         local declaration. [Use]/[Clone]/[Meta] tdecls within these
+         in-memory theories already covered by [used_theories]. *)
+      List.iter
+        (fun th ->
+          Format.fprintf fmt "  (* === inlined: %s === *)@\n"
+            th.Why3.Theory.th_name.Why3.Ident.id_string;
+          List.iter
+            (fun td -> match td.Why3.Theory.td_node with
+              | Why3.Theory.Decl d ->
+                Format.fprintf fmt "  %a@\n@\n"
+                  Why3.Pretty.print_decl d
+              | _ -> ())
+            th.Why3.Theory.th_decls)
+        inline;
+      List.iter
+        (fun d -> Format.fprintf fmt "  %a@\n@\n" Why3.Pretty.print_decl d)
+        local_decls;
+      Format.fprintf fmt "end@]@.";
+      (* Post-process the buffer:
+         - [''a] (double apostrophe — printer mark for introduced
+           tvars) → [`a] (source-form tvar).
+         - Operator-name disambiguation primes ([( *' )] / [(+')] /
+           etc.) when two preludes export the same infix → strip the
+           apostrophe. Why3's parser then disambiguates by type. This
+           IS lossy in pathological cases (two same-named operators
+           with overlapping types) but enables the common case
+           [int.Int] + [real.Real] coexistence: at any infix use site
+           the operand types pick the right resolution. *)
+      let raw = Buffer.contents buf in
+      let cleaned =
+        Str.global_replace (Str.regexp "''") "'" raw in
+      (* Operator-collision rewrite: when [int.Int] and [real.Real]
+         are both [use]d, the pretty-printer emits the second-bound
+         infix as primed ([( *' )] / [(+ ')] / …), invalid in source.
+         Rewrite primed infix USES [(x *' y)] into prefix-qualified
+         [Real.( * ) x y]. The primed form is consistently the real
+         operator (int's prelude is loaded first by EC's
+         [add_core_bindings]). *)
+      let cleaned =
+        let pats = [
+          "\\((\\([^()]+\\) \\*' \\([^()]+\\))\\)", "(Real.( * ) \\2 \\3)";
+          "\\((\\([^()]+\\) +' \\([^()]+\\))\\)", "(Real.( + ) \\2 \\3)";
+          "\\((\\([^()]+\\) -' \\([^()]+\\))\\)", "(Real.( - ) \\2 \\3)";
+          "\\((\\([^()]+\\) /' \\([^()]+\\))\\)", "(Real.( / ) \\2 \\3)";
+        ] in
+        List.fold_left
+          (fun s (pat, repl) ->
+            Str.global_replace (Str.regexp pat) repl s)
+          cleaned pats in
+      output_string stream cleaned)
+    (fun () -> close_out stream)
 
 (* -------------------------------------------------------------------- *)
 module Cast = struct
@@ -503,7 +638,7 @@ and trans_tydecl genv (p, tydecl) =
         let for_ctor (c, ctys) =
           let wcid  = pqoname (prefix p) c in
           let wctys = List.map (trans_ty (genv, lenv)) ctys in
-          let wcls  = WTerm.create_lsymbol ~constr:ncs (preid_p wcid) wctys (Some wdom) in
+          let wcls  = WTerm.create_lsymbol ~constr:ncs (preid_p_ctor wcid) wctys (Some wdom) in
           let w3op  = plain_w3op ~name:c tparams wcls in
           ((wcid, w3op), (wcls, List.make (List.length ctys) None)) in
 
@@ -529,7 +664,7 @@ and trans_tydecl genv (p, tydecl) =
 
         let wcid  = EI.record_ctor_path p in
         let wctys = List.map (trans_ty (genv, lenv)) (List.map snd rc) in
-        let wcls  = WTerm.create_lsymbol ~constr:1 (preid_p wcid) wctys (Some wdom) in
+        let wcls  = WTerm.create_lsymbol ~constr:1 (preid_p_ctor wcid) wctys (Some wdom) in
         let w3op  = plain_w3op ~name:(basename wcid) tparams wcls in
 
         let opts, wproj = List.split (List.map for_field rc) in
@@ -576,16 +711,50 @@ let trans_lvars genv lenv bds =
   trans_bindings genv lenv (List.map (snd_map gtty) bds)
 
 (* -------------------------------------------------------------------- *)
+(* Map operator characters to alphabetic prefixes so HO-wrapper names
+   like [( * )_ho] become [times_ho] / [plus_ho] / etc. — parseable as
+   why3 [lident]. Common single-char operators get short names; any
+   other non-alphanumeric character becomes [_]. *)
+let sanitize_op_name s =
+  let buf = Buffer.create (String.length s + 8) in
+  String.iter (fun c -> match c with
+    | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' -> Buffer.add_char buf c
+    | '*' -> Buffer.add_string buf "times"
+    | '+' -> Buffer.add_string buf "plus"
+    | '-' -> Buffer.add_string buf "minus"
+    | '/' -> Buffer.add_string buf "div"
+    | '%' -> Buffer.add_string buf "mod"
+    | '<' -> Buffer.add_string buf "lt"
+    | '>' -> Buffer.add_string buf "gt"
+    | '=' -> Buffer.add_string buf "eq"
+    | '!' -> Buffer.add_string buf "bang"
+    | '\\' -> Buffer.add_string buf "bs"
+    | '|' -> Buffer.add_string buf "pipe"
+    | '&' -> Buffer.add_string buf "amp"
+    | '^' -> Buffer.add_string buf "hat"
+    | '~' -> Buffer.add_string buf "tilde"
+    | '@' -> Buffer.add_string buf "at"
+    | '$' -> Buffer.add_string buf "dollar"
+    | '#' -> Buffer.add_string buf "hash"
+    | '?' -> Buffer.add_string buf "qmark"
+    | ':' -> Buffer.add_string buf "colon"
+    | '\'' -> Buffer.add_string buf "prime"
+    | '.' -> Buffer.add_string buf "_"
+    | _ -> Buffer.add_char buf '_'
+  ) s;
+  let s = Buffer.contents buf in
+  if s = "" then "op" else s
+
 (* build the higher-order symbol and add the corresponding axiom.       *)
 let mk_highorder_symb ids dom codom =
-  let pid = WIdent.id_fresh (ids ^ "_ho") in
+  let pid = WIdent.id_fresh (sanitize_op_name ids ^ "_ho") in
   let ty = List.fold_right WTy.ty_func dom (odfl WTy.ty_bool codom) in
   WTerm.create_fsymbol pid [] ty, ty
 
 let mk_highorder_func ids dom codom mk =
   let ls', ty = mk_highorder_symb ids dom codom in
   let decl' = WDecl.create_param_decl ls' in
-  let pid_spec = WIdent.id_fresh (ids ^ "_ho_spec") in
+  let pid_spec = WIdent.id_fresh (sanitize_op_name ids ^ "_ho_spec") in
   let pr = WDecl.create_prsymbol pid_spec in
   let preid = WIdent.id_fresh "x" in
   let params = List.map (WTerm.create_vsymbol preid) dom in
@@ -1860,7 +2029,8 @@ and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
         let spec_pr =
           WDecl.create_prsymbol
             (WIdent.id_fresh
-               (Printf.sprintf "%s_spec_%s" proj_name f_P.wcf_name)) in
+               (Printf.sprintf "%s_spec_%s"
+                  proj_name (sanitize_op_name f_P.wcf_name))) in
         let spec_decl =
           WDecl.create_prop_decl WDecl.Paxiom spec_pr spec in
         genv.te_task <- WTask.add_decl genv.te_task spec_decl
@@ -1949,7 +2119,77 @@ let sanitize_for_id s =
        || (c >= '0' && c <= '9') || c = '_'
     then c else '_') s
 
+(* TC-minimal mode (env var [EC_TC_MINIMAL=1]): the SMT task is
+   shipped with NO TC machinery (no Phase B, no per-tparam dicts, no
+   class-axiom polymorphic emission). The user supplies hints
+   [smt(L<:T1, T2>)] to specify which lemmas to bring in and at what
+   type instantiations. *)
+let tc_minimal_mode () =
+  match Sys.getenv_opt "EC_TC_MINIMAL" with
+  | Some ("1" | "true" | "yes") -> true
+  | _ -> false
+
 let trans_axiom genv (p, ax) =
+  (* [smt(L<:T1,…)] handling: when the user has provided a type
+     instantiation for this lemma (via [pr_tvi]), substitute the
+     tparams and [delta_tc]-reduce. The result is a concrete-op
+     axiom — no TC machinery needed in the task. *)
+  let tvi = EcPath.Mp.find_opt p genv.te_tvi in
+  let do_instantiated tys =
+    if List.length tys <> List.length ax.ax_tparams then
+      Format.eprintf
+        "smt-hint: lemma %s has %d tparams but [<:…>] supplies %d types@."
+        (EcPath.tostring p)
+        (List.length ax.ax_tparams)
+        (List.length tys)
+    else
+      let subst_map =
+        List.fold_left2 (fun m (tparam_id, tcs) ty ->
+          (* Resolve TC witnesses for this type at each declared bound.
+             For each [tc] in [tcs], look up [ty <: tc] in the env. If
+             missing, emit a [TCIUni] placeholder — [delta_tc] will fail
+             to reduce class-ops at this tparam, leaving the goal in
+             non-concrete form (likely unprovable, but with a clearer
+             failure mode than a silent skip). *)
+          let witnesses =
+            List.map (fun (tc : EcAst.typeclass) ->
+              let inst_opt =
+                List.find_opt (fun (path_opt, tci) ->
+                  match path_opt, tci.EcTheory.tci_instance with
+                  | Some _, `General (anc, _)
+                    when EcReduction.EqTest.for_type genv.te_env
+                           tci.EcTheory.tci_type ty
+                      && EcPath.p_equal anc.EcAst.tc_name tc.EcAst.tc_name
+                    -> true
+                  | _ -> false
+                ) (EcEnv.TcInstance.get_all genv.te_env) in
+              match inst_opt with
+              | Some (Some inst_path, tci) ->
+                let inst_etyargs =
+                  EcDecl.etyargs_of_tparams tci.EcTheory.tci_params in
+                EcAst.TCIConcrete
+                  { path = inst_path; etyargs = inst_etyargs; lift = [] }
+              | _ ->
+                Format.eprintf
+                  "smt-hint: no instance found for %s <: %s@."
+                  (Format.asprintf "%a" EcPrinting.(pp_type (PPEnv.ofenv genv.te_env)) ty)
+                  (EcPath.tostring tc.EcAst.tc_name);
+                EcAst.TCIUni (EcAst.TcUni.unique (), [])
+            ) tcs in
+          Mid.add tparam_id (ty, witnesses) m
+        ) Mid.empty ax.ax_tparams tys in
+      let axform =
+        EcCoreSubst.Fsubst.f_subst_tvar
+          ~freshen:true subst_map ax.ax_spec in
+      let axform =
+        let ri = { EcReduction.no_red with delta_tc = true } in
+        let ldecl = EcEnv.LDecl.init genv.te_env [] in
+        EcReduction.simplify ri ldecl axform in
+      add_axiom (genv, empty_lenv) (preid_p p) axform
+  in
+  match tvi with
+  | Some tys -> do_instantiated tys
+  | None ->
   let lenv, _wparams = lenv_of_tparams ax.ax_tparams in
   (* Collect (tparam_id, offset, class, tparam_ty) entries for each TC
      bound on each tparam. *)
@@ -1963,6 +2203,12 @@ let trans_axiom genv (p, ax) =
     ) ax.ax_tparams in
   if tc_binders = [] then
     add_axiom (genv, lenv) (preid_p p) ax.ax_spec
+  else if tc_minimal_mode () then
+    (* Skip — user must provide [smt(L<:T>)] for this lemma to be
+       included. *)
+    Format.eprintf
+      "smt-hint: lemma %s has TC tparams; specify type via [<:T>]@."
+      (EcPath.tostring p)
   else begin
     (* Build a dict vsymbol per binder and extend le_tdict. *)
     let lenv, dict_vss =
@@ -2954,6 +3200,7 @@ let dump_why3 (env : EcEnv.env) (filename : string) =
 
 let init hyps_ld concl =
   let env   = LDecl.toenv hyps_ld in
+  let minimal = tc_minimal_mode () in
   (* Pre-reduce TC ops at concrete instances. With this delta_tc pass,
      Fops like [Top.TcMonoid.mop<:int + addmonoid leg>] reduce to
      [CoreInt.add] directly — they NEVER hit Phase D's dict projection
@@ -2968,10 +3215,10 @@ let init hyps_ld concl =
   let tenv  = empty_tenv env task known in
   let ()    = add_core_bindings tenv in
   (* Phase B — eagerly emit dicts + bridges + axhold for all
-     registered reducible instances. Eager so polymorphic lemmas
-     pulled in via [smt(hint1 hint2)] have access to the instance
-     dicts at concrete carriers. *)
-  let ()    =
+     registered reducible instances. Disabled in TC-minimal mode:
+     the user instead supplies hints [smt(L<:T>)] for the specific
+     instantiations they want. *)
+  if not minimal then
     List.iter (fun (path_opt, tci) ->
       match path_opt, tci.EcTheory.tci_instance with
       | Some path, `General (_, Some _)
@@ -2979,8 +3226,15 @@ let init hyps_ld concl =
              && tci.EcTheory.tci_reducible ->
         ignore (emit_instance_dict tenv path : _ option)
       | _ -> ()
-    ) (EcEnv.TcInstance.get_all env) in
-  let lenv  = lenv_of_hyps tenv hyps in
+    ) (EcEnv.TcInstance.get_all env);
+  (* In minimal mode skip [emit_tparam_dicts] / [emit_abstract_type_dicts]
+     too — no TC machinery enters the task from the goal-context side. *)
+  let lenv =
+    if minimal then
+      let lenv = fst (lenv_of_tparams_for_hyp tenv hyps.h_tvar) in
+      snd (List.fold_left trans_hyp (tenv, lenv) (List.rev hyps.h_local))
+    else
+      lenv_of_hyps tenv hyps in
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
@@ -3013,9 +3267,17 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
       (fun () -> Format.fprintf
         (Format.formatter_of_out_channel stream)
         "%a@." Why3.Pretty.print_task task)
-      (fun () -> close_out stream) in
+      (fun () -> close_out stream);
+    (* Companion re-parseable theory dump: replaces ".w3" extension
+       with ".why" when present, else appends ".why". *)
+    let why_name =
+      if Filename.check_suffix filename ".w3"
+      then Filename.chop_suffix filename ".w3" ^ ".why"
+      else filename ^ ".why" in
+    dump_task_theory task why_name in
 
   let env,hyps,tenv,decl = init hyps concl in
+  tenv.te_tvi <- pi.P.pr_tvi;
 
   let execute_task toadd =
     if pi.P.pr_selected then begin

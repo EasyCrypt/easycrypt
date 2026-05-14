@@ -2807,17 +2807,19 @@ occurences:
 
 dbmap1:
 | f=dbmap_flag? x=dbmap_target
-    { { pht_flag = odfl `Include f;
-        pht_kind = (fst x);
-        pht_name = (snd x); } }
+    { let kind, name, tvi = x in
+      { pht_flag = odfl `Include f;
+        pht_kind = kind;
+        pht_name = name;
+        pht_tvi  = tvi; } }
 
 %inline dbmap_flag:
 | PLUS  { `Include }
 | MINUS { `Exclude }
 
 %inline dbmap_target:
-| AT x=uqident { (`Theory, x) }
-| x=qident     { (`Lemma , x) }
+| AT x=uqident                  { (`Theory, x, None    ) }
+| x=qident tvi=tvars_app?       { (`Lemma , x, tvi     ) }
 
 dbhint:
 | m=dbmap1         { [m] }
