@@ -1864,26 +1864,28 @@ let hs_inv_alpha_eq hyps (inv1 : hs_inv) (inv2 : hs_inv) =
 module EqTest = struct
   include EqTest_base
 
+  let for_expr env ~norm:_ alpha e1 e2 =
+    let convert e =
+      let f = (ss_inv_of_expr (EcIdent.create "&dummy") e).inv in
+
+      if Mid.is_empty alpha then f else
+
+      let subst =
+        Mid.fold
+          (fun x (y, ty) subst ->
+            Fsubst.f_bind_local subst x (f_local y ty))
+        alpha Fsubst.f_subst_id
+
+      in Fsubst.f_subst subst f in
+
+    let f1 = convert e1 in
+    let f2 = convert e2 in
+
+    is_conv (LDecl.init env []) f1 f2
+
   include EqMod_base(struct
-    let for_expr env ~norm:_ alpha e1 e2 =
-      let convert e =
-        let f = (ss_inv_of_expr (EcIdent.create "&dummy") e).inv in
-
-        if Mid.is_empty alpha then f else
-
-        let subst =
-          Mid.fold
-            (fun x (y, ty) subst ->
-              Fsubst.f_bind_local subst x (f_local y ty))
-          alpha Fsubst.f_subst_id
-
-        in Fsubst.f_subst subst f in
-
-      let f1 = convert e1 in
-      let f2 = convert e2 in
-
-      is_conv (LDecl.init env []) f1 f2
-   end)
+    let for_expr = for_expr
+  end)
 
   let for_pv    = fun env ?(norm = true) -> for_pv    env ~norm
   let for_lv    = fun env ?(norm = true) -> for_lv    env ~norm
