@@ -5,6 +5,14 @@
 \RequirePackage{xcolor}
 \RequirePackage{xparse}
 
+\providecommand\sample{\leftarrow\mathrel{\mkern-2.0mu}\pc@smalldollar}
+\newcommand{\pc@smalldollar}{\mathrel{\mathpalette\pc@small@dollar\relax}}
+\newcommand{\pc@small@dollar}[2]{%
+  \vcenter{\hbox{%
+    $#1\textnormal{\fontsize{\dimexpr\f@size pt}{0}\selectfont\$\hskip-0.05em plus 0.5em}$%
+  }}%
+}
+
 % EasyCrypt % Language
 \lstdefinelanguage{easycrypt}{%
 	sensitive=true, % Case sensitive keywords
@@ -28,7 +36,7 @@
 		elim, eta, exfalso, exlim, fel, field, fieldeq, fission, fusion, gen, have,
 		idassign, idtac, inline, interleave, iota, kill, left, logic, modpath, move,
 		outline, pose, pr_bounded, progress, rcondf, rcondt, replace, rewrite, right,
-		ring, ringeq, rnd, rndsem, rwnormal, seq, sim, simplify, skip, sp, split,
+		ring, ringeq, rnd, rndsem, rwnormal, seq, sim, simplify, skip, sp,
 		splitwhile, subst, suff, swap, symmetry, transitivity, trivial, unroll,
 		weakmem, wlog, wp, zeta
 	},
@@ -49,6 +57,12 @@
 }
 
 % Style (base/default)
+% We wrap the style definition in a catcode-change group so that `$` in the
+% `literate=` trigger (`<$`) is parsed as a regular character rather than a
+% math-shift token.  Outputs use \ensuremath{...} so they are unaffected by
+% the catcode change.
+\begingroup
+\catcode`\$=12\relax
 \lstdefinestyle{easycrypt-base}{%
 	% Frame
 	captionpos=t, % Position caption at top (mirroring what's typical for algorithms)
@@ -63,13 +77,50 @@
 	tabsize=2, % Tabstops every 2 spaces
 	mathescape=false, % Don't allow escaping to LaTeX with $
 	showstringspaces=false, % Don't print characters for spaces
+	extendedchars=true, % Allow non-ASCII (UTF-8) literate triggers
 	% Line numbers
 	numbers=none, % No line numbers
 	% Basic style
 	basicstyle={\normalsize\ttfamily},
 	% Style for (non-keyword) identifiers
 	identifierstyle={},
+	% Math/symbol substitutions
+	% ASCII triggers (rendered in any listing without source change)
+	literate=%
+		{<-}{\ensuremath{\gets}}{2}%
+		{<$}{\ensuremath{\sample}}{2}%
+		{->}{\ensuremath{\to}}{2}%
+		{=>}{\ensuremath{\Rightarrow}}{2}%
+		{<=}{\ensuremath{\le}}{2}%
+		{>=}{\ensuremath{\ge}}{2}%
+		{<>}{\ensuremath{\neq}}{2}%
+		{!=}{\ensuremath{\neq}}{2}%
+		% Unicode triggers (must be typed explicitly in source)
+		{∈}{\ensuremath{\in}}{1}%
+		{∉}{\ensuremath{\notin}}{1}%
+		{∪}{\ensuremath{\cup}}{1}%
+		{∩}{\ensuremath{\cap}}{1}%
+		{∅}{\ensuremath{\emptyset}}{1}%
+		{∖}{\ensuremath{\setminus}}{1}%
+		{⊑}{\ensuremath{\sqsubseteq}}{1}%
+		{⊓}{\ensuremath{\sqcap}}{1}%
+		{⊥}{\ensuremath{\bot}}{1}%
+		{∀}{\ensuremath{\forall}}{1}%
+		{∃}{\ensuremath{\exists}}{1}%
+		{↦}{\ensuremath{\mapsto}}{1}%
+		{←}{\ensuremath{\gets}}{1}%
+		{→}{\ensuremath{\to}}{1}%
+		{⇒}{\ensuremath{\Rightarrow}}{1}%
+		{≤}{\ensuremath{\le}}{1}%
+		{≥}{\ensuremath{\ge}}{1}%
+		{≠}{\ensuremath{\neq}}{1}%
+		{≡}{\ensuremath{\equiv}}{1}%
+		{×}{\ensuremath{\times}}{1}%
+		{·}{\ensuremath{\cdot}}{1}%
+		{𝟙}{\ensuremath{\mathds{1}}}{1}%
+		{𝒰}{\ensuremath{\mathcal{U}}}{1}%
 }
+\endgroup
 
 % Define default colors based on availability of colorblind colors
 \@ifpackageloaded{colorblind}{
