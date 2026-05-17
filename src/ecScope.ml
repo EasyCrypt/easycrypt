@@ -522,7 +522,7 @@ module Prover = struct
        concrete [ty list] in the same pass — typing is local (closed
        types in [<:int>] etc.), so a fresh [unienv] suffices. *)
     let tvi_map = ref EcPath.Mp.empty in
-    let resolve_tvi (p : EcPath.path) (tvi : ptyannot) : unit =
+    let resolve_tvi (p : EcPath.path) (ax : EcDecl.axiom) (tvi : ptyannot) : unit =
       let ue = EcUnify.UniEnv.create None in
       let tys =
         match (unloc tvi) with
@@ -532,6 +532,13 @@ module Prover = struct
         | TVInamed _ ->
           hierror ~loc:tvi.pl_loc
             "named type instantiation not supported in smt hints" in
+      let nty = List.length tys in
+      let ntp = List.length ax.EcDecl.ax_tparams in
+      if nty <> ntp then
+        hierror ~loc:tvi.pl_loc
+          "smt-hint: lemma `%s' has %d type parameter(s) \
+           but %d type(s) supplied via <:…>"
+          (EcPath.tostring p) ntp nty;
       tvi_map := EcPath.Mp.add p tys !tvi_map in
     let add hints x =
       let nf kind p =
@@ -549,8 +556,8 @@ module Prover = struct
       and add1 hints hflag p tvi =
         match EcEnv.Ax.lookup_opt (unloc p) env with
         | None -> nf `Lemma p
-        | Some (p, _) ->
-          Option.iter (resolve_tvi p) tvi;
+        | Some (p, ax) ->
+          Option.iter (resolve_tvi p ax) tvi;
           EcProvers.Hints.add1 p hflag hints
       in
 

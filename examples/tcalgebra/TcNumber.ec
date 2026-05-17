@@ -744,7 +744,7 @@ lemma pmulr_gt0 (x y : t) : zero <= x => zero <= y =>
   zero < x * y <=> zero < x /\ zero < y.
 proof.
 move=> x_ge0 y_ge0; split; last by smt(pmulr_rgt0).
-smt (pmulr_rgt0 ltrNge ler_anti mul0r ltrr).
+smt (pmulr_rgt0 ltrNge ler_anti mul0r<:t> ltrr).
 qed.
 
 (* -------------------------------------------------------------------- *)

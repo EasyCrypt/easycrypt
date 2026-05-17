@@ -155,6 +155,19 @@ type tenv = {
        [delta_tc]-reduces the result before emitting — producing a
        concrete-op axiom rather than the polymorphic dict-passing
        form. Empty by default; populated by [check] from [pi.pr_tvi]. *)
+  mutable te_wanted     : EcProvers.hints;
+    (* User-explicit lemma set (from [pi.pr_wanted]). In TC-minimal
+       mode we use this to distinguish lemmas the user explicitly
+       asked for ([smt(L)]) from auto-included ones: a TC-parametric
+       lemma in [te_wanted] without a [te_tvi] entry is a hard error,
+       while an auto-included one is just skipped. *)
+  (*---*) te_missing    : (WTy.ty * EcPath.path, WTerm.term) Hashtbl.t;
+    (* Cache of [placeholder_dict] results, keyed by (carrier why3
+       type, TC class path). In TC-minimal mode this is what makes
+       lemma/goal share dicts at abstract carriers: every call to
+       a class op at a section-bound type [t :: comring] picks up
+       the SAME [missing_dict] constant, so SMT can unify the
+       lemma's body with the goal. *)
 }
 
 let empty_tenv env task (kwty, kw, kwk) =
@@ -175,7 +188,19 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_pidict     = Hp.create 0;
     te_absdict    = Hashtbl.create 17;
     te_tvi        = EcPath.Mp.empty;
+    te_wanted     = EcProvers.Hints.empty;
+    te_missing    = Hashtbl.create 17;
   }
+
+(* TC-minimal mode (env var [EC_TC_MINIMAL=1]): the SMT task is
+   shipped with NO TC machinery (no Phase B, no per-tparam dicts, no
+   class-axiom polymorphic emission). The user supplies hints
+   [smt(L<:T1, T2>)] to specify which lemmas to bring in and at what
+   type instantiations. *)
+let tc_minimal_mode () =
+  match Sys.getenv_opt "EC_TC_MINIMAL" with
+  | Some ("1" | "true" | "yes") -> true
+  | _ -> false
 
 (* -------------------------------------------------------------------- *)
 (* Carrier key for an in-scope dict. [DKVar] keys tparam-ident carriers
@@ -1183,14 +1208,24 @@ and compute_op_dicts
        OR when EC's etyargs short-circuit witness emission for ops
        whose body doesn't reference class ops at the tparam (subtype
        constructors like [to_poly] / [of_poly], data constructors that
-       never need a dict). *)
-    let w3cd = trans_class genv tc.EcAst.tc_name in
-    let dict_ty = WTy.ty_app w3cd.wcd_ts [carrier_w3_ty] in
-    let ls =
-      WTerm.create_lsymbol
-        (WIdent.id_fresh "missing_dict") [] (Some dict_ty) in
-    genv.te_task <- WTask.add_param_decl genv.te_task ls;
-    WTerm.fs_app ls [] dict_ty in
+       never need a dict).
+       Cached per (carrier_w3_ty, tc_name): two call sites at the
+       same abstract carrier + class share the SAME constant, which
+       is what lets an SMT prover unify a lemma's body with the goal
+       in TC-minimal mode (section-bound types). *)
+    let key = (carrier_w3_ty, tc.EcAst.tc_name) in
+    match Hashtbl.find_opt genv.te_missing key with
+    | Some t -> t
+    | None ->
+      let w3cd = trans_class genv tc.EcAst.tc_name in
+      let dict_ty = WTy.ty_app w3cd.wcd_ts [carrier_w3_ty] in
+      let ls =
+        WTerm.create_lsymbol
+          (WIdent.id_fresh "missing_dict") [] (Some dict_ty) in
+      genv.te_task <- WTask.add_param_decl genv.te_task ls;
+      let t = WTerm.fs_app ls [] dict_ty in
+      Hashtbl.add genv.te_missing key t;
+      t in
   let tparams_and_etyargs =
     try List.combine op.op_tparams etyargs
     with Invalid_argument _ -> [] in
@@ -2031,9 +2066,14 @@ and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
             (WIdent.id_fresh
                (Printf.sprintf "%s_spec_%s"
                   proj_name (sanitize_op_name f_P.wcf_name))) in
-        let spec_decl =
-          WDecl.create_prop_decl WDecl.Paxiom spec_pr spec in
-        genv.te_task <- WTask.add_decl genv.te_task spec_decl
+        (* TC-structural axiom: parent-dict field via chain projection
+           equals child-dict field directly. Skipped in TC-minimal
+           mode — there we send class operators but no TC axioms. *)
+        if not (tc_minimal_mode ()) then begin
+          let spec_decl =
+            WDecl.create_prop_decl WDecl.Paxiom spec_pr spec in
+          genv.te_task <- WTask.add_decl genv.te_task spec_decl
+        end
     ) parent_w3cd.wcd_fields
   ) class_decl.tc_prts;
   w3cd
@@ -2119,15 +2159,6 @@ let sanitize_for_id s =
        || (c >= '0' && c <= '9') || c = '_'
     then c else '_') s
 
-(* TC-minimal mode (env var [EC_TC_MINIMAL=1]): the SMT task is
-   shipped with NO TC machinery (no Phase B, no per-tparam dicts, no
-   class-axiom polymorphic emission). The user supplies hints
-   [smt(L<:T1, T2>)] to specify which lemmas to bring in and at what
-   type instantiations. *)
-let tc_minimal_mode () =
-  match Sys.getenv_opt "EC_TC_MINIMAL" with
-  | Some ("1" | "true" | "yes") -> true
-  | _ -> false
 
 let trans_axiom genv (p, ax) =
   (* [smt(L<:T1,…)] handling: when the user has provided a type
@@ -2203,12 +2234,19 @@ let trans_axiom genv (p, ax) =
     ) ax.ax_tparams in
   if tc_binders = [] then
     add_axiom (genv, lenv) (preid_p p) ax.ax_spec
-  else if tc_minimal_mode () then
-    (* Skip — user must provide [smt(L<:T>)] for this lemma to be
-       included. *)
-    Format.eprintf
-      "smt-hint: lemma %s has TC tparams; specify type via [<:T>]@."
-      (EcPath.tostring p)
+  else if tc_minimal_mode () then begin
+    (* Auto-included TC-parametric lemmas are silently dropped (no
+       encoding available in minimal mode). User-explicit hints
+       ([smt(L)] where L is in [te_wanted]) must instead be
+       instantiated via [<:T>] — failure to do so is a hard error
+       so the user sees the problem. *)
+    if EcProvers.Hints.mem p genv.te_wanted then
+      failwith
+        (Printf.sprintf
+           "smt-hint: lemma %s is type-class polymorphic; \
+            instantiate it explicitly: smt(%s<:T>)"
+           (EcPath.tostring p) (EcPath.basename p))
+  end
   else begin
     (* Build a dict vsymbol per binder and extend le_tdict. *)
     let lenv, dict_vss =
@@ -3278,6 +3316,7 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
 
   let env,hyps,tenv,decl = init hyps concl in
   tenv.te_tvi <- pi.P.pr_tvi;
+  tenv.te_wanted <- pi.P.pr_wanted;
 
   let execute_task toadd =
     if pi.P.pr_selected then begin
