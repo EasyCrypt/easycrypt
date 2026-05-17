@@ -1389,46 +1389,105 @@ and try_dict_proj
           if not (EcPath.p_equal anc_arrived.EcAst.tc_name class_path) then
             None
           else
-            (* TC-minimal canonicalization: project the dict all the
-               way to the op's class via [lift]. The flat-constant
-               cache returns a pre-emitted constant (logic-def equal
-               to the chain composition) so the body term is bytewise
-               identical across lemma and operator-body call sites
-               at the same (carrier, anc_class, lift). Non-minimal
-               mode keeps the leaf-rename shortcut for compactness
-               (with chain-proj specs bridging). *)
+            (* In TC-minimal mode emit a CONCRETE-TYPED lsymbol per
+               (carrier, op_class, lift) — no dict argument, no
+               polymorphism, mimicking what clone-based theories
+               produce. All references to the same operation at the
+               same (carrier, leg) land on the SAME fresh lsymbol,
+               so Z3/CVC5 pattern-match without needing to instantiate
+               polymorphic types. Non-minimal mode keeps the dict-
+               projection encoding. *)
             let resolved =
-              if tc_minimal_mode () then
-                let final_w3cd_opt =
-                  try Some (trans_class genv class_path)
-                  with _ -> None in
+              if tc_minimal_mode () then begin
                 let carrier_ec_ty = fst (List.last etyargs) in
                 let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
-                let key = (carrier_w3_ty, class_path, lift) in
-                match Hashtbl.find_opt genv.te_chain_dicts key, final_w3cd_opt with
-                | Some final_dict, Some final_w3cd ->
-                  Option.map (fun f -> (final_dict, final_w3cd, f))
-                    (Hashtbl.find_opt final_w3cd.wcd_by_leaf local_name)
-                | _ ->
-                  (* Cache miss: fall back to the chain composition
-                     so we don't crash. May happen for class-op uses
-                     at carriers we didn't pre-emit constants for —
-                     e.g. inside a polymorphic op body translated
-                     once (where the carrier is a fresh tvar). *)
-                  match walk_dict_lift dict_term w3cd lift with
-                  | None -> None
-                  | Some (final_dict, final_w3cd) ->
-                    Option.map (fun f -> (final_dict, final_w3cd, f))
-                      (Hashtbl.find_opt final_w3cd.wcd_by_leaf local_name)
-              else
+                let key = (carrier_w3_ty, class_path, local_name) in
+                let ls =
+                  match Hashtbl.find_opt genv.te_carrier_ops key with
+                  | Some ls -> ls
+                  | None ->
+                    (* Look up the op's signature with self-tparam
+                       substituted to the carrier; emit lsymbol of
+                       that concrete type. *)
+                    let op = EcEnv.Op.by_path p genv.te_env in
+                    match List.rev op.op_tparams with
+                    | [] -> assert false
+                    | (self_id, _) :: _ ->
+                      let lenv_local =
+                        { empty_lenv with
+                          le_tv = Mid.singleton self_id carrier_w3_ty } in
+                      let dom, codom =
+                        EcEnv.Ty.signature genv.te_env op.op_ty in
+                      let wdom =
+                        List.map (trans_ty (genv, lenv_local)) dom in
+                      let wcodom =
+                        if EcReduction.EqTest.is_bool genv.te_env codom
+                        then None
+                        else Some (trans_ty (genv, lenv_local) codom) in
+                      let carrier_name =
+                        let rec head (ty : EcAst.ty) =
+                          match ty.ty_node with
+                          | Tconstr (cp, _) -> EcPath.basename cp
+                          | Tvar id          -> EcIdent.name id
+                          | _                -> "carrier" in
+                        head carrier_ec_ty in
+                      let leg_suffix =
+                        if lift = [] then ""
+                        else "_" ^ String.concat "_"
+                                     (List.map string_of_int lift) in
+                      let op_name =
+                        let s = sanitize_op_name local_name in
+                        if s = "" then "op" else s in
+                      let lid =
+                        Printf.sprintf "%s_at_%s%s"
+                          op_name carrier_name leg_suffix in
+                      let lid = str_lid lid in
+                      let ls =
+                        WTerm.create_lsymbol
+                          (WIdent.id_fresh lid) wdom wcodom in
+                      genv.te_task <-
+                        WTask.add_param_decl genv.te_task ls;
+                      Hashtbl.add genv.te_carrier_ops key ls;
+                      ls in
+                (* Apply [ls] directly to args, no dict prefix. *)
+                Some (`Concrete ls)
+              end else begin
                 let leaf_name =
                   try List.assoc local_name ren
                   with Not_found -> local_name in
-                Option.map (fun f -> (dict_term, w3cd, f))
-                  (Hashtbl.find_opt w3cd.wcd_by_leaf leaf_name) in
+                match Hashtbl.find_opt w3cd.wcd_by_leaf leaf_name with
+                | None -> None
+                | Some field -> Some (`Field (dict_term, w3cd, field))
+              end in
             match resolved with
             | None -> None
-            | Some (dict_term, w3cd, field) ->
+            | Some (`Concrete ls) ->
+              (* Concrete-typed lsymbol (minimal mode): no dict
+                 prefix. Same fragmentation logic as the dict case
+                 for partial / over-application. *)
+              let n_op_args = List.length ls.WTerm.ls_args in
+              let n_args    = List.length args in
+              if n_args = n_op_args then
+                Some (WTerm.t_app_infer ls args)
+              else if n_args > n_op_args then
+                let first, rest = List.takedrop n_op_args args in
+                Some (apply_highorder
+                        (WTerm.t_app_infer ls first) rest)
+              else
+                (* Partial application: build a HO wrapper. We can
+                   reuse [mk_highorder_func] for this. *)
+                let id = ls.WTerm.ls_name.WIdent.id_string in
+                let dom = ls.WTerm.ls_args in
+                let codom = ls.WTerm.ls_value in
+                let ho_ls, decl, decl_s =
+                  mk_highorder_func id dom codom (WTerm.t_app ls) in
+                genv.te_task <- WTask.add_decl genv.te_task decl;
+                genv.te_task <- WTask.add_decl genv.te_task decl_s;
+                let fty =
+                  List.fold_right WTy.ty_func dom (odfl WTy.ty_bool codom) in
+                let head = WTerm.fs_app ho_ls [] fty in
+                Some (apply_highorder head args)
+            | Some (`Field (dict_term, w3cd, field)) ->
               let proj_ls = field.wcf_proj in
               let n_op_args = List.length proj_ls.WTerm.ls_args - 1 in
               let n_args    = List.length args in
