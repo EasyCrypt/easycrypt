@@ -215,16 +215,6 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_chain_dicts = Hashtbl.create 17;
   }
 
-(* TC-minimal mode (env var [EC_TC_MINIMAL=1]): the SMT task is
-   shipped with NO TC machinery (no Phase B, no per-tparam dicts, no
-   class-axiom polymorphic emission). The user supplies hints
-   [smt(L<:T1, T2>)] to specify which lemmas to bring in and at what
-   type instantiations. *)
-let tc_minimal_mode () =
-  match Sys.getenv_opt "EC_TC_MINIMAL" with
-  | Some ("1" | "true" | "yes") -> true
-  | _ -> false
-
 (* -------------------------------------------------------------------- *)
 (* Carrier key for an in-scope dict. [DKVar] keys tparam-ident carriers
    (true type parameters); [DKAbs] keys declared-abstract type-constructor
@@ -1280,29 +1270,24 @@ and compute_op_dicts
       (witness : EcAst.tcwitness)
     : (WTerm.term * w3_class_decl) option
   =
-    (* TC-minimal mode: prefer the flat-constant cache. The flat
-       constant's logic-definition is the same chain composition
-       [walk_dict_lift] would compute, but referencing the constant
-       directly keeps body terms small and bytewise identical to
-       what class-op uses (via [try_dict_proj]) emit. *)
-    let try_minimal_cache () =
-      if not (tc_minimal_mode ()) then None
-      else
-        match resolve_witness genv lenv witness with
-        | None -> None
-        | Some (_, _, lift) ->
-          let key = (carrier_w3_ty, target_class, lift) in
-          match Hashtbl.find_opt genv.te_chain_dicts key with
-          | None -> None
-          | Some flat_term ->
-            let target_w3cd = trans_class genv target_class in
-            Some (flat_term, target_w3cd) in
-    match try_minimal_cache () with
-    | Some _ as r -> r
-    | None ->
-      match resolve_witness genv lenv witness with
-      | None -> None
-      | Some (dt, w3cd, lift) -> walk_dict_lift dt w3cd lift
+    (* Prefer the flat-constant cache. The flat constant's
+       logic-definition is the same chain composition that
+       [walk_dict_lift] would compute, but referencing the
+       constant directly keeps body terms small and bytewise
+       identical to what class-op uses (via [try_dict_proj])
+       emit. Fall back to the chain composition if the cache
+       is missing (e.g. polymorphic op body translated at a
+       fresh tvar carrier). *)
+    match resolve_witness genv lenv witness with
+    | None -> None
+    | Some (dt, w3cd, lift) ->
+      let key = (carrier_w3_ty, target_class, lift) in
+      match Hashtbl.find_opt genv.te_chain_dicts key with
+      | Some flat_term ->
+        let target_w3cd = trans_class genv target_class in
+        Some (flat_term, target_w3cd)
+      | None ->
+        walk_dict_lift dt w3cd lift
   in
   let placeholder_dict (tc : EcAst.typeclass) (carrier_w3_ty : WTy.ty) =
     (* Emit a typed opaque constant so the call's arity AND types match
@@ -1395,76 +1380,64 @@ and try_dict_proj
                produce. All references to the same operation at the
                same (carrier, leg) land on the SAME fresh lsymbol,
                so Z3/CVC5 pattern-match without needing to instantiate
-               polymorphic types. Non-minimal mode keeps the dict-
-               projection encoding. *)
-            let resolved =
-              if tc_minimal_mode () then begin
-                let carrier_ec_ty = fst (List.last etyargs) in
-                let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
-                let key = (carrier_w3_ty, class_path, local_name) in
-                let ls =
-                  match Hashtbl.find_opt genv.te_carrier_ops key with
-                  | Some ls -> ls
-                  | None ->
-                    (* Look up the op's signature with self-tparam
-                       substituted to the carrier; emit lsymbol of
-                       that concrete type. *)
-                    let op = EcEnv.Op.by_path p genv.te_env in
-                    match List.rev op.op_tparams with
-                    | [] -> assert false
-                    | (self_id, _) :: _ ->
-                      let lenv_local =
-                        { empty_lenv with
-                          le_tv = Mid.singleton self_id carrier_w3_ty } in
-                      let dom, codom =
-                        EcEnv.Ty.signature genv.te_env op.op_ty in
-                      let wdom =
-                        List.map (trans_ty (genv, lenv_local)) dom in
-                      let wcodom =
-                        if EcReduction.EqTest.is_bool genv.te_env codom
-                        then None
-                        else Some (trans_ty (genv, lenv_local) codom) in
-                      let carrier_name =
-                        let rec head (ty : EcAst.ty) =
-                          match ty.ty_node with
-                          | Tconstr (cp, _) -> EcPath.basename cp
-                          | Tvar id          -> EcIdent.name id
-                          | _                -> "carrier" in
-                        head carrier_ec_ty in
-                      let leg_suffix =
-                        if lift = [] then ""
-                        else "_" ^ String.concat "_"
-                                     (List.map string_of_int lift) in
-                      let op_name =
-                        let s = sanitize_op_name local_name in
-                        if s = "" then "op" else s in
-                      let lid =
-                        Printf.sprintf "%s_at_%s%s"
-                          op_name carrier_name leg_suffix in
-                      let lid = str_lid lid in
-                      let ls =
-                        WTerm.create_lsymbol
-                          (WIdent.id_fresh lid) wdom wcodom in
-                      genv.te_task <-
-                        WTask.add_param_decl genv.te_task ls;
-                      Hashtbl.add genv.te_carrier_ops key ls;
-                      ls in
-                (* Apply [ls] directly to args, no dict prefix. *)
-                Some (`Concrete ls)
-              end else begin
-                let leaf_name =
-                  try List.assoc local_name ren
-                  with Not_found -> local_name in
-                match Hashtbl.find_opt w3cd.wcd_by_leaf leaf_name with
-                | None -> None
-                | Some field -> Some (`Field (dict_term, w3cd, field))
-              end in
+               polymorphic types. *)
+            let _ = dict_term and _ = ren and _ = w3cd in
+            let carrier_ec_ty = fst (List.last etyargs) in
+            let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
+            let key = (carrier_w3_ty, class_path, local_name) in
+            let ls =
+              match Hashtbl.find_opt genv.te_carrier_ops key with
+              | Some ls -> ls
+              | None ->
+                (* Look up the op's signature with self-tparam
+                   substituted to the carrier; emit lsymbol of
+                   that concrete type. *)
+                let op = EcEnv.Op.by_path p genv.te_env in
+                match List.rev op.op_tparams with
+                | [] -> assert false
+                | (self_id, _) :: _ ->
+                  let lenv_local =
+                    { empty_lenv with
+                      le_tv = Mid.singleton self_id carrier_w3_ty } in
+                  let dom, codom =
+                    EcEnv.Ty.signature genv.te_env op.op_ty in
+                  let wdom =
+                    List.map (trans_ty (genv, lenv_local)) dom in
+                  let wcodom =
+                    if EcReduction.EqTest.is_bool genv.te_env codom
+                    then None
+                    else Some (trans_ty (genv, lenv_local) codom) in
+                  let carrier_name =
+                    let head (ty : EcAst.ty) =
+                      match ty.ty_node with
+                      | Tconstr (cp, _) -> EcPath.basename cp
+                      | Tvar id          -> EcIdent.name id
+                      | _                -> "carrier" in
+                    head carrier_ec_ty in
+                  let leg_suffix =
+                    if lift = [] then ""
+                    else "_" ^ String.concat "_"
+                                 (List.map string_of_int lift) in
+                  let op_name =
+                    let s = sanitize_op_name local_name in
+                    if s = "" then "op" else s in
+                  let lid =
+                    Printf.sprintf "%s_at_%s%s"
+                      op_name carrier_name leg_suffix in
+                  let lid = str_lid lid in
+                  let ls =
+                    WTerm.create_lsymbol
+                      (WIdent.id_fresh lid) wdom wcodom in
+                  genv.te_task <-
+                    WTask.add_param_decl genv.te_task ls;
+                  Hashtbl.add genv.te_carrier_ops key ls;
+                  ls in
+            let resolved = Some (`Concrete ls) in
             match resolved with
             | None -> None
             | Some (`Concrete ls) ->
-              (* Concrete-typed lsymbol (minimal mode): no dict
-                 prefix. Same fragmentation logic as the dict case
-                 for partial / over-application. *)
+              (* Concrete-typed lsymbol: no dict prefix. Standard
+                 fragmentation logic for partial / over-application. *)
               let n_op_args = List.length ls.WTerm.ls_args in
               let n_args    = List.length args in
               if n_args = n_op_args then
@@ -1474,8 +1447,6 @@ and try_dict_proj
                 Some (apply_highorder
                         (WTerm.t_app_infer ls first) rest)
               else
-                (* Partial application: build a HO wrapper. We can
-                   reuse [mk_highorder_func] for this. *)
                 let id = ls.WTerm.ls_name.WIdent.id_string in
                 let dom = ls.WTerm.ls_args in
                 let codom = ls.WTerm.ls_value in
@@ -1487,39 +1458,6 @@ and try_dict_proj
                   List.fold_right WTy.ty_func dom (odfl WTy.ty_bool codom) in
                 let head = WTerm.fs_app ho_ls [] fty in
                 Some (apply_highorder head args)
-            | Some (`Field (dict_term, w3cd, field)) ->
-              let proj_ls = field.wcf_proj in
-              let n_op_args = List.length proj_ls.WTerm.ls_args - 1 in
-              let n_args    = List.length args in
-              if n_args = n_op_args then
-                (* Full application: first-order [proj_ls dict args]
-                   yields the result directly. No [@] needed — SMT
-                   bridges of the same shape match without HO work. *)
-                Some (WTerm.t_app_infer proj_ls (dict_term :: args))
-              else if n_args > n_op_args then
-                (* Over-application: apply [n_op_args] flat args first,
-                   then [apply_highorder] for the surplus. *)
-                let first, rest = List.takedrop n_op_args args in
-                let head =
-                  WTerm.t_app_infer proj_ls (dict_term :: first) in
-                Some (apply_highorder head rest)
-              else
-                (* Partial application: get the HO wrapper of [proj_ls]
-                   (lazily emitted as a function-typed constant with a
-                   spec axiom linking it to [proj_ls]), then apply via
-                   [@] to the supplied args. The wrapper plays the same
-                   role as [trans_op]'s [mk_highorder_func]. The
-                   wrapper's type is polymorphic in [w3cd.wcd_tparam];
-                   instantiate at the actual carrier. *)
-                let carrier_ec_ty = fst (List.last etyargs) in
-                let carrier_w3_ty = trans_ty (genv, lenv) carrier_ec_ty in
-                let mtv =
-                  WTy.Mtv.singleton w3cd.wcd_tparam carrier_w3_ty in
-                let inst t = WTy.ty_inst mtv t in
-                let ho_ls = w3op_proj_ho_lsymbol genv field in
-                let fty = inst (ho_ls_type ho_ls) in
-                let head = WTerm.fs_app ho_ls [] fty in
-                Some (apply_highorder head (dict_term :: args))
         in
         (* Unified resolution: [resolve_witness] handles all four
            witness shapes — abstract [`Var]/[`Abs] from [lenv]/[te_absdict],
@@ -2059,15 +1997,12 @@ and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
      pair (anc, ren) gives an ancestor typeclass and a list of
      [(ancestor_op_name, leaf_local_name)] entries. Empty ren = no
      renaming along this path.
-     In TC-minimal mode the dict carries ONLY the natively-declared
-     ops of this class — inherited ops are reached via chain
-     projections + projection at the origin class (see
-     [try_dict_proj]). Keeping the chain to the self class avoids
-     emitting redundant lsymbols ([idomain_zero] etc.) that
-     canonicalization never references. *)
-  let chain =
-    if tc_minimal_mode () then [(self_tc, [])]
-    else EcTypeClass.ancestors_with_renaming genv.te_env self_tc in
+     The dict carries ONLY the natively-declared ops of this class —
+     inherited ops are reached via chain projections + projection at
+     the origin class (see [try_dict_proj]). Keeping the chain to
+     the self class avoids emitting redundant lsymbols
+     ([idomain_zero] etc.) that canonicalization never references. *)
+  let chain = [(self_tc, [])] in
 
   (* Fresh tvar 'a for the dict's carrier. We use the basename of [cp]
      as the type-symbol name. *)
@@ -2216,7 +2151,7 @@ and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
      we feed an [alpha_tv]-typed dict in. *)
   let class_decl = EcEnv.TypeClass.by_path cp genv.te_env in
   let src_ty = WTy.ty_app dict_ts [alpha_ty] in
-  List.iteri (fun edge_idx (parent_tc, _label, edge_ren) ->
+  List.iteri (fun edge_idx (parent_tc, _label, _edge_ren) ->
     let parent_w3cd = trans_class genv parent_tc.EcAst.tc_name in
     let dst_ty = WTy.ty_app parent_w3cd.wcd_ts [alpha_ty] in
     let proj_name =
@@ -2228,68 +2163,7 @@ and trans_class (genv : tenv) (cp : EcPath.path) : w3_class_decl =
       WTerm.create_lsymbol (WIdent.id_fresh proj_name)
         [src_ty] (Some dst_ty) in
     genv.te_task <- WTask.add_param_decl genv.te_task proj_ls;
-    Hashtbl.add w3cd.wcd_chain_projs edge_idx (proj_ls, parent_w3cd);
-    (* Spec: for each parent field f_P (keyed by leaf-name [n_P] in
-       [parent_w3cd]), find the matching cp field whose leaf-name is
-       [lookup_ren edge_ren n_P] — the child-side name the parent's op
-       acquires when projected along THIS edge. Keying by leaf-name
-       (after edge-rename application) instead of [(wcf_origin,
-       wcf_orig_name)] is critical for diamond ancestors: at [comring],
-       monoid's [idm] is reached BOTH via the addgroup leg (renamed
-       to [zero]) and via the mulmonoid leg (renamed to [oner]); both
-       child fields share [(origin=monoid, orig_name=idm)] and an
-       origin-keyed lookup picks one arbitrarily, producing the
-       wrong spec axiom (e.g. [mulmonoid_oner (comring_to_mulmonoid_1
-       d) = comring_zero d]). Leaf-name keying selects the correct
-       leg per edge. *)
-    let cp_by_leaf = Hashtbl.create 17 in
-    List.iter (fun f ->
-      Hashtbl.replace cp_by_leaf f.wcf_name f
-    ) w3cd.wcd_fields;
-    let lookup_edge_ren ren n =
-      match List.assoc_opt n ren with Some n' -> n' | None -> n in
-    List.iter (fun f_P ->
-      let target_leaf = lookup_edge_ren edge_ren f_P.wcf_name in
-      match Hashtbl.find_opt cp_by_leaf target_leaf with
-      | None -> ()
-      | Some f_C ->
-        let d_vs =
-          WTerm.create_vsymbol (WIdent.id_fresh "d") src_ty in
-        let d_tm = WTerm.t_var d_vs in
-        let proj_d =
-          WTerm.t_app_infer proj_ls [d_tm] in
-        let xs_tys = List.tl f_C.wcf_proj.WTerm.ls_args in
-        let xs =
-          List.mapi (fun i ty ->
-            WTerm.create_vsymbol
-              (WIdent.id_fresh (Printf.sprintf "x%d" i)) ty
-          ) xs_tys in
-        let xs_terms = List.map WTerm.t_var xs in
-        let lhs =
-          WTerm.t_app_infer f_P.wcf_proj (proj_d :: xs_terms) in
-        let rhs =
-          WTerm.t_app_infer f_C.wcf_proj (d_tm :: xs_terms) in
-        let eq =
-          match f_C.wcf_proj.WTerm.ls_value with
-          | None -> WTerm.t_iff (Cast.force_prop lhs) (Cast.force_prop rhs)
-          | Some _ -> WTerm.t_equ lhs rhs in
-        let spec =
-          WTerm.t_forall_close (d_vs :: xs) [] eq in
-        let spec_pr =
-          WDecl.create_prsymbol
-            (WIdent.id_fresh
-               (Printf.sprintf "%s_spec_%s"
-                  proj_name (sanitize_op_name f_P.wcf_name))) in
-        (* Chain-projection definitional bridge axiom. Emitted in
-           non-minimal mode; minimal mode canonicalizes class-op Fops
-           to their origin-class field, so all references land on
-           the same SMT term without needing this bridge. *)
-        if not (tc_minimal_mode ()) then begin
-          let spec_decl =
-            WDecl.create_prop_decl WDecl.Paxiom spec_pr spec in
-          genv.te_task <- WTask.add_decl genv.te_task spec_decl
-        end
-    ) parent_w3cd.wcd_fields
+    Hashtbl.add w3cd.wcd_chain_projs edge_idx (proj_ls, parent_w3cd)
   ) class_decl.tc_prts;
   w3cd
 
@@ -2428,9 +2302,9 @@ let trans_axiom genv (p, ax) =
     ) ax.ax_tparams in
   if tc_binders = [] then
     add_axiom (genv, lenv) (preid_p p) ax.ax_spec
-  else if tc_minimal_mode () then begin
+  else begin
     (* Auto-included TC-parametric lemmas are silently dropped (no
-       encoding available in minimal mode). User-explicit hints
+       polymorphic encoding in the task). User-explicit hints
        ([smt(L)] where L is in [te_wanted]) must instead be
        instantiated via [<:T>] — failure to do so is a hard error
        so the user sees the problem. *)
@@ -2440,97 +2314,6 @@ let trans_axiom genv (p, ax) =
            "smt-hint: lemma %s is type-class polymorphic; \
             instantiate it explicitly: smt(%s<:T>)"
            (EcPath.tostring p) (EcPath.basename p))
-  end
-  else begin
-    (* Build a dict vsymbol per binder and extend le_tdict. *)
-    let lenv, dict_vss =
-      List.fold_left (fun (lenv, acc) (tparam_id, offset, tc, tparam_ty) ->
-        let w3cd = trans_class genv tc.EcAst.tc_name in
-        let dict_ty = WTy.ty_app w3cd.wcd_ts [tparam_ty] in
-        let dict_vs =
-          WTerm.create_vsymbol
-            (WIdent.id_fresh
-               (Printf.sprintf "d_%s_%s_%d"
-                  (EcIdent.name tparam_id)
-                  (EcPath.basename tc.EcAst.tc_name) offset))
-            dict_ty in
-        let dict_term = WTerm.t_var dict_vs in
-        let lenv =
-          { lenv with
-            le_tdict =
-              (DKVar tparam_id, offset, dict_term, w3cd) :: lenv.le_tdict } in
-        lenv, (dict_vs, dict_term, w3cd) :: acc
-      ) (lenv, []) tc_binders in
-    let dict_vss = List.rev dict_vss in
-    (* Build body: forall ds. (axioms holds) -> <translated body>. *)
-    let w_body = Cast.force_prop (trans_form (genv, lenv) ax.ax_spec) in
-    let w_body =
-      List.fold_right (fun (_, dict_term, w3cd) acc ->
-        let premise = WTerm.ps_app w3cd.wcd_axioms [dict_term] in
-        WTerm.t_implies premise acc
-      ) dict_vss w_body in
-    let w_body =
-      WTerm.t_forall_close
-        (List.map (fun (vs, _, _) -> vs) dict_vss) [] w_body in
-    let pr = WDecl.create_prsymbol (preid_p p) in
-    let decl = WDecl.create_prop_decl WDecl.Paxiom pr w_body in
-    genv.te_task <- WTask.add_decl genv.te_task decl;
-    (* Additionally emit a SPECIALIZED version at each registered
-       instance whose class matches a TC binder. With the dict
-       universally quantified at the polymorphic level, SMT often
-       fails to instantiate at a concrete carrier — especially when
-       the body contains nested polymorphic ops (like [intmul] inside
-       [mulrNz]). The specialized version substitutes the tparam to
-       the instance's carrier, the dict-var to a TCIConcrete witness
-       on the instance, then [delta_tc]-reduces — yielding a pure
-       concrete fact that SMT uses directly. *)
-    if List.length tc_binders = 1 then begin
-      let (tparam_id, _offset, tc, _) = List.hd tc_binders in
-      List.iter (fun (path_opt, tci) ->
-        match path_opt, tci.EcTheory.tci_instance with
-        | Some inst_path, `General (anc, Some _)
-          when tci.EcTheory.tci_params = []
-               && EcPath.p_equal anc.EcAst.tc_name tc.EcAst.tc_name
-               && tci.EcTheory.tci_reducible -> begin
-          let inst_etyargs =
-            EcDecl.etyargs_of_tparams tci.EcTheory.tci_params in
-          let our_etyarg : EcAst.etyarg =
-            (tci.EcTheory.tci_type,
-             [EcAst.TCIConcrete
-                { path = inst_path; etyargs = inst_etyargs; lift = [] }]) in
-          let subst_map = Mid.singleton tparam_id our_etyarg in
-          let axform' =
-            EcCoreSubst.Fsubst.f_subst_tvar ~freshen:true subst_map ax.ax_spec in
-          let axform' =
-            let ri = { EcReduction.no_red with delta_tc = true } in
-            let ldecl = EcEnv.LDecl.init genv.te_env [] in
-            EcReduction.simplify ri ldecl axform' in
-          let carrier_name =
-            let rec head_name (ty : EcAst.ty) =
-              match ty.ty_node with
-              | Tconstr (cp, _) -> EcPath.basename cp
-              | Tvar id -> EcIdent.name id
-              | Tglob _ -> "glob"  | Tunivar _ -> "univ"
-              | Ttuple _ -> "tuple"
-              | Tfun (_, t) -> head_name t
-            in head_name tci.EcTheory.tci_type in
-          let leg_suffix =
-            match tci.EcTheory.tci_chain_labels with
-            | Some labels when labels <> [] ->
-              "_" ^ String.concat "_" (List.map sanitize_for_id labels)
-            | _ -> "" in
-          let spec_pid =
-            WIdent.id_fresh
-              (Printf.sprintf "%s_at_%s_%s%s"
-                 (EcPath.basename p)
-                 (sanitize_for_id carrier_name)
-                 (sanitize_for_id (EcPath.basename anc.EcAst.tc_name))
-                 leg_suffix) in
-          add_axiom (genv, empty_lenv) spec_pid axform'
-        end
-        | _ -> ()
-      ) (EcEnv.TcInstance.get_all genv.te_env)
-    end
   end
 
 (* Phase B — for ONE registered chain-instance path, lazily emit:
@@ -2857,7 +2640,6 @@ let trans_tc_axioms genv (tparams : ty_params) =
        in-scope dict);
      - [carrier_name]: short string for the why3 const's id (debugging). *)
 let emit_one_dict
-    ?(emit_axioms : bool = true)
     (genv : tenv) (lenv : lenv)
     (carrier_key : dict_carrier)
     (carrier_ty : WTy.ty)
@@ -2867,6 +2649,7 @@ let emit_one_dict
     (tc : EcAst.typeclass)
   : lenv
 =
+  let _ = carrier_ec_ty in
   let w3cd = trans_class genv tc.EcAst.tc_name in
   let dict_ty = WTy.ty_app w3cd.wcd_ts [carrier_ty] in
   let dict_id =
@@ -2878,30 +2661,13 @@ let emit_one_dict
   let dict_ls = WTerm.create_lsymbol dict_id [] (Some dict_ty) in
   genv.te_task <- WTask.add_param_decl genv.te_task dict_ls;
   let dict_term = WTerm.fs_app dict_ls [] dict_ty in
-  (* Axioms-hold: assert the uninterpreted [<class>_axioms] predicate
-     holds for this dict. Skipped in TC-minimal mode — the dict is
-     emitted for [try_dict_proj] alignment only, not to support
-     polymorphic lemma encoding. *)
-  if emit_axioms then begin
-    let hold_pid =
-      WIdent.id_fresh
-        (Printf.sprintf "axhold_%s_%s_%d"
-           carrier_name
-           (EcPath.basename tc.EcAst.tc_name)
-           offset) in
-    let hold_term = WTerm.ps_app w3cd.wcd_axioms [dict_term] in
-    let hold_pr = WDecl.create_prsymbol hold_pid in
-    let hold_decl =
-      WDecl.create_prop_decl WDecl.Paxiom hold_pr hold_term in
-    genv.te_task <- WTask.add_decl genv.te_task hold_decl
-  end;
-  (* Register the dict so Phase D's [try_dict_proj] sees it. Tparam
-     dicts live in [lenv.le_tdict] (per-goal). Declared-abstract-type
-     dicts ALSO live in [tenv.te_absdict] (tenv-level) so lemma and
-     op-body translations see them too — axiom bodies referencing a
-     section-declared `t::comring` must project through the SAME dict
-     the goal uses, or the LHS/RHS of an equation between an axiom
-     fact and a goal hypothesis won't have a common why3 symbol. *)
+  (* Register the dict so [try_dict_proj] / [compute_op_dicts] see it.
+     Tparam dicts live in [lenv.le_tdict] (per-goal). Declared-abstract-
+     type dicts ALSO live in [tenv.te_absdict] (tenv-level) so lemma and
+     op-body translations see them too — abstract carriers must project
+     through the SAME dict the goal uses, or the LHS/RHS of an equation
+     between an axiom fact and a goal hypothesis won't have a common
+     why3 symbol. *)
   let lenv' =
     let lenv =
       { lenv with
@@ -2912,110 +2678,53 @@ let emit_one_dict
     | DKVar _ -> ()
     end;
     lenv in
-  (* TC-minimal mode: pre-emit flat-constant logic-definitions for
-     every ancestor-class reachable from this carrier's bound. Each
-     [(anc_class, lift)] pair gets one constant whose body is the
-     explicit [chain_proj1 (chain_proj2 (… base_dict …))] composition.
-     References to class ops at this carrier then use the flat
-     constant directly (via [te_chain_dicts]) instead of rebuilding
-     the nested chain — bytewise identical SMT terms across lemma
-     and operator-body call sites. The logic-definition lets Why3
-     unfold the constant when an operator body internally projects
-     through chain projections from a less-derived dict. *)
-  if tc_minimal_mode () then begin
-    let self_tc =
-      let decl =
-        EcEnv.TypeClass.by_path tc.EcAst.tc_name genv.te_env in
-      { EcAst.tc_name = tc.EcAst.tc_name;
-        tc_args =
-          EcDecl.etyargs_of_tparams decl.EcDecl.tc_tparams; } in
-    let entries = ancestors_with_lifts genv.te_env self_tc in
-    List.iter (fun (anc, lift, _ren) ->
-      let key = (carrier_ty, anc.EcAst.tc_name, lift) in
-      if not (Hashtbl.mem genv.te_chain_dicts key) then begin
-        match walk_dict_lift dict_term w3cd lift with
-        | None -> ()
-        | Some (chain_term, anc_w3cd) ->
-          if lift = [] then
-            Hashtbl.add genv.te_chain_dicts key chain_term
-          else begin
-            let anc_dict_ty =
-              WTy.ty_app anc_w3cd.wcd_ts [carrier_ty] in
-            let const_id =
-              WIdent.id_fresh
-                (Printf.sprintf "d_%s_%s_%s"
-                   carrier_name
-                   (EcPath.basename anc.EcAst.tc_name)
-                   (String.concat "_" (List.map string_of_int lift))) in
-            let const_ls =
-              WTerm.create_lsymbol const_id [] (Some anc_dict_ty) in
-            let const_def =
-              WDecl.make_ls_defn const_ls [] chain_term in
-            let decl =
-              WDecl.create_logic_decl [const_def] in
-            genv.te_task <- WTask.add_decl genv.te_task decl;
-            let const_term =
-              WTerm.fs_app const_ls [] anc_dict_ty in
-            Hashtbl.add genv.te_chain_dicts key const_term
-          end
-      end
-    ) entries
-  end;
-  (* Build the etyarg for [carrier]: this is what substitutes the
-     ancestor-class's tparam in each axiom form, so all Fops in the
-     axiom resolve their carrier-witness via OUR dict. *)
-  let our_witness : EcAst.tcwitness =
-    match carrier_key with
-    | DKVar id ->
-      EcAst.TCIAbstract { support = `Var id; offset; lift = [] }
-    | DKAbs p ->
-      EcAst.TCIAbstract { support = `Abs p; offset; lift = [] } in
+  (* Pre-emit flat-constant logic-definitions for every ancestor-class
+     reachable from this carrier's bound. Each [(anc_class, lift)] pair
+     gets one constant whose body is the explicit [chain_proj1
+     (chain_proj2 (… base_dict …))] composition. References to class
+     ops at this carrier then use the flat constant directly (via
+     [te_chain_dicts]) instead of rebuilding the nested chain —
+     bytewise identical SMT terms across lemma and operator-body call
+     sites. The logic-definition lets Why3 unfold the constant when an
+     operator body internally projects through chain projections from
+     a less-derived dict. *)
   let self_tc =
-    let decl = EcEnv.TypeClass.by_path tc.EcAst.tc_name genv.te_env in
+    let decl =
+      EcEnv.TypeClass.by_path tc.EcAst.tc_name genv.te_env in
     { EcAst.tc_name = tc.EcAst.tc_name;
       tc_args =
         EcDecl.etyargs_of_tparams decl.EcDecl.tc_tparams; } in
-  if emit_axioms then begin
-    let entries = ancestors_with_lifts genv.te_env self_tc in
-    List.iter (fun (anc, lift_to_anc, _ren) ->
-      let anc_decl =
-        EcEnv.TypeClass.by_path anc.EcAst.tc_name genv.te_env in
-      let anc_prefix = EcPath.prefix anc.EcAst.tc_name in
-      (* For each axiom name, look up the BOUND axiom (env-bound, with
-         fresh [self_id] as last tparam). Substitute that [self_id] with
-         our carrier (incl. [lift_to_anc] in the witness) so each Fop's
-         carrier projects through OUR dict at the right chain leg. *)
-      List.iter (fun (axname, _raw_axform) ->
-        let ax_path = EcPath.pqoname anc_prefix axname in
-        match EcEnv.Ax.by_path_opt ax_path genv.te_env with
-        | None -> ()
-        | Some ax ->
-        match List.rev ax.EcDecl.ax_tparams with
-        | [] -> ()
-        | (self_id, _) :: _ ->
-        let our_etyarg : EcAst.etyarg =
-          (carrier_ec_ty,
-           [EcAst.bump_lift lift_to_anc our_witness]) in
-        let subst_map = Mid.singleton self_id our_etyarg in
-        let axform' =
-          EcCoreSubst.Fsubst.f_subst_tvar ~freshen:true subst_map ax.ax_spec in
-        let ax_pid =
-          WIdent.id_fresh
-            (Printf.sprintf "tcaxiom_%s_%s_%d_%s"
-               carrier_name
-               (EcPath.basename tc.EcAst.tc_name)
-               offset axname) in
-        let w = trans_form (genv, lenv') axform' in
-        let pr = WDecl.create_prsymbol ax_pid in
-        let decl =
-          WDecl.create_prop_decl WDecl.Paxiom pr (Cast.force_prop w) in
-        genv.te_task <- WTask.add_decl genv.te_task decl
-      ) anc_decl.EcDecl.tc_axs
-    ) entries
-  end;
-  (* Ignore the synthesized witness when axioms aren't being emitted;
-     prevents an "unused" warning in that branch. *)
-  let _ = our_witness in
+  let entries = ancestors_with_lifts genv.te_env self_tc in
+  List.iter (fun (anc, lift, _ren) ->
+    let key = (carrier_ty, anc.EcAst.tc_name, lift) in
+    if not (Hashtbl.mem genv.te_chain_dicts key) then begin
+      match walk_dict_lift dict_term w3cd lift with
+      | None -> ()
+      | Some (chain_term, anc_w3cd) ->
+        if lift = [] then
+          Hashtbl.add genv.te_chain_dicts key chain_term
+        else begin
+          let anc_dict_ty =
+            WTy.ty_app anc_w3cd.wcd_ts [carrier_ty] in
+          let const_id =
+            WIdent.id_fresh
+              (Printf.sprintf "d_%s_%s_%s"
+                 carrier_name
+                 (EcPath.basename anc.EcAst.tc_name)
+                 (String.concat "_" (List.map string_of_int lift))) in
+          let const_ls =
+            WTerm.create_lsymbol const_id [] (Some anc_dict_ty) in
+          let const_def =
+            WDecl.make_ls_defn const_ls [] chain_term in
+          let decl =
+            WDecl.create_logic_decl [const_def] in
+          genv.te_task <- WTask.add_decl genv.te_task decl;
+          let const_term =
+            WTerm.fs_app const_ls [] anc_dict_ty in
+          Hashtbl.add genv.te_chain_dicts key const_term
+        end
+    end
+  ) entries;
   lenv'
 
 (* For each TC bound on a goal hyps' free tparam, emit the dict. *)
@@ -3489,7 +3198,6 @@ let dump_why3 (env : EcEnv.env) (filename : string) =
 
 let init hyps_ld concl =
   let env   = LDecl.toenv hyps_ld in
-  let minimal = tc_minimal_mode () in
   (* Pre-reduce TC ops at concrete instances. With this delta_tc pass,
      Fops like [Top.TcMonoid.mop<:int + addmonoid leg>] reduce to
      [CoreInt.add] directly — they NEVER hit Phase D's dict projection
@@ -3503,57 +3211,40 @@ let init hyps_ld concl =
   let known = Lazy.force core_theories in
   let tenv  = empty_tenv env task known in
   let ()    = add_core_bindings tenv in
-  (* Phase B — eagerly emit dicts + bridges + axhold for all
-     registered reducible instances. Disabled in TC-minimal mode:
-     the user instead supplies hints [smt(L<:T>)] for the specific
-     instantiations they want. *)
-  if not minimal then
-    List.iter (fun (path_opt, tci) ->
-      match path_opt, tci.EcTheory.tci_instance with
-      | Some path, `General (_, Some _)
-        when tci.EcTheory.tci_params = []
-             && tci.EcTheory.tci_reducible ->
-        ignore (emit_instance_dict tenv path : _ option)
-      | _ -> ()
-    ) (EcEnv.TcInstance.get_all env);
-  (* In minimal mode emit dicts WITHOUT axhold/tcaxiom payload — just
-     enough structure to keep [try_dict_proj] satisfied for class-op
-     Fops at abstract carriers. The user-hinted lemmas (instantiated
-     at carriers) and op bodies (e.g. [bigM] unfolded at carrier) then
-     both project through the same [d_<carrier>_<class>_<offset>] const,
-     so SMT can align them. No TC axioms are sent. *)
+  (* Emit dicts for each TC bound on a goal-level tparam and on each
+     declared-abstract type. The dicts carry no axioms — just enough
+     structure to feed [te_chain_dicts] and let [try_dict_proj] /
+     [compute_op_dicts] reach a common [d_<carrier>_<class>_<offset>]
+     across lemma and operator-body uses. *)
   let lenv =
-    if minimal then begin
-      let lenv = fst (lenv_of_tparams_for_hyp tenv hyps.h_tvar) in
-      let lenv =
-        List.fold_left (fun lenv (tparam_id, tcs) ->
-          let tparam_ty =
-            try Mid.find tparam_id lenv.le_tv
-            with Not_found -> assert false in
-          let carrier_name = EcIdent.name tparam_id in
+    let lenv = fst (lenv_of_tparams_for_hyp tenv hyps.h_tvar) in
+    let lenv =
+      List.fold_left (fun lenv (tparam_id, tcs) ->
+        let tparam_ty =
+          try Mid.find tparam_id lenv.le_tv
+          with Not_found -> assert false in
+        let carrier_name = EcIdent.name tparam_id in
+        List.fold_lefti (fun lenv offset tc ->
+          emit_one_dict tenv lenv
+            (DKVar tparam_id) tparam_ty
+            (EcTypes.tvar tparam_id) carrier_name offset tc
+        ) lenv tcs
+      ) lenv hyps.h_tvar in
+    let lenv =
+      List.fold_left (fun lenv (path, (tydecl : EcDecl.tydecl)) ->
+        match tydecl.tyd_type with
+        | `Abstract tcs when tcs <> [] && tydecl.tyd_params = [] ->
+          let carrier_ty = WTy.ty_app (trans_pty tenv path) [] in
+          let carrier_ec_ty = EcTypes.tconstr_tc path [] in
+          let carrier_name = EcPath.basename path in
           List.fold_lefti (fun lenv offset tc ->
-            emit_one_dict ~emit_axioms:false tenv lenv
-              (DKVar tparam_id) tparam_ty
-              (EcTypes.tvar tparam_id) carrier_name offset tc
+            emit_one_dict tenv lenv
+              (DKAbs path) carrier_ty
+              carrier_ec_ty carrier_name offset tc
           ) lenv tcs
-        ) lenv hyps.h_tvar in
-      let lenv =
-        List.fold_left (fun lenv (path, (tydecl : EcDecl.tydecl)) ->
-          match tydecl.tyd_type with
-          | `Abstract tcs when tcs <> [] && tydecl.tyd_params = [] ->
-            let carrier_ty = WTy.ty_app (trans_pty tenv path) [] in
-            let carrier_ec_ty = EcTypes.tconstr_tc path [] in
-            let carrier_name = EcPath.basename path in
-            List.fold_lefti (fun lenv offset tc ->
-              emit_one_dict ~emit_axioms:false tenv lenv
-                (DKAbs path) carrier_ty
-                carrier_ec_ty carrier_name offset tc
-            ) lenv tcs
-          | _ -> lenv
-        ) lenv (EcEnv.Ty.all env) in
-      snd (List.fold_left trans_hyp (tenv, lenv) (List.rev hyps.h_local))
-    end else
-      lenv_of_hyps tenv hyps in
+        | _ -> lenv
+      ) lenv (EcEnv.Ty.all env) in
+    snd (List.fold_left trans_hyp (tenv, lenv) (List.rev hyps.h_local)) in
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
