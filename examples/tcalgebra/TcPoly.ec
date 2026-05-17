@@ -536,7 +536,7 @@ case: (p = poly0) => [->|] /=; first by rewrite lc0.
 rewrite -deg_eq0 eqr_le ge0_deg /= -ltrNge => gt0_deg.
 pose P i := forall j, (i <= j)%Int => p.[j] = zero<:c>.
 apply/negP => zp; have h: 0 <= deg p - 1 < argmin idfun P.
-+ rewrite /P /argmin -/(deg p); smt(ge0_deg).
++ rewrite /P /argmin -/(deg p); smt(ge0_deg<:c>).
 have := argmin_min idfun P (deg p - 1) h.
 move=> @/idfun /= j /ler_eqVlt [<<-//| ltj].
 by apply: gedeg_coeff => /#.
@@ -556,7 +556,7 @@ proof. by rewrite degN polyNE. qed.
 
 lemma degD (p q : c poly) : deg (p + q) <= max (deg p) (deg q).
 proof.
-apply: deg_leP; [by smt(ge0_deg) | move=> i /ler_maxrP[le1 le2]].
+apply: deg_leP; [by smt(ge0_deg<:c>) | move=> i /ler_maxrP[le1 le2]].
 by rewrite polyDE !gedeg_coeff ?addr0.
 qed.
 
@@ -847,7 +847,7 @@ lemma surj_polyL p n :
   deg p <= n => exists s, size s = n /\ p = polyL s.
 proof.
 move=> len; exists (map (fun i => p.[i]) (range 0 n)); split.
-- by rewrite size_map size_range /=; smt(ge0_deg).
+- by rewrite size_map size_range /=; smt(ge0_deg<:c>).
 apply/poly_eqP=> i ge0_i; rewrite polyLE; case: (i < n).
 - by move=> lt_in; rewrite (nth_map 0) ?size_range ?nth_range //#.
 - rewrite ltrNge /= => le_ni; rewrite gedeg_coeff // 1:/#.
@@ -912,11 +912,11 @@ rewrite /poly_unit; split.
   have nz_p : p <> poly0.
   - apply/negP=> ->>; have := pMqE; rewrite polyM_mulrC polyM_mul0r => /eq_sym.
     by move/(congr1 (fun r : c poly => r.[0])) => /=;
-       rewrite poly0E polyCE /=; smt(oner_neq0).
+       rewrite poly0E polyCE /=; smt(oner_neq0<:c>).
   have nz_q : q <> poly0.
   - apply/negP=> ->>; have := pMqE; rewrite polyM_mul0r => /eq_sym.
     by move/(congr1 (fun r : c poly => r.[0])) => /=;
-       rewrite poly0E polyCE /=; smt(oner_neq0).
+       rewrite poly0E polyCE /=; smt(oner_neq0<:c>).
   have /(congr1 deg) : polyM q p = poly1 by exact pMqE.
   rewrite deg1 degM //= => sum_eq.
   have ge1_p : 1 <= deg p by rewrite deg_ge1.
@@ -974,7 +974,7 @@ have eq2 : polyM q (polyC a) = polyM (polyC (invr a)) (polyC a)
 (* Cancel [polyC a] on the right: it has [unit] coeff, so it's [lreg]. *)
 have nz_a : a <> zero<:c>.
 - apply/negP=> a0; have h := mulVr a ua; rewrite a0 mulr0 in h.
-  by move: h => /eq_sym; smt(oner_neq0).
+  by move: h => /eq_sym; smt(oner_neq0<:c>).
 have lreg_pCa : lreg (polyC a).
 - apply lreg_lc; rewrite lcC; apply/lregP/nz_a.
 have inj_pCa : injective (fun y : c poly => polyM y (polyC a)).
