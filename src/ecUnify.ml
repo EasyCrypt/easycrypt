@@ -397,8 +397,6 @@ module Unify = struct
             match TcUni.Muid.find_opt uid (!uc).tcenv.problems with
             | Some (_, _, op) -> op
             | None -> None in
-          (* See doc/typeclasses-inference.md for the strategy framework
-             and the catalog of inference modes this resolver covers. *)
           let deps = ref TyUni.Suid.empty in
 
           let rec check_ty (ty : ty) : ty =
