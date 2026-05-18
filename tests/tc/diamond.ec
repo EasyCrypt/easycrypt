@@ -7,7 +7,7 @@ require import AllCore.
        \  /
        tc3
    Verify that ancestors are correctly walked through both branches and
-   that the SMT auto-axiom inclusion does not double-pull base axioms. *)
+   that explicit instantiation reaches the right axiom via the chain. *)
 
 type class base = {
   op zero : base
@@ -34,10 +34,10 @@ type class tc3 <: tc1 = {
 lemma f1_via_tc3 ['a <: tc3] (x : 'a) : f1 x = x.
 proof. by apply f1_id. qed.
 
-(* SMT auto-includes ancestor axioms — base, tc1, tc3 should all be
-   reachable from tc3 without duplication. *)
+(* SMT with explicit instantiation at the abstract carrier — class axioms
+   are polymorphic lemmas, the user picks the relevant instance via [<:'a>]. *)
 lemma f3_smt ['a <: tc3] (x : 'a) : f3 x = x.
-proof. smt(). qed.
+proof. smt(f3_id<:'a>). qed.
 
 lemma f1_smt ['a <: tc3] (x : 'a) : f1 x = x.
-proof. smt(). qed.
+proof. smt(f1_id<:'a>). qed.

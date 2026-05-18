@@ -23,46 +23,30 @@ realize add0m by rewrite /plus_int /zero_int; smt().
 
 lemma idm_int : (idm<:int>) = zero_int by smt().
 
-(* 2) Abstract carrier with TC axiom hints: SMT chains TC axioms through
-   the polymorphic operator surface. *)
+(* 2) Abstract carrier: TC class axioms are polymorphic lemmas, instantiated
+      explicitly at the per-lemma tparam via [<:'a>]. *)
 lemma combine_abs ['a <: addmonoid] (x y : 'a) : (idm + x) + y = x + y.
-proof. smt(add0m). qed.
+proof. smt(add0m<:'a>). qed.
 
 lemma triple_assoc ['a <: addmonoid] (x y z w : 'a) :
   ((x + y) + z) + w = x + (y + (z + w)).
-proof. smt(addmA). qed.
+proof. smt(addmA<:'a>). qed.
 
-(* 2bis) Abstract carrier WITHOUT explicit TC axiom hints: the TC axioms
-   tied to the tparam constraint are auto-included by [trans_tc_axioms]. *)
-lemma idm_left_nohint ['a <: addmonoid] (x : 'a) : idm + x = x.
-proof. smt(). qed.
-
-lemma idm_right_nohint ['a <: addmonoid] (x : 'a) : x + idm = x.
-proof. smt(). qed.
-
-(* 3) TC inheritance: parent axioms remain available to SMT. *)
+(* 3) TC inheritance: parent axioms instantiated at child carrier. *)
 type class addgroup <: addmonoid = {
   op opp : addgroup -> addgroup
   axiom addNm : forall (x : addgroup), opp x + x = idm
 }.
 
 lemma group_zero ['a <: addgroup] (x : 'a) : (opp x + x) + idm = idm.
-proof. smt(addNm add0m). qed.
-
-(* 3bis) Inheritance + no-hints: parent (addmonoid) axioms must also be
-   pulled in via the ancestor walk. *)
-lemma group_left_nohint ['a <: addgroup] (x : 'a) : idm + x = x.
-proof. smt(). qed.
-
-lemma group_inv_nohint ['a <: addgroup] (x : 'a) : opp x + x = idm.
-proof. smt(). qed.
+proof. smt(addNm<:'a> add0m<:'a>). qed.
 
 (* 4) Section [declare type t <: tc] reaches SMT correctly. *)
 section.
   declare type t <: addmonoid.
 
   lemma chain (a b c : t) : ((a + idm) + b) + (idm + c) = (a + b) + c.
-  proof. smt(add0m addmA addmC). qed.
+  proof. smt(add0m<:t> addmA<:t> addmC<:t>). qed.
 end section.
 
 (* 5) Two distinct concrete instances coexist in one goal. *)

@@ -26,6 +26,15 @@ module WDecl   = Why3.Decl
 module WTask   = Why3.Task
 
 (* -------------------------------------------------------------------- *)
+exception SmtHintError of string
+
+let () =
+  EcPException.register (fun fmt exn ->
+    match exn with
+    | SmtHintError msg -> Format.fprintf fmt "%s" msg
+    | _ -> raise exn)
+
+(* -------------------------------------------------------------------- *)
 let w_t_let vs w1 w2 =
    WTerm.t_let_simp w1 (WTerm.t_close_bound vs w2)
 
@@ -118,6 +127,28 @@ type kpattern =
   | KProj of kpattern * int
 
 (* -------------------------------------------------------------------- *)
+(* Carrier key for an in-scope dict. [DKVar] keys tparam-ident carriers
+   (true type parameters); [DKAbs] keys declared-abstract type-constructor
+   carriers (path-based, e.g. section-introduced [declare type t]). *)
+type dict_carrier =
+  | DKVar of EcIdent.t
+  | DKAbs of EcPath.path
+
+(* Tparam dict bindings: for each [(carrier, offset)] referencing a TC
+   bound on the goal's free type parameters, [le_tdict] stores the why3
+   dict term and class decl. Populated by Phase C. *)
+type lenv = {
+  le_lv     : WTerm.vsymbol Mid.t;
+  le_tv     : WTy.ty Mid.t;
+  le_mt     : EcMemory.memtype Mid.t;
+  le_tdict  : (dict_carrier * int * WTerm.term * w3_class_decl) list;
+}
+
+let empty_lenv : lenv =
+  { le_tv = Mid.empty; le_lv = Mid.empty;
+    le_mt = Mid.empty; le_tdict = []; }
+
+(* -------------------------------------------------------------------- *)
 type tenv = {
   (*---*) te_env        : EcEnv.env;
   mutable te_task       : WTask.task;
@@ -189,6 +220,16 @@ type tenv = {
        chain_proj2 …)] expression in body terms — Z3/CVC5 pattern-
        match directly, and Why3 logic-def unfolding lets the prover
        bridge to operator bodies that internally compose chains. *)
+  mutable te_hyps_lenv     : lenv;
+    (* The goal's lenv after [init] has bound goal-level tparams and
+       emitted abstract dicts. Used by [trans_axiom]'s [do_instantiated]
+       so substituted axioms that mention goal tparams (e.g.
+       [smt(L<:'a>)]) translate against the same tysymbols AND dict
+       registrations as the goal. *)
+  mutable te_hyps_tparams  : EcDecl.ty_params;
+    (* The goal's tparams (id + TC bounds). Used to seed the unienv in
+       [trans_axiom]'s [do_instantiated] so [flush_tc_problems] can
+       infer TC witnesses for user-supplied carriers like [<:'a>]. *)
 }
 
 let empty_tenv env task (kwty, kw, kwk) =
@@ -213,29 +254,9 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_missing    = Hashtbl.create 17;
     te_carrier_ops = Hashtbl.create 17;
     te_chain_dicts = Hashtbl.create 17;
+    te_hyps_lenv     = empty_lenv;
+    te_hyps_tparams  = [];
   }
-
-(* -------------------------------------------------------------------- *)
-(* Carrier key for an in-scope dict. [DKVar] keys tparam-ident carriers
-   (true type parameters); [DKAbs] keys declared-abstract type-constructor
-   carriers (path-based, e.g. section-introduced [declare type t]). *)
-type dict_carrier =
-  | DKVar of EcIdent.t
-  | DKAbs of EcPath.path
-
-(* Tparam dict bindings: for each [(carrier, offset)] referencing a TC
-   bound on the goal's free type parameters, [le_tdict] stores the why3
-   dict term and class decl. Populated by Phase C. *)
-type lenv = {
-  le_lv     : WTerm.vsymbol Mid.t;
-  le_tv     : WTy.ty Mid.t;
-  le_mt     : EcMemory.memtype Mid.t;
-  le_tdict  : (dict_carrier * int * WTerm.term * w3_class_decl) list;
-}
-
-let empty_lenv : lenv =
-  { le_tv = Mid.empty; le_lv = Mid.empty;
-    le_mt = Mid.empty; le_tdict = []; }
 
 let get_memtype lenv m =
   try Mid.find m lenv.le_mt with Not_found -> assert false
@@ -2039,7 +2060,10 @@ let trans_axiom genv (p, ax) =
        section-abstract carriers ([TCIAbstract] for [declare type
        t <: …]), which our previous hand-rolled lookup did not. *)
     let env = genv.te_env in
-    let ue = EcUnify.UniEnv.create None in
+    let ue_tparams =
+      if genv.te_hyps_tparams = [] then None
+      else Some genv.te_hyps_tparams in
+    let ue = EcUnify.UniEnv.create ue_tparams in
     let petyargs =
       List.map (fun ty -> (Some ty, None, EcUnify.ws_empty)) tys in
     let tvi = Some (EcUnify.TVIunamed petyargs) in
@@ -2061,7 +2085,7 @@ let trans_axiom genv (p, ax) =
       let ri = { EcReduction.no_red with delta_tc = true } in
       let ldecl = EcEnv.LDecl.init env [] in
       EcReduction.simplify ri ldecl axform in
-    add_axiom (genv, empty_lenv) (preid_p p) axform
+    add_axiom (genv, genv.te_hyps_lenv) (preid_p p) axform
   in
   match tvi with
   | Some tys -> do_instantiated tys
@@ -2086,11 +2110,11 @@ let trans_axiom genv (p, ax) =
        instantiated via [<:T>] — failure to do so is a hard error
        so the user sees the problem. *)
     if EcProvers.Hints.mem p genv.te_wanted then
-      failwith
+      raise (SmtHintError
         (Printf.sprintf
            "smt-hint: lemma %s is type-class polymorphic; \
             instantiate it explicitly: smt(%s<:T>)"
-           (EcPath.tostring p) (EcPath.basename p))
+           (EcPath.tostring p) (EcPath.basename p)))
   end
 
 (* Phase B — for ONE registered chain-instance path, lazily emit:
@@ -2242,57 +2266,6 @@ let emit_instance_dict
         add_axiom (genv, empty_lenv) (WIdent.id_fresh name) body
       | _ -> ()
     ) symbols;
-    (* Emit each chain ancestor's class axioms INSTANTIATED at this
-       instance's concrete carrier and realisations. Without this,
-       obligation proofs (where the obligation IS a class axiom at
-       the instance) have no way to discharge — the legacy unsound
-       encoding relied on bridge-collision False; this sound encoding
-       provides the class laws as concrete facts about the instance's
-       realisations. The axioms are translated with [te_idict] now
-       containing this entry, so Fops of class ops translate to dict
-       projections, which the bridges then equate to the realisations.
-    *)
-    let self_tc =
-      let decl = EcEnv.TypeClass.by_path anc.EcAst.tc_name genv.te_env in
-      { EcAst.tc_name = anc.EcAst.tc_name;
-        tc_args =
-          EcDecl.etyargs_of_tparams decl.EcDecl.tc_tparams; } in
-    let entries = ancestors_with_lifts env self_tc in
-    let inst_self_witness : EcAst.tcwitness =
-      EcAst.TCIConcrete { path; etyargs = inst_etyargs; lift = [] } in
-    List.iter (fun (anc2, lift_to_anc2, _ren) ->
-      let anc2_prefix = EcPath.prefix anc2.EcAst.tc_name in
-      List.iter (fun (axname, _) ->
-        let ax_path = EcPath.pqoname anc2_prefix axname in
-        match EcEnv.Ax.by_path_opt ax_path env with
-        | None -> ()
-        | Some ax ->
-        match List.rev ax.EcDecl.ax_tparams with
-        | [] -> ()
-        | (self_id, _) :: _ ->
-        let our_etyarg : EcAst.etyarg =
-          (tci.EcTheory.tci_type,
-           [EcAst.bump_lift lift_to_anc2 inst_self_witness]) in
-        let subst_map = Mid.singleton self_id our_etyarg in
-        let axform' =
-          EcCoreSubst.Fsubst.f_subst_tvar ~freshen:true subst_map ax.ax_spec in
-        (* Reduce TC ops at concrete carriers. The substituted axiom
-           now has TCIConcrete witnesses pointing to this instance and
-           its chain ancestors. [delta_tc] resolves these to the
-           user-provided concrete realisations (CoreInt.add, etc.),
-           so the axiom becomes a pure fact about those concretes —
-           it matches obligation goals (which are similarly reduced)
-           and other concrete-carrier goals. *)
-        let axform' =
-          let ri = { EcReduction.no_red with delta_tc = true } in
-          let ldecl = EcEnv.LDecl.init env [] in
-          EcReduction.simplify ri ldecl axform' in
-        let ax_pid =
-          WIdent.id_fresh
-            (Printf.sprintf "instax_%s_%s" inst_name (sanitize_for_id axname)) in
-        add_axiom (genv, empty_lenv) ax_pid axform'
-      ) (EcEnv.TypeClass.by_path anc2.EcAst.tc_name env).EcDecl.tc_axs
-    ) entries;
     Some (dict_term, w3cd)
   | _ -> None
 
@@ -2376,32 +2349,6 @@ let emit_polymorphic_instance
   | _ -> None
 
 let () = emit_polymorphic_instance_ref := emit_polymorphic_instance
-
-(* For each typeclass constraint on a goal-context type parameter, pull
-   in the typeclass axioms (and those of all its ancestors) as Why3
-   axioms. The axioms are registered globally with [`NoSmt] visibility
-   so the relevance heuristic skips them; we add them here on a
-   per-tparam basis so [smt()] (without explicit hints) can still close
-   goals over abstract TC carriers. *)
-let trans_tc_axioms genv (tparams : ty_params) =
-  let seen = ref EcPath.Sp.empty in
-  let trans_one tc =
-    let ancestors = EcTypeClass.ancestors genv.te_env tc in
-    List.iter (fun anc ->
-      match EcEnv.TypeClass.by_path_opt anc.tc_name genv.te_env with
-      | None -> ()
-      | Some tc_decl ->
-        List.iter (fun (axname, _) ->
-          let ax_path =
-            EcPath.pqoname (EcPath.prefix anc.tc_name) axname in
-          if not (EcPath.Sp.mem ax_path !seen) then begin
-            seen := EcPath.Sp.add ax_path !seen;
-            EcEnv.Ax.by_path_opt ax_path genv.te_env
-            |> Option.iter (fun ax -> trans_axiom genv (ax_path, ax))
-          end
-        ) tc_decl.tc_axs
-    ) ancestors in
-  List.iter (fun (_, tcs) -> List.iter trans_one tcs) tparams
 
 (* -------------------------------------------------------------------- *)
 (* Phase C — emit a fresh why3 dict constant + projected ancestor
@@ -2543,9 +2490,7 @@ let emit_abstract_type_dicts
 (* -------------------------------------------------------------------- *)
 let lenv_of_hyps genv (hyps : hyps) : lenv =
   let lenv = fst (lenv_of_tparams_for_hyp genv hyps.h_tvar) in
-  (* Phase C — sound dict-passing axioms for tparams + declared-
-     abstract types (replaces legacy [trans_tc_axioms] which erased
-     witnesses and produced [idm <> idm = false] at [t::comring]). *)
+  (* Phase C — emit dicts for tparams + declared-abstract types. *)
   let lenv = emit_tparam_dicts genv lenv hyps.h_tvar in
   let lenv = emit_abstract_type_dicts genv lenv in
   snd (List.fold_left trans_hyp (genv, lenv) (List.rev hyps.h_local))
@@ -3022,6 +2967,9 @@ let init hyps_ld concl =
         | _ -> lenv
       ) lenv (EcEnv.Ty.all env) in
     snd (List.fold_left trans_hyp (tenv, lenv) (List.rev hyps.h_local)) in
+  tenv.te_hyps_lenv <- lenv;
+  tenv.te_hyps_tparams <- hyps.h_tvar;
+  tenv.te_hyps_tparams <- hyps.h_tvar;
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in

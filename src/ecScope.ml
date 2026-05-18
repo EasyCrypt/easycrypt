@@ -403,6 +403,24 @@ let xgoal (scope : scope) =
   scope.sc_pr_uc
 
 (* -------------------------------------------------------------------- *)
+(* Type parameters of the currently-active proof obligation, or [] when
+   no proof is open. Used to seed unienvs that need to resolve named
+   tvars like [<:'a>] introduced in the lemma signature. *)
+let active_tparams (scope : scope) : EcDecl.ty_params =
+  match scope.sc_pr_uc with
+  | None -> []
+  | Some pr_uc ->
+    match pr_uc.puc_active with
+    | None -> []
+    | Some (pa, _) ->
+      match pa.puc_jdg with
+      | PSNoCheck -> []
+      | PSCheck proof ->
+        let tc = EcCoreGoal.tcenv1_of_proof proof in
+        let hyps = EcEnv.LDecl.tohyps (EcCoreGoal.FApi.tc1_hyps tc) in
+        hyps.EcBaseLogic.h_tvar
+
+(* -------------------------------------------------------------------- *)
 let dump_why3 (scope : scope) (filename : string) =
   try  EcSmt.dump_why3 (env scope) filename
   with
@@ -515,15 +533,18 @@ module Prover = struct
     name
 
   (* -------------------------------------------------------------------- *)
-  let process_dbhint env db =
+  let process_dbhint ?(tparams = []) env db =
     (* Returns the [hints] (path-set form, fed to the relevance filter)
        AND the per-path type instantiations collected from
        [smt(L<:T1, T2>)] annotations. The TVI is resolved into a
-       concrete [ty list] in the same pass — typing is local (closed
-       types in [<:int>] etc.), so a fresh [unienv] suffices. *)
+       concrete [ty list] in the same pass. [tparams] seeds the unienv
+       with the active proof's tparams so [<:'a>] resolves to the
+       lemma's own [['a <: …]] tparam (not a fresh ident). *)
     let tvi_map = ref EcPath.Mp.empty in
+    let ue_tparams =
+      if tparams = [] then None else Some tparams in
     let resolve_tvi (p : EcPath.path) (ax : EcDecl.axiom) (tvi : ptyannot) : unit =
-      let ue = EcUnify.UniEnv.create None in
+      let ue = EcUnify.UniEnv.create ue_tparams in
       let tys =
         match (unloc tvi) with
         | TVIunamed lt ->
@@ -607,7 +628,7 @@ module Prover = struct
   }
 
   (* -------------------------------------------------------------------- *)
-  let process_prover_option env ppr =
+  let process_prover_option ?(tparams = []) env ppr =
     let provers =
       match ppr.pprov_names with
       | None -> None, []
@@ -639,9 +660,9 @@ module Prover = struct
         | None  , None   -> None
         | None  , Some _ -> Some 0
         end;
-      pl_wanted    = omap (fun d -> fst (process_dbhint env d)) ppr.plem_wanted;
-      pl_unwanted  = omap (fun d -> fst (process_dbhint env d)) ppr.plem_unwanted;
-      pl_tvi       = omap (fun d -> snd (process_dbhint env d)) ppr.plem_wanted;
+      pl_wanted    = omap (fun d -> fst (process_dbhint ~tparams env d)) ppr.plem_wanted;
+      pl_unwanted  = omap (fun d -> fst (process_dbhint ~tparams env d)) ppr.plem_unwanted;
+      pl_tvi       = omap (fun d -> snd (process_dbhint ~tparams env d)) ppr.plem_wanted;
       pl_dumpin    = ppr.plem_dumpin;
       pl_selected  = ppr.plem_selected;
       gn_debug     = ppr.psmt_debug;
@@ -687,7 +708,8 @@ module Prover = struct
 
   (* -------------------------------------------------------------------- *)
   let do_prover_info scope ?(default = empty_options) ppr =
-    let options = Option.map (process_prover_option (env scope)) ppr in
+    let tparams = active_tparams scope in
+    let options = Option.map (process_prover_option ~tparams (env scope)) ppr in
     let options = Option.value ~default options in
     mk_prover_info scope options
 
