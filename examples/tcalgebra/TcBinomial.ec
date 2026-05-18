@@ -10,9 +10,7 @@ require import TcMonoid TcRing TcBigop TcBigalg TcInt TcNumber TcReal.
 op fact (n : int) = bigiM predT idfun 1 (n+1).
 
 lemma fact0 (n : int) : n <= 0 => fact n = 1.
-proof.
-move=> le0n; rewrite /fact /bigiM /bigM range_geq /#.
-qed.
+proof. by move=> le0n; rewrite /fact big_geq // ler_naddl. qed.
 
 lemma factS (n : int) : 0 <= n => fact (n+1) = (n+1) * (fact n).
 proof.
@@ -32,7 +30,9 @@ op bin (n k : int) : int =
 
 (* -------------------------------------------------------------------- *)
 lemma size_bin1 (s : int list) : size (bin1 s) = 1 + size s.
-proof. by rewrite /bin1 /= size_map size_range /#. qed.
+proof.
+by rewrite /bin1 /= size_map size_range subz0 ler_maxr ?size_ge0.
+qed.
 
 lemma size_bin (s : int list) n : 0 <= n =>
   size (iter n bin1 s) = n + size s.

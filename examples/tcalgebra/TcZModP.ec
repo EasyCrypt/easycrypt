@@ -291,7 +291,7 @@ clone include ZModRing with
 
 lemma unitE (x : zmod) : zmod_unit x <=> x <> inzmod 0.
 proof.
-split; first by apply: contraL => ->; smt(zmod_mulrC zmod_mul1r choicebP).
+split; first by apply: contraL => ->; apply: (unitr0<:zmod>).
 move=> nz_x; exists (inzmod (invm (asint x) p)).
 apply: asint_inj; rewrite inzmod1E zmod_mulE inzmodK.
 rewrite (@modzE (invm _ _)) -mulNr mulrDl mulrAC modzMDr mulrC.
@@ -308,13 +308,10 @@ qed.
 lemma zmod_mulf_eq0 (x y : zmod) :
   zmod_mul x y = inzmod 0 <=> x = inzmod 0 \/ y = inzmod 0.
 proof.
-split; last first.
-- by case=> ->; apply/asint_inj;
-    rewrite zmod_mulE inzmod0E; smt(inzmod0E rg_asint).
-move/(congr1 asint); rewrite zmod_mulE inzmod0E => /dvdzE dvd.
-have [dvd'|dvd'] : p %| asint x \/ p %| asint y by smt(prime_p).
-- by left; apply/asint_inj; rewrite inzmod0E; smt(rg_asint dvdzE).
-- by right; apply/asint_inj; rewrite inzmod0E; smt(rg_asint dvdzE).
+case: (x = inzmod 0) => //= [->|]; first by rewrite mul0r.
+move=> nz_x; split=> [|->]; last by rewrite mulr0.
+move=> h; apply: (mulrI x); last by rewrite mulr0.
+by rewrite unitE.
 qed.
 
 (* Comring (and ancestors) inherited from ZModRing's instance via the
