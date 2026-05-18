@@ -1224,8 +1224,6 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
            fail to reduce here even when the carrier's TC instance is
            registered in the env.                                       *)
         EcUnify.UniEnv.flush_tc_problems env ue;
-        let f1 = norm f1 in
-        let f2 = norm f2 in
         if Sys.getenv_opt "EC_DBG_TD" <> None then begin
           let dump f = match (destr_app f) with
             | { f_node = Fop (p, _); _ }, args ->
