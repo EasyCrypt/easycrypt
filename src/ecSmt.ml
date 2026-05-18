@@ -241,75 +241,11 @@ let get_memtype lenv m =
   try Mid.find m lenv.le_mt with Not_found -> assert false
 
 (* -------------------------------------------------------------------- *)
-(* Why3's source grammar uses [lident] (lowercase-first) for types,
-   functions, predicates, and constants, and [uident] for theories /
-   modules / algebraic constructors. EC paths often start with an
-   uppercase theory name (e.g. [Top.real_unit] becomes [Top_real_unit]),
-   which is fine for the why3 task pretty-printer but rejects on
-   re-parse. We normalise: [str_p] lower-cases the first letter so the
-   default output is [lident]-shaped; [str_p_ctor] preserves an upper-
-   case-first form for constructor symbols. *)
-(* Map EC path strings (e.g. [Top.List.( :: )]) to a flat
-   identifier suitable as a Why3 source-level name. Dots become
-   underscores; operator / bracket / punctuation chars become
-   their pronounced equivalents (so [( :: )] becomes
-   [_colon_colon_], [( + )] becomes [_plus_], etc.) — Why3
-   identifiers must match [\\w]+ and reject [], [::], etc. *)
-let str_p_raw p =
-  let buf = Buffer.create (String.length p + 8) in
-  String.iter (fun c -> match c with
-    | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' -> Buffer.add_char buf c
-    | '.' -> Buffer.add_char buf '_'
-    | '*' -> Buffer.add_string buf "times"
-    | '+' -> Buffer.add_string buf "plus"
-    | '-' -> Buffer.add_string buf "minus"
-    | '/' -> Buffer.add_string buf "div"
-    | '%' -> Buffer.add_string buf "mod"
-    | '<' -> Buffer.add_string buf "lt"
-    | '>' -> Buffer.add_string buf "gt"
-    | '=' -> Buffer.add_string buf "eq"
-    | '!' -> Buffer.add_string buf "bang"
-    | '|' -> Buffer.add_string buf "pipe"
-    | '&' -> Buffer.add_string buf "amp"
-    | '^' -> Buffer.add_string buf "hat"
-    | '~' -> Buffer.add_string buf "tilde"
-    | '@' -> Buffer.add_string buf "at"
-    | '$' -> Buffer.add_string buf "dollar"
-    | '#' -> Buffer.add_string buf "hash"
-    | '?' -> Buffer.add_string buf "qmark"
-    | ':' -> Buffer.add_string buf "colon"
-    | '\'' -> Buffer.add_string buf "prime"
-    | '[' | ']' | '(' | ')' | '{' | '}' -> ()
-    | ' ' | '\t' -> ()
-    | _ -> Buffer.add_char buf '_'
-  ) p;
-  Buffer.contents buf
-
-let str_lid s =
-  if String.length s = 0 then s
-  else String.make 1 (Char.lowercase_ascii s.[0]) ^
-       String.sub s 1 (String.length s - 1)
-
-let str_uid s =
-  if String.length s = 0 then s
-  else String.make 1 (Char.uppercase_ascii s.[0]) ^
-       String.sub s 1 (String.length s - 1)
-
-let str_p p = WIdent.id_fresh (str_lid (str_p_raw p))
-let str_p_ctor p = WIdent.id_fresh (str_uid (str_p_raw p))
+let str_p p =
+  WIdent.id_fresh (String.map (function '.' -> '_' | c -> c) p)
 
 let preid    id = WIdent.id_fresh (EcIdent.name id)
-(* Like [preid] but lowercases the first letter — required for Why3
-   source-level identifiers in [lident] position (predicates,
-   functions, constants, types, variables). EC's [P] / [F_ho] /
-   etc. would otherwise emit as [predicate P ...] / [function F_ho]
-   which the Why3 parser rejects (those positions need [a-z]-first).
-   The why3 ident is still hash-cons-unique per EC ident so
-   distinct EC idents stay distinct after lowercasing. *)
-let preid_lid id =
-  WIdent.id_fresh (str_lid (EcIdent.name id))
 let preid_p  p  = str_p (EcPath.tostring p)
-let preid_p_ctor p = str_p_ctor (EcPath.tostring p)
 let preid_mp mp = str_p (EcPath.m_tostring mp)
 let preid_xp xp = str_p (EcPath.x_tostring xp)
 
@@ -322,112 +258,6 @@ let dump_tasks (tasks : WTask.task) (filename : string) =
         (Format.formatter_of_out_channel stream)
         "%a@." Why3.Pretty.print_task tasks)
       (fun () -> close_out stream)
-
-(* Companion dump producing a re-parseable Why3 source (`.why`
-   style). [Pretty.print_theory] / [Pretty.print_task] emit "use"
-   directives as comments [(* use … *)], so their output isn't
-   directly re-parseable. We extract the same information via
-   [Task.used_theories] / [Task.local_decls] and emit:
-
-     theory Task
-       use real.Real
-       use int.Int
-       ...
-       <local decls>
-       goal goal1 : <task goal>
-     end
-
-   which [why3 prove FILE.why] accepts. *)
-let dump_task_theory (task : WTask.task) (filename : string) =
-  let stream = open_out filename in
-  let buf = Buffer.create 4096 in
-  let fmt = Format.formatter_of_buffer buf in
-  EcUtils.try_finally
-    (fun () ->
-      (* Reset the pretty-printer's identifier-uniquification state.
-         Without this, names accumulate primes across successive
-         dumps (each [print_decl] call rebinds new uniques), so
-         [Real.inv] gets printed as [inv2] / [inv3] / etc. depending
-         on how many other [inv]s have been seen. [forget_all] clears
-         the state so each dump starts from source-level names. *)
-      Why3.Pretty.forget_all ();
-      let used = Why3.Task.used_theories task in
-      (* Split used theories into [from_file] (have a library path, so
-         [use real.Real] works) and [inline] (EC-internal theories
-         like [Distr] / [Witness] created via [WTheory.create_theory]
-         with no [~path] — these don't exist as [.mlw] files so
-         [why3 prove] can't find them via [use]; we inline their
-         declarations instead). *)
-      let from_file, inline =
-        Why3.Ident.Mid.fold
-          (fun _ th (ff, il) ->
-            if th.Why3.Theory.th_path = []
-            then (ff, th :: il)
-            else (th :: ff, il))
-          used ([], []) in
-      let used_syms = Why3.Task.used_symbols used in
-      let local_decls = Why3.Task.local_decls task used_syms in
-      Format.fprintf fmt "@[<v 0>theory Task@\n";
-      List.iter
-        (fun th ->
-          let qname =
-            String.concat "." th.Why3.Theory.th_path ^ "." ^
-            th.Why3.Theory.th_name.Why3.Ident.id_string in
-          Format.fprintf fmt "  use %s@\n" qname)
-        from_file;
-      Format.fprintf fmt "@\n";
-      (* Inline EC-internal theories: emit each non-Use tdecl as a
-         local declaration. [Use]/[Clone]/[Meta] tdecls within these
-         in-memory theories already covered by [used_theories]. *)
-      List.iter
-        (fun th ->
-          Format.fprintf fmt "  (* === inlined: %s === *)@\n"
-            th.Why3.Theory.th_name.Why3.Ident.id_string;
-          List.iter
-            (fun td -> match td.Why3.Theory.td_node with
-              | Why3.Theory.Decl d ->
-                Format.fprintf fmt "  %a@\n@\n"
-                  Why3.Pretty.print_decl d
-              | _ -> ())
-            th.Why3.Theory.th_decls)
-        inline;
-      List.iter
-        (fun d -> Format.fprintf fmt "  %a@\n@\n" Why3.Pretty.print_decl d)
-        local_decls;
-      Format.fprintf fmt "end@]@.";
-      (* Post-process the buffer:
-         - [''a] (double apostrophe — printer mark for introduced
-           tvars) → [`a] (source-form tvar).
-         - Operator-name disambiguation primes ([( *' )] / [(+')] /
-           etc.) when two preludes export the same infix → strip the
-           apostrophe. Why3's parser then disambiguates by type. This
-           IS lossy in pathological cases (two same-named operators
-           with overlapping types) but enables the common case
-           [int.Int] + [real.Real] coexistence: at any infix use site
-           the operand types pick the right resolution. *)
-      let raw = Buffer.contents buf in
-      let cleaned =
-        Str.global_replace (Str.regexp "''") "'" raw in
-      (* Operator-collision rewrite: when [int.Int] and [real.Real]
-         are both [use]d, the pretty-printer emits the second-bound
-         infix as primed ([( *' )] / [(+ ')] / …), invalid in source.
-         Rewrite primed infix USES [(x *' y)] into prefix-qualified
-         [Real.( * ) x y]. The primed form is consistently the real
-         operator (int's prelude is loaded first by EC's
-         [add_core_bindings]). *)
-      let cleaned =
-        let pats = [
-          "\\((\\([^()]+\\) \\*' \\([^()]+\\))\\)", "(Real.( * ) \\2 \\3)";
-          "\\((\\([^()]+\\) +' \\([^()]+\\))\\)", "(Real.( + ) \\2 \\3)";
-          "\\((\\([^()]+\\) -' \\([^()]+\\))\\)", "(Real.( - ) \\2 \\3)";
-          "\\((\\([^()]+\\) /' \\([^()]+\\))\\)", "(Real.( / ) \\2 \\3)";
-        ] in
-        List.fold_left
-          (fun s (pat, repl) ->
-            Str.global_replace (Str.regexp pat) repl s)
-          cleaned pats in
-      output_string stream cleaned)
-    (fun () -> close_out stream)
 
 (* -------------------------------------------------------------------- *)
 module Cast = struct
@@ -570,23 +400,8 @@ let lenv_of_tparams ts =
     List.map_fold trans_tv empty_lenv ts
 
 let lenv_of_tparams_for_hyp genv ts =
-  (* EC tparam names start with a tick (['a], ['b], …). A
-     tysymbol with that exact name prints as [type 'a], which
-     Why3's source parser rejects (the tick is reserved for
-     type variables). Drop the leading tick when minting the
-     tysymbol's ident — the name becomes [EC_tv_a] etc. Each
-     EC ident still hash-cons-uniquely, so two distinct ['a]s
-     in different scopes get distinct tysymbols regardless of
-     the shared string. *)
-  let strip_tick (id : EcIdent.t) =
-    let n = EcIdent.name id in
-    if String.length n >= 1 && n.[0] = '\''
-    then "ec_tv_" ^ String.sub n 1 (String.length n - 1)
-    else n in
   let trans_tv env ((id, _) : ty_param) =
-    let ts =
-      WTy.create_tysymbol
-        (WIdent.id_fresh (strip_tick id)) [] WTy.NoDef in
+    let ts = WTy.create_tysymbol (preid id) [] WTy.NoDef in
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     { env with le_tv = Mid.add id (WTy.ty_app ts []) env.le_tv }, ts
   in
@@ -734,7 +549,7 @@ and trans_tydecl genv (p, tydecl) =
         let for_ctor (c, ctys) =
           let wcid  = pqoname (prefix p) c in
           let wctys = List.map (trans_ty (genv, lenv)) ctys in
-          let wcls  = WTerm.create_lsymbol ~constr:ncs (preid_p_ctor wcid) wctys (Some wdom) in
+          let wcls  = WTerm.create_lsymbol ~constr:ncs (preid_p wcid) wctys (Some wdom) in
           let w3op  = plain_w3op ~name:c tparams wcls in
           ((wcid, w3op), (wcls, List.make (List.length ctys) None)) in
 
@@ -760,7 +575,7 @@ and trans_tydecl genv (p, tydecl) =
 
         let wcid  = EI.record_ctor_path p in
         let wctys = List.map (trans_ty (genv, lenv)) (List.map snd rc) in
-        let wcls  = WTerm.create_lsymbol ~constr:1 (preid_p_ctor wcid) wctys (Some wdom) in
+        let wcls  = WTerm.create_lsymbol ~constr:1 (preid_p wcid) wctys (Some wdom) in
         let w3op  = plain_w3op ~name:(basename wcid) tparams wcls in
 
         let opts, wproj = List.split (List.map for_field rc) in
@@ -807,50 +622,16 @@ let trans_lvars genv lenv bds =
   trans_bindings genv lenv (List.map (snd_map gtty) bds)
 
 (* -------------------------------------------------------------------- *)
-(* Map operator characters to alphabetic prefixes so HO-wrapper names
-   like [( * )_ho] become [times_ho] / [plus_ho] / etc. — parseable as
-   why3 [lident]. Common single-char operators get short names; any
-   other non-alphanumeric character becomes [_]. *)
-let sanitize_op_name s =
-  let buf = Buffer.create (String.length s + 8) in
-  String.iter (fun c -> match c with
-    | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' -> Buffer.add_char buf c
-    | '*' -> Buffer.add_string buf "times"
-    | '+' -> Buffer.add_string buf "plus"
-    | '-' -> Buffer.add_string buf "minus"
-    | '/' -> Buffer.add_string buf "div"
-    | '%' -> Buffer.add_string buf "mod"
-    | '<' -> Buffer.add_string buf "lt"
-    | '>' -> Buffer.add_string buf "gt"
-    | '=' -> Buffer.add_string buf "eq"
-    | '!' -> Buffer.add_string buf "bang"
-    | '\\' -> Buffer.add_string buf "bs"
-    | '|' -> Buffer.add_string buf "pipe"
-    | '&' -> Buffer.add_string buf "amp"
-    | '^' -> Buffer.add_string buf "hat"
-    | '~' -> Buffer.add_string buf "tilde"
-    | '@' -> Buffer.add_string buf "at"
-    | '$' -> Buffer.add_string buf "dollar"
-    | '#' -> Buffer.add_string buf "hash"
-    | '?' -> Buffer.add_string buf "qmark"
-    | ':' -> Buffer.add_string buf "colon"
-    | '\'' -> Buffer.add_string buf "prime"
-    | '.' -> Buffer.add_string buf "_"
-    | _ -> Buffer.add_char buf '_'
-  ) s;
-  let s = Buffer.contents buf in
-  if s = "" then "op" else s
-
 (* build the higher-order symbol and add the corresponding axiom.       *)
 let mk_highorder_symb ids dom codom =
-  let pid = WIdent.id_fresh (sanitize_op_name ids ^ "_ho") in
+  let pid = WIdent.id_fresh (ids ^ "_ho") in
   let ty = List.fold_right WTy.ty_func dom (odfl WTy.ty_bool codom) in
   WTerm.create_fsymbol pid [] ty, ty
 
 let mk_highorder_func ids dom codom mk =
   let ls', ty = mk_highorder_symb ids dom codom in
   let decl' = WDecl.create_param_decl ls' in
-  let pid_spec = WIdent.id_fresh (sanitize_op_name ids ^ "_ho_spec") in
+  let pid_spec = WIdent.id_fresh (ids ^ "_ho_spec") in
   let pr = WDecl.create_prsymbol pid_spec in
   let preid = WIdent.id_fresh "x" in
   let params = List.map (WTerm.create_vsymbol preid) dom in
@@ -1418,13 +1199,9 @@ and try_dict_proj
                     if lift = [] then ""
                     else "_" ^ String.concat "_"
                                  (List.map string_of_int lift) in
-                  let op_name =
-                    let s = sanitize_op_name local_name in
-                    if s = "" then "op" else s in
                   let lid =
                     Printf.sprintf "%s_at_%s%s"
-                      op_name carrier_name leg_suffix in
-                  let lid = str_lid lid in
+                      local_name carrier_name leg_suffix in
                   let ls =
                     WTerm.create_lsymbol
                       (WIdent.id_fresh lid) wdom wcodom in
@@ -2185,11 +1962,11 @@ let trans_hyp ((genv, lenv) as env) (x, ty) =
       then None
       else Some (trans_ty env codom) in
 
-    let ls = WTerm.create_lsymbol (preid_lid x) wdom wcodom in
+    let ls = WTerm.create_lsymbol (preid x) wdom wcodom in
     let w3op = {
       w3op_fo = `LDecl ls;
       w3op_ta = (fun _ -> ([], [], List.map some wdom, wcodom));
-      w3op_ho = `HO_TODO (str_lid (EcIdent.name x), wdom, wcodom);
+      w3op_ho = `HO_TODO (EcIdent.name x, wdom, wcodom);
     } in
 
     let decl =
@@ -2214,7 +1991,7 @@ let trans_hyp ((genv, lenv) as env) (x, ty) =
     let wty = trans_memtype env mt in
     let lenv = { lenv with le_mt = Mid.add x mt lenv.le_mt } in
     let wcodom = Some wty in
-      let ls =  WTerm.create_lsymbol (preid_lid x) [] wcodom in
+      let ls =  WTerm.create_lsymbol (preid x) [] wcodom in
       let w3op = {
         w3op_fo = `LDecl ls;
         w3op_ta = (fun _ -> ([], [], [], wcodom));
@@ -3277,14 +3054,7 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
       (fun () -> Format.fprintf
         (Format.formatter_of_out_channel stream)
         "%a@." Why3.Pretty.print_task task)
-      (fun () -> close_out stream);
-    (* Companion re-parseable theory dump: replaces ".w3" extension
-       with ".why" when present, else appends ".why". *)
-    let why_name =
-      if Filename.check_suffix filename ".w3"
-      then Filename.chop_suffix filename ".w3" ^ ".why"
-      else filename ^ ".why" in
-    dump_task_theory task why_name in
+      (fun () -> close_out stream) in
 
   let env,hyps,tenv,decl = init hyps concl in
   tenv.te_tvi <- pi.P.pr_tvi;
