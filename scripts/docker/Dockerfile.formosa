@@ -1,7 +1,0 @@
-# syntax = devthefuture/dockerfile-x
-
-FROM ./Dockerfile.build as build-formosa
-
-RUN \
-	opam install --deps-only --confirm-level=unsafe-yes jasmin && \
-	opam clean
