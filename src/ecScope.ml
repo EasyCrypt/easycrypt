@@ -1331,8 +1331,8 @@ module Op = struct
     let add_distr_tag
         (pred : path) (bases : string list) (tag : string) (suffix : string) scope
     =
-      if not (EcAlgTactic.is_module_loaded (env scope)) then
-        hierror "for tag %s, load Distr first" tag;
+      if EcEnv.Op.by_path_opt pred (env scope) = None then
+         hierror "for tag %s, load Distr first" tag;
 
       let subst, nparams =
         EcSubst.fresh_tparams EcSubst.empty tyop.op_tparams in
