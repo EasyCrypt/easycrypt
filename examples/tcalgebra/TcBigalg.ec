@@ -288,7 +288,7 @@ proof.
 elim: s => // x s IHs F_ge0; rewrite big_cons.
 have {IHs} IHs := IHs _; first by smt().
 case: (P x) => [Px F_big_gt0 a a_x_s Pa| nPx /IHs]; 2:smt().
-smt(pmulr_gt0 prodr_ge0_seq).
+smt(pmulr_gt0<:t> prodr_ge0_seq).
 qed.
 
 lemma prodr_eq0 ['a] P (F : 'a -> t) s :
