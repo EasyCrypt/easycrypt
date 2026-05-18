@@ -16,47 +16,15 @@ exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
 exception IncompatibleExpr of env * (expr * expr)
 
-(* -------------------------------------------------------------------- *)
-type 'a eqtest  = env -> 'a -> 'a -> bool
+type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> 'a -> bool
 
+(* -------------------------------------------------------------------- *)
 module EqTest_base = struct
-  let rec for_type env t1 t2 =
-    ty_equal t1 t2 || for_type_r env t1 t2
-
-  and for_type_r env t1 t2 =
-    match t1.ty_node, t2.ty_node with
-    | Tunivar uid1, Tunivar uid2 -> EcUid.uid_equal uid1 uid2
-
-    | Tvar i1, Tvar i2 -> i1 = i2
-
-    | Ttuple lt1, Ttuple lt2 ->
-          List.length lt1 = List.length lt2
-       && List.all2 (for_type env) lt1 lt2
-
-    | Tfun (t1, t2), Tfun (t1', t2') ->
-        for_type env t1 t1' && for_type env t2 t2'
-
-    | Tglob m1, Tglob m2 -> EcIdent.id_equal m1 m2
-
-    | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
-        if
-             List.length lt1 = List.length lt2
-          && List.all2 (for_type env) lt1 lt2
-        then true
-        else
-          if   Ty.defined p1 env
-          then for_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env)
-          else false
-
-    | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
-        for_type env (Ty.unfold p1 lt1 env) t2
-
-    | _, Tconstr(p2,lt2) when Ty.defined p2 env ->
-        for_type env t1 (Ty.unfold p2 lt2 env)
-
-    | _, _ -> false
+  (* ------------------------------------------------------------------ *)
+  let for_type = EcCoreEqTest.for_type
+  let for_etyarg = EcCoreEqTest.for_etyarg
 
   (* ------------------------------------------------------------------ *)
   let is_unit env ty = for_type env tunit ty
@@ -137,7 +105,7 @@ module EqTest_base = struct
           for_pv env ~norm p1 p2
 
       | Eop(o1,ty1), Eop(o2,ty2) ->
-          p_equal o1 o2 && List.all2 (for_type env) ty1 ty2
+          p_equal o1 o2 && List.all2 (for_etyarg env) ty1 ty2
 
       | Equant(q1,b1,e1), Equant(q2,b2,e2) when eqt_equal q1 q2 ->
           let alpha = check_bindings env alpha b1 b2 in
@@ -409,6 +377,9 @@ let ensure b = if b then () else raise NotConv
 let check_ty env subst ty1 ty2 =
   ensure (EqTest_base.for_type env ty1 (ty_subst subst ty2))
 
+let check_etyarg env subst (ty1, w1) (ty2, w2) =
+  ensure (EqTest_base.for_etyarg env (ty1, w1) (ty_subst subst ty2, w2))
+
 let add_local (env, subst) (x1, ty1) (x2, ty2) =
   check_ty env subst ty1 ty2;
   env,
@@ -538,7 +509,7 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
       check_mod subst m1 m2
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
-      List.iter2 (check_ty env subst) ty1 ty2
+      List.iter2 (check_etyarg env subst) ty1 ty2
 
     | Fapp(f1',args1), Fapp(f2',args2) when
         List.length args1 = List.length args2 ->
@@ -636,6 +607,7 @@ type reduction_info = {
   beta    : bool;
   delta_p : (path  -> deltap); (* reduce operators *)
   delta_h : (ident -> bool);   (* reduce local definitions *)
+  delta_tc : bool;
   zeta    : bool;
   iota    : bool;
   eta     : bool;
@@ -652,6 +624,7 @@ let full_red = {
   beta    = true;
   delta_p = (fun _ -> `IfTransparent);
   delta_h = EcUtils.predT;
+  delta_tc = true;
   zeta    = true;
   iota    = true;
   eta     = true;
@@ -661,15 +634,16 @@ let full_red = {
 }
 
 let no_red = {
-  beta    = false;
-  delta_p = (fun _ -> `No);
-  delta_h = EcUtils.pred0;
-  zeta    = false;
-  iota    = false;
-  eta     = false;
-  logic   = None;
-  modpath = false;
-  user    = false;
+  beta     = false;
+  delta_p  = (fun _ -> `No);
+  delta_h  = EcUtils.pred0;
+  delta_tc = false;
+  zeta     = false;
+  iota     = false;
+  eta      = false;
+  logic    = None;
+  modpath  = false;
+  user     = false;
 }
 
 let beta_red     = { no_red with beta = true; }
@@ -677,8 +651,8 @@ let betaiota_red = { no_red with beta = true; iota = true; }
 
 let nodelta =
   { full_red with
-      delta_h = EcUtils.pred0;
-      delta_p = (fun _ -> `No); }
+      delta_h  = EcUtils.pred0;
+      delta_p  = (fun _ -> `No); }
 
 let delta = { no_red with delta_p = (fun _ -> `IfTransparent); }
 
@@ -708,6 +682,56 @@ let reduce_op ri env nargs p tys =
        Op.reduce ~mode ~nargs env p tys
      with NotReducible -> raise nohead
 
+(* When a TC witness is [`Abs path] and [path] resolves to a concrete
+   (non-abstract) type, infer the concrete instance so that the TC op
+   becomes reducible. This arises after cloning an abstract theory with
+   a [type t <: tc] carrier substituted to a concrete type. *)
+let resolve_concrete_tcw (env : EcEnv.env) (p : path) (tys : etyarg list) : etyarg list =
+  let op = EcEnv.Op.by_path p env in
+  if not (EcDecl.is_tc_op op) then tys
+  else match List.rev tys with
+    | (carrier_ty, [TCIAbstract { support = `Abs ap; offset = 0; lift = [] }]) :: rest
+        when (match EcEnv.Ty.by_path_opt ap env with
+              | Some { tyd_type = `Abstract _; _ } -> false
+              | _ -> true) ->
+      let tcpath, _ = EcDecl.operator_as_tc op in
+      let tc_decl = EcEnv.TypeClass.by_path tcpath env in
+      let tc = { tc_name = tcpath;
+                 tc_args = EcDecl.etyargs_of_tparams tc_decl.tc_tparams; } in
+      (match EcTypeClass.infer env carrier_ty tc with
+       | Some w -> List.rev ((carrier_ty, [w]) :: rest)
+       | None   -> tys)
+    | _ -> tys
+
+let reduce_tc_op (ri : reduction_info) (env : EcEnv.env) (p : path) (tys : etyarg list) =
+  if ri.delta_tc then
+    try
+      Op.tc_reduce env p (resolve_concrete_tcw env p tys)
+    with NotReducible -> raise nohead
+  else
+    raise nohead
+
+(* Fold every TC op whose witness resolves through a reducible-marked
+   instance, recursively. Used to normalise a term after a polymorphic
+   template (rewrite RHS, [apply] result) has been instantiated at a
+   concrete carrier — without this, the user-visible term carries
+   verbose [idm<:int[Conc(...)]>]-style heads instead of [0]. *)
+let rec fold_reducible_tc (env : EcEnv.env) (f : form) : form =
+  let f = EcCoreFol.f_map (fun ty -> ty) (fold_reducible_tc env) f in
+  match f.f_node with
+  | Fop (p, tys)
+      when EcEnv.Op.tc_reducible ~strict:true env p tys ->
+    (try fold_reducible_tc env (EcEnv.Op.tc_reduce ~strict:true env p tys)
+     with NotReducible -> f)
+  | Fapp ({ f_node = Fop (p, tys); _ }, args)
+      when EcEnv.Op.tc_reducible ~strict:true env p tys ->
+    (try
+       let head = EcEnv.Op.tc_reduce ~strict:true env p tys in
+       fold_reducible_tc env (f_app_simpl head args f.f_ty)
+     with NotReducible -> f)
+  | _ -> f
+
+(* -------------------------------------------------------------------- *)
 let is_record env f =
   match EcFol.destr_app f with
   | { f_node = Fop (p, _) }, _ -> EcEnv.Op.is_record_ctor env p
@@ -750,8 +774,8 @@ let reduce_user_gen simplify ri env hyps f =
   oget ~exn:needsubterm (List.Exceptionless.find_map (fun rule ->
 
     try
-      let ue    = EcUnify.UniEnv.create None in
-      let tvi   = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
+      let ue  = EcUnify.UniEnv.create None in
+      let tvi = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
 
       let check_alpha_eq f f' =
         if not (is_alpha_eq hyps f f') then raise NotReducible
@@ -769,10 +793,12 @@ let reduce_user_gen simplify ri env hyps f =
         | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
-          let tys' = List.map (Tvar.subst tvi) tys' in
+          let tys' = List.map (Tvar.subst_etyarg tvi.subst) tys' in
 
           begin
-            try  List.iter2 (EcUnify.unify env ue) tys tys'
+            try
+              if List.length tys <> List.length tys' then raise NotReducible;
+              List.iter2 (EcUnify.unify_etyarg env ue) tys tys'
             with EcUnify.UnificationFailure _ -> raise NotReducible end;
 
           List.iter2 doit args args'
@@ -804,7 +830,7 @@ let reduce_user_gen simplify ri env hyps f =
         let subst   = ts in
         let subst   =
           Mid.fold (fun x f s -> Fsubst.f_bind_local s x f) !pv subst in
-        Fsubst.f_subst subst (Fsubst.f_subst_tvar ~freshen:true tvi f)
+        Fsubst.f_subst subst (Fsubst.f_subst_tvar ~freshen:true tvi.subst f)
       in
 
       List.iter (fun cond ->
@@ -883,7 +909,7 @@ let reduce_logic ri env hyps f p args =
             when    EcPath.p_equal p1 p2
                  && EcEnv.Op.is_record_ctor env p1
                  && EcEnv.Op.is_record_ctor env p2
-                 && List.for_all2 (EqTest_i.for_type env) tys1 tys2 ->
+                 && List.for_all2 (EqTest_i.for_etyarg env) tys1 tys2 ->
 
             f_ands (List.map2 f_eq args1 args2)
 
@@ -904,14 +930,31 @@ let reduce_logic ri env hyps f p args =
   check_reduced hyps needsubterm f f'
 
 (* -------------------------------------------------------------------- *)
-let reduce_delta ri env _hyps f =
+let reduce_delta ri env f =
   match f.f_node with
   | Fop (p, tys) when ri.delta_p p <> `No ->
-      reduce_op ri env 0 p tys
+    reduce_op ri env 0 p tys
 
   | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p <> `No ->
-      let op = reduce_op ri env (List.length args) p tys in
-      f_app_simpl op args f.f_ty
+    let op = reduce_op ri env (List.length args) p tys in
+    f_app_simpl op args f.f_ty
+
+  | _ -> raise nohead
+
+(* -------------------------------------------------------------------- *)
+let reduce_tc ri env f =
+  match f.f_node with
+  | Fop (p, etyargs)
+      when ri.delta_tc &&
+           Op.tc_reducible env p (resolve_concrete_tcw env p etyargs) ->
+    reduce_tc_op ri env p etyargs
+
+  | Fapp ({ f_node = Fop (p, etyargs) }, args)
+      when ri.delta_tc &&
+           Op.tc_reducible env p (resolve_concrete_tcw env p etyargs)
+  ->
+    let op = reduce_tc_op ri env p etyargs in
+    f_app_simpl op args f.f_ty
 
   | _ -> raise nohead
 
@@ -1064,7 +1107,10 @@ let reduce_head simplify ri env hyps f =
       let body = EcFol.form_of_expr body in
       (* FIXME subst-refact can we do both subst in once *)
       let body =
-        Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+        Tvar.f_subst ~freshen:true
+          (List.combine
+            (List.map fst op.EcDecl.op_tparams)
+            tys) body in
 
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
@@ -1081,19 +1127,22 @@ let reduce_head simplify ri env hyps f =
       when ri.eta && can_eta x (fn, args)
     -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
-  | Fop _ -> begin
-    try
-      reduce_user_gen simplify ri env hyps f
-    with NotRed _ ->
-      reduce_delta ri env hyps f
-    end
+  | Fop _ ->
+    oget ~exn:nohead @@
+      List.find_map_opt
+        (fun cb -> try Some (cb f) with NotRed _ -> None)
+        [ reduce_user_gen simplify ri env hyps
+        ; reduce_delta ri env
+        ; reduce_tc ri env ]
 
-  | Fapp({ f_node = Fop(p,_); }, args) -> begin
+  | Fapp ({ f_node = Fop (p, _); }, args) -> begin
       try  reduce_logic ri env hyps f p args
       with NotRed kind1 ->
         try  reduce_user_gen simplify ri env hyps f
         with NotRed kind2 ->
-          if kind1 = NoHead && kind2 = NoHead then reduce_delta ri env hyps f
+          if kind1 = NoHead && kind2 = NoHead then
+            (try reduce_delta ri env f
+             with NotRed NoHead -> reduce_tc ri env f)
           else raise needsubterm
     end
 
@@ -1195,9 +1244,18 @@ and reduce_head_top_force ri env onhead f =
     match reduce_head_sub ri env f with
     | f ->
       if onhead then reduce_head_top ri env ~onhead f else f
-    | exception (NotRed _) ->
-      try reduce_delta ri.ri env ri.hyps f
-      with NotRed _ -> RedTbl.set_norm ri.redtbl f; raise nohead
+    | exception (NotRed _) -> begin
+      match
+        List.find_map_opt
+          (fun cb -> try Some (cb ri.ri env f) with NotRed _ -> None)
+          [reduce_delta; reduce_tc]
+      with
+      | Some f ->
+        f
+      | None ->
+        RedTbl.set_norm ri.redtbl f;
+        raise nohead
+      end
   end
 
 and reduce_head_sub ri env f =
@@ -1258,30 +1316,25 @@ let rec simplify ri env f =
   match f.f_node with
   | FhoareF hf when ri.ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun env hf.hf_f in
-      f_map (fun ty -> ty) (simplify ri env)
-      (f_hoareF (hf_pr hf) hf_f (hf_po hf))
+      f_map (fun ty -> ty) (simplify ri env) (f_hoareF_r { hf with hf_f })
 
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
-      f_map (fun ty -> ty) (simplify ri env)
-      (f_eHoareF (ehf_pr hf) ehf_f (ehf_po hf))
+      f_map (fun ty -> ty) (simplify ri env) (f_eHoareF_r { hf with ehf_f })
 
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in
-      f_map (fun ty -> ty) (simplify ri env)
-      (f_bdHoareF (bhf_pr hf) bhf_f (bhf_po hf) hf.bhf_cmp (bhf_bd hf))
+      f_map (fun ty -> ty) (simplify ri env) (f_bdHoareF_r { hf with bhf_f })
 
   | FequivF ef when ri.ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun env ef.ef_fr in
-      f_map (fun ty -> ty) (simplify ri env)
-      (f_equivF (ef_pr ef) ef_fl ef_fr (ef_po ef))
+      f_map (fun ty -> ty) (simplify ri env) (f_equivF_r { ef with ef_fl; ef_fr; })
 
   | FeagerF eg when ri.ri.modpath ->
       let eg_fl = EcEnv.NormMp.norm_xfun env eg.eg_fl in
       let eg_fr = EcEnv.NormMp.norm_xfun env eg.eg_fr in
-      f_map (fun ty -> ty) (simplify ri env)
-      (f_eagerF (eg_pr eg) eg.eg_sl eg_fl eg_fr eg.eg_sr (eg_po eg))
+      f_map (fun ty -> ty) (simplify ri env) (f_eagerF_r { eg with eg_fl ; eg_fr; })
 
   | Fpr pr when ri.ri.modpath ->
       let pr_fun = EcEnv.NormMp.norm_xfun env pr.pr_fun in
@@ -1410,6 +1463,9 @@ let zpop ri side f hd =
 let rec conv ri env f1 f2 stk =
   if f_equal f1 f2 then conv_next ri env f1 stk else
   match f1.f_node, f2.f_node with
+  | Flocal x, Flocal y when EcIdent.id_equal x y ->
+    true
+
   | Fquant (q1, bd1, f1'), Fquant(q2,bd2,f2') ->
     if q1 <> q2 then force_head_sub ri env f1 f2 stk
     else
@@ -1463,7 +1519,8 @@ let rec conv ri env f1 f2 stk =
     end
 
   | Fop(p1, ty1), Fop(p2,ty2)
-      when EcPath.p_equal p1 p2 && List.all2 (EqTest_i.for_type env) ty1 ty2 ->
+      when EcPath.p_equal p1 p2
+        && List.all2 (EqTest_i.for_etyarg env) ty1 ty2 ->
     conv_next ri env f1 stk
 
   | Fapp(f1', args1), Fapp(f2', args2)
@@ -1773,8 +1830,8 @@ module User = struct
     let rule =
       let rec rule (f : form) : EcTheory.rule_pattern =
         match EcFol.destr_app f with
-        | { f_node = Fop (p, tys) }, args ->
-            R.Rule (`Op (p, tys), List.map rule args)
+        | { f_node = Fop (p, etyargs) }, args ->
+            R.Rule (`Op (p, etyargs), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)
         | { f_node = Fproj (target, i) }, [] ->
@@ -1797,12 +1854,13 @@ module User = struct
         | R.Rule (op, args) ->
             let ltyvars =
               match op with
-              | `Op (_, tys) ->
-                List.fold_left (
-                    let rec doit ltyvars = function
-                      | { ty_node = Tvar a } -> Sid.add a ltyvars
-                      | _ as ty -> ty_fold doit ltyvars ty in doit)
-                  cst.cst_ty_vs tys
+              | `Op (_, etyargs) ->
+                let rec doit_ty ltyvars = function
+                  | { ty_node = Tvar a } -> Sid.add a ltyvars
+                  | _ as ty -> ty_fold doit_ty ltyvars ty in
+                List.fold_left
+                  (fun ltyvars (ty, _) -> doit_ty ltyvars ty)
+                  cst.cst_ty_vs etyargs
               | `Tuple -> cst.cst_ty_vs
               | `Proj _ -> cst.cst_ty_vs in
             let cst = {cst with cst_ty_vs = ltyvars } in
@@ -1811,7 +1869,7 @@ module User = struct
       in doit empty_cst rule in
 
     let s_bds   = Sid.of_list (List.map fst bds)
-    and s_tybds = Sid.of_list ax.ax_tparams in
+    and s_tybds = Sid.of_list (List.map fst ax.ax_tparams) in
 
     (* Variables appearing in types and formulas are always, respectively,
      * type and formula variables.

@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcMaps
 open EcPath
 open EcAst
 open EcTypes
@@ -26,7 +27,8 @@ and theory_item_r =
   | Th_module    of top_module_expr
   | Th_theory    of (symbol * ctheory)
   | Th_export    of EcPath.path * is_local
-  | Th_instance  of (ty_params * EcTypes.ty) * tcinstance * is_local
+  | Th_instance  of (symbol option * tcinstance)
+  | Th_typeclass of (symbol * tc_decl)
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   | Th_reduction of (EcPath.path * rule_option * rule option) list
@@ -44,8 +46,55 @@ and ctheory = {
   cth_source : thsource option;
 }
 
-and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
-and thmode     = [ `Abstract | `Concrete ]
+and tcinstance = {
+  tci_params    : ty_params;
+  tci_type      : ty;
+  tci_instance  : tcibody;
+  tci_local     : locality;
+  (* When this instance was synthesised by [add_generic_instance] as
+     the projection of a parent class's instance via the subclass
+     chain, [tci_parents] gives the synthesised parent-instance paths
+     in the same order as the underlying TC's [tc_prts]. Empty for
+     manually-declared instances. Used by [resolve_lifted] to walk
+     the correct ancestor when multiple parent paths exist. *)
+  tci_parents   : EcPath.path list;
+  (* When [true], this instance's TC ops fold to their concrete
+     realisations during strict reduction (e.g. [/=], [norm_cbv]).
+     Set on a manual [instance ... reducible] declaration; inherited
+     by parent instances synthesised in the same declaration along
+     the class chain. The matcher and [is_conv] do not consult this
+     flag — they always look through concrete witnesses. *)
+  tci_reducible : bool;
+  (* When this instance was synthesised by [add_generic_instance]
+     via the parent chain, the cumulative ancestor→leaf op renaming
+     accumulated along the chain walk. [None] for manually-declared
+     instances (legacy AlgTactic-based [addring]/[addfield] and any
+     user-declared instance not produced by the chain machinery).
+     Used by the resolver's op-name preservation filter to drop
+     candidates whose renaming clobbers the queried op name, e.g.
+     to disambiguate [( + )<:zmod>] between the addmonoid view
+     ([+] preserved) and the mulmonoid view ([+] renamed to [*]). *)
+  tci_chain_rename : (EcSymbols.symbol * EcSymbols.symbol) list option;
+  (* When this instance was synthesised by [add_generic_instance] via
+     the parent chain, the LABEL PATH from the leaf class down to the
+     ancestor of this instance. Outermost-first: e.g. the synthesised
+     [mulmonoid] instance reached from a [comring] declaration with
+     edge [(mulmonoid as Mul)] has label path [["Mul"; "monoid"]]
+     (Mul = comring's label for its mulmonoid parent; monoid =
+     mulmonoid's default label for its monoid parent).
+     [None] for manually-declared instances. Used by the obligation
+     collector to disambiguate axioms reached via multiple parent
+     paths of the same ancestor class. *)
+  tci_chain_labels : EcSymbols.symbol list option;
+}
+
+and tcibody = [
+  | `Ring    of ring
+  | `Field   of field
+  | `General of typeclass * (EcCoreFol.form Mstr.t) option
+]
+
+and thmode = [ `Abstract | `Concrete ]
 
 and rule_pattern =
   | Rule of top_rule_pattern * rule_pattern list
@@ -53,7 +102,7 @@ and rule_pattern =
   | Var  of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple | `Proj of int]
+  [`Op of (EcPath.path * etyarg list) | `Tuple | `Proj of int]
 
 and rule = {
   rl_tyd   : EcDecl.ty_params;

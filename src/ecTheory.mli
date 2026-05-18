@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcMaps
 open EcPath
 open EcAst
 open EcTypes
@@ -22,10 +23,11 @@ and theory_item_r =
   | Th_module    of top_module_expr
   | Th_theory    of (symbol * ctheory)
   | Th_export    of EcPath.path * is_local
-  | Th_instance  of (ty_params * EcTypes.ty) * tcinstance * is_local
+  | Th_instance  of (symbol option * tcinstance)
+  | Th_typeclass of (symbol * tc_decl)
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
-  (* reduction rule does not survive to section so no locality *)
+  (* reduction rule does not survive section => no locality *)
   | Th_reduction of (EcPath.path * rule_option * rule option) list
   | Th_auto      of auto_rule
   | Th_alias     of (symbol * path)
@@ -41,8 +43,29 @@ and ctheory = {
   cth_source : thsource option;
 }
 
-and tcinstance = [ `Ring of ring | `Field of field | `General of EcPath.path ]
-and thmode     = [ `Abstract | `Concrete ]
+and tcinstance = {
+  tci_params    : ty_params;
+  tci_type      : ty;
+  tci_instance  : tcibody;
+  tci_local     : locality;
+  tci_parents   : EcPath.path list;
+  tci_reducible : bool;
+  tci_chain_rename : (EcSymbols.symbol * EcSymbols.symbol) list option;
+  tci_chain_labels : EcSymbols.symbol list option;
+}
+
+and tcibody = [
+  | `Ring    of ring
+  | `Field   of field
+  | `General of typeclass * (EcCoreFol.form Mstr.t) option
+    (* Symbol map: each TC class op (by basename) maps to the form that
+       realises it on the instance's carrier. Most of the time that
+       form is [Fop (concrete_path, etyargs)] — a named op application
+       — but in principle it can be any closed term (e.g. a literal
+       [Fint 0] for the additive identity at int). *)
+]
+
+and thmode = [ `Abstract | `Concrete ]
 
 and rule_pattern =
   | Rule of top_rule_pattern * rule_pattern list
@@ -50,7 +73,7 @@ and rule_pattern =
   | Var  of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple | `Proj of int]
+  [`Op of (EcPath.path * etyarg list) | `Tuple | `Proj of int]
 
 and rule = {
   rl_tyd   : EcDecl.ty_params;

@@ -7,36 +7,83 @@ open EcSymbols
 let unique () = Oo.id (object end)
 
 (* -------------------------------------------------------------------- *)
-type uid = int
+module type ICore = sig
+  type uid
 
-type uidmap = {
-  (*---*) um_tbl : (symbol, uid) Hashtbl.t;
-  mutable um_uid : int;
-}
+  (* ------------------------------------------------------------------ *)
+  val unique      : unit -> uid
+  val uid_equal   : uid -> uid -> bool
+  val uid_compare : uid -> uid -> int
 
-let create () =
-  { um_tbl = Hashtbl.create 0;
-    um_uid = 0; }
+  (* ------------------------------------------------------------------ *)
+  module Muid : Map.S  with type key = uid
+  module Suid : Set.S  with module M = Map.MakeBase(Muid)
 
-let lookup (um : uidmap) (x : symbol) =
-  try  Some (Hashtbl.find um.um_tbl x)
-  with Not_found -> None
+  (* ------------------------------------------------------------------ *)
+  module SMap : sig
+    type uidmap
 
-let forsym (um : uidmap) (x : symbol) =
-  match lookup um x with
-    | Some uid -> uid
-    | None ->
-      let uid = um.um_uid in
-        um.um_uid <- um.um_uid + 1;
-        Hashtbl.add um.um_tbl x uid;
-        uid
+    val create : unit -> uidmap
+    val lookup : uidmap -> symbol -> uid option
+    val forsym : uidmap -> symbol -> uid
+    val pp_uid : Format.formatter -> uid -> unit
+  end
+end
 
 (* -------------------------------------------------------------------- *)
-let uid_equal x y = x == y
-let uid_compare x y = x - y
+type uid = int
 
-module Muid = Mint
-module Suid = Set.MakeOfMap(Muid)
+(* -------------------------------------------------------------------- *)
+module Core : ICore with type uid := uid = struct
+  (* ------------------------------------------------------------------ *)
+  let unique () : uid =
+    unique ()
+
+  let uid_equal x y = x == y
+  let uid_compare x y = x - y
+
+  (* ------------------------------------------------------------------ *)
+  module Muid = Mint
+  module Suid = Set.MakeOfMap(Muid)
+
+  (* ------------------------------------------------------------------ *)
+  module SMap = struct
+    type uidmap = {
+      (*---*) um_tbl : (symbol, uid) Hashtbl.t;
+      mutable um_uid : int;
+    }
+
+    let create () =
+      { um_tbl = Hashtbl.create 0;
+        um_uid = 0; }
+
+    let lookup (um : uidmap) (x : symbol) =
+      try  Some (Hashtbl.find um.um_tbl x)
+      with Not_found -> None
+
+    let forsym (um : uidmap) (x : symbol) =
+      match lookup um x with
+        | Some uid -> uid
+        | None ->
+          let uid = um.um_uid in
+            um.um_uid <- um.um_uid + 1;
+            Hashtbl.add um.um_tbl x uid;
+            uid
+
+    let pp_uid fmt u =
+      Format.fprintf fmt "#%d" u
+  end
+end
+
+(* -------------------------------------------------------------------- *)
+module CoreGen() : ICore with type uid = private uid = struct
+  type nonrec uid = uid
+
+  include Core
+end
+
+(* -------------------------------------------------------------------- *)
+include Core
 
 (* -------------------------------------------------------------------- *)
 module NameGen = struct

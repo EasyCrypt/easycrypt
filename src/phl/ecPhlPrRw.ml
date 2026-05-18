@@ -112,7 +112,7 @@ let p_BRA_big = EcPath.fromqsymbol (p_BRA, "big")
 let destr_pr_has pr =
   let m = pr.pr_event.m in
   match pr.pr_event.inv.f_node with
-  | Fapp ({ f_node = Fop(op, [ty_elem]) }, [f_f; f_l]) ->
+  | Fapp ({ f_node = Fop(op, [(ty_elem, _)]) }, [f_f; f_l]) ->
       if EcPath.p_equal p_list_has op && not (Mid.mem m f_l.f_fv) then
         Some(ty_elem, {m;inv=f_f}, f_l)
       else None

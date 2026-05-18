@@ -12,9 +12,7 @@ open EcMemory
 type quantif = EcAst.quantif
 
 type hoarecmp = EcAst.hoarecmp
-
-type gty = EcAst.gty
-
+type gty      = EcAst.gty
 type binding  = (EcIdent.t * gty)
 type bindings = binding list
 
@@ -74,7 +72,7 @@ val f_node  : form -> f_node
 
 (* -------------------------------------------------------------------- *)
 (* not recursive *)
-val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
+val f_map  : (ty -> ty) -> (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
 val f_fold : ('a -> form -> 'a) -> 'a -> form -> 'a
 
@@ -96,6 +94,7 @@ val f_glob  : EcIdent.t -> memory -> ss_inv
 
 (* soft-constructors - common formulas constructors *)
 val f_op     : path -> EcTypes.ty list -> EcTypes.ty -> form
+val f_op_tc  : path -> etyarg list -> EcTypes.ty -> form
 val f_app    : form -> form list -> EcTypes.ty -> form
 val f_tuple  : form list -> form
 val f_proj   : form -> int -> EcTypes.ty -> form
@@ -141,6 +140,7 @@ val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
 val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
 
 (* soft-constructors - eager *)
+val f_eagerF_r : eagerF -> form
 val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form
 
 (* soft-constructors - Pr *)
@@ -250,13 +250,13 @@ val destr_forall1  : form -> ident * gty * form
 val destr_exists1  : form -> ident * gty * form
 val destr_lambda1  : form -> ident * gty * form
 
-val destr_op        : form -> EcPath.path * ty list
+val destr_op        : form -> EcPath.path * etyarg list
 val destr_local     : form -> EcIdent.t
 val destr_pvar      : form -> prog_var * memory
 val destr_proj      : form -> form * int
 val destr_tuple     : form -> form list
 val destr_app       : form -> form * form list
-val destr_op_app    : form -> (EcPath.path * ty list) * form list
+val destr_op_app    : form -> (EcPath.path * etyarg list) * form list
 val destr_not       : form -> form
 val destr_nots      : form -> bool * form
 val destr_and       : form -> form * form

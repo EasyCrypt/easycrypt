@@ -8,7 +8,7 @@ open EcEnv
 (* -------------------------------------------------------------------- *)
 type nterror =
 | NTE_Typing        of EcTyping.tyerror
-| NTE_TyNotClosed
+| NTE_TyNotClosed   of EcUnify.uniflags
 | NTE_DupIdent
 | NTE_UnknownBinder of symbol
 | NTE_AbbrevIsVar

@@ -153,7 +153,8 @@ let mk_form = EcAst.mk_form
 let f_node { f_node = form } = form
 
 (* -------------------------------------------------------------------- *)
-let f_op x tys ty = mk_form (Fop (x, tys)) ty
+let f_op x tys ty = mk_form (Fop (x, List.map (fun t -> (t, [])) tys)) ty
+let f_op_tc x tys ty = mk_form (Fop (x, tys)) ty
 
 let f_app f args ty =
   let f, args' =
@@ -463,9 +464,13 @@ let f_map gt g fp =
         (f_pvar id ty' s).inv
 
   | Fop (p, tys) ->
-      let tys' = List.Smart.map gt tys in
+      let tys' =
+        List.Smart.map
+          (fun ((t, w) as ety) ->
+            let t' = gt t in if t == t' then ety else (t', w))
+          tys in
       let ty'  = gt fp.f_ty in
-        f_op p tys' ty'
+        f_op_tc p tys' ty'
 
   | Fapp (f, fs) ->
       let f'  = g f in
@@ -956,7 +961,7 @@ let rec form_of_expr_r ?m (e : expr) =
     end
 
   | Eop (op, tys) ->
-     f_op op tys e.e_ty
+     f_op_tc op tys e.e_ty
 
   | Eapp (ef, es) ->
      f_app (form_of_expr_r ?m ef) (List.map (form_of_expr_r ?m) es) e.e_ty
@@ -1001,7 +1006,7 @@ let expr_of_ss_inv f =
     | Fint   z -> e_int z
     | Flocal x -> e_local x fp.f_ty
 
-    | Fop  (p, tys) -> e_op p tys fp.f_ty
+    | Fop  (p, tys) -> e_op_tc p tys fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
@@ -1043,7 +1048,7 @@ let expr_of_form f =
     | Fint   z -> e_int z
     | Flocal x -> e_local x fp.f_ty
 
-    | Fop  (p, tys) -> e_op p tys fp.f_ty
+    | Fop  (p, tys) -> e_op_tc p tys fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty

@@ -25,7 +25,8 @@ val is_empty : subst -> bool
 (* -------------------------------------------------------------------- *)
 val add_module   : subst -> EcIdent.t -> mpath -> subst
 val add_path     : subst -> src:path -> dst:path -> subst
-val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
+val add_tydef    : subst -> path -> (EcIdent.t list * ty * tcwitness list) -> subst
+val add_tyvar    : subst -> EcIdent.t -> etyarg -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst
 val add_pddef    : subst -> path -> (EcIdent.t list * form) -> subst
 val add_moddef   : subst -> src:path -> dst:mpath -> subst (* Only concrete modules *)
@@ -39,14 +40,15 @@ val rename_flocal : subst -> EcIdent.t -> EcIdent.t -> ty -> subst
 val freshen_type : (ty_params * ty) -> (ty_params * ty)
 
 (* -------------------------------------------------------------------- *)
-val subst_theory    : subst -> theory -> theory
-val subst_ax        : subst -> axiom -> axiom
-val subst_op        : subst -> operator -> operator
-val subst_op_body   : subst -> opbody -> opbody
-val subst_tydecl    : subst -> tydecl -> tydecl
-val subst_theory    : subst -> theory -> theory
-val subst_branches  : subst -> opbranches -> opbranches
-val subst_exception : subst -> exception_ -> exception_
+val subst_theory     : subst -> theory -> theory
+val subst_ax         : subst -> axiom -> axiom
+val subst_op         : subst -> operator -> operator
+val subst_op_body    : subst -> opbody -> opbody
+val subst_tydecl     : subst -> tydecl -> tydecl
+val subst_tc         : subst -> tc_decl -> tc_decl
+val subst_tcinstance : subst -> tcinstance -> tcinstance
+val subst_branches   : subst -> opbranches -> opbranches
+val subst_exception  : subst -> exception_ -> exception_
 
 (* -------------------------------------------------------------------- *)
 val subst_path         : subst -> path  -> path
@@ -65,23 +67,26 @@ val subst_mod_restr    : subst -> mod_restr -> mod_restr
 val subst_oracle_infos : subst -> oracle_infos -> oracle_infos
 
 (* -------------------------------------------------------------------- *)
-val subst_gty   : subst -> gty -> gty
-val subst_genty : subst -> (ty_params * ty) -> (ty_params * ty)
-val subst_ty    : subst -> ty   -> ty
-val subst_form  : subst -> form -> form
-val subst_expr  : subst -> expr -> expr
-val subst_stmt  : subst -> stmt -> stmt
-
-val subst_progvar : subst -> prog_var -> prog_var
-val subst_mem : subst -> EcIdent.t -> EcIdent.t
-val subst_flocal : subst -> form -> form
-val subst_ss_inv : subst -> ss_inv -> ss_inv
-val subst_ts_inv : subst -> ts_inv -> ts_inv
-val subst_inv : subst -> inv -> inv
+val subst_mem     : subst -> EcIdent.t -> EcIdent.t
+val subst_flocal  : subst -> form -> form
+val subst_gty     : subst -> gty -> gty
+val subst_genty   : subst -> (ty_params * ty) -> (ty_params * ty)
+val subst_ty      : subst -> ty   -> ty
+val subst_etyarg  : subst -> etyarg -> etyarg
+val subst_tcw     : subst -> tcwitness -> tcwitness
+val subst_form    : subst -> form -> form
+val subst_expr    : subst -> expr -> expr
+val subst_stmt    : subst -> stmt -> stmt
+val subst_ss_inv  : subst -> ss_inv -> ss_inv
+val subst_ts_inv  : subst -> ts_inv -> ts_inv
+val subst_inv     : subst -> inv -> inv
 
 (* -------------------------------------------------------------------- *)
-val open_oper : operator -> ty list -> ty * operator_kind
-val open_tydecl : tydecl -> ty list -> ty_body
+val open_oper : operator -> etyarg list -> ty * operator_kind
+val open_tydecl : tydecl -> etyarg list -> ty_body
+
+(* -------------------------------------------------------------------- *)
+val fresh_tparams : subst -> ty_params -> subst * ty_params
 
 (* -------------------------------------------------------------------- *)
 val ss_inv_rebind : ss_inv -> memory -> ss_inv

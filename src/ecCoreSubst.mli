@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcUid
 open EcIdent
 open EcPath
 open EcAst
@@ -26,28 +25,33 @@ type 'a subst_binder = f_subst -> 'a -> f_subst * 'a
 (* -------------------------------------------------------------------- *)
 val f_subst_init :
        ?freshen:bool
-    -> ?tu:ty Muid.t
+    -> ?tu:ty TyUni.Muid.t
     -> ?tv:ty Mid.t
+    -> ?tw:tcwitness list Mid.t
+    -> ?tw_uni:tcwitness TcUni.Muid.t
     -> ?esloc:expr Mid.t
     -> unit
     -> f_subst
 
 (* -------------------------------------------------------------------- *)
 module Tuni : sig
-  val univars   : ty -> Suid.t
-  val subst1    : (uid * ty) -> f_subst
-  val subst     : ty Muid.t -> f_subst
-  val subst_dom : ty Muid.t -> dom -> dom
-  val occurs    : uid -> ty -> bool
-  val fv        : ty -> Suid.t
+  val univars   : ty -> TyUni.Suid.t
+  val subst1    : (tyuni * ty) -> f_subst
+  val subst     : ?tw_uni:tcwitness TcUni.Muid.t -> ty TyUni.Muid.t -> f_subst
+  val subst_dom : ty TyUni.Muid.t -> dom -> dom
+  val occurs    : tyuni -> ty -> bool
+  val fv        : ty -> TyUni.Suid.t
 end
 
 (* -------------------------------------------------------------------- *)
 module Tvar : sig
-  val init    : EcIdent.t list -> ty list -> ty Mid.t
-  val subst1  : (EcIdent.t * ty) -> ty -> ty
-  val subst   : ty Mid.t -> ty -> ty
-  val f_subst : freshen:bool -> EcIdent.t list -> ty list -> form -> form
+  val init         : (EcIdent.t * etyarg) list -> etyarg Mid.t
+  val subst1       : (EcIdent.t * etyarg) -> ty -> ty
+  val subst        : etyarg Mid.t -> ty -> ty
+  val subst_etyarg : etyarg Mid.t -> etyarg -> etyarg
+  val subst_tc     : etyarg Mid.t -> typeclass -> typeclass
+
+  val f_subst : freshen:bool -> (EcIdent.t * etyarg) list -> form -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -55,11 +59,11 @@ val add_elocal  : (EcIdent.t * ty) subst_binder
 val add_elocals : (EcIdent.t * ty) list subst_binder
 val bind_elocal : f_subst -> EcIdent.t -> expr -> f_subst
 
-
 (* -------------------------------------------------------------------- *)
-val ty_subst : ty substitute
-val e_subst  : expr substitute
-val s_subst  : stmt substitute
+val ty_subst     : ty substitute
+val etyarg_subst : etyarg substitute
+val e_subst      : expr substitute
+val s_subst      : stmt substitute
 
 (* -------------------------------------------------------------------- *)
 module Fsubst : sig
@@ -68,8 +72,10 @@ module Fsubst : sig
 
   val f_subst_init :
        ?freshen:bool
-    -> ?tu:ty Muid.t
+    -> ?tu:ty TyUni.Muid.t
     -> ?tv:ty Mid.t
+    -> ?tw:tcwitness list Mid.t
+    -> ?tw_uni:tcwitness TcUni.Muid.t
     -> ?esloc:expr Mid.t
     -> unit -> f_subst
 
@@ -85,11 +91,7 @@ module Fsubst : sig
 
   val f_subst_local : EcIdent.t -> form -> form -> form
   val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form
-
-  val f_subst_tvar :
-    freshen:bool ->
-    EcTypes.ty EcIdent.Mid.t ->
-    form -> form
+  val f_subst_tvar  : freshen:bool -> etyarg Mid.t -> form -> form
 
   val add_binding  : binding subst_binder
   val add_bindings : bindings subst_binder

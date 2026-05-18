@@ -23,8 +23,17 @@ type sc_instantiate = {
 (* -------------------------------------------------------------------- *)
 type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
-  fs_u       : ty Muid.t;
+  fs_u       : ty TyUni.Muid.t;
   fs_v       : ty Mid.t;
+  (* Witnesses to use when substituting [TCIAbstract `Var x] for a
+     type variable x that is being replaced by [fs_v]. The list is
+     indexed by witness offset. Empty list / missing key means: leave
+     the witness alone (caller is doing alpha-renaming, not
+     instantiation). *)
+  fs_tw      : tcwitness list Mid.t;
+  (* Resolutions for TCIUni witnesses (typically extracted from the
+     unifier's tcenv.resolution after a matching/unification step). *)
+  fs_tw_uni  : tcwitness TcUni.Muid.t;
   fs_mod     : EcPath.mpath Mid.t;
   fs_modex   : mod_extra Mid.t;
   fs_loc     : form Mid.t;
@@ -56,12 +65,14 @@ let fv_Mid (type a)
 (* -------------------------------------------------------------------- *)
 let f_subst_init
       ?(freshen=false)
-      ?(tu=Muid.empty)
+      ?(tu=TyUni.Muid.empty)
       ?(tv=Mid.empty)
+      ?(tw=Mid.empty)
+      ?(tw_uni=TcUni.Muid.empty)
       ?(esloc=Mid.empty)
       () =
   let fv = Mid.empty in
-  let fv = Muid.fold (fun _ t s -> fv_union s (ty_fv t)) tu fv in
+  let fv = TyUni.Muid.fold (fun _ t s -> fv_union s (ty_fv t)) tu fv in
   let fv = fv_Mid ty_fv tv fv in
   let fv = fv_Mid e_fv esloc fv in
 
@@ -69,6 +80,8 @@ let f_subst_init
     fs_freshen  = freshen;
     fs_u        = tu;
     fs_v        = tv;
+    fs_tw       = tw;
+    fs_tw_uni   = tw_uni;
     fs_mod      = Mid.empty;
     fs_modex    = Mid.empty;
     fs_loc      = Mid.empty;
@@ -158,8 +171,10 @@ let f_rem_mod (s : f_subst) (x : ident) : f_subst =
 (* -------------------------------------------------------------------- *)
 let is_ty_subst_id (s : f_subst) : bool =
      Mid.is_empty s.fs_mod
-  && Muid.is_empty s.fs_u
+  && TyUni.Muid.is_empty s.fs_u
   && Mid.is_empty s.fs_v
+  && Mid.is_empty s.fs_tw
+  && TcUni.Muid.is_empty s.fs_tw_uni
 
 (* -------------------------------------------------------------------- *)
 let rec ty_subst (s : f_subst) (ty : ty) : ty =
@@ -169,7 +184,7 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
     |> Option.map (fun ex -> ex.mex_tglob)
     |> Option.value ~default:ty
   | Tunivar id ->
-       Muid.find_opt id s.fs_u
+       TyUni.Muid.find_opt id s.fs_u
     |> Option.map (ty_subst s)
     |> Option.value ~default:ty
   | Tvar id ->
@@ -180,6 +195,31 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
 (* -------------------------------------------------------------------- *)
 let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
+
+(* -------------------------------------------------------------------- *)
+let rec tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
+  match tcw with
+  | TCIAbstract { support = `Var x; offset; lift } when Mid.mem x s.fs_tw ->
+    let ws = Mid.find x s.fs_tw in
+    if offset < List.length ws then
+      bump_lift lift (tcw_subst s (List.nth ws offset))
+    else
+      tcw
+  | TCIAbstract _ -> tcw
+  | TCIUni (uid, lift) when TcUni.Muid.mem uid s.fs_tw_uni ->
+    bump_lift lift (tcw_subst s (TcUni.Muid.find uid s.fs_tw_uni))
+  | TCIUni _ -> tcw
+  | TCIConcrete c ->
+    let etyargs' = List.Smart.map (etyarg_subst_inner s) c.etyargs in
+    if etyargs' == c.etyargs then tcw
+    else TCIConcrete { c with etyargs = etyargs' }
+
+and etyarg_subst_inner (s : f_subst) ((ty, ws) as e : etyarg) : etyarg =
+  let ty' = ty_subst s ty in
+  let ws' = List.Smart.map (tcw_subst s) ws in
+  if ty == ty' && ws == ws' then e else (ty', ws')
+
+let etyarg_subst (s : f_subst) (e : etyarg) : etyarg = etyarg_subst_inner s e
 
 (* -------------------------------------------------------------------- *)
 let is_e_subst_id (s : f_subst) =
@@ -256,9 +296,9 @@ let rec e_subst (s : f_subst) (e : expr) : expr =
     e_var pv' ty'
 
   | Eop (p, tys) ->
-    let tys' = List.Smart.map (ty_subst s) tys in
+    let tys' = List.Smart.map (etyarg_subst s) tys in
     let ty'  = ty_subst s e.e_ty in
-    e_op p tys' ty'
+    e_op_tc p tys' ty'
 
   | Elet (lp, e1, e2) ->
     let e1' = e_subst s e1 in
@@ -433,8 +473,9 @@ module Fsubst = struct
 
     | Fop (p, tys) ->
       let ty'  = ty_subst s fp.f_ty in
-      let tys' = List.Smart.map (ty_subst s) tys in
-      f_op p tys' ty'
+      let tys' = List.Smart.map (etyarg_subst s) tys in
+      if ty' == fp.f_ty && tys' == tys then fp
+      else f_op_tc p tys' ty'
 
     | Fpvar (pv, m) ->
       let pv' = pv_subst s pv in
@@ -681,57 +722,64 @@ module Fsubst = struct
   let init_subst_tvar ~(freshen : bool) (s : ty Mid.t) : f_subst =
     f_subst_init ~freshen ~tv:s ()
 
-  let f_subst_tvar ~(freshen : bool) (s : ty Mid.t) : form -> form =
-    f_subst (init_subst_tvar ~freshen s)
+  let f_subst_tvar ~(freshen : bool) (s : etyarg Mid.t) : form -> form =
+    let tv = Mid.map fst s in
+    let tw = Mid.map snd s in
+    f_subst (f_subst_init ~freshen ~tv ~tw ())
 end
 
 (* -------------------------------------------------------------------- *)
 module Tuni = struct
-  let subst (uidmap : ty Muid.t) : f_subst =
-    f_subst_init ~tu:uidmap ()
+  let subst ?(tw_uni = TcUni.Muid.empty) (uidmap : ty TyUni.Muid.t) : f_subst =
+    f_subst_init ~tu:uidmap ~tw_uni ()
 
-  let subst1 ((id, t) : uid * ty) : f_subst =
-    subst (Muid.singleton id t)
+  let subst1 ((id, t) : tyuni * ty) : f_subst =
+    subst (TyUni.Muid.singleton id t)
 
-  let subst_dom (uidmap : ty Muid.t) (dom : dom) : dom =
+  let subst_dom (uidmap : ty TyUni.Muid.t) (dom : dom) : dom =
     List.map (ty_subst (subst uidmap)) dom
 
-  let occurs (u : uid) : ty -> bool =
+  let occurs (u : tyuni) : ty -> bool =
     let rec aux t =
       match t.ty_node with
-      | Tunivar u' -> uid_equal u u'
+      | Tunivar u' -> TyUni.uid_equal u u'
       | _ -> ty_sub_exists aux t in
     aux
 
-  let univars : ty -> Suid.t =
+  let univars : ty -> TyUni.Suid.t =
     let rec doit univars t =
       match t.ty_node with
-      | Tunivar uid -> Suid.add uid univars
+      | Tunivar uid -> TyUni.Suid.add uid univars
       | _ -> ty_fold doit univars t
 
-    in fun t -> doit Suid.empty t
+    in fun t -> doit TyUni.Suid.empty t
 
-  let rec fv_rec (fv : Suid.t) (t : ty) : Suid.t =
+  let rec fv_rec (fv : TyUni.Suid.t) (t : ty) : TyUni.Suid.t =
     match t.ty_node with
-    | Tunivar id -> Suid.add id fv
+    | Tunivar id -> TyUni.Suid.add id fv
     | _ -> ty_fold fv_rec fv t
 
-  let fv (ty : ty) : Suid.t =
-    fv_rec Suid.empty ty
+  let fv (ty : ty) : TyUni.Suid.t =
+    fv_rec TyUni.Suid.empty ty
 end
 
 (* -------------------------------------------------------------------- *)
 module Tvar = struct
-  let subst (s : ty Mid.t) (ty : ty) : ty =
-    ty_subst { f_subst_id with fs_v = s } ty
+  let subst (s : etyarg Mid.t) (ty : ty) : ty =
+    ty_subst { f_subst_id with fs_v = Mid.map fst s } ty
 
-  let subst1 ((id, t) : ebinding) (ty : ty) : ty =
+  let subst1 ((id, t) : EcIdent.t * etyarg) (ty : ty) : ty =
     subst (Mid.singleton id t) ty
 
-  let init (lv : ident list) (lt : ty list) : ty Mid.t =
-    assert (List.length lv = List.length lt);
-    List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty lv lt
+  let init (l : (EcIdent.t * etyarg) list) : etyarg Mid.t =
+    List.fold_left (fun s (v, t) -> Mid.add v t s) Mid.empty l
 
-  let f_subst ~(freshen : bool) (lv : ident list) (lt : ty list) : form -> form =
-    Fsubst.f_subst_tvar ~freshen (init lv lt)
+  let subst_etyarg (s : etyarg Mid.t) ((ty, w) : etyarg) : etyarg =
+    (subst s ty, w)
+
+  let subst_tc (s : etyarg Mid.t) (tc : typeclass) : typeclass =
+    { tc with tc_args = List.map (subst_etyarg s) tc.tc_args }
+
+  let f_subst ~(freshen : bool) (l : (EcIdent.t * etyarg) list) : form -> form =
+    Fsubst.f_subst_tvar ~freshen (init l)
 end

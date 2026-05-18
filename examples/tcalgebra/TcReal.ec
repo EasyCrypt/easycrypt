@@ -1,0 +1,70 @@
+pragma +implicits.
+
+(* -------------------------------------------------------------------- *)
+require import Core.
+require import TcMonoid TcRing TcNumber.
+require import Real.
+require CoreReal.
+
+(* ==================================================================== *)
+(* Canonical [real] instance for the [TcMonoid] / [TcRing] hierarchy.
+   Mirrors [theories/datatypes/Real.ec:RField] (a [Ring.Field] clone in
+   the legacy world). The TC declaration synthesises the comring /
+   idomain / addgroup / addmonoid / mulmonoid / monoid ancestors along
+   the way so a single [instance field] is enough.                     *)
+(* ==================================================================== *)
+
+(* -------------------------------------------------------------------- *)
+instance idomain with real reducible
+  op zero  = 0%r
+  op (+)   = CoreReal.add
+  op [-]   = CoreReal.opp
+  op oner  = 1%r
+  op ( * ) = CoreReal.mul
+  op invr  = CoreReal.inv
+  op unit  = (fun x => x <> 0%r)
+
+  proof mopA<:addmonoid>  by smt()
+  proof mopC<:addmonoid>  by smt()
+  proof mop0<:addmonoid>  by smt()
+  proof addrN             by smt()
+  proof oner_neq0         by smt()
+  proof mopA<:mulmonoid>  by smt()
+  proof mopC<:mulmonoid>  by smt()
+  proof mop0<:mulmonoid>  by smt()
+  proof mulrDl            by smt()
+  proof mulVr             by smt()
+  proof unitP             by smt()
+  proof unitout           by smt(invr0)
+  proof mulf_eq0          by smt().
+
+(* -------------------------------------------------------------------- *)
+(* Order and field structure on top of [idomain with real]. Mirrors
+   [theories/algebra/StdOrder.ec:RealOrder] and the [Number.RealField]
+   level of the legacy hierarchy. *)
+op real_norm = Real."`|_|".
+op real_le   = CoreReal.le.
+op real_lt   = CoreReal.lt.
+op real_min  = fun (x y : real) => if x <= y then x else y.
+op real_max  = fun (x y : real) => if y <= x then x else y.
+
+instance tcrealdomain with real reducible
+  op "`|_|" = real_norm
+  op (<=)   = real_le
+  op (<)    = real_lt
+  op minr   = real_min
+  op maxr   = real_max
+
+  proof ler_norm_add   by smt()
+  proof addr_gt0       by smt()
+  proof norm_eq0       by smt()
+  proof ger_leVge      by smt()
+  proof normrM         by smt()
+  proof ler_def        by smt()
+  proof ltr_def        by smt()
+  proof real_axiom     by smt()
+  proof minrE          by smt()
+  proof maxrE          by smt().
+
+instance tcrealfield with real reducible
+  proof unitfP by smt().

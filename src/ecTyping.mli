@@ -14,7 +14,7 @@ open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
-  | `Op   of EcPath.path * EcTypes.ty list
+  | `Op   of EcPath.path * EcTypes.etyarg list
   | `Lc   of EcIdent.t
   | `Var  of EcTypes.prog_var
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg
@@ -23,7 +23,7 @@ type opmatch = [
 type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 
 
-type 'a suboreq       = [`Eq of 'a | `Sub of 'a ]
+type 'a suboreq = [`Eq of 'a | `Sub of 'a ]
 
 type mismatch_funsig =
 | MF_targs  of ty * ty                               (* expected, got *)
@@ -120,7 +120,7 @@ type goal_shape_error =
 
 type tyerror =
 | UniVarNotAllowed
-| FreeTypeVariables
+| FreeUniVariables       of EcUnify.uniflags
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed    of symbol option
 | NoConcreteAnonParams
@@ -147,6 +147,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
 | TypeClassMismatch
+| TypeClassAmbiguous     of typeclass * EcPath.path list
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
 | NotAnInductive
@@ -180,6 +181,8 @@ type tyerror =
 | ModuleNotAbstract      of symbol
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
+| TCArgsCountMismatch    of qsymbol * ty_params * ty list
+| CannotInferTC          of ty * typeclass
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
@@ -202,6 +205,9 @@ val tp_relax   : typolicy
 val tp_nothing : typolicy
 
 (* -------------------------------------------------------------------- *)
+val transtc:
+  env -> EcUnify.unienv -> ptcparam -> typeclass
+
 val transtyvars:
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
