@@ -22,19 +22,19 @@ declare type c <: comring.
 type prepoly = int -> c.
 
 op ispoly (p : prepoly) =
-     (forall i, i < 0 => p i = zero<:c>)
-  /\ (exists d, forall i, d < i => p i = zero<:c>).
+     (forall i, i < 0 => p i = zeror<:c>)
+  /\ (exists d, forall i, d < i => p i = zeror<:c>).
 
 subtype poly = { p : prepoly | ispoly p }
   rename "to_poly", "of_poly".
 
 realize inhabited.
-proof. by exists (fun _ => zero<:c>). qed.
+proof. by exists (fun _ => zeror<:c>). qed.
 
 (* -------------------------------------------------------------------- *)
 op "_.[_]" (p : poly) (i : int) = (of_poly p) i.
 
-lemma lt0_coeff p i : i < 0 => p.[i] = zero<:c>.
+lemma lt0_coeff p i : i < 0 => p.[i] = zeror<:c>.
 proof.
 by move=> lt0_i; rewrite /"_.[_]"; case: (of_polyP p) => /(_ _ lt0_i).
 qed.
@@ -43,12 +43,12 @@ qed.
 (* Degree machinery                                                    *)
 (* -------------------------------------------------------------------- *)
 op deg (p : poly) =
-  argmin idfun (fun i => forall j, i <= j => p.[j] = zero<:c>).
+  argmin idfun (fun i => forall j, i <= j => p.[j] = zeror<:c>).
 
 lemma degP p i :
      0 < i
-  => p.[i-1] <> zero<:c>
-  => (forall j, i <= j => p.[j] = zero<:c>)
+  => p.[i-1] <> zeror<:c>
+  => (forall j, i <= j => p.[j] = zeror<:c>)
   => deg p = i.
 proof.
 move=> ge0_i nz_p_iB1 degi @/deg; apply: argmin_eq => /=.
@@ -58,15 +58,15 @@ by exists (i-1); apply/negP => /(_ _); first by move=> /#.
 qed.
 
 lemma deg_leP p i : 0 <= i =>
-  (forall j, i <= j => p.[j] = zero<:c>) => deg p <= i.
+  (forall j, i <= j => p.[j] = zeror<:c>) => deg p <= i.
 proof.
 move=> ge0_i; apply: contraLR; rewrite lerNgt /= => lei.
 by have @{1}/deg /argmin_min /=: 0 <= i < deg p by done.
 qed.
 
-lemma gedeg_coeff (p : poly) (i : int) : deg p <= i => p.[i] = zero<:c>.
+lemma gedeg_coeff (p : poly) (i : int) : deg p <= i => p.[i] = zeror<:c>.
 proof.
-move=> le_p_i; pose P p i := forall j, i <= j => p.[j] = zero<:c>.
+move=> le_p_i; pose P p i := forall j, i <= j => p.[j] = zeror<:c>.
 case: (of_polyP p) => [_ [d hd]]; move: (argminP idfun (P p)).
 move/(_ (max (d+1) 0) _ _) => /=; first exact: maxrr.
 - by move=> j le_d_j; apply: hd => /#.
@@ -82,8 +82,8 @@ abbrev lc (p : poly) = p.[deg p - 1].
 (* -------------------------------------------------------------------- *)
 (* prepoly-level constructors                                           *)
 (* -------------------------------------------------------------------- *)
-op prepolyC  (a   : c   ) : prepoly = fun i => if i = 0 then a else zero<:c>.
-op prepolyXn (k   : int ) : prepoly = fun i => if 0 <= k /\ i = k then oner<:c> else zero<:c>.
+op prepolyC  (a   : c   ) : prepoly = fun i => if i = 0 then a else zeror<:c>.
+op prepolyXn (k   : int ) : prepoly = fun i => if 0 <= k /\ i = k then oner<:c> else zeror<:c>.
 op prepolyD  (p q : poly) : prepoly = fun i => p.[i] + q.[i].
 op prepolyN  (p   : poly) : prepoly = fun i => - p.[i].
 
@@ -125,7 +125,7 @@ lemma ispolyM (p q : poly) : ispoly (prepolyM p q).
 proof.
 split => @/prepolyM [c' lt0_c|]; 1: by rewrite big_geq //#.
 exists (deg p + deg q + 1) => c' ltc; rewrite big_seq big1 //= => i.
-rewrite mem_range => -[gt0_i lt_ic]; case: (p.[i] = zero<:c>).
+rewrite mem_range => -[gt0_i lt_ic]; case: (p.[i] = zeror<:c>).
 - by move=> ->; rewrite mul0r.
 move/(contra _ _ (gedeg_coeff p i)); rewrite lerNgt /= => lt_ip.
 by rewrite mulrC gedeg_coeff ?mul0r //#.
@@ -154,7 +154,7 @@ op polyD  p q = to_polyd (prepolyD  p q).
 op polyM  p q = to_polyd (prepolyM p q).
 op polyZ  z p = to_polyd (prepolyZ z p).
 
-abbrev poly0  : poly = polyC  zero<:c>.
+abbrev poly0  : poly = polyC  zeror<:c>.
 abbrev poly1  : poly = polyC  oner<:c>.
 abbrev polyX  : poly = polyXn 1.
 abbrev X      : poly = polyXn 1.
@@ -171,13 +171,13 @@ abbrev ( - ) (p q : poly) : poly = p + (-q).
 lemma coeffE p k : ispoly p => (to_polyd p).[k] = p k.
 proof. by move=> ?; rewrite /"_.[_]" to_polydK. qed.
 
-lemma polyCE a k : (polyC a).[k] = if k = 0 then a else zero<:c>.
+lemma polyCE a k : (polyC a).[k] = if k = 0 then a else zeror<:c>.
 proof. by rewrite coeffE 1:ispolyC. qed.
 
-lemma polyXE k : X.[k] = if k = 1 then oner<:c> else zero<:c>.
+lemma polyXE k : X.[k] = if k = 1 then oner<:c> else zeror<:c>.
 proof. by rewrite coeffE 1:ispolyXn. qed.
 
-lemma poly0E k : poly0.[k] = zero<:c>.
+lemma poly0E k : poly0.[k] = zeror<:c>.
 proof. by rewrite polyCE if_same. qed.
 
 lemma polyNE p k : (-p).[k] = - p.[k].
@@ -251,7 +251,7 @@ proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE addNr. qed.
 (* -------------------------------------------------------------------- *)
 (* Scaling lemmas                                                       *)
 (* -------------------------------------------------------------------- *)
-lemma scale0p p : zero<:c> ** p = poly0.
+lemma scale0p p : zeror<:c> ** p = poly0.
 proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE mul0r. qed.
 
 lemma scalep0 a : a ** poly0 = poly0.
@@ -388,7 +388,7 @@ end section.
 (* Wrappers needed by [instance]: its [op X = name] clause requires a *)
 (* qualified ident on the rhs (not an [abbrev]).                        *)
 (* -------------------------------------------------------------------- *)
-op poly_zero ['c <: comring] : 'c poly = polyC zero<:'c>.
+op poly_zero ['c <: comring] : 'c poly = polyC zeror<:'c>.
 op poly_one  ['c <: comring] : 'c poly = polyC oner<:'c>.
 
 (* ==================================================================== *)
@@ -397,7 +397,7 @@ op poly_one  ['c <: comring] : 'c poly = polyC oner<:'c>.
 (* polymorphic over [addmonoid] applies at carrier ['c poly].           *)
 (* ==================================================================== *)
 instance addgroup with ['c <: comring] ('c poly)
-  op zero  = poly_zero<:'c>
+  op zeror  = poly_zero<:'c>
   op (+)   = polyD<:'c>
   op [-]   = polyN<:'c>
 
@@ -410,7 +410,7 @@ instance addgroup with ['c <: comring] ('c poly)
 (* Phase 5: register [poly] as a [comring] over a [comring] coefficient.*)
 (* Mirrors [Ring.ec:ComRingDflInv]: when no structural inverse is       *)
 (* available (here, because the structural "constant with invertible    *)
-(* coefficient" characterisation only holds when [c] has no zero        *)
+(* coefficient" characterisation only holds when [c] has no zeror        *)
 (* divisors, i.e. [c : idomain]), use [choiceb] to pick a left inverse  *)
 (* if any exists, fall back to the element itself otherwise. The three  *)
 (* obligations [mulVr] / [unitP] / [unitout] discharge from [choicebP]  *)
@@ -423,7 +423,7 @@ op poly_invr ['c <: comring] (p : 'c poly) : 'c poly =
   choiceb (fun q => polyM q p = poly_one<:'c>) p.
 
 instance comring with ['c <: comring] ('c poly)
-  op zero  = poly_zero<:'c>
+  op zeror  = poly_zero<:'c>
   op (+)   = polyD<:'c>
   op [-]   = polyN<:'c>
   op oner  = poly_one<:'c>
@@ -459,9 +459,9 @@ declare type c <: comring.
 (* -------------------------------------------------------------------- *)
 (* Degree of constants, leading coefficient, [poly0]/[poly1] degrees.  *)
 (* -------------------------------------------------------------------- *)
-lemma degC (a : c) : deg (polyC a) = if a = zero<:c> then 0 else 1.
+lemma degC (a : c) : deg (polyC a) = if a = zeror<:c> then 0 else 1.
 proof.
-case: (a = zero<:c>) => [->|nz_a]; last first.
+case: (a = zeror<:c>) => [->|nz_a]; last first.
 - apply: degP => //=; first by rewrite polyCE.
   by move=> i ge1_i; rewrite polyCE gtr_eqF //#.
 rewrite /deg; apply: argmin_eq => //=.
@@ -470,12 +470,12 @@ rewrite /deg; apply: argmin_eq => //=.
 qed.
 
 lemma degC_le (a : c) : deg (polyC a) <= 1.
-proof. by rewrite degC; case: (a = zero<:c>). qed.
+proof. by rewrite degC; case: (a = zeror<:c>). qed.
 
 lemma lcC (a : c) : lc (polyC a) = a.
-proof. by rewrite polyCE degC; case: (a = zero<:c>) => [->|]. qed.
+proof. by rewrite polyCE degC; case: (a = zeror<:c>) => [->|]. qed.
 
-lemma lc0 : lc poly0<:c> = zero<:c>.
+lemma lc0 : lc poly0<:c> = zeror<:c>.
 proof. by apply: lcC. qed.
 
 lemma lc1 : lc poly1<:c> = oner<:c>.
@@ -516,11 +516,11 @@ lemma deg_gt0 (p : c poly) : (0 < deg p) <=> (p <> poly0).
 proof. by rewrite -deg_ge1 /#. qed.
 
 lemma deg_eq1 (p : c poly) :
-  (deg p = 1) <=> (exists a, a <> zero<:c> /\ p = polyC a).
+  (deg p = 1) <=> (exists a, a <> zeror<:c> /\ p = polyC a).
 proof.
 split=> [eq1_degp|[a [nz_a ->>]]]; last first.
 + by apply: degP => //= => [|i ge1_i]; rewrite polyCE //= gtr_eqF /#.
-have pC: forall i, 1 <= i => p.[i] = zero<:c>.
+have pC: forall i, 1 <= i => p.[i] = zeror<:c>.
 + by move=> i ge1_i; apply: gedeg_coeff; rewrite eq1_degp.
 exists p.[0]; split; last first.
 + apply/poly_eqP => i /ler_eqVlt -[<<-|]; first by rewrite polyCE.
@@ -530,11 +530,11 @@ apply/poly_eqP=> i; rewrite poly0E => /ler_eqVlt [<<-//|].
 by move=> gt0_i; apply: pC => /#.
 qed.
 
-lemma lc_eq0 (p : c poly) : (lc p = zero<:c>) <=> (p = poly0).
+lemma lc_eq0 (p : c poly) : (lc p = zeror<:c>) <=> (p = poly0).
 proof.
 case: (p = poly0) => [->|] /=; first by rewrite lc0.
 rewrite -deg_eq0 eqr_le ge0_deg /= -ltrNge => gt0_deg.
-pose P i := forall j, (i <= j)%Int => p.[j] = zero<:c>.
+pose P i := forall j, (i <= j)%Int => p.[j] = zeror<:c>.
 apply/negP => zp; have h: 0 <= deg p - 1 < argmin idfun P.
 + rewrite /P /argmin -/(deg p); smt(ge0_deg<:c>).
 have := argmin_min idfun P (deg p - 1) h.
@@ -623,7 +623,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma degM_proper (p q : c poly) :
-  lc p * lc q <> zero<:c> => deg (p * q) = (deg p + deg q) - 1.
+  lc p * lc q <> zeror<:c> => deg (p * q) = (deg p + deg q) - 1.
 proof.
 case: (p = poly0) => [->|nz_p]; first by rewrite lc0 !mul0r.
 case: (q = poly0) => [->|nz_q]; first by rewrite lc0 !mulr0.
@@ -637,13 +637,13 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma lcM_proper (p q : c poly) :
-  lc p * lc q <> zero<:c> => lc (p * q) = lc p * lc q.
+  lc p * lc q <> zeror<:c> => lc (p * q) = lc p * lc q.
 proof. by move=> reg; rewrite degM_proper //= -mul_lc. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma degZ_le (a : c) (p : c poly) : deg (a ** p) <= deg p.
 proof.
-case: (a = zero<:c>) => [->|nz_a]; 1: by rewrite scale0p deg0 ge0_deg.
+case: (a = zeror<:c>) => [->|nz_a]; 1: by rewrite scale0p deg0 ge0_deg.
 case: (p = poly0) => [->|nz_p]; 1: by rewrite scalep0 deg0.
 have nz_cp : polyC a <> poly0.
 - by apply/negP => /(congr1 deg); rewrite deg0 degC nz_a.
@@ -740,7 +740,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma polyXnE i k :
-  0 <= i => (exp X<:c> i).[k] = if k = i then oner<:c> else zero<:c>.
+  0 <= i => (exp X<:c> i).[k] = if k = i then oner<:c> else zeror<:c>.
 proof.
 move=> ge0_i; elim: i ge0_i k => [|i ge0_i ih] k.
 - by rewrite expr0 polyCE.
@@ -801,12 +801,12 @@ qed.
 op peval (p : c poly) (a : c) =
   bigiA<:c> predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
 
-abbrev root (p : c poly) (a : c) = peval p a = zero<:c>.
+abbrev root (p : c poly) (a : c) = peval p a = zeror<:c>.
 
 (* -------------------------------------------------------------------- *)
 (* polyL: build a polynomial from a coefficient list.                   *)
 (* -------------------------------------------------------------------- *)
-op prepolyL (a : c list) : int -> c = fun i => nth zero<:c> a i.
+op prepolyL (a : c list) : int -> c = fun i => nth zeror<:c> a i.
 
 lemma isprepolyL a : ispoly (prepolyL a).
 proof.
@@ -817,7 +817,7 @@ qed.
 
 op polyL (a : c list) : c poly = to_polyd (prepolyL a).
 
-lemma polyLE a i : (polyL a).[i] = nth zero<:c> a i.
+lemma polyLE a i : (polyL a).[i] = nth zeror<:c> a i.
 proof. by rewrite coeffE 1:isprepolyL. qed.
 
 lemma degL_le a : deg (polyL a) <= size a.
@@ -827,7 +827,7 @@ by move=> i gei; rewrite polyLE nth_out //#.
 qed.
 
 lemma degL a :
-  last zero<:c> a <> zero<:c> => deg (polyL a) = size a.
+  last zeror<:c> a <> zeror<:c> => deg (polyL a) = size a.
 proof.
 move=> nz; apply/degP.
 - by case: a nz => //= x s _; rewrite addrC ltzS size_ge0.
@@ -839,7 +839,7 @@ qed.
 lemma inj_polyL a1 a2 :
   size a1 = size a2 => polyL a1 = polyL a2 => a1 = a2.
 proof.
-move=> eq_sz /poly_eqP eq; apply: (eq_from_nth zero<:c>)=> //.
+move=> eq_sz /poly_eqP eq; apply: (eq_from_nth zeror<:c>)=> //.
 by move=> i [+ _] - /eq; rewrite !polyLE.
 qed.
 
@@ -859,7 +859,7 @@ end section.
 (* ==================================================================== *)
 (* Phase 7: idomain extension. Mirrors [theories/algebra/Poly.ec:Poly]   *)
 (* (the idomain-coefficient phase). Adds the multiplicativity of [deg]   *)
-(* and [lc], the no-zero-divisor property, and the structural            *)
+(* and [lc], the no-zeror-divisor property, and the structural            *)
 (* characterisation lemmas [unitE]/[polyVE] bridging the choiceb-based   *)
 (* [poly_unit]/[poly_invr] (committed at Phase 5) to the structural      *)
 (* "deg=1 with invertible constant" form available when [c : idomain].   *)
@@ -885,7 +885,7 @@ by rewrite lcM_proper // mulf_eq0 !lc_eq0 !(nz_p, nz_q).
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* No zero divisors at the poly level (the [mulf_eq0] axiom one would    *)
+(* No zeror divisors at the poly level (the [mulf_eq0] axiom one would    *)
 (* need to register [idomain with ('c poly)]).                           *)
 (* -------------------------------------------------------------------- *)
 lemma polyM_mulf_eq0 (p q : c poly) :
@@ -957,7 +957,7 @@ have ex_q : exists q, polyM q (polyC a) = poly_one<:c>.
 have := choicebP (fun q => polyM q (polyC a) = poly_one<:c>) (polyC a) ex_q.
 move=> /= choice_eq.
 (* Both [choiceb …] and [polyC (invr a)] are left inverses of [polyC a];
-   uniqueness via no-zero-divisors yields equality.                    *)
+   uniqueness via no-zeror-divisors yields equality.                    *)
 pose q := choiceb (fun q => polyM q (polyC a) = poly_one<:c>) (polyC a).
 have qE : polyM q (polyC a) = poly_one<:c> by exact choice_eq.
 apply/poly_eqP=> i ge0_i.
@@ -972,7 +972,7 @@ have polyC_invr_eq : polyM (polyC (invr a)) (polyC a) = poly_one<:c>.
 have eq2 : polyM q (polyC a) = polyM (polyC (invr a)) (polyC a)
   by rewrite qE -polyC_invr_eq.
 (* Cancel [polyC a] on the right: it has [unit] coeff, so it's [lreg]. *)
-have nz_a : a <> zero<:c>.
+have nz_a : a <> zeror<:c>.
 - apply/negP=> a0; have h := mulVr a ua; rewrite a0 mulr0 in h.
   by move: h => /eq_sym; smt(oner_neq0<:c>).
 have lreg_pCa : lreg (polyC a).

@@ -16,7 +16,7 @@ require CoreReal.
 
 (* -------------------------------------------------------------------- *)
 instance idomain with real reducible
-  op zero  = 0%r
+  op zeror  = 0%r
   op (+)   = CoreReal.add
   op [-]   = CoreReal.opp
   op oner  = 1%r

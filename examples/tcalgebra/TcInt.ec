@@ -22,7 +22,7 @@ op int_invr (z : int) : int  = z.
    with int] — declaring both would create duplicate comring witnesses
    for [int] and break op-name resolution downstream.                  *)
 instance idomain with int reducible
-  op zero  = 0
+  op zeror  = 0
   op (+)   = CoreInt.add
   op [-]   = CoreInt.opp
   op oner  = 1

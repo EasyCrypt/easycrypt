@@ -163,11 +163,11 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* [comring] is the right level: [zmod] is commutative and has the      *)
 (* abstract [unit]/[inv] machinery via [choiceb], but it's not an       *)
-(* [idomain] for non-prime [p] (zero divisors exist). Field instance    *)
+(* [idomain] for non-prime [p] (zeror divisors exist). Field instance    *)
 (* lives in [ZModField] below.                                          *)
 (* -------------------------------------------------------------------- *)
 instance comring with zmod
-  op zero  = (inzmod 0)
+  op zeror  = (inzmod 0)
   op (+)   = zmod_add
   op [-]   = zmod_opp
   op oner  = (inzmod 1)

@@ -41,17 +41,17 @@ qed.
 end section.
 
 (* ==================================================================== *)
-(* Additive flavor of [monoid]. Renames [idm]/[mop] to [zero]/[(+)] at
+(* Additive flavor of [monoid]. Renames [idm]/[mop] to [zeror]/[(+)] at
    every [addmonoid] carrier. Below, section lemmas re-export the
    monoid lemmas under [add]-prefixed names; because [`a <: addmonoid]
    has exactly one [monoid] view, [mopA]/[mopC]/[mop0]/[mop0m]/...
    resolve unambiguously here without explicit selectors.              *)
 (* ==================================================================== *)
-type class addmonoid <: (monoid with idm = zero, mop = (+)) = {}.
+type class addmonoid <: (monoid with idm = zeror, mop = (+)) = {}.
 
 (* Manual abbrevs replace the auto-imported renamed ops. *)
 abbrev (+)  ['a <: addmonoid] = mop<:'a>.
-abbrev zero ['a <: addmonoid] = idm<:'a>.
+abbrev zeror ['a <: addmonoid] = idm<:'a>.
 
 section.
 declare type t <: addmonoid.
@@ -62,10 +62,10 @@ proof. by apply: mopA. qed.
 lemma addmC: commutative (+)<:t>.
 proof. by apply: mopC. qed.
 
-lemma add0m: left_id zero<:t> (+).
+lemma add0m: left_id zeror<:t> (+).
 proof. by apply: mop0. qed.
 
-lemma addm0: right_id zero<:t> (+).
+lemma addm0: right_id zeror<:t> (+).
 proof. by apply: mop0m. qed.
 
 lemma addmCA: left_commutative (+)<:t>.

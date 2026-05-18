@@ -11,7 +11,7 @@ require import TcMonoid.
 type class addgroup <: addmonoid = {
   op [-] : addgroup -> addgroup
 
-  axiom addrN : right_inverse zero<:addgroup> [-] (+)<:addgroup>
+  axiom addrN : right_inverse zeror<:addgroup> [-] (+)<:addgroup>
 }.
 
 (* -------------------------------------------------------------------- *)
@@ -26,18 +26,18 @@ proof. exact addmA. qed.
 lemma addrC: commutative (+)<:t>.
 proof. exact addmC. qed.
 
-lemma add0r: left_id zero<:t> (+)<:t>.
+lemma add0r: left_id zeror<:t> (+)<:t>.
 proof. exact add0m. qed.
 
 (* The original [Ring.ec] takes [addNr] as the additive group axiom and
    derives [addrN] from it; here we take [addrN] (right inverse) and
    derive [addNr] (left inverse) instead. *)
-lemma addNr: left_inverse zero<:t> [-] (+)<:t>.
+lemma addNr: left_inverse zeror<:t> [-] (+)<:t>.
 proof. by move=> x; rewrite addrC addrN. qed.
 
 abbrev (-) (x y : t) = x + -y.
 
-lemma addr0: right_id zero<:t> (+).
+lemma addr0: right_id zeror<:t> (+).
 proof. exact addm0. qed.
 
 lemma addrCA: left_commutative (+)<:t>.
@@ -49,7 +49,7 @@ proof. exact addmAC. qed.
 lemma addrACA: interchange (+)<:t> (+).
 proof. exact addmACA. qed.
 
-lemma subrr (x : t): x - x = zero.
+lemma subrr (x : t): x - x = zeror.
 proof. by rewrite addrN. qed.
 
 hint simplify subrr.
@@ -81,16 +81,16 @@ proof. by move=> x; apply (@addIr (-x)); rewrite addNr addrN. qed.
 lemma oppr_inj : injective ([-]<:t>).
 proof. by move=> x y eq; apply/(addIr (-x)); rewrite subrr eq subrr. qed.
 
-lemma oppr0 : -zero<:t> = zero.
-proof. by rewrite -(@addr0 (-zero)) addNr. qed.
+lemma oppr0 : -zeror<:t> = zeror.
+proof. by rewrite -(@addr0 (-zeror)) addNr. qed.
 
-lemma oppr_eq0 (x : t) : (- x = zero) <=> (x = zero).
+lemma oppr_eq0 (x : t) : (- x = zeror) <=> (x = zeror).
 proof. by rewrite (inv_eq opprK) oppr0. qed.
 
-lemma subr0 (x : t): x - zero = x.
+lemma subr0 (x : t): x - zeror = x.
 proof. by rewrite oppr0 addr0. qed.
 
-lemma sub0r (x : t): zero - x = - x.
+lemma sub0r (x : t): zeror - x = - x.
 proof. by rewrite add0r. qed.
 
 lemma opprD (x y : t): -(x + y) = -x + -y.
@@ -110,10 +110,10 @@ move: (can2_eq (fun x, x - z) (fun x, x + z) _ _ x y) => //=.
 + by move=> {x} x /=; rewrite addrK.
 qed.
 
-lemma subr_eq0 (x y : t): (x - y = zero) <=> (x = y).
+lemma subr_eq0 (x y : t): (x - y = zeror) <=> (x = y).
 proof. by rewrite subr_eq add0r. qed.
 
-lemma addr_eq0 (x y : t): (x + y = zero) <=> (x = -y).
+lemma addr_eq0 (x y : t): (x + y = zeror) <=> (x = -y).
 proof. by rewrite -(@subr_eq0 x) opprK. qed.
 
 lemma eqr_opp (x y : t): (- x = - y) <=> (x = y).
@@ -138,18 +138,18 @@ end section.
    characterizing ring exponents.                                       *)
 op intmul ['a <: addgroup] (x : 'a) (n : int) =
   if n < 0
-  then -(iterop (-n) (+) x zero)
-  else  (iterop   n  (+) x zero).
+  then -(iterop (-n) (+) x zeror)
+  else  (iterop   n  (+) x zeror).
 
 (* -------------------------------------------------------------------- *)
 section.
 declare type t <: addgroup.
 
 lemma intmulpE (x : t) (c : int) : 0 <= c =>
-  intmul x c = iterop c (+) x zero.
+  intmul x c = iterop c (+) x zeror.
 proof. by rewrite /intmul lezNgt => ->. qed.
 
-lemma mulr0z (x : t): intmul x 0 = zero.
+lemma mulr0z (x : t): intmul x 0 = zeror.
 proof. by rewrite /intmul /= iterop0. qed.
 
 lemma mulr1z (x : t): intmul x 1 = x.
@@ -215,7 +215,7 @@ end section.
 (* ==================================================================== *)
 type class comring <: addgroup & mulmonoid = {
   (* Additive structure inherited from [addgroup -> addmonoid ->
-     (monoid with idm = zero, mop = (+))].
+     (monoid with idm = zeror, mop = (+))].
      Multiplicative structure inherited from
      [mulmonoid -> (monoid with idm = oner, mop = ( * ))].
      The monoid axioms [mopA] / [mopC] / [mop0] are obligations of
@@ -225,7 +225,7 @@ type class comring <: addgroup & mulmonoid = {
   op invr  : comring -> comring
   op unit  : comring -> bool
 
-  axiom oner_neq0 : oner <> zero<:comring>
+  axiom oner_neq0 : oner <> zeror<:comring>
   axiom mulrDl    : left_distributive ( * ) (+)<:comring>
   axiom mulVr     : left_inverse_in unit oner invr ( * )
   axiom unitP     : forall (x y : comring), y * x = oner => unit x
@@ -269,10 +269,10 @@ proof. by rewrite mulrDl mul1r. qed.
 lemma mulrDr: right_distributive ( * )<:t> (+).
 proof. by move=> x y z; rewrite mulrC mulrDl !(@mulrC _ x). qed.
 
-lemma mul0r: left_zero zero<:t> ( * ).
+lemma mul0r: left_zero zeror<:t> ( * ).
 proof. by move=> x; apply: (@addIr (oner * x)); rewrite -mulrDl !add0r mul1r. qed.
 
-lemma mulr0: right_zero zero<:t> ( * ).
+lemma mulr0: right_zero zeror<:t> ( * ).
 proof. by move=> x; apply: (@addIr (x * oner)); rewrite -mulrDr !add0r mulr1. qed.
 
 lemma mulrN (x y : t): x * (- y) = - (x * y).
@@ -362,10 +362,10 @@ proof. by rewrite mul1r. qed.
 lemma divr1 (x : t) : x / oner = x.
 proof. by rewrite invr1 mulr1. qed.
 
-lemma unitr0: !unit zero<:t>.
+lemma unitr0: !unit zeror<:t>.
 proof. by apply/negP=> /unitrP [y]; rewrite mulr0 eq_sym oner_neq0. qed.
 
-lemma invr0: invr zero<:t> = zero.
+lemma invr0: invr zeror<:t> = zeror.
 proof. by rewrite invr_out ?unitr0. qed.
 
 lemma unitrN1: unit<:t> (-oner).
@@ -413,13 +413,13 @@ case: (unit x) => ux; last by rewrite !invr_out ?unitrN.
 by rewrite -mulN1r invrM ?unitrN1 // invrN1 mulrN1.
 qed.
 
-lemma invr_neq0 (x : t) : x <> zero => invr x <> zero.
+lemma invr_neq0 (x : t) : x <> zeror => invr x <> zeror.
 proof.
 move=> nx0; case: (unit x)=> Ux; last by rewrite invr_out ?Ux.
 by apply/negP=> x'0; move: Ux; rewrite -unitrV x'0 unitr0.
 qed.
 
-lemma invr_eq0 (x : t) : (invr x = zero) <=> (x = zero).
+lemma invr_eq0 (x : t) : (invr x = zeror) <=> (x = zeror).
 proof. by apply/iff_negb; split=> /invr_neq0; rewrite ?invrK. qed.
 
 lemma invr_eq1 (x : t) : (invr x = oner) <=> (x = oner).
@@ -435,7 +435,7 @@ op ofint ['a <: comring] (n : int) : 'a = intmul oner n.
 section.
 declare type t <: comring.
 
-lemma ofint0 : ofint<:t> 0 = zero.
+lemma ofint0 : ofint<:t> 0 = zeror.
 proof. by apply/mulr0z. qed.
 
 lemma ofint1 : ofint<:t> 1 = oner.
@@ -475,7 +475,7 @@ case: (lezWP 0 z)=> [|_] le; first by rewrite mulrnAr.
 by rewrite -oppzK mulrNz mulrN mulrnAr -?mulrNz // oppz_ge0.
 qed.
 
-lemma mul1r0z (x : t) : x * ofint 0 = zero.
+lemma mul1r0z (x : t) : x * ofint 0 = zeror.
 proof. by rewrite ofint0 mulr0. qed.
 
 lemma mul1r1z (x : t) : x * ofint 1 = x.
@@ -631,13 +631,13 @@ elim/natind: n => [|n hn ih hm _]; 1: smt (expr0).
 by rewrite mulzDr exprS //= mulrC exprD_nneg 1:/# 1:// ih.
 qed.
 
-lemma expr0n (n : int) : 0 <= n => exp zero<:t> n = if n = 0 then oner else zero.
+lemma expr0n (n : int) : 0 <= n => exp zeror<:t> n = if n = 0 then oner else zeror.
 proof.
 elim: n => [|n ge0_n _]; first by rewrite expr0.
 by rewrite exprS // mul0r addz1_neq0.
 qed.
 
-lemma expr0z (z : int) : exp zero<:t> z = if z = 0 then oner else zero.
+lemma expr0z (z : int) : exp zeror<:t> z = if z = 0 then oner else zeror.
 proof.
 case: (0 <= z) => [/expr0n // | /ltzNge lt0_z].
 rewrite -{1}(@oppzK z) exprN; have ->/=: z <> 0 by smt().
@@ -687,17 +687,17 @@ qed.
    injective. *)
 op lreg ['a <: comring] (x : 'a) = injective (fun y => x * y).
 
-lemma mulrI_eq0 (x y : t) : lreg x => (x * y = zero) <=> (y = zero).
+lemma mulrI_eq0 (x y : t) : lreg x => (x * y = zeror) <=> (y = zeror).
 proof. by move=> reg_x; rewrite -{1}(mulr0 x) (inj_eq reg_x). qed.
 
-lemma lreg_neq0 (x : t) : lreg x => x <> zero.
+lemma lreg_neq0 (x : t) : lreg x => x <> zeror.
 proof.
-apply/contraL=> ->; apply/negP => /(_ zero oner).
+apply/contraL=> ->; apply/negP => /(_ zeror oner).
 by rewrite (@eq_sym _ oner) oner_neq0 /= !mul0r.
 qed.
 
 lemma mulrI0_lreg (x : t) :
-  (forall y, x * y = zero => y = zero) => lreg x.
+  (forall y, x * y = zeror => y = zeror) => lreg x.
 proof.
 by move=> reg_x y z eq; rewrite -subr_eq0 &(reg_x) mulrBr eq subrr.
 qed.
@@ -754,7 +754,7 @@ type class boolring <: comring = {
 section.
 declare type t <: boolring.
 
-lemma addrr (x : t): x + x = zero.
+lemma addrr (x : t): x + x = zeror.
 proof.
 apply (@addrI (x + x)); rewrite addr0 -{1 2 3 4}[x]mulrr.
 by rewrite -mulrDr -mulrDl mulrr.
@@ -766,22 +766,22 @@ proof. by rewrite -[x]opprK -addr_eq0 opprK addrr. qed.
 end section.
 
 (* ==================================================================== *)
-(* Integral domain: commutative ring with no zero divisors. *)
+(* Integral domain: commutative ring with no zeror divisors. *)
 (* ==================================================================== *)
 type class idomain <: comring = {
   axiom mulf_eq0 :
-    forall (x y : idomain), x * y = zero<:idomain> <=> x = zero \/ y = zero
+    forall (x y : idomain), x * y = zeror<:idomain> <=> x = zeror \/ y = zeror
 }.
 
 (* -------------------------------------------------------------------- *)
 section.
 declare type t <: idomain.
 
-lemma mulf_neq0 (x y : t) : x <> zero => y <> zero => x * y <> zero.
+lemma mulf_neq0 (x y : t) : x <> zeror => y <> zeror => x * y <> zeror.
 proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0 /#. qed.
 
 lemma expf_eq0 (x : t) (n : int) :
-  (exp x n = zero) <=> (n <> 0 /\ x = zero).
+  (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
 proof.
 elim/intwlog: n => [n| |n ge0_n ih].
 + by rewrite exprN invr_eq0 /#.
@@ -789,19 +789,19 @@ elim/intwlog: n => [n| |n ge0_n ih].
 by rewrite exprS // mulf_eq0 ih addz1_neq0 ?andKb.
 qed.
 
-lemma mulfI (x : t) : x <> zero => injective (( * ) x).
+lemma mulfI (x : t) : x <> zeror => injective (( * ) x).
 proof.
 move=> ne0_x y y'; rewrite -(opprK (x * y')) -mulrN -addr_eq0.
 by rewrite -mulrDr mulf_eq0 ne0_x /= addr_eq0 opprK.
 qed.
 
-lemma mulIf (x : t) : x <> zero => injective (fun y => y * x).
+lemma mulIf (x : t) : x <> zeror => injective (fun y => y * x).
 proof. by move=> nz_x y z; rewrite -!(@mulrC x); exact: mulfI. qed.
 
 lemma sqrf_eq1 (x : t) : (exp x 2 = oner) <=> (x = oner \/ x = -oner).
 proof. by rewrite -subr_eq0 subr_sqr_1 mulf_eq0 subr_eq0 addr_eq0. qed.
 
-lemma lregP (x : t) : lreg x <=> x <> zero.
+lemma lregP (x : t) : lreg x <=> x <> zeror.
 proof. by split=> [/lreg_neq0//|/mulfI]. qed.
 
 lemma eqr_div (x1 y1 x2 y2 : t) : unit y1 => unit y2 =>
@@ -818,39 +818,39 @@ qed.
 end section.
 
 (* ==================================================================== *)
-(* Field: integral domain where every non-zero element is a unit.
+(* Field: integral domain where every non-zeror element is a unit.
    The original [Ring.ec] field redefines [unit] via clone-substitution
    (`pred unit x <= x <> zeror`); here we keep [unit] as the inherited
    predicate and add the equivalence as an axiom of [field].          *)
 (* ==================================================================== *)
 type class field <: idomain = {
-  axiom unitfP : forall (x : field), unit x <=> x <> zero<:field>
+  axiom unitfP : forall (x : field), unit x <=> x <> zeror<:field>
 }.
 
 (* -------------------------------------------------------------------- *)
 section.
 declare type t <: field.
 
-lemma mulfV (x : t) : x <> zero => x * (invr x) = oner.
+lemma mulfV (x : t) : x <> zeror => x * (invr x) = oner.
 proof. by move=> nz_x; apply/mulrV/unitfP. qed.
 
-lemma mulVf (x : t) : x <> zero => (invr x) * x = oner.
+lemma mulVf (x : t) : x <> zeror => (invr x) * x = oner.
 proof. by move=> nz_x; apply/mulVr/unitfP. qed.
 
-lemma divff (x : t) : x <> zero => x / x = oner.
+lemma divff (x : t) : x <> zeror => x / x = oner.
 proof. by move=> nz_x; apply/divrr/unitfP. qed.
 
 lemma invfM (x y : t) : invr (x * y) = invr x * invr y.
 proof.
-case: (x = zero) => [->|nz_x]; first by rewrite !(mul0r, invr0).
-case: (y = zero) => [->|nz_y]; first by rewrite !(mulr0, invr0).
+case: (x = zeror) => [->|nz_x]; first by rewrite !(mul0r, invr0).
+case: (y = zeror) => [->|nz_y]; first by rewrite !(mulr0, invr0).
 by rewrite invrM ?unitfP // mulrC.
 qed.
 
 lemma invf_div (x y : t) : invr (x / y) = y / x.
 proof. by rewrite invfM invrK mulrC. qed.
 
-lemma eqf_div (x1 y1 x2 y2 : t) : y1 <> zero => y2 <> zero =>
+lemma eqf_div (x1 y1 x2 y2 : t) : y1 <> zeror => y2 <> zeror =>
   (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
 proof. by move=> nz_y1 nz_y2; apply: eqr_div; apply/unitfP. qed.
 
@@ -881,8 +881,8 @@ declare axiom f_is_additive : additive f.
 lemma raddfB (x y : t1) : f (x - y) = f x - f y.
 proof. by apply/f_is_additive. qed.
 
-lemma raddf0 : f zero<:t1> = zero<:t2>.
-proof. by rewrite -(@subr0 zero<:t1>) raddfB subrr. qed.
+lemma raddf0 : f zeror<:t1> = zeror<:t2>.
+proof. by rewrite -(@subr0 zeror<:t1>) raddfB subrr. qed.
 
 lemma raddfN (x : t1) : f (- x) = - (f x).
 proof. by rewrite -(@sub0r x) raddfB raddf0 sub0r. qed.
