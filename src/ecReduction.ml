@@ -774,8 +774,15 @@ let reduce_user_gen simplify ri env hyps f =
   oget ~exn:needsubterm (List.Exceptionless.find_map (fun rule ->
 
     try
-      let ue  = EcUnify.UniEnv.create None in
+      let goal_tparams = (EcEnv.LDecl.tohyps hyps).EcBaseLogic.h_tvar in
+      let ue  =
+        EcUnify.UniEnv.create
+          (if goal_tparams = [] then None else Some goal_tparams) in
       let tvi = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
+      let tvi_fsub =
+        EcCoreSubst.f_subst_init
+          ~tv:(Mid.map fst tvi.subst)
+          ~tw:(Mid.map snd tvi.subst) () in
 
       let check_alpha_eq f f' =
         if not (is_alpha_eq hyps f f') then raise NotReducible
@@ -793,7 +800,7 @@ let reduce_user_gen simplify ri env hyps f =
         | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
-          let tys' = List.map (Tvar.subst_etyarg tvi.subst) tys' in
+          let tys' = List.map (EcCoreSubst.etyarg_subst tvi_fsub) tys' in
 
           begin
             try
@@ -819,6 +826,8 @@ let reduce_user_gen simplify ri env hyps f =
         | _ -> raise NotReducible in
 
       doit f rule.R.rl_ptn;
+
+      EcUnify.UniEnv.flush_tc_problems env ue;
 
       if not (EcUnify.UniEnv.closed ue) then
         raise NotReducible;
