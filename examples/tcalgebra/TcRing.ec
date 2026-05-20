@@ -132,6 +132,8 @@ lemma subr_add2r (z x y : t): (x + z) - (y + z) = x - y.
 proof. by rewrite opprD addrACA addrN addr0. qed.
 end section.
 
+hint simplify subrr.
+
 (* -------------------------------------------------------------------- *)
 (* [intmul x n] is [n] copies of [x] folded with [+]; for negative [n]
    it is [-(intmul x (-n))]. Foundational for [ofint] and for
