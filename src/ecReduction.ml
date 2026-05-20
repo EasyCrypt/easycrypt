@@ -834,7 +834,8 @@ let reduce_user_gen simplify ri env hyps f =
 
       let subst f =
         let uidmap = EcUnify.UniEnv.assubst ue in
-        let ts = Tuni.subst uidmap in
+        let tw_uni = EcUnify.UniEnv.tw_assubst ue in
+        let ts = Tuni.subst ~tw_uni uidmap in
 
         let subst   = ts in
         let subst   =
