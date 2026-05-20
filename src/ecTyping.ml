@@ -3241,7 +3241,9 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
          let do1 = function
           | GVvar x ->
-              let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+              let ml, mr = match (EcEnv.Memory.get_active_ts env) with
+              | Some (ml, mr) -> ml, mr
+              | None -> tyerror f.pl_loc env (UnexpectedGoalShape GSE_ExpectedTwoSided) in
               let x1 = lookup ml (qual (om |> omap fst) x) in
               let x2 = lookup mr (qual (om |> omap snd) x) in
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
