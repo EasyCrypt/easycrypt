@@ -854,6 +854,70 @@ apply/poly_eqP=> i ge0_i; rewrite polyLE; case: (i < n).
   by rewrite nth_out // size_map size_range /#.
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma finite_for_poly_ledeg n p s :
+     is_finite_for p s
+  => is_finite_for
+       (fun q => deg q <= max 0 n /\ (forall i, 0 <= i < n => p q.[i]))
+       (map polyL (alltuples n s)).
+proof.
+move=> ^[uq hmem] /finite_for_list /(_ n) [usq hmems]; split.
+- rewrite map_inj_in_uniq // => xs ys
+    /alltuplesP [szxs memxs] /alltuplesP [szys memys].
+  by apply: inj_polyL; rewrite szxs szys.
+move=> q; split=> [/mapP[xs [/alltuplesP [szxs memxs ->]]]|].
+- rewrite (ler_trans (size xs)) ?szxs //= => [|i [ge0_i lei]].
+  - by rewrite -szxs; apply: degL_le.
+  - by rewrite polyLE &(all_nthP) -1:/#; move/(eq_all _ _ _ hmem): memxs.
+case=> ledeg memp; apply/mapP; pose xs :=  map (fun i => q.[i]) (range 0 n).
+exists xs; split; first (apply/alltuplesP; split).
+- by rewrite size_map size_range.
+- apply/(all_nthP _ _ zeror<:c>) => i [ge0_i +]; rewrite hmem.
+  rewrite size_map size_range /= => lei.
+  move/(_ i _): memp; first (split=> // _; 1: move=> /#).
+  by rewrite (nth_map 0) ?size_range //= nth_range //#.
+- apply/poly_eqP=> c0 ge0_c0; rewrite polyLE; case: (c0 < n).
+  - move=> lt_cn; rewrite (nth_map 0) ?size_range ?nth_range //#.
+  - rewrite ltrNge /= => le_nc; rewrite gedeg_coeff // 1:/#.
+  by rewrite nth_out // size_map size_range /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op dpoly (n : int) (d : c distr) =
+  dmap (dlist d n) polyL.
+
+lemma supp_dpoly n d p : 0 <= n =>
+      p \in dpoly n d
+  <=> (deg p <= n /\ forall i, 0 <= i < n => p.[i] \in d).
+proof. move=> ge0_n; split.
+- case/supp_dmap=> xs [/(supp_dlist _ _ _ ge0_n)].
+  case=> ^szxs <- /allP hcf ->; rewrite degL_le /=.
+  by move=> i [ge0_i lei]; rewrite polyLE; apply/hcf/mem_nth.
+- case=> degp hcf; apply/supp_dmap; case: (surj_polyL _ _ degp).
+  move=> xs [^szxs <- ^pE ->]; exists xs => //=; apply/supp_dlist => /=.
+  - by apply/size_ge0.
+  apply/allP=> c0 ^c0_in_xs /(nth_index zeror<:c>) <-.
+  rewrite -polyLE -pE; apply/hcf; rewrite index_ge0 /=.
+  by rewrite -szxs index_mem c0_in_xs.
+qed.
+
+lemma dpoly_ll n d : is_lossless d => is_lossless (dpoly n d).
+proof. by move=> d_ll; apply/dmap_ll/dlist_ll. qed.
+
+lemma dpoly_fu n d : 0 <= n => is_full d =>
+  forall (p : c poly), deg p <= n => p \in dpoly n d.
+proof.
+move=> ge0_n d_fu p /surj_polyL[xs [szxs ->>]].
+apply/dmap_supp/supp_dlist => //; rewrite szxs /=.
+by apply/allP=> x _; apply/d_fu.
+qed.
+
+lemma dpoly_uni n d : 0 <= n => is_uniform d => is_uniform (dpoly n d).
+proof.
+move=> ge0_n d_uni; apply/dmap_uni_in_inj/dlist_uni/d_uni.
+by move=> xs ys xs_d ys_d; rewrite &(inj_polyL) !(supp_dlist_size d n).
+qed.
+
 end section.
 
 (* ==================================================================== *)
