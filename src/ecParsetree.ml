@@ -1160,8 +1160,9 @@ type paxiom = {
 
 (* -------------------------------------------------------------------- *)
 type prealize = {
-  pr_name  : pqsymbol;
-  pr_proof : (ptactics option) option;
+  pr_name   : pqsymbol;
+  pr_labels : psymbol list option;
+  pr_proof  : (ptactics option) option;
 }
 
 (* -------------------------------------------------------------------- *)

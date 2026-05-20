@@ -3832,14 +3832,18 @@ clone_override:
    { (x, PTHO_Theory (y, unloc mode, odfl [] renames)) }
 
 realize:
-| REALIZE x=qident
-    {  { pr_name = x; pr_proof = None; } }
+| REALIZE x=qident lbls=ioption(realize_labels)
+    {  { pr_name = x; pr_labels = lbls; pr_proof = None; } }
 
-| REALIZE x=qident BY t=tactics
-    {  { pr_name = x; pr_proof = Some (Some t); } }
+| REALIZE x=qident lbls=ioption(realize_labels) BY t=tactics
+    {  { pr_name = x; pr_labels = lbls; pr_proof = Some (Some t); } }
 
-| REALIZE x=qident BY bracket(empty)
-    {  { pr_name = x; pr_proof = Some None; } }
+| REALIZE x=qident lbls=ioption(realize_labels) BY bracket(empty)
+    {  { pr_name = x; pr_labels = lbls; pr_proof = Some None; } }
+
+realize_labels:
+| LTCOLON lbls=plist1(ident, SLASH) GT
+    { lbls }
 
 
 (* -------------------------------------------------------------------- *)

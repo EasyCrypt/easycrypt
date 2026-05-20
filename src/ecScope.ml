@@ -1109,9 +1109,64 @@ module Ax = struct
     check_state `InProof "activate" scope;
 
     let loc = rl.pl_loc and rl = rl.pl_desc in
-    let qn  = EcPath.fromqsymbol (unloc rl.pr_name) in
-
+    (* Build the path. When labels are provided, search the pending
+       obligation list for an obligation whose effective name matches
+       [bare<:l1/l2/...>] where [l1; l2; ...] is a contiguous
+       sub-sequence of the obligation's labels. Mirrors the
+       sub-sequence matching used by inline [proof X<:Lbl> by Y] in
+       [check_tci_axioms]. *)
     let puc = oget scope.sc_pr_uc in
+    let qn  =
+      let (prefix, name) = unloc rl.pr_name in
+      match rl.pr_labels with
+      | None | Some [] -> EcPath.fromqsymbol (prefix, name)
+      | Some _ when prefix <> [] ->
+        (* Labelled realize only supported for unqualified names. *)
+        hierror ~loc
+          "labelled `realize` requires an unqualified obligation name, \
+           got `%s.%s'"
+          (String.concat "." prefix) name
+      | Some lbls ->
+        let qual = List.map unloc lbls in
+        let labels_match (labels : string list) =
+          let qlen = List.length qual in
+          let llen = List.length labels in
+          let rec scan i =
+            if i + qlen > llen then false
+            else
+              let slice =
+                List.filteri (fun j _ -> j >= i && j < i + qlen) labels in
+              if slice = qual then true else scan (i + 1)
+          in qlen = 0 || scan 0 in
+        let parse_eff (eff : string) : (string * string list) option =
+          (* Split [n<:l1/l2/...>] into [(n, [l1; l2; ...])]. Returns
+             [None] for un-labelled names. *)
+          try
+            let i = String.index eff '<' in
+            if i + 1 >= String.length eff || eff.[i + 1] <> ':' then None
+            else
+              let n = String.sub eff 0 i in
+              let inner = String.sub eff (i + 2) (String.length eff - i - 3) in
+              Some (n, String.split_on_char '/' inner)
+          with Not_found -> None in
+        let candidates =
+          List.filter (fun (((_, _), p, _) : _ * EcPath.path * _) ->
+            match parse_eff (EcPath.basename p) with
+            | Some (n, ls) -> n = name && labels_match ls
+            | None -> false)
+            (fst puc.puc_cont)
+        in
+        match candidates with
+        | [] ->
+          hierror ~loc "no obligation matching `%s<:%s>'"
+            name (String.concat "/" qual)
+        | [(((_, _), p, _))] -> p
+        | _ ->
+          hierror ~loc
+            "ambiguous label qualifier for `%s': matches multiple \
+             obligations. Try a longer label path." name
+    in
+
     let _ =
       match puc.puc_active with
       | Some _ -> hierror "a lemma is already active"
