@@ -2306,7 +2306,7 @@ module Ty = struct
 
     let carrier =
       let ue = EcUnify.UniEnv.create None in
-      transty tp_tydecl env ue subtype.pst_carrier in
+      transty tp_nothing env ue subtype.pst_carrier in
 
     let pred =
       let x = EcIdent.create (fst subtype.pst_pred).pl_desc in
@@ -2316,6 +2316,10 @@ module Ty = struct
       if not (EcUnify.UniEnv.closed ue) then
         hierror ~loc:(snd subtype.pst_pred).pl_loc
           "the predicate contains free type variables";
+      if EcUnify.UniEnv.tparams ue <> [] then
+        hierror ~loc:(snd subtype.pst_pred).pl_loc
+          "Polymorphic predicates are not allowed. \
+           Use clones if you want to make a polymorphic subtype.";
       let uidmap = EcUnify.UniEnv.close ue in
       let fs = Tuni.subst uidmap in
       f_lambda [(x, GTty carrier)] (Fsubst.f_subst fs pred) in
