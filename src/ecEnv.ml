@@ -2796,21 +2796,42 @@ module Op = struct
        type-class information from the witness. *)
     let _, (_, tcw) = List.betail tys in
 
-    let finalise (tci_target : tcinstance) (symbols : form Mstr.t) : form =
+    let finalise ?(bridging : int list = [])
+        (tci_target : tcinstance) (symbols : form Mstr.t) : form =
       let body = Mstr.find opname symbols in
+      (* When [resolve_lifted]'s walk transitioned through chain entries
+         registered at a different tparam context than the use site
+         (e.g. an existing comring instance reused while resolving an
+         idomain-context obligation), [bridging] holds the parent-index
+         path from the use-site bound to the target's bound. The
+         target's body uses [AbsV('c, off=k, lift)] meaning "'c's k-th
+         bound at target context, then walk [lift]". At use site that
+         means "'c's k-th bound at use-site, then walk [bridging], then
+         walk [lift]". We achieve this semantics by encoding [bridging]
+         into the etyarg's tcwitnesses BEFORE building the
+         substitution: the lookup of body's [AbsV('c, off=k, lift)]
+         then yields [bump_lift lift (AbsV('c, off=k, bridging))] =
+         [AbsV('c, off=k, bridging @ lift)], exactly the desired
+         use-site walk.                                                *)
+      let tciargs =
+        match tcw with
+        | [TCIConcrete { etyargs; _ }] -> etyargs
+        | _ -> []
+      in
+      let tciargs =
+        if bridging = [] then tciargs
+        else
+          List.map (fun (ty, ws) ->
+            (ty, List.map (EcAst.bump_lift bridging) ws))
+            tciargs
+      in
       let subst =
         List.fold_left
           (fun subst (a, ety) ->
             let ety = EcSubst.subst_etyarg subst ety in
             EcSubst.add_tyvar subst a ety)
           EcSubst.empty
-          (List.combine
-             (List.map fst tci_target.tci_params)
-             (let tciargs =
-                match tcw with
-                | [TCIConcrete { etyargs; _ }] -> etyargs
-                | _ -> []
-              in tciargs))
+          (List.combine (List.map fst tci_target.tci_params) tciargs)
       in EcSubst.subst_form subst body
     in
 
@@ -2833,19 +2854,36 @@ module Op = struct
       let resolve_lifted () =
         if lift = [] then None
         else
-          let rec walk tci = function
-            | [] -> Some tci
+          (* [bridging] accumulates the parent-index of each step that
+             crosses from one tparam context to a different one (e.g.
+             an idomain-context instance reusing an existing
+             comring-context chain entry). Passed to [finalise] so the
+             target body's witnesses can be re-encoded at the use-site
+             context. *)
+          let tc_name_eq (a : typeclass) (b : typeclass) =
+            EcPath.p_equal a.tc_name b.tc_name in
+          let same_bounds tci_a tci_b =
+            List.length tci_a.tci_params = List.length tci_b.tci_params
+            && List.for_all2 (fun (_, tcs_a) (_, tcs_b) ->
+                  List.length tcs_a = List.length tcs_b
+                  && List.for_all2 tc_name_eq tcs_a tcs_b)
+                 tci_a.tci_params tci_b.tci_params in
+          let rec walk tci bridging = function
+            | [] -> Some (tci, bridging)
             | i :: rest ->
               match List.nth_opt tci.tci_parents i with
               | None -> None
               | Some parent_path ->
                 let parent_tci = TcInstance.by_path parent_path env in
-                walk parent_tci rest
+                let bridging =
+                  if same_bounds tci parent_tci then bridging
+                  else bridging @ [i] in
+                walk parent_tci bridging rest
           in
-          match walk tci lift with
-          | Some target_tci -> begin
+          match walk tci [] lift with
+          | Some (target_tci, bridging) -> begin
             match target_tci.tci_instance with
-            | `General (_, Some sym) -> Some (target_tci, sym)
+            | `General (_, Some sym) -> Some (target_tci, sym, bridging)
             | _ -> None
             end
           | None ->
@@ -2882,17 +2920,17 @@ module Op = struct
                     | `General (tgp', Some sym)
                       when EcPath.p_equal tgp'.tc_name target.tc_name
                         && EcTypes.ty_equal tci_existing.tci_type carrier ->
-                        Some (tci_existing, sym)
+                        Some (tci_existing, sym, [])
                     | _ -> None)
                   None (TcInstance.get_all env)
               end
             | _ -> None in
 
       match resolve_lifted () with
-      | Some (tci_target, symbols) ->
+      | Some (tci_target, symbols, bridging) ->
         if strict && not tci_target.tci_reducible then
           raise NotReducible;
-        finalise tci_target symbols
+        finalise ~bridging tci_target symbols
       | None ->
         match tci.tci_instance with
         | `General (_, Some symbols) ->

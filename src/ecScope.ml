@@ -2777,6 +2777,96 @@ module Ty = struct
     (* Build a substitution mapping every op-ident along the chain to its
        chosen realisation on [ty]. For each ancestor the renaming maps
        its op names to local op names (via [lookup_ren ren]). *)
+    (* Compose two renamings (matches the version in [ecTypeClass.ml]
+       which is used to build the chain). [outer] is declared on the
+       parent edge; [inner] is the cumulative renaming on this entry.
+       Result maps grandparent op names to local op names. *)
+    let compose_ren ~outer ~inner =
+      let inner_map = Mstr.of_list inner in
+      let from_outer =
+        List.map
+          (fun (gp_name, p_name) ->
+            let c_name = odfl p_name (Mstr.find_opt p_name inner_map) in
+            (gp_name, c_name))
+          outer in
+      let outer_p_names =
+        List.fold_left (fun s (_, p) -> Sstr.add p s) Sstr.empty outer in
+      let outer_gp_names =
+        List.fold_left (fun s (gp, _) -> Sstr.add gp s) Sstr.empty outer in
+      let from_inner =
+        List.filter_map
+          (fun (p_name, c_name) ->
+            if Sstr.mem p_name outer_p_names || Sstr.mem p_name outer_gp_names
+            then None
+            else Some (p_name, c_name))
+          inner in
+      from_outer @ from_inner in
+    let ren_eq r1 r2 =
+      List.length r1 = List.length r2
+      && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in
+    (* For each chain entry idx, compute the bridging lift from the
+       user's tparam context (= chain_decls[0]'s context, always
+       [fst ty]) to chain_decls[idx]'s tparam context. Bridging
+       accumulates ONLY context-changing parent-index steps: a step
+       from chain entry i to its parent j is context-changing if the
+       parent's tparam bound list (taken from the existing reused
+       instance, or [fst ty] if fresh) differs from i's tparam bound
+       list. Used to bake a bridging lift into [self_etyargs] for
+       REUSED chain entries so the obligation form's witnesses are
+       re-encoded to walk from the use-site bound down to the
+       reused entry's bound. *)
+    let bridging =
+      let n = List.length chain_decls in
+      let bridging = Array.make n [] in
+      let visited = Array.make n false in
+      let queue = Queue.create () in
+      Queue.add 0 queue;
+      visited.(0) <- true;
+      let chain_arr = Array.of_list chain_decls in
+      (* Tparam bound list of chain entry [idx]. Reused entries
+         expose the existing instance's bounds; fresh entries use the
+         user's bounds [fst ty]. *)
+      let tparams_of idx =
+        let path_opt, inst_path = List.nth chain_paths_pre idx in
+        match path_opt with
+        | Some _ -> fst ty
+        | None ->
+          let tci_existing =
+            EcEnv.TcInstance.by_path inst_path (env scope) in
+          tci_existing.EcTheory.tci_params in
+      let tc_name_eq (a : typeclass) (b : typeclass) =
+        EcPath.p_equal a.tc_name b.tc_name in
+      let same_bounds e c =
+        List.length e = List.length c
+        && List.for_all2 (fun (_, tcs_e) (_, tcs_c) ->
+              List.length tcs_e = List.length tcs_c
+              && List.for_all2 tc_name_eq tcs_e tcs_c)
+             e c in
+      while not (Queue.is_empty queue) do
+        let idx = Queue.pop queue in
+        let (_, anc_decl, ren, _) = chain_arr.(idx) in
+        List.iteri (fun parent_idx (p_tc, _, p_ren) ->
+          let target_ren = compose_ren ~outer:p_ren ~inner:ren in
+          let rec find i =
+            if i >= n then None
+            else
+              let (a, _, r, _) = chain_arr.(i) in
+              if EcPath.p_equal a.EcAst.tc_name p_tc.EcAst.tc_name
+                 && ren_eq r target_ren
+              then Some i
+              else find (i + 1) in
+          match find 0 with
+          | Some j when not visited.(j) ->
+            visited.(j) <- true;
+            let extra =
+              if same_bounds (tparams_of idx) (tparams_of j)
+              then [] else [parent_idx] in
+            bridging.(j) <- bridging.(idx) @ extra;
+            Queue.add j queue
+          | _ -> ())
+          anc_decl.tc_prts
+      done;
+      bridging in
     let subst, _ =
       (* The chain may contain entries sharing a TC name (under
          different renamings). [add_tydef] asserts no double-binding,
@@ -2795,21 +2885,50 @@ module Ty = struct
                  its pre-computed path. The [`Abs] case of
                  [subst_tcw] then bumps the body's lift onto this
                  concrete witness, walking [tci_parents] correctly. *)
-              let _, inst_path = List.nth chain_paths_pre idx in
+              let name_opt, inst_path = List.nth chain_paths_pre idx in
               (* For parametric carriers ([instance C with ['a <: …] (T 'a)]),
                  the chain instance is registered with the same tparams as the
                  user's instance. Its witness must therefore re-apply those
                  tparams as etyargs (each carrying its own abstract TC
                  witnesses), not [], or [tc_reduce] will hit a
                  [tci_params]/[etyargs] length mismatch when the instance is
-                 later consulted via this witness.                          *)
+                 later consulted via this witness.
+
+                 When this chain entry is REUSED (the existing instance
+                 was registered at a different tparam context), the
+                 [bridging] path from the user's instance class down to
+                 the reused entry is baked into each witness's [lift]
+                 so that the body's [AbsV('c, off=k, lift_body)] later
+                 resolves to [AbsV('c, off=k, bridging @ lift_body)] at
+                 substitution time, encoding the use-site walk through
+                 the parent chain.                                       *)
+              let entry_bridging =
+                match name_opt with
+                | Some _ -> []  (* fresh entry: no bridging needed *)
+                | None ->
+                  (* Reused: bridge only if the existing instance was
+                     registered at a different tparam bound list than
+                     the user's current instance. *)
+                  let tci_existing =
+                    EcEnv.TcInstance.by_path inst_path (env scope) in
+                  let tc_name_eq (a : typeclass) (b : typeclass) =
+                    EcPath.p_equal a.tc_name b.tc_name in
+                  let same_bounds =
+                    let e = tci_existing.EcTheory.tci_params in
+                    let c = fst ty in
+                    List.length e = List.length c
+                    && List.for_all2 (fun (_, tcs_e) (_, tcs_c) ->
+                          List.length tcs_e = List.length tcs_c
+                          && List.for_all2 tc_name_eq tcs_e tcs_c)
+                         e c in
+                  if same_bounds then [] else bridging.(idx) in
               let self_etyargs =
                 List.map
                   (fun (x, tcs) ->
                     let tcws =
                       List.mapi (fun i _ ->
                         EcAst.TCIAbstract {
-                          support = `Var x; offset = i; lift = [];
+                          support = `Var x; offset = i; lift = entry_bridging;
                         }) tcs
                     in (EcTypes.tvar x, tcws))
                   (fst ty) in
@@ -2839,30 +2958,8 @@ module Ty = struct
     (* Compose two renamings (matches the version in [ecTypeClass.ml]
        which is used to build the chain). [outer] is declared on the
        parent edge; [inner] is the cumulative renaming on this entry.
-       Result maps grandparent op names to local op names. *)
-    let compose_ren ~outer ~inner =
-      let inner_map = Mstr.of_list inner in
-      let from_outer =
-        List.map
-          (fun (gp_name, p_name) ->
-            let c_name = odfl p_name (Mstr.find_opt p_name inner_map) in
-            (gp_name, c_name))
-          outer in
-      let outer_p_names =
-        List.fold_left (fun s (_, p) -> Sstr.add p s) Sstr.empty outer in
-      let outer_gp_names =
-        List.fold_left (fun s (gp, _) -> Sstr.add gp s) Sstr.empty outer in
-      let from_inner =
-        List.filter_map
-          (fun (p_name, c_name) ->
-            if Sstr.mem p_name outer_p_names || Sstr.mem p_name outer_gp_names
-            then None
-            else Some (p_name, c_name))
-          inner in
-      from_outer @ from_inner in
-    let ren_eq r1 r2 =
-      List.length r1 = List.length r2
-      && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in
+       Result maps grandparent op names to local op names. [compose_ren]
+       and [ren_eq] are defined earlier in this function. *)
 
     (* Build one [tcinstance] record per chain entry in REVERSE BFS order
        (leaves before children) — same order the registration loop used
