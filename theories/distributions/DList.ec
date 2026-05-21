@@ -174,7 +174,7 @@ lemma dlist_fu (d: 'a distr) (xs:'a list):
   xs \in dlist d (size xs).
 proof.
 move=> fu; rewrite /support dlist1E 1:size_ge0 /=.
-by apply Bigreal.prodr_gt0_seq => /= a Hin _; apply fu.
+by apply Bigreal.prodr_gt0_seq => /= a Hin;apply fu.
 qed.
 
 lemma dlist_uni (d:'a distr) n :
@@ -273,9 +273,9 @@ rewrite -big_filter (eq_big_perm _ _ _ (elems I ++ elems J)) ?big_cat.
   + rewrite cat_uniq !uniq_elems => />; apply/hasPn; smt().
   + by rewrite mem_filter mem_range mem_cat -!memE in_fsetU /#.
 rewrite big_seq_cond (eq_bigr _ _ (fun _ => mu d p)) -?big_seq_cond.
-  move => i; rewrite /= /q -memE => -[iI _]; apply mu_eq => /#.
+  move => i; rewrite /= /q -memE => iI; apply mu_eq => /#.
 rewrite mulr_const big_seq_cond (eq_bigr _ _ (fun _ => mu d (predC p))) -?big_seq_cond.
-  move => i; rewrite /= /q -memE => -[iI _]; apply mu_eq => /#.
+  move => i; rewrite /= /q -memE => iI; apply mu_eq => /#.
 by rewrite mulr_const /card.
 qed.
 

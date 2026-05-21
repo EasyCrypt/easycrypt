@@ -222,7 +222,7 @@ move=> rg_p; have h := sum_iexpr_le p n rg_p.
 rewrite &(RealOrder.ler_pdivl_mulr) -1:mulrC //.
 - by rewrite RealOrder.expr_gt0 /#.
 rewrite &(RealOrder.ler_trans _ _ _ _ h) RealOrder.lerr_eq.
-by congr; apply: BRA.eq_bigr => /= i _; rewrite ofintR.
+by congr; apply: BRA.eq_bigr => /= i; rewrite ofintR.
 qed.
 
 end Bigreal.

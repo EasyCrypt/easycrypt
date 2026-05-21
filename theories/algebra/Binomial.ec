@@ -213,6 +213,6 @@ lemma binomial (x y : real) n : 0 <= n => (x + y) ^ n =
   Bigreal.BRA.bigi predT (fun i => (bin n i)%r * (x ^ i * y ^ (n - i))) 0 (n + 1).
 proof.
 move=> ge0_n; have := binomial_r x y n ge0_n => ->.
-by apply: Bigreal.BRA.eq_bigr=> /= k _; rewrite intmulr mulrC mulrA.
+by apply: Bigreal.BRA.eq_bigr=> /= k; rewrite intmulr mulrC mulrA.
 qed.
 end BCR.

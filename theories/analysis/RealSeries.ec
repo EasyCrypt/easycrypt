@@ -75,7 +75,7 @@ move=> K uqK; rewrite (@BRA.bigID _ _ (mem J)) addrC BRA.big1 /=.
 + by move=> x [_ @/predC] /=; apply: contraR; rewrite normr0P &(hfin).
 rewrite -BRA.big_filter (@BRA.bigID _ _ (mem K) (undup J)).
 rewrite -!(@BRA.big_filter (predI _ _)) /= ler_paddr.
-+ by apply: Bigreal.sumr_ge0 => /= a _; rewrite normr_ge0.
++ by apply: Bigreal.sumr_ge0 => /= a; rewrite normr_ge0.
 apply/lerr_eq/BRA.eq_big_perm.
 rewrite uniq_perm_eq ?filter_uniq ?undup_uniq //.
 by move=> x; rewrite !mem_filter mem_undup andbC.
@@ -97,7 +97,7 @@ rewrite (@partition_big (fun x => x) _ predT _ _ I).
 + apply: pmap_inj_in_uniq; last by apply range_uniq.
   by move=> i j v _ _; case: enm => h _; apply/h.
 + by move=> a hin hs /=; rewrite /predT /=; apply /hn.
-apply: sub_ler_sum => // a /= _.
+apply: sub_ler_sum => // a /=.
 by rewrite (@bigD1_cond_if _ _ _ a) //= big1 /#.
 qed.
 
@@ -181,7 +181,7 @@ lemma summableZ (s : 'a -> real) (c : real) :
 proof.
 case=> M h; exists (`|c| * M) => J /h leM.
 rewrite -(@eq_bigr _ (fun x => `|c| * `|s x|)) /=.
-+ by move=> x _; rewrite normrM.
++ by move=> x; rewrite normrM.
 by rewrite -mulr_sumr ler_wpmul2l 1:normr_ge0.
 qed.
 
@@ -209,12 +209,12 @@ proof.
 case=> [Mf smf] [Mg smg]; exists (Mf * Mg) => J uqJ.
 pose J1 := undup (unzip1 J).
 pose F (ab : 'a * 'b) := `|f ab.`1| * `|g ab.`1 ab.`2|.
-rewrite (@eq_bigr _ _ F) /= => [ab _|]; 1: by rewrite normrM.
+rewrite (@eq_bigr _ _ F) /= => [ab|]; 1: by rewrite normrM.
 rewrite /F (@sum_pair_dep ("`|_|"%Real \o f) ("`|_|"%Real \o2 g)) //=.
 apply: (@ler_trans (big predT (fun i => `|f i| * Mg) J1)); last first.
 + rewrite -mulr_suml ler_wpmul2r; 1: by apply: (@smg witness [] _).
   by apply/smf/undup_uniq.
-apply: ler_sum => /= a _; rewrite ler_wpmul2l 1:normr_ge0.
+apply: ler_sum => /= a; rewrite ler_wpmul2l 1:normr_ge0.
 pose G (b : 'b) := `|g a b|.
 rewrite big_filter (@eq_bigr _ _ (G \o snd)) => [[a' b] /= ->>//|].
 rewrite -big_filter -(@big_map snd predT) &(smg).
@@ -371,7 +371,7 @@ lemma eq_psum ['a] (s1 s2 : 'a -> real) :
   (forall x, `|s1 x| = `|s2 x|) => psum s1 = psum s2.
 proof.
 move=> eq; apply: eq_lub => x; split; case=> J [uqJ ->];
-  by exists J; split=> //; apply: eq_bigr => /= i _; rewrite eq.
+  by exists J; split=> //; apply: eq_bigr => /= i; rewrite eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -406,7 +406,7 @@ have uqJ: forall n, uniq (pmap J (range 0 n)).
   by move=> x y v _ _; case: enm => + _; apply.
 have mono_u: forall n1 n2, (0 <= n1 <= n2)%Int => u n1 <= u n2.
 + move=> n1 n2 len; rewrite /u (@range_cat n1 _ n2); 1..2: by case: len.
-  by rewrite pmap_cat big_cat ler_addl sumr_ge0 => x /= _; apply/normr_ge0.
+  by rewrite pmap_cat big_cat ler_addl sumr_ge0 => x /=; apply/normr_ge0.
 case: (sbl) => M sblM; have := cnvto_lub_bmono_from _ M 0 mono_u _.
 + by move=> n ge0_n; apply/sblM/uqJ.
 pose l := lub _; suff ->//: l = psum s; rewrite eqr_le; split.
@@ -457,7 +457,7 @@ have: perm_eq (F1 ++ F2) (pmap J (range 0 N)).
     rewrite pmap_map; apply/mapP; exists (Some v').
     by rewrite mem_filter.
 move/eq_big_perm=> <-; rewrite big_cat ler_addl.
-by apply/sumr_ge0=> y /= _; apply/normr_ge0.
+by apply/sumr_ge0=> y /=; apply/normr_ge0.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -823,7 +823,7 @@ proof.
 move=> sms; rewrite psum_sum.
 + by apply/summable_big=> b bs /=; apply/summable_norm/sms.
 rewrite sum_norm /= -1:sum_big.
-+ by move=> a; apply: sumr_ge0 => /= b _; apply: normr_ge0.
++ by move=> a; apply: sumr_ge0 => /= b; apply: normr_ge0.
 + by move=> b bs /=; apply/summable_norm/sms.
 by rewrite !big_seq &(eq_bigr) => /= b bs; rewrite psum_sum 1:&(sms).
 qed.
@@ -898,14 +898,14 @@ move=> sm; rewrite eqr_le; split => [|_].
     by apply: eq_psum => a /= @/v /#.
   rewrite /G /F (@partition_big f predT predT _ J L) /=.
   - by apply/undup_uniq.
-  - by move=> x xJ _ @/L; rewrite mem_undup map_f.
+  - by move=> x xJ @/L; rewrite mem_undup map_f.
   apply: ler_sum_seq => b bL _ /= @/predT /=; rewrite big_mkcond /=.
   rewrite ger0_norm; first by rewrite ge0_psum summable_cond.
   have smc := summable_cond _ (fun x => b = f x) sms.
   apply: (ler_trans _ _ (ler_big_psum smc uqJ)) => {smc}.
-  by rewrite lerr_eq &(eq_bigr) => a /= _ /#.
+  by rewrite lerr_eq &(eq_bigr) => a /= /#.
 + apply: ler_psum_lub => J uqJ; rewrite sumr_norm /=.
-  - by move=> ? _; apply/ge0_psum/summable_cond.
+  - by move=> ?; apply/ge0_psum/summable_cond.
   rewrite -psum_big /=.
   - by move=> b _; apply/summable_cond.
   apply: ler_psum => //= a; case: (f a \in J) => faJ; last first.
@@ -929,10 +929,10 @@ rewrite (@psum_partition f (pos s)) 1:&summable_pos //.
 rewrite (@psum_partition f (neg s)) 1:&summable_neg //.
 rewrite psumB /=; last apply: eq_sum => b /=.
 + exists (psum (pos s)) => J uqJ; rewrite sumr_norm /=.
-    by move=> b _; apply/ge0_psum/hp.
+    by move=> b; apply/ge0_psum/hp.
   by apply: summable_psum_partition => //; apply/summable_pos.
 + exists (psum (neg s)) => J uqJ; rewrite sumr_norm /=.
-    by move=> b _; apply/ge0_psum/hn.
+    by move=> b; apply/ge0_psum/hn.
   by apply: summable_psum_partition => //; apply/summable_neg.
 rewrite ger0_norm; 1: by apply/ge0_psum/hp.
 rewrite ger0_norm; 1: by apply/ge0_psum/hn.
@@ -956,7 +956,7 @@ lemma summable_partition ['a 'b] (f : 'a -> 'b) s : summable s =>
 proof.
 move=> sms; exists (psum s) => J uqJ.
 have h := summable_psum_partition f s sms J uqJ.
-apply/(ler_trans _ _ h)/Bigreal.ler_sum => /= b _.
+apply/(ler_trans _ _ h)/Bigreal.ler_sum => /= b.
 by apply/norm_sum/summable_cond.
 qed.
 
@@ -1073,7 +1073,7 @@ exists (sum S) => J uqJ. pose G y x := fa x * (F x y * fb y).
 have ge0_G: forall x y, 0%r <= G y x.
 - by move=> x y; rewrite mulr_ge0 1?ge0_fa mulr_ge0 (ge0_fb, ge0_F).
 rewrite (@BRA.eq_bigr _ _ (fun x => sum (fun y => G y x))) /=.
-- move=> x _ @/G; rewrite ger0_norm.
+- move=> x @/G; rewrite ger0_norm.
   - apply: mulr_ge0; [exact/ge0_fa | apply: ge0_sum => y /=].
     by apply: mulr_ge0; [exact/ge0_F | exact/ge0_fb].
   by rewrite -sumZ /= &(eq_sum) => y /=.
@@ -1085,7 +1085,7 @@ apply: ler_sum_pos => /= [y|]; [split | exact/smb].
 move=> _ @/S @/G; case: (fb y = 0%r) => [-> /= | nz_fb_y].
 - by rewrite BRA.big1_eq.
 rewrite -sumZr -(@BRA.eq_bigr _ (fun x => (fa x * F x y) * fb y)) /=.
-- by move=> x _; ring.
+- by move=> x; ring.
 rewrite -BRA.mulr_suml sumZr &(ler_wpmul2r) 1:&ge0_fb.
 apply: ler_big_sum => //=.
 - by move=> x; apply: mulr_ge0; [exact/ge0_fa | exact/ge0_F].
