@@ -274,7 +274,7 @@ rewrite !dotpE size_addv; pose m := max _ (max _ _).
 (* FIXME: (max _ _) should be precise enough, but this matches m! *)
 rewrite -[bigi _ _ 0 (max _ (size v2))](big_range0r _ m); 1,2: smt(getv0E mul0r).
 rewrite -[bigi _ _ 0 (max _ (size v3))](big_range0r _ m); 1,2: smt(getv0E mul0r).
-by rewrite sumrD /= &(eq_bigr) /= => i _; rewrite get_addv mulrDr.
+by rewrite sumrD /= &(eq_bigr) /= => i; rewrite get_addv mulrDr.
 qed.
 
 lemma dotpDl v1 v2 v3: dotp (v1 + v2) v3 = dotp v1 v3 + dotp v2 v3.
@@ -460,7 +460,7 @@ qed.
 lemma dotp_scalarv (v1 v2: vector) (s1 s2: t):
   dotp (s1 ** v1) (s2 ** v2) = (s1 * s2) * (dotp v1 v2).
 proof.
-rewrite 2!dotpE 2!size_scalarv !mulr_sumr &(eq_bigr) /= => i _.
+rewrite 2!dotpE 2!size_scalarv !mulr_sumr &(eq_bigr) /= => i.
 rewrite 2!get_scalarv; smt(mulrA mulrC).
 qed.
 
@@ -1109,7 +1109,7 @@ rewrite !get_mulmx dotpE /= (big_range0r (rows m2)) 1:/#.
 - smt(getm0E mulr0 mul0r rows_mulmx cols_mulmx row0E).
 rewrite (eq_bigr _ _ (fun k =>
     bigi predT (fun (l : int) => m1.[i,k] * (m2.[k,l] * m3.[l,j])) 0 (rows m3))).
-- move => k /= _.
+- move => k /=.
   rewrite get_mulmx dotpE mulr_sumr /= (big_range0r (rows m3)) // 1:/#.
   smt(getm0E mulr0 mul0r).
 rewrite exchange_big /= dotpE /=.
