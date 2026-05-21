@@ -283,7 +283,7 @@ abstract theory AdversaryN.
       rnd;auto => &hr /> ??? Hs.
       apply (ler_trans (BRA.big predT (fun (x : t) => 1%r/n%r) X{hr})).
       + apply (ler_trans _ _ _ (mu_mem_le (d i{hr}) X{hr})).
-        by apply ler_sum_seq => /= ???;rewrite d_uni.
+        by apply ler_sum_seq => /= ??;rewrite d_uni.
       rewrite BRA.sumr_const RField.intmulr count_predT.
       by have /# : 0%r < inv n%r; apply invr_gt0; rewrite lt_fromint n_pos.
     + move=> c;proc;sp;inline *.
