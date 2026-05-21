@@ -1048,3 +1048,36 @@ by rewrite q_eq.
 qed.
 
 end section.
+
+(* ==================================================================== *)
+(* Phase 8: register [poly] as an [idomain] over an [idomain]            *)
+(* coefficient. Adds [mulf_eq0] (no zeror divisors) on top of the        *)
+(* Phase 5 comring instance. All other obligations re-discharge from   *)
+(* the comring-level [poly*_*] lemmas registered earlier.                *)
+(* ==================================================================== *)
+instance idomain with ['c <: idomain] ('c poly)
+  op zeror  = poly_zero<:'c>
+  op (+)   = polyD<:'c>
+  op [-]   = polyN<:'c>
+  op oner  = poly_one<:'c>
+  op ( * ) = polyM<:'c>
+  op invr  = poly_invr<:'c>
+  op unit  = poly_unit<:'c>
+
+  proof mopA<:addmonoid> by apply polyD_addrA
+  proof mopC<:addmonoid> by apply polyD_addrC
+  proof mop0<:addmonoid> by (move=> p; rewrite -/(poly_zero<:'c>); apply polyD_add0r)
+  proof addrN           by (move=> p; rewrite polyD_addrC -/(poly_zero<:'c>); apply polyD_addNr)
+  proof oner_neq0       by (rewrite -/(poly_one<:'c>) -/(poly_zero<:'c>); apply polyM_oner_neq0)
+  proof mopA<:mulmonoid> by apply polyM_mulrA
+  proof mopC<:mulmonoid> by apply polyM_mulrC
+  proof mop0<:mulmonoid> by (move=> p; rewrite -/(poly_one<:'c>); apply polyM_mul1r)
+  proof mulrDl     by apply polyM_mulrDl
+  proof mulVr      by (move=> p hu; rewrite /poly_invr<:'c>;
+                       have := choicebP (fun q => polyM q p = poly_one<:'c>) p hu;
+                       by rewrite /=)
+  proof unitP      by (move=> p q heq; rewrite /poly_unit<:'c>; by exists q)
+  proof unitout    by (move=> p; rewrite /poly_unit<:'c> /poly_invr<:'c> negb_exists => hne;
+                       by apply choiceb_dfl => q; apply hne)
+  proof mulf_eq0   by apply polyM_mulf_eq0.
+
