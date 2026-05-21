@@ -107,9 +107,22 @@ type pty_r =
   | PTglob   of pmsymbol located
 and pty = pty_r located
 
+(* Optional witness selector for a type-instantiation entry. Combines
+   label-suffix [/Lbl1/Lbl2/...] and path-via [via P] forms. Empty
+   means: let TC inference pick the witness as before. Parser accepts
+   any combination; the typer rejects irrelevant mixtures. *)
+type pwitness_selector = {
+  pws_labels : psymbol list;
+  pws_via    : pqsymbol option;
+}
+
+let pws_none : pwitness_selector = { pws_labels = []; pws_via = None; }
+let pws_is_empty (s : pwitness_selector) =
+  List.is_empty s.pws_labels && Option.is_none s.pws_via
+
 type ptyannot_r =
-  | TVIunamed of pty list
-  | TVInamed  of (psymbol * pty) list
+  | TVIunamed of (pty * pwitness_selector) list
+  | TVInamed  of (psymbol * pty * pwitness_selector) list
 
 and ptyannot  = ptyannot_r  located
 
@@ -136,19 +149,23 @@ and 'a rfield = {
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
 
-type ptyparam  = psymbol
+(* -------------------------------------------------------------------- *)
+type ptcparam  = pqsymbol * pty list
+(* A class bound: class instantiation + optional label + rename clause. *)
+type ptcbound  = ptcparam * psymbol option * (psymbol * psymbol) list
+type ptyparam  = psymbol * ptcbound list
 type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
-  pty_name   : psymbol;
-  pty_tyvars : ptyparams;
-  pty_body   : ptydbody;
+  pty_name     : psymbol;
+  pty_tyvars   : ptyparams;
+  pty_body     : ptydbody;
   pty_locality : locality;
 }
 
 and ptydbody =
-  | PTYD_Abstract
+  | PTYD_Abstract of ptcbound list
   | PTYD_Alias    of pty
   | PTYD_Record   of precord
   | PTYD_Datatype of pdatatype
@@ -162,7 +179,6 @@ type f_or_mod_ident =
   | FM_FunOrVar of pgamepath
   | FM_Mod of pmsymbol located
 
-
 type pmod_restr_mem_el =
   | PMPlus    of f_or_mod_ident
   | PMMinus   of f_or_mod_ident
@@ -172,7 +188,7 @@ type pmod_restr_mem_el =
 type pmod_restr_mem = pmod_restr_mem_el list
 
 (* -------------------------------------------------------------------- *)
-type pmemory   = psymbol
+type pmemory = psymbol
 
 type phoarecmp = EcFol.hoarecmp
 
@@ -441,9 +457,6 @@ type psubtype = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptyvardecls =
-  psymbol list
-
 type pop_def =
   | PO_abstr of pty
   | PO_concr of pty * pformula
@@ -465,7 +478,7 @@ type poperator = {
   po_name   : psymbol;
   po_aliases: psymbol list;
   po_tags   : psymbol list;
-  po_tyvars : ptyvardecls option;
+  po_tyvars : ptyparams option;
   po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
   po_ax     : osymbol_r;
@@ -499,7 +512,7 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
-  pp_tyvars : psymbol list option;
+  pp_tyvars : ptyparams option;
   pp_def    : ppred_def;
   pp_locality  : locality;
 }
@@ -507,7 +520,7 @@ type ppredicate = {
 (* -------------------------------------------------------------------- *)
 type pnotation = {
   nt_name  : psymbol;
-  nt_tv    : ptyvardecls option;
+  nt_tv    : ptyparams option;
   nt_bd    : (psymbol * pty) list;
   nt_args  : (psymbol * (psymbol list * pty option)) list;
   nt_codom : pty;
@@ -521,7 +534,7 @@ type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
   ab_name  : psymbol;
-  ab_tv    : ptyvardecls option;
+  ab_tv    : ptyparams option;
   ab_args  : ptybindings;
   ab_def   : pty * pexpr;
   ab_opts  : abrvopts;
@@ -562,6 +575,7 @@ type pmpred_args = (osymbol * pformula) list
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
   pdelta   : pqsymbol list option;      (* definition unfolding *)
+  pdeltatc : bool;
   pzeta    : bool;                      (* let-reduction *)
   piota    : bool;                      (* case/if-reduction *)
   peta     : bool;                      (* η-reduction *)
@@ -865,6 +879,11 @@ type pdbmap1 = {
   pht_flag : include_exclude;
   pht_kind : [ `Theory  | `Lemma   ];
   pht_name : pqsymbol;
+  pht_tvi  : ptyannot option;
+    (* [smt(L<:T>)] type instantiation. [None] for [smt(L)] without
+       annotations, [Some _] when the user writes [smt(L<:T1, T2>)] —
+       the lemma is then specialized at those types (with [delta_tc]
+       reduction) before being added to the SMT task. *)
 }
 
 and pdbhint = pdbmap1 list
@@ -1141,18 +1160,34 @@ type paxiom = {
 
 (* -------------------------------------------------------------------- *)
 type prealize = {
-  pr_name  : pqsymbol;
-  pr_proof : (ptactics option) option;
+  pr_name   : pqsymbol;
+  pr_labels : psymbol list option;
+  pr_proof  : (ptactics option) option;
 }
 
 (* -------------------------------------------------------------------- *)
+type ptypeclass = {
+  ptc_name   : psymbol;
+  ptc_params : ptyparams option;
+  ptc_inth   : ptcbound list;
+  ptc_ops    : (psymbol * pty) list;
+  ptc_axs    : (psymbol * pformula) list;
+  ptc_loca   : is_local;
+}
+
 type ptycinstance = {
-  pti_name : pqsymbol;
-  pti_type : ptyparams * pty;
-  pti_ops  : (psymbol * (pty list * pqsymbol)) list;
-  pti_axs  : (psymbol * ptactic_core) list;
-  pti_args : [`Ring of (zint option * zint option)] option;
-  pti_loca : is_local;
+  pti_tc        : ptcparam;
+  pti_name      : psymbol option;
+  pti_type      : ptyparams * pty;
+  (* Each [op X = body] binding parses [body] as an arbitrary form. For
+     existing instances the body is a bare op application (e.g.
+     [CoreInt.zero]), which is a degenerate form; the elaborator
+     handles it uniformly via [trans_form]. *)
+  pti_ops       : (psymbol * pformula) list;
+  pti_axs       : (psymbol * psymbol list option * ptactic_core) list;
+  pti_args      : [`Ring of (zint option * zint option)] option;
+  pti_loca      : is_local;
+  pti_reducible : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1344,6 +1379,7 @@ type global_action =
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
   | Gsubtype     of psubtype
+  | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred

@@ -168,7 +168,7 @@ module LowApply = struct
     | PTGlobal (p, tys) ->
         (* FIXME: poor API ==> poor error recovery *)
         let env = LDecl.toenv (hyps_of_ckenv tc) in
-        (pt, EcEnv.Ax.instantiate p tys env, subgoals)
+        (pt, EcEnv.Ax.instanciate p tys env, subgoals)
 
     | PTTerm pt ->
       let pt, ax, subgoals = check_ `Elim pt subgoals tc in
@@ -261,13 +261,24 @@ module LowApply = struct
           (PTQuant (bd, pt), f_forall [bd] ax, subgoals)
       end
 
+  (* Fold every TC op in [f] whose witness resolves through a
+     [tci_reducible] instance. Applied to the type returned by [check_]
+     so that [Ax.instanciate]'s polymorphic-lemma instantiation at a
+     concrete carrier is normalised at the point of consumption. Pairs
+     with [EcProofTerm.cpt_subst_form] which applies the same rule to
+     concretization-time substitutions. *)
+  let fold_check_ax (tc : ckenv) (f : form) : form =
+    let env = LDecl.toenv (hyps_of_ckenv tc) in
+    EcReduction.fold_reducible_tc env f
+
   let check_with_cutsolve (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
-    check_ mode pt DMap.empty tc
+    let pt, f, subgoals = check_ mode pt DMap.empty tc in
+    (pt, fold_check_ax tc f, subgoals)
 
   let check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
     let pt, f, subgoals = check_ mode pt DMap.empty tc in
     assert (DMap.is_empty subgoals);
-    (pt, f)
+    (pt, fold_check_ax tc f)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -744,8 +755,13 @@ let t_hyp (x : EcIdent.t) tc =
   t_apply_hyp x ~args:[] ~sk:0 tc
 
 (* -------------------------------------------------------------------- *)
+let t_apply_s_tc (p : path) (etys : etyarg list) ?args ?sk tc =
+  tt_apply_s p etys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
 let t_apply_s (p : path) (tys : ty list) ?args ?sk tc =
-  tt_apply_s p tys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
+  let etys = List.map (fun ty -> (ty, [])) tys in
+  tt_apply_s p etys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
 let t_apply_hd (hd : handle) ?args ?sk tc =
@@ -1009,7 +1025,7 @@ let t_true (tc : tcenv1) =
 let t_reflex_s (f : form) (tc : tcenv1) =
   t_apply_s LG.p_eq_refl [f.f_ty] ~args:[f] tc
 
-let t_reflex ?(mode=`Conv) ?reduce (tc : tcenv1) =
+let t_reflex ?(mode = `Conv) ?reduce (tc : tcenv1) =
   let t_reflex_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
     | SFeq (f1, f2) ->
@@ -1171,9 +1187,9 @@ let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
         | None    -> begin
           let strategy =
             match reduce with
-            | `None    -> raise InvalidGoalShape
-            | `Full    -> EcReduction.full_red
-            | `NoDelta -> EcReduction.nodelta in
+            | `None     -> raise InvalidGoalShape
+            | `Full     -> EcReduction.full_red
+            | `NoDelta  -> EcReduction.nodelta in
 
             match h_red_opt strategy (FApi.tc1_hyps tc) f1 with
             | None    -> raise InvalidGoalShape
@@ -1508,9 +1524,9 @@ let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
            end;
            (oget (EcEnv.Op.scheme_of_prind env `Case p), tv, args)
 
-         | _ -> raise InvalidGoalShape
+         | _ -> raise InvalidGoalShape in
 
-       in t_apply_s p tv ~args:(args @ [f2]) ~sk tc
+       t_apply_s_tc p tv ~args:(args @ [f2]) ~sk tc
 
     | _ -> raise TTC.NoMatch
 
@@ -1665,7 +1681,7 @@ let t_split_prind ?reduce (tc : tcenv1) =
     | None -> raise InvalidGoalShape
     | Some (x, sk) ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s_tc p tv ~args ~sk tc
 
   in t_lazy_match ?reduce t_split_r tc
 
@@ -1685,10 +1701,10 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
     match EcInductive.prind_is_iso_ors pri with
     | Some ((x, sk), _) when side = `Left ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s_tc p tv ~args ~sk tc
     | Some (_, (x, sk)) when side = `Right ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s_tc p tv ~args ~sk tc
     | _  -> raise InvalidGoalShape
 
   in t_lazy_match ?reduce t_split_r tc
@@ -1889,9 +1905,14 @@ module LowSubst = struct
           (* check if x is a declared module *)
           let fv = Sid.add x fv in
           if EcEnv.Mod.by_mpath_opt (EcPath.mident x) env <> None then fv
+          (* [f.f_fv] also collects type-variables (which live in
+             [h_tvar], not [h_local]) and other non-hypothesis idents;
+             a raw [LDecl.by_id] would crash with [LookupError]. Only
+             expand let-bound locals. *)
           else match LDecl.by_id x hyps with
           | LD_var (_, Some f) -> add_f fv f
           | _ -> fv
+          | exception LDecl.LdeclError _ -> fv
       and add_f fv f = Mid.fold_left add fv f.f_fv in
       Some(side,v,f, add_f Sid.empty f)
 
@@ -2288,8 +2309,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
             else elims
           in
 
-          let reduce =
-            if options.pgo_delta.pgod_case then `Full else `NoDelta in
+          let reduce = if options.pgo_delta.pgod_case then `Full else `NoDelta in
 
           FApi.t_switch ~on:`All (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail tc
     end

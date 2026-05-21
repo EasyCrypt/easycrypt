@@ -5,13 +5,12 @@ open EcTypes
 open EcCoreFol
 
 module Sp   = EcPath.Sp
-module TC   = EcTypeClass
 module BI   = EcBigInt
 module Ssym = EcSymbols.Ssym
 module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t
+type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -27,34 +26,36 @@ type ty_dtype = {
   tydt_schcase : EcCoreFol.form;
 }
 
-type ty_body = 
-  | Concrete of EcTypes.ty
-  | Abstract
-  | Datatype of ty_dtype
-  | Record   of ty_record
+type ty_body = [
+  | `Concrete of EcTypes.ty
+  | `Abstract of typeclass list
+  | `Datatype of ty_dtype
+  | `Record   of ty_record
+]
 
 
 type tydecl = {
   tyd_params  : ty_params;
   tyd_type    : ty_body;
+  tyd_resolve : bool;
   tyd_loca    : locality;
   tyd_subtype : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 let tydecl_as_concrete (td : tydecl) =
-  match td.tyd_type with Concrete x -> Some x | _ -> None
+  match td.tyd_type with `Concrete x -> Some x | _ -> None
 
 let tydecl_as_abstract (td : tydecl) =
-  match td.tyd_type with Abstract -> Some () | _ -> None
+  match td.tyd_type with `Abstract x -> Some x | _ -> None
 
 let tydecl_as_datatype (td : tydecl) =
-  match td.tyd_type with Datatype x -> Some x | _ -> None
+  match td.tyd_type with `Datatype x -> Some x | _ -> None
 
 let tydecl_as_record (td : tydecl) =
-  match td.tyd_type with Record (x, y) -> Some (x, y) | _ -> None
+  match td.tyd_type with `Record x -> Some x | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(params = `Int 0) lc =
+let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
   let params =
     match params with
     | `Named params ->
@@ -62,18 +63,27 @@ let abs_tydecl ?(params = `Int 0) lc =
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
         List.map
-          (fun x -> (EcIdent.create x))
+          (fun x -> (EcIdent.create x, []))
           (EcUid.NameGen.bulk ~fmt n)
   in
 
   { tyd_params  = params;
-    tyd_type    = Abstract;
+    tyd_type    = `Abstract tc;
+    tyd_resolve = resolve;
     tyd_loca    = lc;
     tyd_subtype = None; }
 
 (* -------------------------------------------------------------------- *)
-let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = CS.Tvar.init params args in
+let etyargs_of_tparams (tps : ty_params) : etyarg list =
+  List.map (fun (a, tcs) ->
+    let ety =
+      List.mapi (fun offset _ -> TCIAbstract { support = `Var a; offset; lift = [] }) tcs
+    in (tvar a, ety)
+  ) tps
+
+(* -------------------------------------------------------------------- *)
+let ty_instanciate (params : ty_params) (args : etyarg list) (ty : ty) =
+  let subst = CS.Tvar.init (List.combine (List.map fst params) args) in
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
@@ -91,7 +101,7 @@ and opbody =
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
   | OP_Exn    of ty list
-  | OP_TC
+  | OP_TC     of EcPath.path * string
 
 and prbody =
   | PR_Plain of form
@@ -191,6 +201,11 @@ let is_rcrd op =
   | OB_oper (Some (OP_Record _)) -> true
   | _ -> false
 
+let is_tc_op op =
+  match op.op_kind with
+  | OB_oper (Some (OP_TC _)) -> true
+  | _ -> false
+
 let is_fix op =
   match op.op_kind with
   | OB_oper (Some (OP_Fix _)) -> true
@@ -272,6 +287,11 @@ let operator_as_prind (op : operator) =
   | OB_pred (Some (PR_Ind pri)) -> pri
   | _ -> assert false
 
+let operator_as_tc (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_TC (tcpath, name))) -> (tcpath, name)
+  | _ -> assert false
+
 let operator_as_exception (op : operator) =
   match op.op_kind with
   | OB_oper (Some (OP_Exn exn_dom)) ->
@@ -283,47 +303,30 @@ let operator_of_exception (ex: exception_) =
   mk_op ~opaque: optransparent [] ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
 
 (* -------------------------------------------------------------------- *)
-let axiomatized_op 
-  ?(nargs = 0) 
-  ?(nosmt = false) 
-  (path : EcPath.path)
-  ((tparams, axbd) : ty_params * form)
-  (lc : locality)
-  : axiom
-=
-  let axbd, axpm =
-    let bdpm = tparams in
-    let axpm = List.map EcIdent.fresh bdpm in
-      (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
-       axpm)
-  in
-
-  let args, axbd =
-    match axbd.f_node with
-    | Fquant (Llambda, bds, axbd) ->
-        let bds, flam = List.split_at nargs bds in
-        (bds, f_lambda flam axbd)
-    | _ -> [], axbd
-  in
-
-  let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
-  let tyargs = List.map EcTypes.tvar axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
-  let op     = f_app op opargs axbd.f_ty in
-  let axspec = f_forall args (f_eq op axbd) in
-
-  { ax_tparams = axpm;
-    ax_spec    = axspec;
-    ax_kind    = `Axiom (Ssym.empty, false);
-    ax_loca    = lc;
-    ax_smt     = not nosmt; }
-
-(* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_prt : EcPath.path option;
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * EcCoreFol.form) list;
-  tc_loca: is_local;
+(* A parent typeclass plus an optional op renaming. The renaming maps
+   the parent's op names (recursively, including its own ancestors)
+   to op names declared in or inherited by the subclass — used to
+   project a subclass instance into a parent instance with different
+   operator names. Empty list = plain inheritance. *)
+type tc_decl = {
+  tc_tparams : ty_params;
+  (* Per parent-edge: the typeclass instantiation, an optional label
+     (defaulting to the parent's bare class name), and the rename
+     clause. The label disambiguates obligations reaching the
+     instance through multiple parent edges of the same class. *)
+  tc_prts    : (typeclass * EcSymbols.symbol
+                * (EcSymbols.symbol * EcSymbols.symbol) list) list;
+  tc_ops     : (EcIdent.t * EcTypes.ty) list;
+  tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
+  tc_loca    : is_local;
+  (* Origin tracking for [tc_ops]: maps each op's local name to its
+     "canonical source" — the (ancestor class path, original op name)
+     pair where this op was first introduced. User-declared ops have
+     origin [(self_path, local_name)]; auto-promoted renamed ops
+     inherit origin from the ancestor whose op they alias. Used by
+     downstream classes' auto-import to dedupe ops reached via
+     multiple inheritance paths. *)
+  tc_ops_origin : (EcSymbols.symbol * (EcPath.path * EcSymbols.symbol)) list;
 }
 
 (* -------------------------------------------------------------------- *)

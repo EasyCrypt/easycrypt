@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
-open EcUid
 open EcIdent
 open EcTypes
 open EcModules
@@ -384,7 +383,7 @@ val f_match :
   -> unienv * mevmap
   -> form
   -> form
-  -> unienv * (ty Muid.t) * mevmap
+  -> unienv * (ty EcAst.TyUni.Muid.t) * mevmap
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = private [`Select of int | `Sub of ptnpos] Mint.t
@@ -425,7 +424,7 @@ module FPosition : sig
 end
 
 (* -------------------------------------------------------------------- *)
-type cptenv = CPTEnv of f_subst
+type cptenv = CPTEnv of f_subst * EcEnv.env
 
 val can_concretize : mevmap -> EcUnify.unienv -> bool
 

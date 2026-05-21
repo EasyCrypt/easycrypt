@@ -3,7 +3,6 @@ open EcUtils
 open EcSymbols
 open EcIdent
 open EcPath
-open EcUid
 
 module BI = EcBigInt
 
@@ -33,7 +32,6 @@ type quantif =
 type hoarecmp = FHle | FHeq | FHge
 
 (* -------------------------------------------------------------------- *)
-
 type 'a use_restr = {
   ur_pos : 'a option;   (* If not None, can use only element in this set. *)
   ur_neg : 'a;          (* Cannot use element in this set. *)
@@ -41,6 +39,13 @@ type 'a use_restr = {
 
 type mr_xpaths = EcPath.Sx.t use_restr
 type mr_mpaths = EcPath.Sm.t use_restr
+
+(* -------------------------------------------------------------------- *)
+module TyUni = EcUid.CoreGen ()
+module TcUni = EcUid.CoreGen ()
+
+type tyuni = TyUni.uid
+type tcuni = TcUni.uid
 
 (* -------------------------------------------------------------------- *)
 type ty = {
@@ -51,11 +56,48 @@ type ty = {
 
 and ty_node =
   | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
-  | Tunivar of EcUid.uid
+  | Tunivar of tyuni
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
+  | Tconstr of EcPath.path * etyarg list
   | Tfun    of ty * ty
+
+(* -------------------------------------------------------------------- *)
+and etyarg = ty * tcwitness list
+
+and tcwitness =
+  (* Unification variable, possibly with a pending [lift] path to apply
+     once the variable is resolved. *)
+  | TCIUni of tcuni * int list
+
+  | TCIConcrete of {
+      path: EcPath.path;
+      etyargs: (ty * tcwitness list) list;
+      (* Same semantics as [TCIAbstract.lift]. *)
+      lift: int list;
+  }
+
+  | TCIAbstract of {
+      support: [
+        | `Var    of EcIdent.t
+        | `Abs    of EcPath.path
+      ];
+      offset: int;
+      (* Path through the parent DAG starting at the typeclass at
+         [support]'s [offset]-th position. [lift = []] means "use the
+         declared typeclass directly"; [lift = [i; j; ...]] means
+         "take parent index [i], then parent index [j] of that, ...".
+         For single-parent classes the path is always [0; 0; ...].
+         For multi-parent (factory) classes, the path encodes which
+         parent edge is taken at each step. *)
+      lift: int list;
+  }
+
+(* -------------------------------------------------------------------- *)
+and typeclass = {
+  tc_name : EcPath.path;
+  tc_args : etyarg list;
+}
 
 (* -------------------------------------------------------------------- *)
 and ovariable = {
@@ -84,7 +126,7 @@ and expr_node =
   | Eint   of BI.zint                      (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eop    of EcPath.path * etyarg list    (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
@@ -185,7 +227,7 @@ and f_node =
   | Flocal  of EcIdent.t
   | Fpvar   of prog_var * memory
   | Fglob   of EcIdent.t * memory
-  | Fop     of EcPath.path * ty list
+  | Fop     of EcPath.path * etyarg list
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
@@ -782,6 +824,100 @@ let lp_fv = function
         Sid.empty ids
 
 (* -------------------------------------------------------------------- *)
+(* Append [extra] to a witness's [lift] path. Used during substitution
+   when a witness referencing the [k]-th tc of some support gets
+   replaced by the witness for that tc, which may itself need further
+   parent-walk steps. *)
+let bump_lift (extra : int list) (tcw : tcwitness) : tcwitness =
+  if extra = [] then tcw else
+  match tcw with
+  | TCIUni (uid, l) -> TCIUni (uid, l @ extra)
+  | TCIConcrete c -> TCIConcrete { c with lift = c.lift @ extra }
+  | TCIAbstract a -> TCIAbstract { a with lift = a.lift @ extra }
+
+(* -------------------------------------------------------------------- *)
+let rec tcw_fv (tcw : tcwitness) =
+  match tcw with
+  | TCIUni _  ->
+    Mid.empty
+
+  | TCIConcrete { etyargs } ->
+    List.fold_left
+      (fun fv (ty, tcws) -> fv_union fv (fv_union ty.ty_fv (tcws_fv tcws)))
+      Mid.empty etyargs
+
+  | TCIAbstract { support = `Var v } ->
+    Mid.singleton v 1
+
+  | TCIAbstract { support = `Abs _ } ->
+    Mid.empty
+
+and tcws_fv (tcws : tcwitness list) =
+  List.fold_left
+    (fun fv tcw -> fv_union fv (tcw_fv tcw))
+    Mid.empty tcws
+
+let etyarg_fv ((ty, tcws) : etyarg) =
+  fv_union ty.ty_fv (tcws_fv tcws)
+
+let etyargs_fv (tyargs : etyarg list) =
+  List.fold_left
+    (fun fv tyarg -> fv_union fv (etyarg_fv tyarg))
+    Mid.empty tyargs
+
+(* -------------------------------------------------------------------- *)
+let rec tcw_equal (tcw1 : tcwitness) (tcw2 : tcwitness) =
+  match tcw1, tcw2 with
+  | TCIUni (uid1, l1), TCIUni (uid2, l2) ->
+    TcUni.uid_equal uid1 uid2 && l1 = l2
+
+  | TCIConcrete tcw1, TCIConcrete tcw2 ->
+       EcPath.p_equal tcw1.path tcw2.path
+    && tcw1.lift = tcw2.lift
+    && List.all2 etyarg_equal tcw1.etyargs tcw2.etyargs
+
+  | TCIAbstract { support = support1; offset = o1; lift = l1 }
+  , TCIAbstract { support = support2; offset = o2; lift = l2 }
+  ->
+    let tyvar_eq () =
+      match support1, support2 with
+      | `Var x1, `Var x2 ->
+        EcIdent.id_equal x1 x2
+      | `Abs p1, `Abs p2 ->
+        EcPath.p_equal p1 p2
+      | _, _ -> false
+
+      in o1 = o2 && l1 = l2 && tyvar_eq ()
+
+  | _, _ ->
+    false
+
+and etyarg_equal ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
+  ty_equal ty1 ty2 && List.all2 tcw_equal tcws1 tcws2
+
+(* -------------------------------------------------------------------- *)
+let rec tcw_hash (tcw : tcwitness) =
+  let lift_hash = Why3.Hashcons.combine_list (fun i -> i) 0 in
+  match tcw with
+  | TCIUni (uid, l) ->
+    Why3.Hashcons.combine (Hashtbl.hash uid) (lift_hash l)
+
+  | TCIConcrete tcw ->
+    Why3.Hashcons.combine_list
+      etyarg_hash
+      (Why3.Hashcons.combine (p_hash tcw.path) (lift_hash tcw.lift))
+      tcw.etyargs
+
+  | TCIAbstract { support = `Var tyvar; offset; lift } ->
+    Why3.Hashcons.combine2 (EcIdent.id_hash tyvar) offset (lift_hash lift)
+
+  | TCIAbstract { support = `Abs p; offset; lift } ->
+    Why3.Hashcons.combine2 (EcPath.p_hash p) offset (lift_hash lift)
+
+  and etyarg_hash ((ty, tcws) : etyarg) =
+    Why3.Hashcons.combine_list tcw_hash (ty_hash ty) tcws
+
+(* -------------------------------------------------------------------- *)
 let e_equal   = ((==) : expr -> expr -> bool)
 let e_hash    = fun e -> e.e_tag
 let e_fv e    = e.e_fv
@@ -791,7 +927,6 @@ let eqt_equal : equantif -> equantif -> bool = (==)
 let eqt_hash  : equantif -> int = Hashtbl.hash
 
 (* -------------------------------------------------------------------- *)
-
 let lv_equal lv1 lv2 =
   match lv1, lv2 with
   | LvVar (pv1, ty1), LvVar (pv2, ty2) ->
@@ -815,7 +950,6 @@ let lv_fv = function
       let add s (pv, _) = EcIdent.fv_union s (pv_fv pv) in
       List.fold_left add Mid.empty pvs
 
-
 let lv_hash = function
   | LvVar (pv, ty) ->
       Why3.Hashcons.combine (pv_hash pv) (ty_hash ty)
@@ -825,7 +959,6 @@ let lv_hash = function
         (fun (pv, ty) ->
           Why3.Hashcons.combine (pv_hash pv) (ty_hash ty)) 0 pvs
 
-
 (* -------------------------------------------------------------------- *)
 let i_equal   = ((==) : instr -> instr -> bool)
 let i_hash    = fun i -> i.i_tag
@@ -834,7 +967,6 @@ let i_fv i    = i.i_fv
 let s_equal   = ((==) : stmt -> stmt -> bool)
 let s_hash    = fun s -> s.s_tag
 let s_fv      = fun s -> s.s_fv
-
 
 (*-------------------------------------------------------------------- *)
 let qt_equal : quantif -> quantif -> bool = (==)
@@ -1216,7 +1348,7 @@ module Hsty = Why3.Hashcons.Make (struct
         EcIdent.id_equal m1 m2
 
     | Tunivar u1, Tunivar u2 ->
-        uid_equal u1 u2
+        TyUni.uid_equal u1 u2
 
     | Tvar v1, Tvar v2 ->
         id_equal v1 v2
@@ -1225,7 +1357,7 @@ module Hsty = Why3.Hashcons.Make (struct
         List.all2 ty_equal lt1 lt2
 
     | Tconstr (p1, lt1), Tconstr (p2, lt2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
+        EcPath.p_equal p1 p2 && List.all2 etyarg_equal lt1 lt2
 
     | Tfun (d1, c1), Tfun (d2, c2)->
         ty_equal d1 d2 && ty_equal c1 c2
@@ -1235,10 +1367,10 @@ module Hsty = Why3.Hashcons.Make (struct
   let hash ty =
     match ty.ty_node with
     | Tglob m          -> EcIdent.id_hash m
-    | Tunivar u        -> u
+    | Tunivar u        -> Hashtbl.hash u
     | Tvar    id       -> EcIdent.tag id
     | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
-    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
+    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list etyarg_hash p.p_tag tl
     | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
 
   let fv ty =
@@ -1250,7 +1382,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar _        -> Mid.empty
     | Tvar    _        -> Mid.empty (* FIXME: section *)
     | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
-    | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
+    | Tconstr (_, tys) -> union etyarg_fv tys
     | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
 
   let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node; }
@@ -1260,7 +1392,6 @@ let mk_ty node =
   Hsty.hashcons { ty_node = node; ty_tag = -1; ty_fv = Mid.empty }
 
 (* ----------------------------------------------------------------- *)
-
 module Hexpr = Why3.Hashcons.Make (struct
   type t = expr
 
@@ -1277,7 +1408,7 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eop (p1, tys1), Eop (p2, tys2) ->
            (EcPath.p_equal p1 p2)
-        && (List.all2 ty_equal tys1 tys2)
+        && (List.all2 etyarg_equal tys1 tys2)
 
     | Eapp (e1, es1), Eapp (e2, es2) ->
            (e_equal e1 e2)
@@ -1320,9 +1451,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
 
-    | Eop (p, tys) ->
-        Why3.Hashcons.combine_list ty_hash
-          (EcPath.p_hash p) tys
+    | Eop (p, tyargs) ->
+        Why3.Hashcons.combine_list etyarg_hash (EcPath.p_hash p) tyargs
 
     | Eapp (e, es) ->
         Why3.Hashcons.combine_list e_hash (e_hash e) es
@@ -1359,7 +1489,7 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     match e with
     | Eint _            -> Mid.empty
-    | Eop (_, tys)      -> union (fun a -> a.ty_fv) tys
+    | Eop (_, tyargs)   -> etyargs_fv tyargs
     | Evar v            -> pv_fv v
     | Elocal id         -> fv_singleton id
     | Eapp (e, es)      -> union e_fv (e :: es)
@@ -1376,7 +1506,27 @@ module Hexpr = Why3.Hashcons.Make (struct
 end)
 
 (* -------------------------------------------------------------------- *)
-let mk_expr e ty =
+let normalize_enode (node : expr_node) : expr_node =
+  match node with
+  | Equant (_, [], body) ->
+    body.e_node
+
+  | Equant (q1, bds1, { e_node = Equant (q2, bds2, body) })
+      when q1 = q2
+    -> Equant (q1, bds1 @ bds2, body)
+
+  | Eapp (hd, []) ->
+    hd.e_node
+
+  | Eapp ({ e_node = Eapp (hd, args1) }, args2) ->
+    Eapp (hd, args1 @ args2)
+
+  | _ ->
+    node
+
+(* -------------------------------------------------------------------- *)
+let mk_expr (e : expr_node) (ty : ty) =
+  let e = normalize_enode e in
   Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = Mid.empty; e_ty = ty }
 
 (* -------------------------------------------------------------------- *)
@@ -1411,7 +1561,7 @@ module Hsform = Why3.Hashcons.Make (struct
       EcIdent.id_equal mp1 mp2 && EcIdent.id_equal m1 m2
 
     | Fop(p1,lty1), Fop(p2,lty2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
+        EcPath.p_equal p1 p2 && List.all2 etyarg_equal lty1 lty2
 
     | Fapp(f1,args1), Fapp(f2,args2) ->
         f_equal f1 f2 && List.all2 f_equal args1 args2
@@ -1465,8 +1615,10 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fglob(mp, m) ->
         Why3.Hashcons.combine (EcIdent.id_hash mp) (EcIdent.id_hash m)
 
-    | Fop(p, lty) ->
-        Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
+    | Fop(p, tyargs) ->
+        Why3.Hashcons.combine_list
+          etyarg_hash (EcPath.p_hash p)
+          tyargs
 
     | Fapp(f, args) ->
         Why3.Hashcons.combine_list f_hash (f_hash f) args
@@ -1505,7 +1657,7 @@ module Hsform = Why3.Hashcons.Make (struct
 
     match f with
     | Fint _              -> Mid.empty
-    | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
+    | Fop (_, tyargs)     -> union etyarg_fv tyargs
     | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
     | Fpvar (PVloc _,m)   -> fv_add m Mid.empty
     | Fglob (mp,m)        -> fv_add mp (fv_add m Mid.empty)
@@ -1581,7 +1733,28 @@ module Hsform = Why3.Hashcons.Make (struct
       { f with f_tag = n; f_fv = fv; }
 end)
 
-let mk_form node ty =
+(* -------------------------------------------------------------------- *)
+let normalize_fnode (node : f_node) : f_node =
+  match node with
+  | Fquant (_, [], body) ->
+    body.f_node
+
+  | Fquant (q1, bds1, { f_node = Fquant (q2, bds2, body) })
+      when q1 = q2
+    -> Fquant (q1, bds1 @ bds2, body)
+
+  | Fapp (hd, []) ->
+    hd.f_node
+
+  | Fapp ({ f_node = Fapp (hd, args1)}, args2) ->
+    Fapp (hd, args1 @ args2)
+
+  | _ ->
+    node
+
+(* -------------------------------------------------------------------- *)
+let mk_form (node : f_node) (ty : ty) =
+  let node = normalize_fnode (node) in
   let aout =
     Hsform.hashcons
       { f_node = node;

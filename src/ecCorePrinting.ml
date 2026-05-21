@@ -4,8 +4,7 @@ module type PrinterAPI = sig
   open EcIdent
   open EcSymbols
   open EcPath
-  open EcTypes
-  open EcFol
+  open EcAst
   open EcDecl
   open EcModules
   open EcTheory
@@ -59,7 +58,8 @@ module type PrinterAPI = sig
   val pp_mem      : PPEnv.t -> EcIdent.t pp
   val pp_memtype  : PPEnv.t -> EcMemory.memtype pp
   val pp_tyvar    : PPEnv.t -> ident pp
-  val pp_tyunivar : PPEnv.t -> EcUid.uid pp
+  val pp_tyunivar : PPEnv.t -> tyuni pp
+  val pp_tcunivar : PPEnv.t -> tcuni pp
   val pp_path     : path pp
   
   (* ------------------------------------------------------------------ *)
@@ -86,11 +86,12 @@ module type PrinterAPI = sig
     | `Glob  of EcIdent.t * EcMemory.memory
     | `PVar  of EcTypes.prog_var * EcMemory.memory
   ]
-  
+
   val pp_vsubst : PPEnv.t -> vsubst pp
 
   (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
+  val pp_typeclass   : PPEnv.t -> (typeclass                      ) pp
   val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
   val pp_added_op    : PPEnv.t -> operator pp
   val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp

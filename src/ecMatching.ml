@@ -389,10 +389,10 @@ module Position = struct
     let (env, s), npath = normalize_cpos_path env cpath s in
     (env, s), (npath, normalize_cpos1 env cp1 s)
 
-  let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 = 
+  let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 =
     match off with
-    | `Absolute off -> normalize_cpos1 env off s 
-    | `Relative i -> 
+    | `Absolute off -> normalize_cpos1 env off s
+    | `Relative i ->
       let nm = (base + i) in
       check_nm_cpos1 nm s; nm
 
@@ -828,7 +828,9 @@ module MEV = struct
     v
 
   let assubst ue ev env =
-    let subst = f_subst_init ~tu:(EcUnify.UniEnv.assubst ue) () in
+    let subst = f_subst_init
+      ~tu:(EcUnify.UniEnv.assubst ue)
+      ~tw_uni:(EcUnify.UniEnv.tw_assubst ue) () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
     let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
     let seen  = ref Sid.empty in
@@ -1046,9 +1048,8 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if i <> j then failure () else doit env ilc f1 f2
 
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
-          if not (EcPath.p_equal op1 op2) then
-            failure ();
-          try  List.iter2 (EcUnify.unify env ue) tys1 tys2
+          if not (EcPath.p_equal op1 op2) then failure ();
+          try List.iter2 (EcUnify.unify_etyarg env ue) tys1 tys2
           with EcUnify.UnificationFailure _ -> failure ()
       end
 
@@ -1144,6 +1145,55 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           failure ();
         doit env (subst, mxs) f1' f2' in
 
+      (* Eta-reduce a [fun (x_1 ... x_n) => h x_1 ... x_n] body when
+         [h] does not mention any [x_i]. Returns [Some h] on success. *)
+      let try_eta_reduce (f : form) : form option =
+        match f.f_node with
+        | Fquant (Llambda, bd, body) -> begin
+          let nbd = List.length bd in
+          match destr_app body with
+          | (h, args) when List.length args >= nbd ->
+            let n_extra = List.length args - nbd in
+            let extra, tail = List.split_at n_extra args in
+            let bd_ids = List.map fst bd in
+            (* Tail must be exactly [x_1; ...; x_n] in order. *)
+            let tail_ok =
+              List.for_all2 (fun (x, _) a ->
+                match a.f_node with
+                | Flocal y -> EcIdent.id_equal x y
+                | _ -> false) bd tail in
+            (* And [h] (with extras) must not mention the [x_i]. *)
+            let captures =
+              List.exists (fun id -> Mid.mem id h.f_fv) bd_ids
+              || List.exists
+                   (fun a -> List.exists (fun id -> Mid.mem id a.f_fv) bd_ids)
+                   extra in
+            if tail_ok && not captures then
+              Some (if n_extra = 0 then h else f_app h extra body.f_ty)
+            else None
+          | _ -> None
+          end
+        | _ -> None in
+
+      let is_lambda f =
+        match f.f_node with Fquant (Llambda, _, _) -> true | _ -> false in
+      let try_etared () =
+        (* Only η-reduce when the other side is not itself a lambda;
+           if both are lambdas, the structural Fquant/Fquant case
+           handles it, and prematurely eta-reducing one side would
+           interfere with higher-order matching against lambda
+           patterns. *)
+        match f1.f_node, f2.f_node with
+        | Fquant (Llambda, _, _), _ when not (is_lambda f2) ->
+          (match try_eta_reduce f1 with
+           | Some f1' -> doit env (subst, mxs) f1' f2
+           | None     -> failure ())
+        | _, Fquant (Llambda, _, _) when not (is_lambda f1) ->
+          (match try_eta_reduce f2 with
+           | Some f2' -> doit env (subst, mxs) f1 f2'
+           | None     -> failure ())
+        | _ -> failure () in
+
       let try_horder () =
         if not opts.fm_horder then
           failure ();
@@ -1166,6 +1216,34 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       let try_delta () =
         if not opts.fm_delta then
           failure ();
+        (* Drain pending TC constraints before checking [tc_reducible]:
+           a [TCIUni] witness on a TC op-head needs to be committed in
+           the resolution map (and then dereferenced via [norm]) for
+           [tc_core_reduce] to fire. Without this drain, a parametric-
+           carrier proof-term carrying an unresolved [TCIUni] would
+           fail to reduce here even when the carrier's TC instance is
+           registered in the env.                                       *)
+        EcUnify.UniEnv.flush_tc_problems env ue;
+        if Sys.getenv_opt "EC_DBG_TD" <> None then begin
+          let dump f = match (destr_app f) with
+            | { f_node = Fop (p, _); _ }, args ->
+              Printf.sprintf "Fop %s [%d]" (EcPath.tostring p) (List.length args)
+            | _ -> "<o>" in
+          Format.eprintf "[try_delta] %s | %s@." (dump f1) (dump f2)
+        end;
+        (* When one side is a TC op call on a univar carrier and the
+           other side's head is a registered realisation of that same
+           class op, we'd lose the chance to pin the carrier if we
+           [delta]-unfolded the realisation first. Detect this case so
+           the mathcomp-style branch below is preferred. *)
+        let mathcomp_eligible op_tc tys_tc op_concrete =
+          EcEnv.Op.is_tc_op env op_tc
+          && (not (EcPath.p_equal op_tc op_concrete))
+          && EcEnv.Op.tc_op_realised_by env op_tc op_concrete
+          && (match List.rev tys_tc with
+              | (ty, _) :: _ ->
+                not (TyUni.Suid.is_empty (Tuni.univars ty))
+              | [] -> false) in
 
         match fst_map f_node (destr_app f1),
               fst_map f_node (destr_app f2)
@@ -1176,11 +1254,60 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
         | _, (Flocal x2, args2) when LDecl.can_unfold x2 hyps ->
             doit_lreduce env (doit env ilc f1) f2.f_ty x2 args2
 
+        (* Mathcomp-style (pre-empt delta unfolding of [op2] which would
+           commit the carrier to a specific realisation and lose the
+           cross-instance match). After unifying carriers, re-normalise
+           the now-pinned TC op call so [tc_reduce] can fire and the
+           realisation matches the goal-side concrete op.               *)
+        | (Fop (op1, tys1), _), (Fop (op2, _), _)
+          when mathcomp_eligible op1 tys1 op2 ->
+            let before = Tuni.univars f1.f_ty in
+            (try EcUnify.unify env ue f1.f_ty f2.f_ty
+             with EcUnify.UnificationFailure _ -> failure ());
+            let f1' = norm f1 in
+            let after = Tuni.univars f1'.f_ty in
+            if TyUni.Suid.cardinal after >= TyUni.Suid.cardinal before then
+              failure ();
+            EcUnify.UniEnv.flush_tc_problems env ue;
+            (* The pattern's TC-op application is now at a concrete
+               carrier; reduce it through the registered instance. *)
+            let f1_reduced =
+              let head, args = destr_app f1' in
+              match head.f_node with
+              | Fop (p, tys) when EcEnv.Op.tc_reducible env p tys ->
+                f_app (EcEnv.Op.tc_reduce env p tys) args f1'.f_ty
+              | _ -> f1' in
+            doit env ilc (norm f1_reduced) (norm f2)
+
+        | (Fop (op1, _), _), (Fop (op2, tys2), _)
+          when mathcomp_eligible op2 tys2 op1 ->
+            let before = Tuni.univars f2.f_ty in
+            (try EcUnify.unify env ue f1.f_ty f2.f_ty
+             with EcUnify.UnificationFailure _ -> failure ());
+            let f2' = norm f2 in
+            let after = Tuni.univars f2'.f_ty in
+            if TyUni.Suid.cardinal after >= TyUni.Suid.cardinal before then
+              failure ();
+            EcUnify.UniEnv.flush_tc_problems env ue;
+            let f2_reduced =
+              let head, args = destr_app f2' in
+              match head.f_node with
+              | Fop (p, tys) when EcEnv.Op.tc_reducible env p tys ->
+                f_app (EcEnv.Op.tc_reduce env p tys) args f2'.f_ty
+              | _ -> f2' in
+            doit env ilc (norm f1) (norm f2_reduced)
+
         | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
             doit_reduce env ((doit env ilc)^~ f2) f1.f_ty op1 tys1 args1
 
         | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
             doit_reduce env (doit env ilc f1) f2.f_ty op2 tys2 args2
+
+        | (Fop (op1, tys1), args1), _ when EcEnv.Op.tc_reducible env op1 tys1 ->
+            doit_tc_reduce env ((doit env ilc)^~ f2) f1.f_ty op1 tys1 args1
+
+        | _, (Fop (op2, tys2), args2) when EcEnv.Op.tc_reducible env op2 tys2 ->
+            doit_tc_reduce env (doit env ilc f1) f2.f_ty op2 tys2 args2
 
         | _, _ -> failure ()
 
@@ -1193,7 +1320,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       List.find_map_opt
         (fun doit ->
            try Some (doit ()) with MatchFailure -> None)
-        [try_betared; try_horder; try_delta; default]
+        [try_betared; try_horder; try_etared; try_delta; default]
       |> oget ~exn:MatchFailure
 
   and doit_args env ilc fs1 fs2 =
@@ -1204,6 +1331,12 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
   and doit_reduce env cb ty op tys args =
     let reduced =
       try  f_app (EcEnv.Op.reduce env op tys) args ty
+      with NotReducible -> raise MatchFailure in
+    cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
+
+  and doit_tc_reduce env cb ty op tys args =
+    let reduced =
+      try  f_app (EcEnv.Op.tc_reduce env op tys) args ty
       with NotReducible -> raise MatchFailure in
     cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
 
@@ -1292,7 +1425,7 @@ let f_match opts hyps (ue, ev) f1 f2 =
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
-      with EcUnify.UninstantiateUni -> raise MatchFailure
+      with EcUnify.UninstanciateUni _ -> raise MatchFailure
     in
       (ue, clue, ev)
 
@@ -1652,7 +1785,10 @@ module FPosition = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type cptenv = CPTEnv of f_subst
+(* The [env] component is the environment in which the proof-term was
+   elaborated. It is needed to consult [tci_reducible] flags when
+   normalising the substituted form via [EcReduction.fold_reducible_tc]. *)
+type cptenv = CPTEnv of f_subst * EcEnv.env
 
 let can_concretize ev ue =
   EcUnify.UniEnv.closed ue && MEV.filled ev

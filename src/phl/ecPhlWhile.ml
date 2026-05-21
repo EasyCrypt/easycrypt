@@ -370,7 +370,7 @@ module LossLess = struct
       | Fint   z -> e_int z
       | Flocal x -> e_local x fp.f_ty
 
-      | Fop  (p, tys) -> e_op p tys fp.f_ty
+      | Fop  (p, tys) -> e_op_tc p tys fp.f_ty
       | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
       | Ftuple fs     -> e_tuple (List.map aux fs)
       | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty

@@ -33,13 +33,8 @@ and 'a ovrhooks = {
 
 (* -------------------------------------------------------------------- *)
 val replay : 'a ovrhooks
-  -> abstract:bool
-  -> override_locality:EcTypes.is_local option
-  -> incl:bool
-  -> clears:Sp.t
-  -> renames:(renaming list)
-  -> opath:path
-  -> npath:path
-  -> evclone
-  -> 'a -> symbol * bool * theory_item list * EcTypes.is_local
+  -> abstract:bool -> override_locality:EcTypes.is_local option -> incl:bool
+  -> clears:Sp.t -> renames:(renaming list)
+  -> opath:path -> npath:path -> evclone
+  -> 'a -> symbol * theory_item list * EcTypes.is_local
   ->  axclone list * 'a

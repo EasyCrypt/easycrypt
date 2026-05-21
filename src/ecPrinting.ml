@@ -194,14 +194,25 @@ module PPEnv = struct
 
   let ty_symb (ppe : t) p =
     let exists sm =
-      try  EcPath.p_equal (EcEnv.Ty.lookup_path ~unique:true sm ppe.ppe_env) p
-      with EcEnv.LookupFailure _ -> false
+      let p1 = Option.map fst (EcEnv.Ty.lookup_opt sm ppe.ppe_env) in
+      let p2 = Option.map fst (EcEnv.TypeClass.lookup_opt sm ppe.ppe_env) in
+
+      List.exists
+        (EcPath.p_equal p)
+        (Option.to_list p1 @ Option.to_list p2)
     in
       p_shorten ppe exists (P.toqsymbol p)
 
   let tc_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.TypeClass.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+      p_shorten ppe exists (P.toqsymbol p)
+
+  let tci_symb (ppe : t) p =
+    let exists sm =
+      try  EcPath.p_equal (EcEnv.TcInstance.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
       p_shorten ppe exists (P.toqsymbol p)
@@ -227,7 +238,7 @@ module PPEnv = struct
     in
       p_shorten ppe exists (P.toqsymbol p)
 
-  let op_symb (ppe : t) p info =
+  let op_symb (ppe : t) (p : P.path) (info : ([`Expr | `Form] * etyarg list * dom) option) =
     let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.CI_Bool.p_eq) "<>"] in
 
     let check_for_local sm =
@@ -241,13 +252,13 @@ module PPEnv = struct
           check_for_local sm;
           EcEnv.Op.lookup_path sm ppe.ppe_env
 
-      | Some (mode, typ, dom) ->
+      | Some (mode, ety, dom) ->
           let filter =
             match mode with
             | `Expr -> fun _ op -> not (EcDecl.is_pred op)
             | `Form -> fun _ _  -> true
           in
-          let tvi = Some (EcUnify.TVIunamed typ) in
+          let tvi = Some (EcUnify.tvi_unamed ety) in
 
         fun sm ->
           check_for_local sm;
@@ -259,6 +270,13 @@ module PPEnv = struct
           let ue  = EcUnify.UniEnv.create None in
           let ops = EcUnify.select_op ~hidden:true ~filter tvi ppe.ppe_env sm ue dom in
           let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
+          (* Run the same candidate-deduplication chain as the
+             elaborator. Without this, a TC class op like
+             [Top.TcRing.*] coexists with an abbreviation
+             [Top.TcMonoid.*] (a [mulmonoid]-view alias) and [op_symb]
+             can't pick a unique short form, falling back to qualified
+             — which then forces prefix display instead of infix. *)
+          let ops = EcUnify.canonicalize ppe.ppe_env ops in
 
           match ops with
           | [(p1, _), _, _, _] -> p1
@@ -382,7 +400,7 @@ module PPEnv = struct
 
   exception FoundUnivarSym of symbol
 
-  let tyunivar (ppe : t) i =
+  let univar (ppe : t) (i : EcUid.uid) =
     if not (Mint.mem i (fst !(ppe.ppe_univar))) then begin
       let alpha  = "abcdefghijklmnopqrstuvwxyz" in
 
@@ -496,6 +514,14 @@ let pp_maybe_paren c pp =
   pp_maybe c pp_paren pp
 
 (* -------------------------------------------------------------------- *)
+let pp_bracket pp fmt x =
+  pp_enclose ~pre:"[" ~post:"]" pp fmt x
+
+(* -------------------------------------------------------------------- *)
+let pp_maybe_bracket c pp =
+  pp_maybe c pp_bracket pp
+
+(* -------------------------------------------------------------------- *)
 let pp_string fmt x =
   Format.fprintf fmt "%s" x
 
@@ -547,8 +573,12 @@ let pp_tyvar ppe fmt x =
   Format.fprintf fmt "%s" (PPEnv.tyvar ppe x)
 
 (* -------------------------------------------------------------------- *)
-let pp_tyunivar ppe fmt x =
-  Format.fprintf fmt "%s" (PPEnv.tyunivar ppe x)
+let pp_tyunivar (ppe : PPEnv.t) (fmt : Format.formatter) (a : tyuni) =
+  Format.fprintf fmt "%s" (PPEnv.univar ppe (a :> EcUid.uid))
+
+(* -------------------------------------------------------------------- *)
+let pp_tcunivar (ppe : PPEnv.t) (fmt : Format.formatter) (a : tcuni) =
+  Format.fprintf fmt "%s" (PPEnv.univar ppe (a :> EcUid.uid))
 
 (* -------------------------------------------------------------------- *)
 let pp_tyname ppe fmt p =
@@ -559,6 +589,10 @@ let pp_tcname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.tc_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
+let pp_tciname ppe fmt p =
+  Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.tci_symb ppe p)
+
+  (* -------------------------------------------------------------------- *)
 let pp_rwname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.rw_symb ppe p)
 
@@ -840,7 +874,7 @@ let rec pp_type_r
                 (pp_paren (pp_list ",@ " subpp)) xs
                 (pp_tyname ppe) name
       in
-        maybe_paren outer t_prio_name pp fmt (name, tyargs)
+        maybe_paren outer t_prio_name pp fmt (name, List.map fst tyargs)
     end
 
   | Tfun (t1, t2) ->
@@ -1091,41 +1125,114 @@ let pp_app (type v1 v2)
       maybe_paren outer e_app_prio pp fmt ()
 
 (* -------------------------------------------------------------------- *)
-(* [tvi_dominated env op nargs] checks whether all type parameters of [op]
-   can be inferred from the types of the first [nargs] arguments. *)
+(* [tvi_dominated env op nargs] checks whether all type parameters of
+   [op] can be inferred from the types visible at the use site: the
+   types of the first [nargs] arguments AND the type of the residual
+   term after those args have been consumed (i.e. the unconsumed-dom
+   suffix plus the codomain). Including the residual type catches
+   nullary ops whose tparam appears only in the codomain — like
+   [zero ['a]: 'a] used bare — for which the surrounding context
+   pins ['a]. *)
 let tvi_dominated (env : EcEnv.env) (op : EcPath.path) (nargs : int) : bool =
   match EcEnv.Op.by_path_opt op env with
   | None -> false
   | Some opdecl ->
     let tparams = opdecl.op_tparams in
-    let dom, _ = tyfun_flat opdecl.op_ty in
+    let dom, codom = tyfun_flat opdecl.op_ty in
     let arg_tys = List.take nargs dom in
+    let residual = EcTypes.toarrow (List.drop nargs dom) codom in
     let covered =
       List.fold_left
         (fun acc ty -> Sid.union acc (EcTypes.Tvar.fv ty))
-        Sid.empty arg_tys in
-    List.for_all (fun id -> Sid.mem id covered) tparams
+        Sid.empty (residual :: arg_tys) in
+    List.for_all (fun (id, _) -> Sid.mem id covered) tparams
+
+(* -------------------------------------------------------------------- *)
+let pp_opname fmt (nm, op) =
+  let op =
+    if EcCoreLib.is_mixfix_op op then
+      Printf.sprintf "\"%s\"" op
+    else if is_binop op then begin
+      if op.[0] = '*' || op.[String.length op - 1] = '*'
+      then Format.sprintf "( %s )" op
+      else Format.sprintf "(%s)" op
+    end else op
+
+  in EcSymbols.pp_qsymbol fmt (nm, op)
+
+(* -------------------------------------------------------------------- *)
+let rec pp_etyarg (ppe : PPEnv.t) (fmt : Format.formatter) ((ty, tcws) : etyarg) =
+  match tcws with
+  | [] -> pp_type ppe fmt ty
+  | _  -> Format.fprintf fmt "%a[%a]" (pp_type ppe) ty (pp_tcws ppe) tcws
+
+(* -------------------------------------------------------------------- *)
+and pp_etyargs (ppe : PPEnv.t) (fmt : Format.formatter) (etys : etyarg list) =
+    Format.fprintf fmt "%a" (pp_list ",@ " (pp_etyarg ppe)) etys
+
+(* -------------------------------------------------------------------- *)
+and pp_tcw (ppe : PPEnv.t) (fmt : Format.formatter) (tcw : tcwitness) =
+  let pp_lift fmt = function
+    | [] -> ()
+    | l when List.for_all (fun i -> i = 0) l ->
+      Format.fprintf fmt "^%d" (List.length l)
+    | l ->
+      Format.fprintf fmt "^[%a]"
+        (pp_list ",@ " (fun fmt i -> Format.fprintf fmt "%d" i)) l in
+  match tcw with
+  | TCIUni (uid, lift) ->
+    Format.fprintf fmt "%a%a" (pp_tcunivar ppe) uid pp_lift lift
+
+  | TCIConcrete { path; etyargs; lift } ->
+    (match etyargs with
+     | [] -> Format.fprintf fmt "%a%a" (pp_tciname ppe) path pp_lift lift
+     | _  -> Format.fprintf fmt "%a[%a]%a"
+               (pp_tciname ppe) path (pp_etyargs ppe) etyargs pp_lift lift)
+
+  | TCIAbstract { support = `Var x; offset; lift } ->
+    Format.fprintf fmt "%a.`%d%a" (pp_tyvar ppe) x (offset + 1) pp_lift lift
+
+  | TCIAbstract { support = `Abs path; offset; lift } ->
+    Format.fprintf fmt "%a.`%d%a" (pp_tyname ppe) path (offset + 1) pp_lift lift
+
+(* -------------------------------------------------------------------- *)
+and pp_tcws (ppe : PPEnv.t) (fmt : Format.formatter) (tcws : tcwitness list) =
+  Format.fprintf fmt "%a" (pp_list ",@ " (pp_tcw ppe)) tcws
+
+(* -------------------------------------------------------------------- *)
+let pp_opname_with_tvi
+  (ppe : PPEnv.t)
+  (fmt : Format.formatter)
+  ((nm, op, tvi) : symbol list * symbol * etyarg list option)
+=
+  match tvi with
+  | None ->
+      pp_opname fmt (nm, op)
+
+  | Some tvi ->
+      Format.fprintf fmt "%a<:%a>"
+        pp_opname (nm, op) (pp_etyargs ppe) tvi
 
 (* -------------------------------------------------------------------- *)
 let pp_opapp
-  (ppe      : PPEnv.t)
-  (t_ty     : 'a -> EcTypes.ty)
-  ((dt_sub  : 'a -> (EcPath.path * _ * 'a list) option),
-  (pp_sub   : PPEnv.t -> (opprec * iassoc) -> 'a pp),
-  (is_trm   : 'a -> bool),
-  (is_tuple : 'a -> 'a list option),
-  (is_proj  : EcPath.path -> 'a -> (EcIdent.t * int) option))
-  (lwr_left : PPEnv.t -> ('a -> EcTypes.ty) -> 'a -> opprec -> int option)
-  (outer    : ((_ * fixity) * iassoc))
-  (fmt      : Format.formatter)
-  ((pred    : [`Expr | `Form]),
-  (op       : EcPath.path),
-  (tvi      : EcTypes.ty list),
-  (es       : 'a list),
-  (tyopt    : ty option))
+     (ppe      : PPEnv.t)
+     (t_ty     : 'a -> EcTypes.ty)
+    ((dt_sub   : 'a -> (EcPath.path * _ * 'a list) option),
+     (pp_sub   : PPEnv.t -> opprec * iassoc -> Format.formatter -> 'a -> unit),
+     (is_trm   : 'a -> bool),
+     (is_tuple : 'a -> 'a list option),
+     (is_proj  : EcPath.path -> 'a -> (EcIdent.t * int) option))
+     (lwr_left : PPEnv.t -> ('a -> EcTypes.ty) -> 'a ->
+                 EcSymbols.symbol list -> opprec -> int option)
+     (outer    : symbol list * ((_ * fixity) * iassoc))
+     (fmt      : Format.formatter)
+     ((pred    : [`Expr | `Form]),
+      (op      : EcPath.path),
+      (tvi     : EcTypes.etyarg list),
+      (es      : 'a list))
 =
   let (nm, opname) =
-    PPEnv.op_symb ppe op (Some (pred, tvi, (List.map t_ty es, tyopt))) in
+    PPEnv.op_symb ppe op (Some (pred, tvi, List.map t_ty es)) in
 
   let pp_tuple_sub ppe prec fmt e =
     match is_tuple e with
@@ -1171,7 +1278,7 @@ let pp_opapp
       let rec doit fmt args =
         match args with
         | [] ->
-           maybe_paren outer prio (fun fmt () -> pp fmt) fmt ()
+           maybe_paren (snd outer) prio (fun fmt () -> pp fmt) fmt ()
 
         | a :: args ->
            Format.fprintf fmt "%a@ %a"
@@ -1195,10 +1302,10 @@ let pp_opapp
             pp_opname_with_tvi ppe fmt (nm, opname, tvi_opt)
 
         | _  ->
-            let pp_first = fun _ _ fmt op ->
-              pp_opname_with_tvi ppe fmt (fst op, snd op, tvi_opt) in
-            let pp fmt () = pp_app ppe ~pp_first ~pp_sub outer fmt ((nm, opname), es) in
-            maybe_paren outer max_op_prec pp fmt ()
+            let pp_first = fun ppe _ -> pp_opname_with_tvi ppe in
+            let pp fmt () =
+              pp_app ppe ~pp_first ~pp_sub (snd outer) fmt (([], opname, tvi_opt), es)
+            in maybe_paren (snd outer) max_op_prec pp fmt ()
 
   and try_pp_as_uniop () =
     match es with
@@ -1216,7 +1323,7 @@ let pp_opapp
               (if is_trm e then "" else " ")
               (pp_sub ppe (opprio, `NonAssoc)) e in
           let pp fmt =
-            maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
+            maybe_paren (snd outer) opprio (fun fmt () -> pp fmt) fmt
           in
             Some pp
     end
@@ -1257,14 +1364,14 @@ let pp_opapp
             (pp_sub ppe (e_bin_prio_rop4, `Left )) e1
             (pp_sub ppe (e_bin_prio_rop4, `Right)) e2 in
         let opprio_left =
-          match lwr_left ppe t_ty e2 e_bin_prio_rop4 with
+          match lwr_left ppe t_ty e2 nm e_bin_prio_rop4 with
           | None   -> e_bin_prio_rop4
           | Some n ->
               if n <= fst e_bin_prio_rop4
               then (n, snd e_bin_prio_rop4)
               else e_bin_prio_rop4 in
         let pp fmt =
-          maybe_paren_gen outer (e_bin_prio_rop4, opprio_left)
+          maybe_paren_gen (snd outer) (e_bin_prio_rop4, opprio_left)
           (fun fmt () -> pp fmt) fmt in
         Some pp
       end
@@ -1279,12 +1386,12 @@ let pp_opapp
               opname
               (pp_sub ppe (opprio, `Right)) e2 in
           let opprio_left =
-            match lwr_left ppe t_ty e2 opprio with
+            match lwr_left ppe t_ty e2 nm opprio with
             | None   -> opprio
             | Some n ->
                 if n <= fst opprio then (n, snd opprio) else opprio in
           let pp fmt =
-            maybe_paren_gen outer (opprio, opprio_left)
+            maybe_paren_gen (snd outer) (opprio, opprio_left)
             (fun fmt () -> pp fmt) fmt
           in
             Some pp
@@ -1299,8 +1406,8 @@ let pp_opapp
         let pp_first _ _ fmt opname =
           let subpp = pp_sub ppe (e_uni_prio_rint, `NonAssoc) in
           Format.fprintf fmt "%a%s" subpp e opname in
-        let pp fmt () = pp_app ppe ~pp_first ~pp_sub outer fmt (opname, es) in
-        Some (maybe_paren outer max_op_prec pp)
+        let pp fmt () = pp_app ppe ~pp_first ~pp_sub (snd outer) fmt (opname, es) in
+        Some (maybe_paren (snd outer) max_op_prec pp)
       end
 
     | _ ->
@@ -1338,7 +1445,7 @@ let pp_opapp
       let recp = EcDecl.operator_as_rcrd op in
 
       match EcEnv.Ty.by_path_opt recp env with
-      | Some { tyd_type = Record (_, fields) }
+      | Some { tyd_type = `Record (_, fields) }
           when List.length fields = List.length es
         -> begin
           let wmap =
@@ -1414,7 +1521,7 @@ let pp_opapp
               (pp_list "@ " (pp_sub ppe (max_op_prec, `NonAssoc)))
               args in
           let pp fmt =
-            maybe_paren outer e_app_prio (fun fmt () -> pp fmt) fmt
+            maybe_paren (snd outer) e_app_prio (fun fmt () -> pp fmt) fmt
           in
             Some pp
       | _ -> None
@@ -1440,7 +1547,7 @@ let pp_chained_orderings (type v)
   (pp_sub  : PPEnv.t -> opprec * iassoc -> v pp)
   (outer   : opprec * iassoc)
   (fmt     : Format.formatter)
-  ((f, fs) : v * (P.path * ty list * v) list)
+  ((f, fs) : v * (P.path * etyarg list * v) list)
 =
   match fs with
   | [] -> pp_sub ppe outer fmt f
@@ -1451,7 +1558,7 @@ let pp_chained_orderings (type v)
         ignore (List.fold_left
           (fun fe (op, tvi, f) ->
             let (nm, opname) =
-              PPEnv.op_symb ppe op (Some (`Form, tvi, ([t_ty fe; t_ty f], None)))
+              PPEnv.op_symb ppe op (Some (`Form, tvi, [t_ty fe; t_ty f]))
             in
               Format.fprintf fmt " %t@ %a"
                 (fun fmt ->
@@ -1541,7 +1648,7 @@ let pp_locality fmt lc =
    this function. see maybe_paren_gen for how this precedence is
    used *)
 
-let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form) (opprec : opprec) : int option
+let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form) (_nm : symbol list) (opprec : opprec) : int option
 =
   let rec l_l f opprec =
     match f.f_node with
@@ -1555,7 +1662,7 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form) (opprec : 
         else l_l f2 e_bin_prio_rop4
     | Fapp ({f_node = Fop (op, tys)}, [f1; f2]) ->
         (let (_, opname) =
-           PPEnv.op_symb ppe op (Some (`Form, tys, (List.map t_ty [f1; f2], None))) in
+           PPEnv.op_symb ppe op (Some (`Form, tys, List.map t_ty [f1; f2])) in
         match priority_of_binop opname with
         | None         -> None
         | Some opprec' ->
@@ -1721,9 +1828,9 @@ and try_pp_chained_orderings
 
   let as_ordering (f : form) =
     match match_pp_notations ~filter:(fun (p, _) -> is_ordering_op p) ppe f with
-    | Some ((op, (tvi, _)), ue, ev, ov, [i1; i2]) -> begin
-      let ti  = Tvar.subst ov in
-      let tvi = List.map (ti -| tvar) tvi in
+    | Some ((op, (tvi, _)), ue, ev, (ov : EcUnify.UniEnv.opened), [i1; i2]) -> begin
+      let ti  = Tvar.subst ov.subst in
+      let tvi = List.map (fun (t, _) -> (ti (tvar t), [])) tvi in
       let sb  = EcMatching.MEV.assubst ue ev ppe.ppe_env in
       let i1  = Fsubst.f_subst sb i1 in
       let i2  = Fsubst.f_subst sb i2 in
@@ -1756,11 +1863,10 @@ and try_pp_chained_orderings
     Option.fold ~none:(i1, acc) ~some:(collect acc (Some i1)) f1
   in
     match collect [] None f with
-    | (_, ([] | [_])) ->
-      false
-
+    | (_, ([] | [_])) -> false
     | (f, fs) ->
-        pp_chained_orderings ppe f_ty pp_form_r outer fmt (f, fs);
+        pp_chained_orderings
+          ppe f_ty pp_form_r outer fmt (f, fs);
         true
 
     | exception Bailout ->
@@ -1810,15 +1916,13 @@ and match_pp_notations
           let a1, a2 = List.split_at na a in
           f_app f a1 (toarrow (List.map f_ty a2) oty), a2
         else f_app f a oty, [] in
-
-      let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
-      let ue = EcUnify.UniEnv.create None in
-      let ov = EcUnify.UniEnv.opentvi ue tv None in
-      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
-      let bd = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
-      | None -> form_of_expr nt.ont_body
-      | Some m -> (ss_inv_of_expr m nt.ont_body).inv in
-      let bd = Fsubst.f_subst_tvar ~freshen:true ov bd in
+      let ev   = MEV.of_idents (List.map fst nt.ont_args) `Form in
+      let ue   = EcUnify.UniEnv.create None in
+      let ov   = EcUnify.UniEnv.opentvi ue tv None in
+      let hy   = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+      let mr   = odfl (EcIdent.create "&hr") (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) in
+      let bd   = form_of_expr ~m:mr nt.ont_body in
+      let bd   = Fsubst.f_subst_tvar ~freshen:true ov.subst bd in
 
       try
         let (ue, ev) =
@@ -1858,15 +1962,28 @@ and try_pp_notations
   | None ->
     false
 
-  | Some ((p, (tv, nt)), ue, ev, ov, eargs) ->
-    let ti   = Tvar.subst ov in
-    let rty  = ti nt.ont_resty in
-    let tv   = List.map (ti -| tvar) tv in
-    let args = List.map (curry f_local -| snd_map ti) nt.ont_args in
-    let args =
-      let subst = EcMatching.MEV.assubst ue ev ppe.ppe_env in
-      List.map (Fsubst.f_subst subst) args in
-    let f    = f_app (f_op p tv rty) (args @ eargs) f.f_ty in
+  | Some ((p, (_tv, nt)), ue, ev, (ov : EcUnify.UniEnv.opened), eargs) ->
+    let ti   = Tvar.subst ov.subst in
+    (* After [f_match_core], the abbrev's tparam univars (created by
+       [opentvi] in [ov.subst]) have been bound by the matcher. Chase
+       those bindings through the unienv so the displayed [tv] /
+       [resty] / [args] show concrete carriers (e.g. [c]) rather than
+       the fresh univars [#a, #b, ...] that [ov.subst] alone would
+       produce.
+
+       Use [ov.args] (the [etyarg list] from [opentvi], which carries
+       both the type univar AND its TC-witness univar(s)) instead of
+       just the bare tparams; chasing through [mev_subst] then
+       resolves both the type univars AND the TC-witness univars
+       into their committed forms, so the printed notation shows
+       both the carrier ([c]) and its TC witness when one exists.    *)
+    let mev_subst = EcMatching.MEV.assubst ue ev ppe.ppe_env in
+    let chase ty = EcCoreSubst.ty_subst mev_subst (ti ty) in
+    let rty  = chase nt.ont_resty in
+    let tv   = List.map (EcCoreSubst.etyarg_subst mev_subst) ov.args in
+    let args = List.map (curry f_local -| snd_map chase) nt.ont_args in
+    let args = List.map (Fsubst.f_subst mev_subst) args in
+    let f    = f_app (f_op_tc p tv rty) (args @ eargs) f.f_ty in
     pp_form_core_r ppe outer fmt f; true
 
 and pp_poe (ppe : PPEnv.t) (fmt : Format.formatter) (poe : form Mop.t) =
@@ -1900,7 +2017,7 @@ and pp_form_core_r
   (f     : form)
 =
   let pp_opapp ppe (outer : opprec * iassoc) (fmt : Format.formatter)
-      (op, tys, es, tyopt) =
+      (op, tys, es, _tyopt) =
     let rec dt_sub f =
       match destr_app f with
       | ({ f_node = Fop (p, tvi) }, args) -> Some (p, tvi, args)
@@ -1930,7 +2047,7 @@ and pp_form_core_r
     in
       pp_opapp ppe f_ty
         (dt_sub, pp_form_r, is_trm, is_tuple, is_proj)
-        lower_left outer fmt (`Form, op, tys, es, tyopt)
+        lower_left ([], outer) fmt (`Form, op, tys, es)
   in
 
   match f.f_node with
@@ -2135,8 +2252,9 @@ and pp_form_core_r
         (string_of_hcmp hs.bhs_cmp)
         (pp_form_r ppef (max_op_prec,`NonAssoc)) (bhs_bd hs).inv
 
-  | Fpr pr->
+  | Fpr pr ->
       let me = EcEnv.Fun.prF_memenv pr.pr_event.m pr.pr_fun ppe.PPEnv.ppe_env in
+
       let ppep = PPEnv.create_and_push_mem ppe ~active:true me in
       let pm = debug_mode || pr.pr_event.m.id_symb <> "&hr" in
       Format.fprintf fmt "Pr[@[%a@[%t@] %a@@ %a :@ %a@]]"
@@ -2152,12 +2270,7 @@ and pp_form_core_r
         (pp_local ppe) pr.pr_mem
         (pp_form ppep) pr.pr_event.inv
 
-and pp_form_r
-  (ppe   : PPEnv.t)
-  (outer : opprec * iassoc)
-  (fmt   : Format.formatter)
-  (f     : form)
-=
+and pp_form_r (ppe : PPEnv.t) outer fmt f =
   let printers =
     [try_pp_notations;
      try_pp_form_eqveq;
@@ -2351,7 +2464,7 @@ let pp_sform ppe fmt f =
 (* -------------------------------------------------------------------- *)
 let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   let ppe = PPEnv.enter_theory ppe (Option.get (EcPath.prefix x)) in
-  let ppe = PPEnv.add_locals ppe tyd.tyd_params in
+  let ppe = PPEnv.add_locals ppe (List.map fst tyd.tyd_params) in
   let name = P.basename x in
 
   let pp_prelude fmt =
@@ -2359,22 +2472,34 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     | [] ->
         Format.fprintf fmt "type %s" name
 
-    | [tx] ->
+    | [(tx, _)] ->
         Format.fprintf fmt "type %a %s" (pp_tyvar ppe) tx name
 
     | txs ->
         Format.fprintf fmt "type %a %s"
-          (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
+          (pp_paren (pp_list ",@ " (pp_tyvar ppe))) (List.map fst txs) name
 
   and pp_body fmt =
+    let pp_one_tc fmt (tc : typeclass) =
+      match tc.tc_args with
+      | []   -> pp_tyname ppe fmt tc.tc_name
+      | [ty] ->
+          Format.fprintf fmt "%a %a"
+            (pp_type ppe) (fst ty) (pp_tyname ppe) tc.tc_name
+      | tys ->
+          Format.fprintf fmt "(%a) %a"
+            (pp_list ",@ " (pp_type ppe)) (List.fst tys)
+            (pp_tyname ppe) tc.tc_name in
     match tyd.tyd_type with
-    | Abstract ->
-        ()
+    | `Abstract [] -> ()
+    | `Abstract tcs ->
+        Format.fprintf fmt " <: %a"
+          (pp_list " &@ " pp_one_tc) tcs
 
-    | Concrete ty ->
+    | `Concrete ty ->
         Format.fprintf fmt " =@ %a" (pp_type ppe) ty
 
-    | Datatype { tydt_ctors = cs } ->
+    | `Datatype { tydt_ctors = cs } ->
         let pp_ctor fmt (c, cty) =
           match cty with
           | [] ->
@@ -2385,7 +2510,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
         in
           Format.fprintf fmt " =@ [@[<hov 2>%a@]]" (pp_list " |@ " pp_ctor) cs
 
-    | Record (_, fields) ->
+    | `Record (_, fields) ->
         let pp_field fmt (f, fty) =
           Format.fprintf fmt "%s: @[<hov 2>%a@]" f (pp_type ppe) fty
         in
@@ -2395,10 +2520,35 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     Format.fprintf fmt "@[%a%t%t.@]" pp_locality tyd.tyd_loca pp_prelude pp_body
 
 (* -------------------------------------------------------------------- *)
+let pp_typeclass (ppe : PPEnv.t) fmt tc =
+  match tc.tc_args with
+  | [] ->
+     pp_tyname ppe fmt tc.tc_name
+
+  | [ty] ->
+     Format.fprintf fmt "%a %a"
+       (pp_type ppe) (fst ty)
+       (pp_tyname ppe) tc.tc_name
+
+  | tys ->
+     Format.fprintf fmt "(%a) %a"
+       (pp_list ",@ " (pp_type ppe)) (List.map fst tys)
+       (pp_tyname ppe) tc.tc_name
+
+(* -------------------------------------------------------------------- *)
+let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
+  match ctt with
+  | []  -> pp_tyvar ppe fmt tvar
+  | ctt ->
+      Format.fprintf fmt "%a <: %a"
+        (pp_tyvar ppe) tvar
+        (pp_list " &@ " (fun fmt tc -> pp_typeclass ppe fmt tc)) ctt
+
+(* -------------------------------------------------------------------- *)
 let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: ty_param list) =
   match ids with
   | []  -> ()
-  | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
+  | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar_ctt ppe)) ids
 
 let pp_pvar (ppe : PPEnv.t) fmt ids =
   match ids with
@@ -2480,8 +2630,19 @@ let pp_codepos_path ppe =
   (pp_list "" (pp_codepos_step ppe))
 
 (* -------------------------------------------------------------------- *)
-let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((cpath, cp1) : CP.codepos) =
-  Format.fprintf fmt "%a%a" (pp_codepos_path ppe) cpath (pp_codepos1 ppe) cp1
+let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos) =
+  let pp_nm (fmt : Format.formatter) ((cp, bs) : CP.codepos1 * CP.codepos_brsel) =
+    let bs =
+      match bs with
+      | `Cond  true     -> "."
+      | `Cond  false    -> "?"
+      | `Match cp       -> Format.sprintf "#%s." cp
+      | `MatchByPos i   -> Format.sprintf "#%d." i
+      in
+    Format.fprintf fmt "%a%s" (pp_codepos1 ppe) cp bs
+  in
+
+  Format.fprintf fmt "%a%a" (pp_list "" pp_nm) nm (pp_codepos1 ppe) cp1
 
 (* -------------------------------------------------------------------- *)
 let pp_codegap1 (ppe : PPEnv.t) (fmt : Format.formatter) (g : CP.codegap1) =
@@ -2509,7 +2670,7 @@ let pp_codegap_range (ppe: PPEnv.t) (fmt: Format.formatter) ((cpath, cp1r) : CP.
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * ty_param list * ty * prbody option) =
-  let ppe = PPEnv.add_locals ppe ts in
+  let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
   let pp_body fmt =
     match op with
@@ -2574,8 +2735,8 @@ let pp_exception_decl (ppe: PPEnv.t) fmt basename ty =
     pp_opname ([], basename) pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
-  let ppe = PPEnv.add_locals ppe ts in
+let pp_opdecl_op (ppe : PPEnv.t) fmt ((basename, ts, ty, op) : symbol * ty_param list * ty * _) =
+  let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
   let pp_body fmt =
     match op with
@@ -2649,8 +2810,9 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
         (pp_type ppe) fix.opf_resty
         (pp_list "@\n" pp_branch) cfix
 
-    | Some (OP_TC) ->
-      Format.fprintf fmt "= < type-class-operator >"
+    | Some (OP_TC (path, name)) ->
+        Format.fprintf fmt ": %a = < type-class operator `%s' of `%a'>"
+          (pp_type ppe) ty name (pp_tyname ppe) path
 
     | Some (OP_Exn _) ->
       Format.fprintf fmt "= < exception >"
@@ -2667,7 +2829,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
 let pp_opdecl_nt (ppe : PPEnv.t) fmt
   ((basename, ts, _ty, nt) : symbol * ty_param list * ty * notation)
 =
-  let ppe = PPEnv.add_locals ppe ts in
+  let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
   let pp_body fmt =
     let subppe, pplocs =
@@ -2716,7 +2878,7 @@ let pp_opdecl
   in Format.fprintf fmt "@[<v>%a%a%a@]" pp_locality op.op_loca pp_name x pp_decl op
 
 let pp_added_op (ppe : PPEnv.t) fmt op =
-  let ppe = PPEnv.add_locals ppe op.op_tparams in
+  let ppe = PPEnv.add_locals ppe (List.map fst op.op_tparams) in
   match op.op_tparams with
   | [] -> Format.fprintf fmt ": @[<hov 2>%a@]"
     (pp_type ppe) op.op_ty
@@ -2738,7 +2900,7 @@ let tags_of_axkind = function
   | `Lemma -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
-  let ppe = PPEnv.add_locals ppe ax.ax_tparams in
+  let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_tparams) in
   let basename = P.basename x in
 
   let pp_spec fmt =
@@ -3281,8 +3443,8 @@ let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =
 
   let insync =
        EcMemory.mt_equal (snd es.es_ml) (snd es.es_mr)
-    && EcReduction.EqTest.for_stmt
-         ppe.PPEnv.ppe_env ~norm:false es.es_sl es.es_sr in
+(*    && EcReduction.EqTest.for_stmt
+         ppe.PPEnv.ppe_env ~norm:false es.es_sl es.es_sr in *) in
 
   let ppnode =
     if insync then begin
@@ -3316,6 +3478,50 @@ let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =
 let pp_rwbase ppe fmt (p, rws) =
   Format.fprintf fmt "%a = %a@\n%!"
     (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
+
+(* -------------------------------------------------------------------- *)
+let pp_tparam ppe fmt (id, tcs) =
+  Format.fprintf fmt "%a <: %a"
+    pp_symbol (EcIdent.name id)
+    (pp_list " &@ " (pp_typeclass ppe)) tcs
+
+let pp_tparams ppe fmt tparams =
+  Format.fprintf fmt "%a"
+    (pp_maybe (List.length tparams != 0) (pp_enclose ~pre:"[" ~post:"] ") (pp_list ",@ " (pp_tparam ppe))) tparams
+
+let pp_prts ppe fmt = function
+  | [] -> ()
+  | tcs ->
+    let pp_one fmt (p, _lbl, _ren) = pp_typeclass ppe fmt p in
+    Format.fprintf fmt " <: %a"
+      (pp_list "@ & " pp_one) tcs
+
+let pp_op ppe fmt (t, ty) =
+  Format.fprintf fmt "  @[<hov 2>op %s :@ %a.@]"
+    (EcIdent.name t)
+    (pp_type ppe) ty
+
+let pp_ops ppe fmt ops =
+  pp_maybe (List.length ops != 0) (pp_enclose ~pre:"" ~post:"@,@,") (pp_list "@,@," (pp_op ppe)) fmt ops
+
+let pp_ax ppe fmt (s, f) =
+  Format.fprintf fmt "  @[<hov 2>axiom %s :@ %a.@]"
+    s (pp_form ppe) f
+
+let pp_axs ppe fmt axs =
+  pp_maybe (List.length axs != 0) (pp_enclose ~pre:"" ~post:"@,@,") (pp_list "@,@," (pp_ax ppe)) fmt axs
+
+let pp_ops_axs ppe fmt (ops, axs) =
+  Format.fprintf fmt "%a%a"
+    (pp_maybe (List.length ops + List.length axs != 0) (pp_enclose ~pre:"@,@," ~post:"") (pp_ops ppe)) ops
+    (pp_axs ppe) axs
+
+let pp_tc_decl ppe fmt (p, tcdecl) =
+  Format.fprintf fmt "@[<v>type class %a%a%a = {%a}.@]"
+    (pp_tparams ppe) tcdecl.tc_tparams
+    (pp_tyname ppe) p
+    (pp_prts ppe) tcdecl.tc_prts
+    (pp_ops_axs ppe) (tcdecl.tc_ops, tcdecl.tc_axs)
 
 (* -------------------------------------------------------------------- *)
 let pp_solvedb ppe fmt (db: (int * (P.path * _) list) list) =
@@ -3409,7 +3615,7 @@ module PPGoal = struct
     in (ppe, (id, pdk))
 
   let pp_goal1 ?(pphyps = true) ?prpo ?(idx) (ppe : PPEnv.t) fmt (hyps, concl) =
-    let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+    let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
     let ppe, pps = List.map_fold pre_pp_hyp ppe (List.rev hyps.EcBaseLogic.h_local) in
 
     idx |> oiter (Format.fprintf fmt "Goal #%d@\n");
@@ -3420,7 +3626,7 @@ module PPGoal = struct
         | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
         | tv ->
             Format.fprintf fmt "Type variables: %a@\n\n%!"
-              (pp_list ", " (pp_tyvar ppe)) tv
+              (pp_list ", " (pp_tyvar ppe)) (List.map fst tv)
       end;
       List.iter (fun (id, (pk, dk)) ->
         let pk fmt =
@@ -3455,7 +3661,7 @@ end
 (* -------------------------------------------------------------------- *)
 let pp_hyps (ppe : PPEnv.t) fmt hyps =
   let hyps = EcEnv.LDecl.tohyps hyps in
-  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+  let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
   let ppe, pps =
     List.map_fold PPGoal.pre_pp_hyp ppe
                   (List.rev hyps.EcBaseLogic.h_local) in
@@ -3464,7 +3670,7 @@ let pp_hyps (ppe : PPEnv.t) fmt hyps =
   | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
   | tv ->
       Format.fprintf fmt "Type variables: %a@\n\n%!"
-        (pp_list ", " (pp_tyvar ppe)) tv
+        (pp_list ", " (pp_tyvar ppe)) (List.map fst tv)
   end;
   List.iter (fun (id, (pk, dk)) ->
     let pk fmt =
@@ -3615,7 +3821,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
 
     let pp_branch fmt ((vars, s), (cname, _)) =
       let ptn = EcTypes.toarrow (List.snd vars) e.e_ty in
-      let ptn = f_op (EcPath.pqoname (EcPath.prefix p) cname) typ ptn in
+      let ptn = f_op_tc (EcPath.pqoname (EcPath.prefix p) cname) typ ptn in
       let ptn = f_app ptn (List.map (fun (x, ty) -> f_local x ty) vars) e.e_ty in
 
       Format.fprintf fmt "| %a => @[<hov 2>%a@]@ "
@@ -3770,10 +3976,13 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
       Format.fprintf fmt "export %a."
         EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
 
-  | EcTheory.Th_instance ((typ, ty), tc, lc) -> begin
-      let ppe = PPEnv.add_locals ppe typ in (* FIXME *)
+  | EcTheory.Th_typeclass _ ->
+      Format.fprintf fmt "typeclass <FIXME>."
 
-      match tc with
+  | EcTheory.Th_instance (_, tci) -> begin
+      let ppe = PPEnv.add_locals ppe (List.map fst tci.tci_params) in
+
+      match tci.tci_instance with
       | (`Ring _ | `Field _) as tc -> begin
           let (name, ops) =
             let rec ops_of_ring cr =
@@ -3809,10 +4018,10 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
           in
             Format.fprintf fmt
               "%ainstance %s with [%a] %a@\n@[<hov 2>  %a@]"
-              pp_locality lc
+              pp_locality tci.tci_local
               name
-              (pp_paren (pp_list ",@ " (pp_tyvar ppe))) typ
-              (pp_type ppe) ty
+              (pp_paren (pp_list ",@ " (pp_tyvar ppe))) (List.map fst tci.tci_params)
+              (pp_type ppe) tci.tci_type
               (pp_list "@\n"
                  (fun fmt (name, op) ->
                    Format.fprintf fmt "op %s = %s"
@@ -3820,9 +4029,11 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
               ops
       end
 
-      | `General p ->
+      | `General (tc, _) ->
           Format.fprintf fmt "%ainstance %a with %a."
-            pp_locality lc (pp_type ppe) ty pp_path p
+            pp_locality tci.tci_local
+            (pp_type ppe) tci.tci_type
+            (pp_typeclass ppe) tc
   end
 
   | EcTheory.Th_baserw (name, _lc) ->
@@ -4044,6 +4255,12 @@ module ObjectInfo = struct
     | `Solve   name -> pr_at fmt env name
 
   (* ------------------------------------------------------------------ *)
+  let pr_tc_r =
+    { od_name    = "type classes";
+      od_lookup  = EcEnv.TypeClass.lookup;
+      od_printer = pp_tc_decl; }
+
+  (* ------------------------------------------------------------------ *)
   let pr_any fmt env qs =
     let printers = [pr_gen_r ~prcat:true pr_ty_r ;
                     pr_gen_r ~prcat:true pr_op_r ;
@@ -4052,7 +4269,8 @@ module ObjectInfo = struct
                     pr_gen_r ~prcat:true pr_mod_r;
                     pr_gen_r ~prcat:true pr_mty_r;
                     pr_gen_r ~prcat:true pr_rw_r ;
-                    pr_gen_r ~prcat:true pr_at_r ; ] in
+                    pr_gen_r ~prcat:true pr_at_r ;
+                    pr_gen_r ~prcat:true pr_tc_r ; ] in
 
     let ok = ref (List.length printers) in
 

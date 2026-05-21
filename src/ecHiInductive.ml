@@ -84,7 +84,8 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let env0  =
     let myself = {
       tyd_params  = EcUnify.UniEnv.tparams ue;
-      tyd_type    = Abstract;
+      tyd_type    = `Abstract [];
+      tyd_resolve = true;
       tyd_loca    = lc;
       tyd_subtype = None;
     } in
@@ -132,19 +133,19 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
       let tdecl = EcEnv.Ty.by_path_opt tname env0
         |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
-      let tyinst = ty_instantiate tdecl.tyd_params targs in
+      let tyinst = ty_instanciate tdecl.tyd_params targs in
 
       match tdecl.tyd_type with
-      | Abstract ->
-          List.exists isempty targs
+      | `Abstract _ ->
+          List.exists isempty (List.fst targs)
 
-      | Concrete ty ->
+      | `Concrete ty ->
           isempty_1 [ tyinst ty ]
 
-      | Record (_, fields) ->
+      | `Record (_, fields) ->
           isempty_1 (List.map (tyinst -| snd) fields)
 
-      | Datatype dt ->
+      | `Datatype dt ->
           (* FIXME: Inspecting all constructors recursively causes
              non-termination in some cases. One can have the same
              limitation as is done for positivity in order to limit this
@@ -334,7 +335,7 @@ let trans_matchfix
         | PPApp ((cname, tvi), _cargs) ->
             let tvi = tvi |> omap (TT.transtvi env ue) in
             let filter = fun _ op -> EcDecl.is_ctor op in
-            let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+            let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
             match cts with
             | [] ->
               fxerror cname.pl_loc env TT.FXE_CtorUnk
@@ -369,7 +370,7 @@ let trans_matchfix
           let indp, _ = Msym.find x indtbl in
           let indty = oget (EcEnv.Ty.by_path_opt indp env) in
           let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
-          let codom = tconstr indp (List.map tvar indty.tyd_params) in
+          let codom = tconstr_tc indp (etyargs_of_tparams indty.tyd_params) in
           let tys = List.map (fun (_, dom) -> toarrow dom codom) ind in
           let tys, _ = EcUnify.UniEnv.opentys ue indty.tyd_params None tys in
           let doargs cty =
@@ -381,7 +382,7 @@ let trans_matchfix
         | PPApp ((cname, tvi), cargs) ->
           let filter = fun _ op -> EcDecl.is_ctor op in
           let tvi = tvi |> omap (TT.transtvi env ue) in
-          let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+          let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
 
           match cts with
           | [] ->
@@ -412,8 +413,8 @@ let trans_matchfix
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
               let ctorty =
-                let tvi = Some (EcUnify.TVIunamed tvi) in
-                  fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+                let tvi = Some (EcUnify.tvi_unamed tvi) in
+                fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
               let pty = EcUnify.UniEnv.fresh ue in
 
               (try  EcUnify.unify env ue (toarrow ctorty pty) opty
@@ -484,7 +485,7 @@ let trans_matchfix
       let codom    = ty_subst ts codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
       let args     = List.map (snd_map (ty_subst ts)) args in
-      let opexpr   = e_op opexpr (List.map tvar tparams)
+      let opexpr   = e_op_tc opexpr (etyargs_of_tparams tparams)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
         bind_elocal ts opname opexpr

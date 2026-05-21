@@ -51,6 +51,7 @@ type prover_infos = {
   pr_max       : int;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_tvi       : EcAst.ty list EcPath.Mp.t;
   pr_dumpin    : string EcLocation.located option;
   pr_selected  : bool;
   gn_debug     : bool;

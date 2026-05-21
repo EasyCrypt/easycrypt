@@ -138,9 +138,9 @@ end
 (* -------------------------------------------------------------------- *)
 module Ty : sig
   val add : ?src:string -> scope -> ptydecl located -> scope
-
-  val add_subtype : scope -> psubtype located -> scope
-  val add_instance : scope -> Ax.proofmode -> ptycinstance located -> scope
+  val add_class    : scope -> ptypeclass located -> scope
+  val add_subtype  : scope -> psubtype located -> scope
+  val add_instance : ?import:bool -> scope -> Ax.proofmode -> ptycinstance located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -248,6 +248,7 @@ module Prover : sig
     pl_max        : int option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
+    pl_tvi        : EcAst.ty list EcPath.Mp.t option;
     pl_dumpin     : string located option;
     pl_selected   : bool option;
     gn_debug      : bool option;

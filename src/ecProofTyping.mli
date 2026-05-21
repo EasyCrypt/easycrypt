@@ -1,11 +1,13 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcIdent
+open EcAst
+open EcFol
 open EcPath
 open EcDecl
 open EcEnv
 open EcCoreGoal
-open EcAst
+open EcMemory
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
@@ -15,7 +17,7 @@ type metavs = EcFol.form EcSymbols.Msym.t
  * proof-environment. See the [Exn] module for more information. *)
 
 val unienv_of_hyps : LDecl.hyps -> EcUnify.unienv
-val pf_check_tvi   : proofenv -> ty_params -> EcUnify.tvi -> unit
+val pf_check_tvi   : env -> proofenv -> ty_params -> EcUnify.tvi -> unit
 
 (* Typing in the environment implied by [LDecl.hyps]. *)
 val process_form_opt : ?mv:metavs -> LDecl.hyps -> pformula -> ty option -> form

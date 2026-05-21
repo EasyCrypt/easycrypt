@@ -90,17 +90,18 @@
 
   let mk_simplify l =
     if l = [] then
-      { pbeta  = true; pzeta  = true;
-        piota  = true; peta   = true;
-        plogic = true; pdelta = None;
-        pmodpath = true; puser = true; }
+      { pbeta    = true; pzeta    = true;
+        piota    = true; peta     = true;
+        plogic   = true; pdelta   = None;
+        pdeltatc = true; pmodpath = true;
+        puser    = true; }
     else
       let doarg acc = function
         | `Delta l ->
             if   l = [] || acc.pdelta = None
             then { acc with pdelta = None }
             else { acc with pdelta = Some (oget acc.pdelta @ l) }
-
+        | `DeltaTC -> { acc with pdeltatc = true }
         | `Zeta    -> { acc with pzeta    = true }
         | `Iota    -> { acc with piota    = true }
         | `Beta    -> { acc with pbeta    = true }
@@ -110,10 +111,11 @@
         | `User    -> { acc with puser    = true }
       in
         List.fold_left doarg
-          { pbeta  = false; pzeta  = false;
-            piota  = false; peta   = false;
-            plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false; } l
+          { pbeta    = false; pzeta    = false;
+            piota    = false; peta     = false;
+            plogic   = false; pdelta   = Some [];
+            pdeltatc = false; pmodpath = false;
+            puser    = false; } l
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
@@ -398,6 +400,7 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
+%token CLASS
 %token CLEAR
 %token CLONE
 %token COLON
@@ -532,6 +535,7 @@
 %token REFLEX
 %token REMOVE
 %token RENAME
+%token REDUCIBLE
 %token REPLACE
 %token REQUIRE
 %token RES
@@ -595,6 +599,7 @@
 %token WHILE
 %token WHY3
 %token WITH
+%token VIA
 %token WLOG
 %token WP
 %token ZETA
@@ -902,11 +907,28 @@ lp_field:
 (* -------------------------------------------------------------------- *)
 (* Expressions: program expression, real expression                     *)
 
+(* Optional witness selector trailing a type-instantiation entry.
+   Accepts any combination of [/Lbl+] and [via P]. *)
+witness_selector:
+| (* empty *)
+    { pws_none }
+| SLASH lbls=plist1(ident, SLASH)
+    { { pws_labels = lbls; pws_via = None; } }
+| VIA p=qident
+    { { pws_labels = []; pws_via = Some p; } }
+| SLASH lbls=plist1(ident, SLASH) VIA p=qident
+    { { pws_labels = lbls; pws_via = Some p; } }
+| VIA p=qident SLASH lbls=plist1(ident, SLASH)
+    { { pws_labels = lbls; pws_via = Some p; } }
+
+tyvar_unnamed1:
+| ty=loc(type_exp) sel=witness_selector { (ty, sel) }
+
 tyvar_byname1:
-| x=tident EQ ty=loc(type_exp) { (x, ty) }
+| x=tident EQ ty=loc(type_exp) sel=witness_selector { (x, ty, sel) }
 
 tyvar_annot:
-| lt = plist1(loc(type_exp), COMMA) { TVIunamed lt }
+| lt = plist1(tyvar_unnamed1, COMMA) { TVIunamed lt }
 | lt = plist1(tyvar_byname1, COMMA) { TVInamed lt }
 
 %inline tvars_app:
@@ -1629,6 +1651,7 @@ signature_item:
            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } }
 
 (* -------------------------------------------------------------------- *)
+(* EcTypes declarations / definitions *)
 %inline locality:
 | (* empty *) { `Global }
 | LOCAL       { `Local }
@@ -1643,19 +1666,38 @@ signature_item:
 %inline is_local:
 | lc=loc(locality) { locality_as_local lc }
 
-(* -------------------------------------------------------------------- *)
-(* EcTypes declarations / definitions                                   *)
+(* A TC class instantiation: type args + class name. Used inside
+   [tc_bound] (the bare-or-parenthesized class-bound form). *)
+tcparam:
+| tys=ioption(type_args) x=lqident
+    { (x, odfl [] tys) }
+
+(* A class bound: optionally labeled and/or renamed. Used uniformly
+   in class-declaration parents, type-declaration tparams, and
+   op/lemma-signature tparams. *)
+tc_bound:
+| p=tcparam
+    { (p, None, []) }
+| LPAREN p=tcparam AS lbl=ident RPAREN
+    { (p, Some lbl, []) }
+| LPAREN p=tcparam WITH ren=plist1(tc_rename, COMMA) RPAREN
+    { (p, None, ren) }
+| LPAREN p=tcparam AS lbl=ident WITH ren=plist1(tc_rename, COMMA) RPAREN
+    { (p, Some lbl, ren) }
+
+tc_rename:
+| src=oident EQ tgt=oident { (src, tgt) }
 
 typaram:
-| x=tident
-    { (x : ptyparam) }
+| x=tident { (x, []) }
+| x=tident LTCOLON tc=plist1(tc_bound, AMP) { (x, tc) }
 
 typarams:
 | empty
     { ([] : ptyparams) }
 
 | x=tident
-    { ([x] : ptyparams) }
+    { ([(x, [])] : ptyparams) }
 
 | xs=paren(plist1(typaram, COMMA))
     { (xs : ptyparams) }
@@ -1679,7 +1721,10 @@ rec_field_def:
 
 typedecl:
 | locality=locality TYPE td=rlist1(tyd_name, COMMA)
-    { List.map (fun x -> mk_tydecl ~locality x PTYD_Abstract) td }
+    { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
+
+| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tc_bound, AMP)
+    { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
 
 | locality=locality TYPE td=tyd_name EQ te=loc(type_exp)
     { [mk_tydecl ~locality td (PTYD_Alias te)] }
@@ -1689,6 +1734,29 @@ typedecl:
 
 | locality=locality TYPE td=tyd_name EQ te=datatype_def
     { [mk_tydecl ~locality td (PTYD_Datatype te)] }
+
+(* -------------------------------------------------------------------- *)
+(* Type classes                                                         *)
+typeclass:
+| loca=is_local TYPE CLASS  tya=tyvars_decl? x=lident
+  inth=prefix(LTCOLON, plist1(tc_bound, AMP))?
+  EQ LBRACE body=tc_body RBRACE {
+    { ptc_name   = x;
+      ptc_params = tya;
+      ptc_inth   = odfl [] inth;
+      ptc_ops    = fst body;
+      ptc_axs    = snd body;
+      ptc_loca   = loca; }
+  }
+
+tc_body:
+| ops=tc_op* axs=tc_ax* { (ops, axs) }
+
+tc_op:
+| OP x=oident COLON ty=loc(type_exp) { (x, ty) }
+
+tc_ax:
+| AXIOM x=ident COLON ax=form { (x, ax) }
 
 (* -------------------------------------------------------------------- *)
 (* Subtypes                                                             *)
@@ -1708,40 +1776,34 @@ subtype_rename:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| loca=is_local INSTANCE x=qident
-    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+| loca=is_local INSTANCE tc=tcparam args=tyci_args?
+    name=prefix(AS, lident)? WITH typ=tyvars_decl? ty=loc(type_exp)
+    reducible=boption(REDUCIBLE) ops=tyci_op* axs=tyci_ax*
   {
-    { pti_name = x;
-      pti_type = (odfl [] typ, ty);
-      pti_ops  = ops;
-      pti_axs  = axs;
-      pti_args = None;
-      pti_loca = loca;
-    }
+    let args = args |> omap (fun (c, p) -> `Ring (c, p)) in
+    { pti_tc        = tc;
+      pti_name      = name;
+      pti_type      = (odfl [] typ, ty);
+      pti_ops       = ops;
+      pti_axs       = axs;
+      pti_args      = args;
+      pti_loca      = loca;
+      pti_reducible = reducible; }
   }
 
-| loca=is_local INSTANCE x=qident c=uoption(UINT) p=uoption(UINT)
-    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
-  {
-    { pti_name = x;
-      pti_type = (odfl [] typ, ty);
-      pti_ops  = ops;
-      pti_axs  = axs;
-      pti_args = Some (`Ring (c, p));
-      pti_loca = loca;
-    }
-  }
+tyci_args:
+| c=uoption(UINT) p=uoption(UINT)
+   { (c, p) }
 
 tyci_op:
-| OP x=oident EQ tg=qoident
-    { (x, ([], tg)) }
-
-| OP x=oident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
-    { (x, (tvi, tg)) }
+| OP x=oident EQ body=sform
+    { (x, body) }
 
 tyci_ax:
 | PROOF x=ident BY tg=tactic_core
-    { (x, tg) }
+    { (x, None, tg) }
+| PROOF x=ident LTCOLON lbls=plist1(ident, SLASH) GT BY tg=tactic_core
+    { (x, Some lbls, tg) }
 
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
@@ -1758,8 +1820,9 @@ pred_tydom:
 
 tyvars_decl:
 | LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET
-| LBRACKET tyvars=rlist2(tident, empty) RBRACKET
     { tyvars }
+| LBRACKET tyvars=rlist2(tident, empty) RBRACKET
+    { List.map (fun x -> (x, [])) tyvars }
 
 op_or_const:
 | OP    { `Op    }
@@ -2486,6 +2549,7 @@ genpattern:
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
+| CLASS            { `DeltaTC }
 | ZETA             { `Zeta }
 | IOTA             { `Iota }
 | BETA             { `Beta }
@@ -2743,17 +2807,19 @@ occurences:
 
 dbmap1:
 | f=dbmap_flag? x=dbmap_target
-    { { pht_flag = odfl `Include f;
-        pht_kind = (fst x);
-        pht_name = (snd x); } }
+    { let kind, name, tvi = x in
+      { pht_flag = odfl `Include f;
+        pht_kind = kind;
+        pht_name = name;
+        pht_tvi  = tvi; } }
 
 %inline dbmap_flag:
 | PLUS  { `Include }
 | MINUS { `Exclude }
 
 %inline dbmap_target:
-| AT x=uqident { (`Theory, x) }
-| x=qident     { (`Lemma , x) }
+| AT x=uqident                  { (`Theory, x, None    ) }
+| x=qident tvi=tvars_app?       { (`Lemma , x, tvi     ) }
 
 dbhint:
 | m=dbmap1         { [m] }
@@ -3766,14 +3832,18 @@ clone_override:
    { (x, PTHO_Theory (y, unloc mode, odfl [] renames)) }
 
 realize:
-| REALIZE x=qident
-    {  { pr_name = x; pr_proof = None; } }
+| REALIZE x=qident lbls=ioption(realize_labels)
+    {  { pr_name = x; pr_labels = lbls; pr_proof = None; } }
 
-| REALIZE x=qident BY t=tactics
-    {  { pr_name = x; pr_proof = Some (Some t); } }
+| REALIZE x=qident lbls=ioption(realize_labels) BY t=tactics
+    {  { pr_name = x; pr_labels = lbls; pr_proof = Some (Some t); } }
 
-| REALIZE x=qident BY bracket(empty)
-    {  { pr_name = x; pr_proof = Some None; } }
+| REALIZE x=qident lbls=ioption(realize_labels) BY bracket(empty)
+    {  { pr_name = x; pr_labels = lbls; pr_proof = Some None; } }
+
+realize_labels:
+| LTCOLON lbls=plist1(ident, SLASH) GT
+    { lbls }
 
 
 (* -------------------------------------------------------------------- *)
@@ -3927,6 +3997,7 @@ global_action:
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | subtype          { Gsubtype     $1 }
+| typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
 | exception_       { Gexception   $1 }

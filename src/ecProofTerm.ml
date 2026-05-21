@@ -111,36 +111,46 @@ let can_concretize (pt : pt_env) =
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) (LDecl.toenv pe.pte_hy))
+  let env = LDecl.toenv pe.pte_hy in
+  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) env, env)
+
+(* Substitute [subst] in [f] and then fold every TC op whose witness
+   resolves through a [tci_reducible] instance. Used to normalise a
+   form right after a polymorphic template has been instantiated at
+   a concrete carrier — without this, the user-visible term carries
+   verbose [op<:T[Conc(...)]>]-style heads instead of the underlying
+   core op. The fold for non-reducible-marked instances is a no-op. *)
+let cpt_subst_form ((subst, env) : f_subst * EcEnv.env) (f : form) : form =
+  EcReduction.fold_reducible_tc env (Fsubst.f_subst subst f)
 
 (* -------------------------------------------------------------------- *)
-let concretize_e_form_gen (CPTEnv subst) ids f =
-  let f = Fsubst.f_subst subst f in
+let concretize_e_form_gen (CPTEnv (subst, env)) ids f =
+  let f = cpt_subst_form (subst, env) f in
   let ids = List.map (snd_map (Fsubst.gty_subst subst)) ids in
   f_forall ids f
 
 (* -------------------------------------------------------------------- *)
-let concretize_e_form cptenv f =
-   concretize_e_form_gen cptenv [] f
+let concretize_e_form (CPTEnv (subst, env)) f =
+  cpt_subst_form (subst, env) f
 
 (* -------------------------------------------------------------------- *)
-let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
+let rec concretize_e_arg ((CPTEnv (subst, env)) as cptenv) arg =
   match arg with
-  | PAFormula f        -> PAFormula (Fsubst.f_subst subst f)
+  | PAFormula f        -> PAFormula (cpt_subst_form (subst, env) f)
   | PAMemory  m        -> PAMemory (Fsubst.m_subst subst m)
   | PAModule  (mp, ms) -> PAModule (mp, ms)
   | PASub     pt       -> PASub (pt |> omap (concretize_e_pt cptenv))
 
 
-and concretize_e_head ((CPTEnv subst) as cptenv) head =
+and concretize_e_head ((CPTEnv (subst, env)) as cptenv) head =
   match head with
-  | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
+  | PTCut    (f, s)   -> PTCut    (cpt_subst_form (subst, env) f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
+  | PTGlobal (p, tys) -> PTGlobal (p, List.map (EcCoreSubst.etyarg_subst subst) tys)
   | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
-and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
+and concretize_e_pt ((CPTEnv (subst, _)) as cptenv) pt =
   match pt with
   | PTApply { pt_head; pt_args } ->
     PTApply {
@@ -163,8 +173,8 @@ let concretize_gen ({ ptev_env = pe } as pt) ids =
 
 (* -------------------------------------------------------------------- *)
 let concretize ({ ptev_env = pe } as pt) =
-  let (CPTEnv subst) as cptenv = concretize_env pe in
-  (concretize_e_pt cptenv pt.ptev_pt, Fsubst.f_subst subst pt.ptev_ax)
+  let (CPTEnv (subst, env)) as cptenv = concretize_env pe in
+  (concretize_e_pt cptenv pt.ptev_pt, cpt_subst_form (subst, env) pt.ptev_ax)
 
 (* -------------------------------------------------------------------- *)
 let tc_pterm_apperror pte ?loc (kind : apperror) =
@@ -191,22 +201,30 @@ let pt_of_hyp_r ptenv x =
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
-let pt_of_global pf hyps p tys =
+let pt_of_global_tc pf hyps p etyargs =
   let ptenv = ptenv_of_penv hyps pf in
-  let ax    = EcEnv.Ax.instantiate p tys (LDecl.toenv hyps) in
+  let ax    = EcEnv.Ax.instanciate p etyargs (LDecl.toenv hyps) in
 
   { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys p;
+    ptev_pt  = ptglobal ~tys:etyargs p;
+    ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
+let pt_of_global pf hyps p tys =
+  pt_of_global_tc pf hyps p (List.map (fun ty -> (ty, [])) tys)
+
+(* -------------------------------------------------------------------- *)
+let pt_of_global_tc_r ptenv p etyargs =
+  let env = LDecl.toenv ptenv.pte_hy in
+  let ax  = EcEnv.Ax.instanciate p etyargs env in
+
+  { ptev_env = ptenv;
+    ptev_pt  = ptglobal ~tys:etyargs p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
 let pt_of_global_r ptenv p tys =
-  let env = LDecl.toenv ptenv.pte_hy in
-  let ax  = EcEnv.Ax.instantiate p tys env in
-
-  { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys p;
-    ptev_ax  = ax; }
+  pt_of_global_tc_r ptenv p (List.map (fun ty -> (ty, [])) tys)
 
 (* -------------------------------------------------------------------- *)
 let pt_of_handle_r ptenv hd =
@@ -222,13 +240,11 @@ let pt_of_uglobal_r ptenv p =
   let ax      = oget (EcEnv.Ax.by_path_opt p env) in
   let typ, ax = (ax.EcDecl.ax_tparams, ax.EcDecl.ax_spec) in
 
-  (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
-  let ax  = Fsubst.f_subst_tvar ~freshen:true fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  let ax  = Fsubst.f_subst_tvar ~freshen:true fs.subst ax in
 
   { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys:typ p;
+    ptev_pt  = ptglobal ~tys:fs.args p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -313,21 +329,95 @@ let pf_find_occurence
     | _, _ -> false
   in
 
+  (* Two heads match keywise iff they're path-equal, OR the candidate's
+     head TC-reduces (via factory rename on its abstract witness) to an
+     [Fop] with the pattern's key. Without the second clause, [rewrite L]
+     misses positions where [L]'s LHS uses a class op like [( * )<:comring>]
+     and the goal has the rename-equivalent [(+)<:t mulmonoid leg>] —
+     deeper matching would resolve them, but [keycheck] would have
+     filtered them out first.                                          *)
+  let env_for_kmatch = EcEnv.LDecl.toenv pt.pte_hy in
+  let head_op_after_tc_reduce (head : form) : EcPath.path option =
+    match head.f_node with
+    | Fop (p, tys) -> begin
+        match EcEnv.Op.tc_reduce env_for_kmatch p tys with
+        | exception EcEnv.NotReducible -> None
+        | reduced ->
+          match (fst (destr_app reduced)).f_node with
+          | Fop (p', _) -> Some p'
+          | _ -> None
+      end
+    | _ -> None in
+  (* Reverse-instance lookup: given a TC class op [tcop] and a
+     concrete op [concrete], is there a registered instance where
+     [tcop]'s realisation is [concrete]? Used by [kmatch] when the
+     pattern is a TC-op call with a univar carrier (so [tc_reduce]
+     can't fire forward) and the goal's head is the concrete
+     realisation. Lets [rewrite mul0r] (no TVI) match positions
+     whose head is e.g. [polyM] — pinning the carrier via
+     [try_delta] / [doit_tc_reduce] downstream.                    *)
+  let tc_op_realised_by tcop concrete =
+    EcEnv.Op.tc_op_realised_by env_for_kmatch tcop concrete in
+  (* Compute the alternative head an [Fop p tys] could expose after a
+     single [tc_reduce] step at the carrier. Used for both pattern- and
+     goal-side keyed matching. *)
+  let kmatch_alt_head (head : form) : EcPath.path option =
+    head_op_after_tc_reduce head in
   let kmatch key tp =
-    match key, (fst (destr_app tp)).f_node with
+    let tp_head = fst (destr_app tp) in
+    match key, tp_head.f_node with
     | `NoKey , _           -> true
-    | `Path p, Fop (p', _) -> EcPath.p_equal p p'
-    | `Path _, _           -> false
+    | `Path p, Fop (p', _) when EcPath.p_equal p p' -> true
+    | `Path p, Fop (p', _) when tc_op_realised_by p p' -> true
+    | `Path p, _ -> begin
+        match kmatch_alt_head tp_head with
+        | Some p' when EcPath.p_equal p p' -> true
+        (* Multi-parent factory rename: pattern's [p] is a TC op (e.g.
+           [( * )] from comring) and goal's head is a different TC op
+           (e.g. [(+)] inherited from monoid via comring's mulmonoid
+           parent edge with [( * ) := (+)] rename). The goal's head
+           [tc_reduce]s to a concrete op; check whether the pattern's
+           [p] is also realised by that same concrete op in some
+           registered instance.                                       *)
+        | Some p' -> tc_op_realised_by p p'
+        | None -> false
+      end
     | `Var  x, Flocal x'   -> id_equal x x'
     | `Var  _, _           -> false
   in
 
-  let keycheck tp key = not occmode.k_keyed || kmatch key tp in
+  let keycheck tp key =
+    let r = not occmode.k_keyed || kmatch key tp in
+    if Sys.getenv_opt "EC_DBG_KEY" <> None then begin
+      let dump_key = function
+        | `NoKey -> "NoKey"
+        | `Path p -> "Path " ^ EcPath.tostring p
+        | `Var v -> "Var " ^ EcIdent.name v in
+      let dump_head f =
+        match (destr_app f) with
+        | { f_node = Fop (p, _); _ }, _ -> "Fop " ^ EcPath.tostring p
+        | { f_node = Flocal id; _ }, _ -> "Flocal " ^ EcIdent.name id
+        | _ -> "<o>" in
+      Format.eprintf "[keycheck] key=%s head=%s -> %b@."
+        (dump_key key) (dump_head tp) r
+    end;
+    r in
 
-  (* Extract key from pattern *)
+  (* Extract key from pattern. For a TC-op pattern, take the *reduced*
+     head as the key when [tc_reduce] yields a concrete op at the
+     pattern's carrier — that's the form most goals will have after
+     abbrev expansion at that carrier. Without this, [rewrite L] with
+     [L] using a class op like [(+)<:int poly>] would key on [(+)]
+     and miss goals where the same position has been elaborated to
+     the carrier's structural realisation (e.g. [polyD]).            *)
   let key =
-    match (fst (destr_app ptn)).f_node with
-    | Fop (p, _) -> `Path p
+    let ptn_head = fst (destr_app ptn) in
+    match ptn_head.f_node with
+    | Fop (p, _) -> begin
+        match kmatch_alt_head ptn_head with
+        | Some p' -> `Path p'
+        | None -> `Path p
+      end
     | Flocal x   ->
         if   is_none (EcMatching.MEV.get x `Form !(pt.pte_ev))
         then `Var x
@@ -514,14 +604,16 @@ let process_named_pterm pe (tvi, fp) =
       (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi)
   in
 
-  PT.pf_check_tvi pe.pte_pe typ tvi;
+  PT.pf_check_tvi env pe.pte_pe typ tvi;
 
-  (* FIXME: TC HOOK *)
-  let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
-  let ax  = Fsubst.f_subst_tvar ~freshen:false fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  let fs  =
+    try EcUnify.UniEnv.opentvi ~env pe.pte_ue typ tvi
+    with EcUnify.UniEnv.InvalidSelector msg ->
+      tc_error pe.pte_pe "invalid witness selector: %s" msg
+  in
+  let ax  = Fsubst.f_subst_tvar ~freshen:false fs.subst ax in
 
-  (p, (typ, ax))
+  (p, (fs.args, ax))
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =
@@ -918,7 +1010,7 @@ let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ppterm) =
 (* -------------------------------------------------------------------- *)
 type prept = [
   | `Hy   of EcIdent.t
-  | `G    of EcPath.path * ty list
+  | `G    of EcPath.path * etyarg list
   | `UG   of EcPath.path
   | `HD   of handle
   | `PE   of pt_ev
@@ -937,8 +1029,8 @@ and prept_arg =  [
 let pt_of_prept_r (ptenv : pt_env) : prept -> pt_ev =
   let rec build_pt : prept -> pt_ev = function
     | `Hy  id         -> pt_of_hyp_r ptenv id
-    | `G   (p, tys)   -> pt_of_global_r ptenv p tys
-    | `UG  p          -> pt_of_global_r ptenv p []
+    | `G   (p, tys)   -> pt_of_global_tc_r ptenv p tys
+    | `UG  p          -> pt_of_global_tc_r ptenv p []
     | `HD  hd         -> pt_of_handle_r ptenv hd
     | `PE  pe         -> pe
     | `App (pt, args) -> List.fold_left app_pt_ev (build_pt pt) args

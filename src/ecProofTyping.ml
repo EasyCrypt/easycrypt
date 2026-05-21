@@ -1,14 +1,13 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
+open EcAst
 open EcTypes
 open EcPath
 open EcFol
 open EcEnv
 open EcCoreGoal
-open EcAst
 open EcParsetree
-open EcUnify
 
 module Msym = EcSymbols.Msym
 
@@ -26,12 +25,12 @@ let process_form_opt ?mv hyps pf oty =
   try
     let ue  = unienv_of_hyps hyps in
     let ff  = EcTyping.trans_form_opt ?mv (LDecl.toenv hyps) ue pf oty in
-    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let ts = Tuni.subst ~tw_uni:(EcUnify.UniEnv.tw_assubst ue) (EcUnify.UniEnv.close ue) in
     EcFol.Fsubst.f_subst ts ff
 
-  with EcUnify.UninstantiateUni ->
+  with EcUnify.UninstanciateUni infos ->
     EcTyping.tyerror pf.EcLocation.pl_loc
-      (LDecl.toenv hyps) EcTyping.FreeTypeVariables
+      (LDecl.toenv hyps) (FreeUniVariables infos)
 
 (* ------------------------------------------------------------------ *)
 let process_form ?mv hyps pf ty =
@@ -60,8 +59,10 @@ let process_type hyps pty =
   let ue  = unienv_of_hyps hyps in
   let ty  = EcTyping.transty EcTyping.tp_tydecl env ue pty in
 
-  if not (EcUnify.UniEnv.closed ue) then
-    EcTyping.tyerror (EcLocation.loc pty) env EcTyping.FreeTypeVariables;
+  begin match EcUnify.UniEnv.xclosed ue with
+  | None -> ()
+  | Some flags -> EcTyping.tyerror (EcLocation.loc pty) env (EcTyping.FreeUniVariables flags)
+  end;
 
   let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
   EcCoreSubst.ty_subst ts ty
@@ -73,17 +74,17 @@ let process_stmt hyps s =
   let s   = EcTyping.transstmt env ue s in
 
   try
-    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let ts = Tuni.subst ~tw_uni:(EcUnify.UniEnv.tw_assubst ue) (EcUnify.UniEnv.close ue) in
     s_subst ts s
-  with EcUnify.UninstantiateUni ->
-    EcTyping.tyerror EcLocation._dummy env EcTyping.FreeTypeVariables
+  with EcUnify.UninstanciateUni flags ->
+    EcTyping.tyerror EcLocation._dummy env (EcTyping.FreeUniVariables flags)
 
 (* ------------------------------------------------------------------ *)
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
   let e   = EcTyping.transexpcast_opt env mode ue oty e in
-  let ts  = Tuni.subst (EcUnify.UniEnv.close ue)  in
+  let ts  = Tuni.subst ~tw_uni:(EcUnify.UniEnv.tw_assubst ue) (EcUnify.UniEnv.close ue) in
   e_subst ts e
 
 (* ------------------------------------------------------------------ *)
@@ -166,7 +167,8 @@ let tc1_process_stmt ?map hyps tc c =
   let ue     = unienv_of_hyps hyps in
   let c      = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
   let uidmap = Exn.recast_pe !!tc hyps (fun () -> EcUnify.UniEnv.close ue) in
-  let es     = Tuni.subst uidmap in
+  let tw_uni = EcUnify.UniEnv.tw_assubst ue in
+  let es     = Tuni.subst ~tw_uni uidmap in
   s_subst es c
 
 
@@ -228,11 +230,53 @@ let tc1_process_Xhl_formula ?side tc pf =
 let tc1_process_Xhl_formula_xreal tc pf =
   tc1_process_Xhl_form tc txreal pf
 
+
 (* ------------------------------------------------------------------ *)
-(* FIXME: factor out to typing module                                 *)
-(* FIXME: TC HOOK - check parameter constraints                       *)
-(* ------------------------------------------------------------------ *)
-let pf_check_tvi (pe : proofenv) (typ : EcDecl.ty_params) (tvi : tvar_inst option) =
+let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
+  let rec is_ground (ty : ty) =
+    match ty.ty_node with
+    | Tunivar _ | Tvar _ -> false
+    | _ -> not (ty_sub_exists (fun t -> not (is_ground t)) ty) in
+
+  (* Walk the ancestor chain of each TC declared on an abstract type
+     [p] (i.e. [tyd_type = `Abstract tcs]) and accept [tc] if it
+     appears anywhere in [ancestors tcs(i)]. This mirrors Mode #6 of
+     the unifier strategies (see [strat_abs_via_decl] in ecUnify.ml). *)
+  let abs_satisfies (ty : ty) (tc : typeclass) =
+    match ty.ty_node with
+    | Tconstr (p, _) -> begin
+      match EcEnv.Ty.by_path_opt p env with
+      | Some { tyd_type = `Abstract tcs; _ } ->
+        let eq_tc tc' =
+          EcPath.p_equal tc.tc_name tc'.tc_name
+          && List.length tc.tc_args = List.length tc'.tc_args
+          && List.for_all2
+               (fun (a, _) (b, _) -> EcCoreEqTest.for_type env a b)
+               tc.tc_args tc'.tc_args in
+        List.exists
+          (fun tc' -> List.exists eq_tc (EcTypeClass.ancestors env tc'))
+          tcs
+      | _ -> false
+      end
+    | _ -> false in
+
+  (* Constraints can reference earlier tparams (e.g. 'c <: ('a, 'b) embed
+     references 'a, 'b). We substitute the user-supplied tparam values
+     before calling [infer]. *)
+  let check_constraints (subst : etyarg Mid.t) (tcs : typeclass list) (ty : ty) =
+    if is_ground ty then
+      List.iter (fun tc ->
+        let tc = EcCoreSubst.Tvar.subst_tc subst tc in
+        if Option.is_none (EcTypeClass.infer env ty tc)
+           && not (abs_satisfies ty tc) then
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          tc_error_lazy pe (fun fmt ->
+            Format.fprintf fmt
+              "type @[<hov 2>%a@] does not satisfy typeclass constraint @[<hov 2>%a@]"
+              (EcPrinting.pp_type ppe) ty
+              (EcPrinting.pp_tyname ppe) tc.tc_name)
+      ) tcs in
+
   match tvi with
   | None -> ()
 
@@ -240,15 +284,32 @@ let pf_check_tvi (pe : proofenv) (typ : EcDecl.ty_params) (tvi : tvar_inst optio
       if List.length tyargs <> List.length typ then
         tc_error pe
           "wrong number of type parameters (%d, expecting %d)"
-          (List.length tyargs) (List.length typ)
+          (List.length tyargs) (List.length typ);
+      let _ : etyarg Mid.t =
+        List.fold_left2 (fun subst (id, tcs) (ty_opt, _, _) ->
+          Option.iter (check_constraints subst tcs) ty_opt;
+          match ty_opt with
+          | Some ty -> Mid.add id (ty, []) subst
+          | None    -> subst
+        ) Mid.empty typ tyargs
+      in ()
 
   | Some (EcUnify.TVInamed tyargs) ->
-      let typnames = List.map EcIdent.name typ in
+      let typnames = List.map (fun (id, _) -> EcIdent.name id) typ in
       List.iter
         (fun (x, _) ->
           if not (List.mem x typnames) then
             tc_error pe "unknown type variable: %s" x)
-        tyargs
+        tyargs;
+      let _ : etyarg Mid.t =
+        List.fold_left (fun subst (id, tcs) ->
+          match List.assoc_opt (EcIdent.name id) tyargs with
+          | Some (Some ty, _, _) ->
+            check_constraints subst tcs ty;
+            Mid.add id (ty, []) subst
+          | _ -> subst
+        ) Mid.empty typ
+      in ()
 
 (* -------------------------------------------------------------------- *)
 exception NoMatch

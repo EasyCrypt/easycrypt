@@ -114,15 +114,16 @@ let process_simplify_info ri (tc : tcenv1) =
   in
 
   {
-    EcReduction.beta    = ri.pbeta;
-    EcReduction.delta_p = delta_p;
-    EcReduction.delta_h = delta_h;
-    EcReduction.zeta    = ri.pzeta;
-    EcReduction.iota    = ri.piota;
-    EcReduction.eta     = ri.peta;
-    EcReduction.logic   = if ri.plogic then Some `Full else None;
-    EcReduction.modpath = ri.pmodpath;
-    EcReduction.user    = ri.puser;
+    EcReduction.beta     = ri.pbeta;
+    EcReduction.delta_p  = delta_p;
+    EcReduction.delta_h  = delta_h;
+    EcReduction.delta_tc = ri.pdeltatc;
+    EcReduction.zeta     = ri.pzeta;
+    EcReduction.iota     = ri.piota;
+    EcReduction.eta      = ri.peta;
+    EcReduction.logic    = if ri.plogic then Some `Full else None;
+    EcReduction.modpath  = ri.pmodpath;
+    EcReduction.user     = ri.puser;
   }
 
 (*-------------------------------------------------------------------- *)
@@ -571,7 +572,7 @@ let process_exacttype qs (tc : tcenv1) =
       tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
   in
   let tys =
-    List.map (fun a -> EcTypes.tvar a)
+    List.map (fun (a, _) -> (tvar a, []))
       (EcEnv.LDecl.tohyps hyps).h_tvar in
   let pt = ptglobal ~tys p in
 
@@ -753,8 +754,10 @@ let process_delta ~und_delta ?target ((s :rwside), o, p) tc =
 
   in
 
-  let ri = { EcReduction.full_red with
-               delta_p = (fun p -> if Some p = dp then `Force else `IfTransparent)} in
+  let ri =
+    let delta_p p =
+      if Some p = dp then `Force else `IfTransparent
+    in  { EcReduction.full_red with delta_p } in
   let na = List.length args in
 
   match s with
@@ -791,9 +794,12 @@ let process_delta ~und_delta ?target ((s :rwside), o, p) tc =
 
             match sform_of_form fp with
             | SFop ((_, tvi), []) -> begin
-              (* FIXME: TC HOOK *)
-              let body  = Tvar.f_subst ~freshen:true tparams tvi body in
-              let body  = f_app body args topfp.f_ty in
+              let body =
+                Tvar.f_subst
+                  ~freshen:true
+                  (List.combine (List.map fst tparams) tvi)
+                  body in
+              let body = f_app body args topfp.f_ty in
                 try  EcReduction.h_red EcReduction.beta_red hyps body
                 with EcEnv.NotReducible -> body
             end
@@ -814,9 +820,13 @@ let process_delta ~und_delta ?target ((s :rwside), o, p) tc =
 
   | `RtoL ->
     let fp =
-      (* FIXME: TC HOOK *)
-      let body  = Tvar.f_subst ~freshen:true tparams tvi body in
-      let fp    = f_app body args p.f_ty in
+      let body =
+        Tvar.f_subst
+          ~freshen:true
+          (List.combine (List.map fst tparams) tvi)
+          body
+      in
+      let fp = f_app body args p.f_ty in
         try  EcReduction.h_red EcReduction.beta_red hyps fp
         with EcEnv.NotReducible -> fp
     in
@@ -1183,7 +1193,7 @@ let process_view1 pe tc =
                         if not meta then raise E.Bailout;
 
                         let y, yty =
-                          let CPTEnv subst = PT.concretize_env pe.PT.ptev_env in
+                          let CPTEnv (subst, _) = PT.concretize_env pe.PT.ptev_env in
                           snd_map (ty_subst subst) (oget pre) in
                         let fy = EcIdent.fresh y in
 
@@ -1542,7 +1552,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         end
     in
 
-    let tc = t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case] in
+    let tc = t_ors [
+        t_elimT_ind ~reduce:`Full `Case;
+        t_elim ~reduce:`Full;
+        t_elim_prind ~reduce:`Full `Case] in
     let tc =
       fun g ->
         try  tc g
@@ -2176,7 +2189,11 @@ let process_split ?(i : int option) (tc : tcenv1) =
 let process_elim (pe, qs) tc =
   let doelim tc =
     match qs with
-    | None    -> t_or (t_elimT_ind `Ind) t_elim tc
+    | None ->
+        t_or
+          (t_elimT_ind ~reduce:`Full `Ind)
+          (t_elim ~reduce:`Full)
+          tc
     | Some qs ->
         let qs = {
             fp_mode = `Implicit;
@@ -2222,7 +2239,10 @@ let process_case ?(doeq = false) gp tc =
   with E.LEMFailure ->
     try
       FApi.t_last
-        (t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case])
+        (t_ors [
+          t_elimT_ind ~reduce:`Full `Case;
+          t_elim ~reduce:`Full;
+          t_elim_prind ~reduce:`Full `Case])
         (process_move ~doeq gp.pr_view gp.pr_rev tc)
 
     with EcCoreGoal.InvalidGoalShape ->

@@ -1,12 +1,13 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcSymbols
 open EcBigInt
 open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t
+type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -22,36 +23,40 @@ type ty_dtype = {
   tydt_schcase : EcCoreFol.form;
 }
 
-type ty_body = 
-  | Concrete of EcTypes.ty
-  | Abstract
-  | Datatype of ty_dtype
-  | Record   of ty_record
+and ty_body = [
+  | `Concrete of EcTypes.ty
+  | `Abstract of typeclass list
+  | `Datatype of ty_dtype
+  | `Record   of ty_record
+]
 
 
 type tydecl = {
   tyd_params  : ty_params;
   tyd_type    : ty_body;
+  tyd_resolve : bool;
   tyd_loca    : locality;
   (* For [subtype]-declared types: the carrier and the predicate. The
-     declared type itself stays [tyd_type = Abstract], because a
+     declared type itself stays [tyd_type = `Abstract []], because a
      subtype is semantically a fresh abstract type — but its dependency
      on free type variables (when declared inside a section) must be
      visible to the section-close machinery. [tydecl_fv] unions the
      carrier+predicate fv into the type's fv when this field is set,
-     so a subtype declared inside [section. declare type c.] gets the
-     section's tparams added at close, just like type aliases do.      *)
+     so a subtype declared inside [section. declare type c <: tc.] gets
+     the section's tparams added at close, just like type aliases do.  *)
   tyd_subtype : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
-val tydecl_as_abstract : tydecl -> unit option
+val tydecl_as_abstract : tydecl -> typeclass list option
 val tydecl_as_datatype : tydecl -> ty_dtype option
-val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
+val tydecl_as_record   : tydecl -> ty_record option
 
-val abs_tydecl : ?params:ty_pctor -> locality -> tydecl
+val abs_tydecl : ?resolve:bool -> ?tc:typeclass list -> ?params:ty_pctor -> locality -> tydecl
 
-val ty_instantiate : ty_params -> ty list -> ty -> ty
+val etyargs_of_tparams : ty_params -> etyarg list
+
+val ty_instanciate : ty_params -> etyarg list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type exception_ = {
@@ -76,7 +81,7 @@ and opbody =
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
   | OP_Exn    of ty list
-  | OP_TC
+  | OP_TC     of EcPath.path * string
 
 and prbody =
   | PR_Plain of form
@@ -135,6 +140,7 @@ val is_oper      : operator -> bool
 val is_ctor      : operator -> bool
 val is_proj      : operator -> bool
 val is_rcrd      : operator -> bool
+val is_tc_op     : operator -> bool
 val is_fix       : operator -> bool
 val is_abbrev    : operator -> bool
 val is_prind     : operator -> bool
@@ -154,6 +160,7 @@ val operator_as_rcrd  : operator -> EcPath.path
 val operator_as_proj  : operator -> EcPath.path * int * int
 val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
+val operator_as_tc    : operator -> EcPath.path * string
 
 val operator_as_exception : operator -> exception_
 val operator_of_exception : exception_ -> operator
@@ -174,20 +181,14 @@ val is_axiom  : axiom_kind -> bool
 val is_lemma  : axiom_kind -> bool
 
 (* -------------------------------------------------------------------- *)
-val axiomatized_op :
-     ?nargs: int
-  -> ?nosmt:bool
-  -> EcPath.path
-  -> (ty_params * form)
-  -> locality
-  -> axiom
-
-(* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_prt : EcPath.path option;
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * form) list;
-  tc_loca: is_local;
+type tc_decl = {
+  tc_tparams : ty_params;
+  tc_prts    : (typeclass * EcSymbols.symbol
+                * (EcSymbols.symbol * EcSymbols.symbol) list) list;
+  tc_ops     : (EcIdent.t * EcTypes.ty) list;
+  tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
+  tc_loca    : is_local;
+  tc_ops_origin : (EcSymbols.symbol * (EcPath.path * EcSymbols.symbol)) list;
 }
 
 (* -------------------------------------------------------------------- *)

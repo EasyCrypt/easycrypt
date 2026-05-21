@@ -180,7 +180,7 @@ module Ax : sig
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
-  val instantiate : path -> EcTypes.ty list -> env -> form
+  val instanciate : path -> etyarg list -> env -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -328,11 +328,30 @@ module Op : sig
   val bind : ?import:bool -> symbol -> operator -> env -> env
 
   val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
-  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> ty list -> form
+  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> etyarg list -> form
+
+  (* When [strict = true] (default [false]), only reduce through TC
+     instances marked [tci_reducible]. Used by the simplifier ([/=],
+     [norm_cbv]); the matcher and [is_conv] keep [strict = false] so
+     they always look through concrete witnesses. *)
+  val tc_reducible : ?strict:bool -> env -> path -> etyarg list -> bool
+  val tc_reduce    : ?strict:bool -> env -> path -> etyarg list -> form
+
+  (* [tc_op_realised_by env tcop concrete] is true iff [tcop] is a
+     TC-class op and there exists a registered instance whose
+     symbol-map binds [tcop]'s basename to [concrete]. Used by the
+     matcher to bridge a pattern with a TC-op head whose carrier
+     is still a univar to a goal whose head is the registered
+     realisation, so e.g. [rewrite mul0r] (no TVI) matches goals
+     containing the structural [polyM]. The lookup is purely
+     syntactic — the caller must still post the carrier-pinning
+     unification that makes the bridge sound.                       *)
+  val tc_op_realised_by : env -> path -> path -> bool
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
   val is_dtype_ctor  : ?nargs:int -> env -> path -> bool
+  val is_tc_op       : env -> path -> bool
   val is_fix_def     : env -> path -> bool
   val is_abbrev      : env -> path -> bool
   val is_prind       : env -> path -> bool
@@ -362,16 +381,15 @@ module Ty : sig
   val bind : ?import:bool -> symbol -> t -> env -> env
 
   val defined : path -> env -> bool
-  val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
-  val hnorm   : EcTypes.ty -> env -> EcTypes.ty
-  val decompose_fun : EcTypes.ty -> env -> EcTypes.dom * EcTypes.ty
+  val unfold  : path -> etyarg list -> env -> ty
+  val hnorm   : ty -> env -> ty
+  val decompose_fun : ty -> env -> EcTypes.dom * ty
 
   val get_top_decl :
-    EcTypes.ty -> env -> (path * EcDecl.tydecl * EcTypes.ty list) option
-
+    EcTypes.ty -> env -> (path * EcDecl.tydecl * etyarg list) option
 
   val scheme_of_ty :
-    [`Ind | `Case] -> EcTypes.ty -> env -> (path * EcTypes.ty list) option
+    [`Ind | `Case] -> EcTypes.ty -> env -> (path * etyarg list) option
 
   val signature : env -> ty -> ty list * ty
 
@@ -382,17 +400,26 @@ end
 val ty_hnorm : ty -> env -> ty
 
 (* -------------------------------------------------------------------- *)
-module Algebra : sig
-  val add_ring  : ty -> EcDecl.ring -> is_local -> env -> env
-  val add_field : ty -> EcDecl.field -> is_local -> env -> env
+module TypeClass : sig
+  type t = tc_decl
+
+  val add    : path -> env -> env
+  val bind   : ?import:bool -> symbol -> t -> env -> env
+  val rebind : symbol -> t -> env -> env
+
+  val by_path     : path -> env -> t
+  val by_path_opt : path -> env -> t option
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val lookup_path : qsymbol -> env -> path
 end
 
 (* -------------------------------------------------------------------- *)
-module TypeClass : sig
-  type t = typeclass
+module TcInstance : sig
+  type t = tcinstance
 
-  val add   : path -> env -> env
-  val graph : env -> EcTypeClass.graph
+  val add  : path -> env -> env
+  val bind : ?import:bool -> symbol option -> t -> env -> env
 
   val by_path     : path -> env -> t
   val by_path_opt : path -> env -> t option
@@ -400,8 +427,7 @@ module TypeClass : sig
   val lookup_opt  : qsymbol -> env -> (path * t) option
   val lookup_path : qsymbol -> env -> path
 
-  val add_instance  : ?import:bool -> (ty_params * ty) -> tcinstance -> is_local -> env -> env
-  val get_instances : env -> ((ty_params * ty) * tcinstance) list
+  val get_all : env -> (path option * t) list
 end
 
 (* -------------------------------------------------------------------- *)
