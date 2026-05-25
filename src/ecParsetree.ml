@@ -1044,7 +1044,7 @@ type logtactic =
   | Preflexivity
   | Passumption
   | Psmt        of pprover_infos
-  | Psplit      of int option
+  | Psplit      of [ `Default of int option | `All of [ `Maybe | `One ] ]
   | Pfield      of psymbol list
   | Pring       of psymbol list
   | Palg_norm

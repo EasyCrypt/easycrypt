@@ -2817,7 +2817,13 @@ logtactic:
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | SPLIT i=word?
-    { Psplit i }
+    { Psplit (`Default i) }
+
+| SPLIT STAR
+    { Psplit (`All `Maybe) }
+
+| SPLIT PLUS
+    { Psplit (`All `One) }
 
 | FIELD eqs=ident*
     { Pfield eqs }
