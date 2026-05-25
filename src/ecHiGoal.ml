@@ -2173,6 +2173,10 @@ let process_split ?(i : int option) (tc : tcenv1) =
       (EcPrinting.pp_opt Format.pp_print_int) i
 
 (* -------------------------------------------------------------------- *)
+let process_split_all ~(must : bool) (tc : tcenv1) =
+  EcLowGoal.t_split_all ~must tc
+
+(* -------------------------------------------------------------------- *)
 let process_elim (pe, qs) tc =
   let doelim tc =
     match qs with

@@ -1649,6 +1649,32 @@ let t_split ?(i = 0) ?(closeonly = false) ?reduce (tc : tcenv1) =
     t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
+let rec t_split_all ?(must = false) (tc : tcenv1) =
+  let concl = FApi.tc1_goal tc in
+  match sform_of_form concl with
+  | SFand (`Sym, (f1, f2)) ->
+      let tc = t_and_intro_s `Sym (f1, f2) tc in
+      FApi.t_onall (t_split_all ~must:false) tc
+  | SFand (`Asym, (f1, f2)) ->
+      let tc = t_and_intro_s `Asym (f1, f2) tc in
+      (* subgoal 0 = f1; subgoal 1 = f1 => f2.
+         On the second, intro the f1-hypothesis, recurse on f2, then
+         generalize-and-clear so each produced leaf becomes f1 => leaf. *)
+      FApi.t_onalli (fun i tc ->
+        if i = 0 then
+          t_split_all ~must:false tc
+        else
+          let h   = LDecl.fresh_id (FApi.tc1_hyps tc) "h" in
+          let tc  = t_intros_i_1 [h] tc in
+          let tc  = t_split_all ~must:false tc in
+          FApi.t_onall (t_generalize_hyp ~clear:`Yes h) tc
+      ) tc
+  | _ when must ->
+      tc_error !!tc "split+: goal is not a top-level conjunction"
+  | _ ->
+      FApi.tcenv_of_tcenv1 tc
+
+(* -------------------------------------------------------------------- *)
 let t_split_prind ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
     let env = FApi.tc1_env tc in
