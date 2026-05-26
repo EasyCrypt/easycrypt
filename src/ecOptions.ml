@@ -53,6 +53,7 @@ and llm_option = {
   llmo_provers   : prv_options;
   llmo_lastgoals : bool;
   llmo_upto      : (int * int option) option;
+  llmo_trace     : (int * int option) option;
 }
 
 and prv_options = {
@@ -374,7 +375,8 @@ let specs = {
       `Group "loader";
       `Group "provers";
       `Spec  ("lastgoals" , `Flag  , "Print last unproved goals on failure");
-      `Spec  ("upto"      , `String, "Compile up to LINE or LINE:COL and print goals")]);
+      `Spec  ("upto"      , `String, "Compile up to LINE or LINE:COL and print goals");
+      `Spec  ("trace"     , `String, "Trace one sentence at LINE or LINE:COL (before/after goals)")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -562,11 +564,11 @@ let doc_options_of_values values input =
   { doco_input     = input;
     doco_outdirp   = get_string "outdir" values; }
 
-let parse_upto values =
-  get_string "upto" values |> Option.map (fun s ->
+let parse_line_col ~name values =
+  get_string name values |> Option.map (fun s ->
     let invalid () =
       raise (Arg.Bad (Printf.sprintf
-        "invalid -upto format: expected LINE or LINE:COL, got %S" s)) in
+        "invalid -%s format: expected LINE or LINE:COL, got %S" name s)) in
     match String.split_on_char ':' s with
     | [line] ->
         let line = try int_of_string line with Failure _ -> invalid () in
@@ -578,10 +580,15 @@ let parse_upto values =
     | _ -> invalid ())
 
 let llm_options_of_values ini values input =
+  let upto  = parse_line_col ~name:"upto"  values in
+  let trace = parse_line_col ~name:"trace" values in
+  if Option.is_some upto && Option.is_some trace then
+    raise (Arg.Bad "options -upto and -trace are mutually exclusive");
   { llmo_input     = input;
     llmo_provers   = prv_options_of_values ini values;
     llmo_lastgoals = get_flag "lastgoals" values;
-    llmo_upto      = parse_upto values; }
+    llmo_upto      = upto;
+    llmo_trace     = trace; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =

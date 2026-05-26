@@ -23,6 +23,36 @@ easycrypt llm [OPTIONS] FILE.ec
   stdout and exit with code 0. Use this to inspect the proof state at
   a specific point in a file.
 
+- `-trace LINE` or `-trace LINE:COL` — Run every sentence strictly
+  before the target sentence, print the focused goal, run the target
+  sentence, print the new-or-modified goals, then a one-line summary.
+  The target sentence is the first sentence whose start position is
+  `>= (LINE, COL)`, same as `-upto`. Output uses stable delimiters:
+
+  ```
+  === BEFORE: line L (col C) ===
+  <focused goal only>
+
+  === TACTIC (lines L1:C1 - L2:C2) ===
+  <full source of the sentence>
+
+  === AFTER: line L (col C) ===
+  <new or modified goals, in focus order; or "(no open goals)"
+   if the proof closed>
+
+  === SUMMARY ===
+  open goals: N1 -> N2
+  ```
+
+  AFTER always prints the new focused goal (its focus status counts as
+  modified even if its text matched a sibling in BEFORE), followed by
+  any subsequent goals that didn't appear in BEFORE. `N1` / `N2` are
+  the total open-goal counts before and after the tactic.
+
+  Exit code 0 on success; 1 if the target sentence failed (BEFORE is
+  still printed, error goes to stderr); 2 if no sentence at or after
+  the target exists. Mutually exclusive with `-upto`.
+
 - `-lastgoals` — On failure, print the goal state (as it was just
   before the failing command) to stdout, then print the error to
   stderr, and exit with code 1. Use this to understand what the

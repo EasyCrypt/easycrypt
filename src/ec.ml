@@ -416,6 +416,7 @@ let main () =
       (*---*) docgen      : bool;
       (*---*) outdirp     : string option;
       (*---*) upto        : (int * int option) option;
+      (*---*) trace_at    : (int * int option) option;
       mutable trace       : trace1 list option;
     }
 
@@ -495,6 +496,7 @@ let main () =
         ; docgen      = false
         ; outdirp     = None
         ; upto        = None
+        ; trace_at    = None
         ; trace       = None }
 
     end
@@ -531,6 +533,7 @@ let main () =
         ; docgen      = false
         ; outdirp     = None
         ; upto        = None
+        ; trace_at    = None
         ; trace       = trace0 }
 
       end
@@ -560,6 +563,7 @@ let main () =
         ; docgen      = false
         ; outdirp     = None
         ; upto        = llmopts.llmo_upto
+        ; trace_at    = llmopts.llmo_trace
         ; trace       = None }
 
       end
@@ -605,6 +609,7 @@ let main () =
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
         ; upto        = None
+        ; trace_at    = None
         ; trace       = None }
       end
 
@@ -618,7 +623,7 @@ let main () =
        | Some pwd -> EcCommands.addidir pwd);
 
   (* Check if the .eco is up-to-date and exit if so *)
-  (if not state.docgen && state.upto = None then
+  (if not state.docgen && state.upto = None && state.trace_at = None then
     oiter
       (fun input -> if EcCommands.check_eco input then exit 0)
       state.input);
@@ -712,6 +717,38 @@ let main () =
           | None -> true
           | Some c -> sc >= c) in
 
+  (* Check if a sentence's start location is at-or-past the -trace target.
+     Returns the actual (line, col) of the matched sentence start on hit. *)
+  let at_trace (loc : EcLocation.t) =
+    match state.trace_at with
+    | None -> None
+    | Some (line, col) ->
+        let (sl, sc) = loc.loc_start in
+        let hit =
+          sl > line || (sl = line && match col with
+            | None -> true
+            | Some c -> sc >= c)
+        in if hit then Some (sl, sc) else None in
+
+  (* Lazy read of the whole input file as bytes, used by --trace to slice
+     the exact source text of a sentence by byte offsets. *)
+  let input_bytes = lazy (
+    match state.input with
+    | None -> ""
+    | Some path ->
+        let ic = open_in_bin path in
+        let n  = in_channel_length ic in
+        let b  = Bytes.create n in
+        really_input ic b 0 n;
+        close_in ic;
+        Bytes.unsafe_to_string b) in
+
+  let sentence_source (loc : EcLocation.t) =
+    let s = Lazy.force input_bytes in
+    let lo = max 0 loc.EcLocation.loc_bchar in
+    let hi = min (String.length s) loc.EcLocation.loc_echar in
+    if hi <= lo then "" else String.sub s lo (hi - lo) in
+
   try
     if T.interactive terminal then Sys.catch_break true;
 
@@ -780,6 +817,70 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+
+                   (* -trace: at-or-past the target, print BEFORE (focused
+                      goal only), run this one sentence, print AFTER
+                      (new-or-modified goals only), then SUMMARY, exit. *)
+                   (match at_trace loc with
+                    | None -> ()
+                    | Some (sl, sc) ->
+                        let out = Format.std_formatter in
+                        let before_goals = EcCommands.pp_all_goals () in
+                        let n1 = List.length before_goals in
+                        Format.fprintf out
+                          "=== BEFORE: line %d (col %d) ===@\n" sl sc;
+                        EcCommands.pp_current_goal_or_noproof ~all:false out;
+                        let (el, ec) = loc.EcLocation.loc_end in
+                        Format.fprintf out
+                          "@\n=== TACTIC (lines %d:%d - %d:%d) ===@\n%s@\n@\n"
+                          sl sc el ec (sentence_source loc);
+                        (try
+                           let _ : float option =
+                             EcCommands.process ~src ~timed:false ~break:false
+                               p.EP.gl_action
+                           in
+                           let after_goals = EcCommands.pp_all_goals () in
+                           let n2 = List.length after_goals in
+                           Format.fprintf out
+                             "=== AFTER: line %d (col %d) ===@\n" sl sc;
+                           let before_set =
+                             List.fold_left
+                               (fun s g -> EcMaps.Sstr.add g s)
+                               EcMaps.Sstr.empty before_goals
+                           in
+                           (* The new focused goal always counts as
+                              "modified" (its focus status changed even if
+                              its text matches an old sibling). Subsequent
+                              goals are printed only if they didn't appear
+                              in BEFORE. *)
+                           let to_print =
+                             match after_goals with
+                             | [] -> []
+                             | head :: tail ->
+                                 head ::
+                                 List.filter
+                                   (fun g -> not (EcMaps.Sstr.mem g before_set))
+                                   tail
+                           in
+                           (match to_print with
+                            | [] ->
+                                Format.fprintf out "(no open goals)@\n"
+                            | _ ->
+                                List.iteri (fun i g ->
+                                  if i > 0 then Format.fprintf out "@\n";
+                                  Format.fprintf out "%s@\n" g)
+                                  to_print);
+                           Format.fprintf out
+                             "@\n=== SUMMARY ===@\nopen goals: %d -> %d@\n" n1 n2
+                         with e ->
+                           Format.fprintf out
+                             "=== AFTER: line %d (col %d) ===@\n<sentence failed>@\n" sl sc;
+                           EcPException.exn_printer Format.err_formatter e;
+                           Format.pp_print_newline Format.err_formatter ();
+                           T.finalize terminal;
+                           exit 1);
+                        T.finalize terminal;
+                        exit 0);
 
                    (* -upto: if this command starts past the target, print goals and exit *)
                    if past_upto loc then begin
@@ -857,6 +958,15 @@ let main () =
 
         if !terminate then begin
             T.finalize terminal;
+            (match state.trace_at with
+             | Some (line, col) ->
+                 let col_s = match col with
+                   | None -> "" | Some c -> Printf.sprintf ":%d" c in
+                 Format.eprintf
+                   "trace: no sentence at or after line %d%s@."
+                   line col_s;
+                 exit 2
+             | None -> ());
             if not state.eco then
               finalize_input state.input (EcCommands.current ());
             if state.docgen then

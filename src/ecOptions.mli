@@ -49,6 +49,7 @@ and llm_option = {
   llmo_provers   : prv_options;
   llmo_lastgoals : bool;
   llmo_upto      : (int * int option) option;
+  llmo_trace     : (int * int option) option;
 }
 
 and prv_options = {
