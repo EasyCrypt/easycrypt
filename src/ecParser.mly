@@ -599,6 +599,7 @@
 %token WP
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
+%token <string> PLUSn MINUSn STARn
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 %token <Lexing.position> FINAL
 %token <EcParsetree.dockind * string> DOCCOMMENT
@@ -623,10 +624,10 @@
 %left  LOP1
 %right ROP1
 %right QUESTION
-%left  LOP2 MINUS PLUS PLUSGT
+%left  LOP2 MINUS PLUS PLUSGT MINUSn PLUSn
 %right ROP2
 %right RARROW
-%left  LOP3 STAR SLASH
+%left  LOP3 STAR SLASH STARn
 %right ROP3
 %left  LOP4 AT AMP HAT BACKSLASH
 %right ROP4
@@ -829,10 +830,12 @@ inlinepat:
 | LE { "<=" }
 
 %inline uniop:
-| x=NOP { Printf.sprintf "[%s]" x }
-| NOT   { "[!]" }
-| PLUS  { "[+]" }
-| MINUS { "[-]" }
+| x=NOP    { Printf.sprintf "[%s]" x }
+| NOT      { "[!]" }
+| PLUS     { "[+]" }
+| MINUS    { "[-]" }
+| x=PLUSn  { Printf.sprintf "[%s]" x }
+| x=MINUSn { Printf.sprintf "[%s]" x }
 
 %inline sbinop:
 | EQ        { "="   }
@@ -842,6 +845,9 @@ inlinepat:
 | STAR      { "*"   }
 | SLASH     { "/"   }
 | AT        { "@"   }
+| x=PLUSn   { x }
+| x=MINUSn  { x }
+| x=STARn   { x }
 | OR        { "\\/" }
 | ORA       { "||"  }
 | AND       { "/\\" }
@@ -3589,11 +3595,17 @@ tactics0:
 | ts=tactics   { Pseq ts }
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
+%inline bullet:
+| b=loc(MINUS)  { mk_loc b.pl_loc "-" }
+| b=loc(PLUS)   { mk_loc b.pl_loc "+" }
+| b=loc(STAR)   { mk_loc b.pl_loc "*" }
+| b=loc(MINUSn) { mk_loc b.pl_loc b.pl_desc }
+| b=loc(PLUSn)  { mk_loc b.pl_loc b.pl_desc }
+| b=loc(STARn)  { mk_loc b.pl_loc b.pl_desc }
+
 toptactic:
-| PLUS  t=tactics { t }
-| STAR  t=tactics { t }
-| MINUS t=tactics { t }
-|       t=tactics { t }
+| b=bullet t=tactics { (Some b, t) }
+|          t=tactics { (None,   t) }
 
 tactics_or_prf:
 | t=toptactic  { `Actual t }

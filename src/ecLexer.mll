@@ -302,7 +302,30 @@
     | _                     -> LOP4 (name |> odfl op)
 
   (* ------------------------------------------------------------------ *)
+  (* Repeated bullet characters (`--`, `+++`, `***`, ...) are emitted as
+     a single token so that the parser can distinguish them from two
+     separate operator characters. Single-character forms keep going
+     through the standard operator path for backward compatibility. *)
+  let lex_bullet_chunk (op : string) =
+    let n = String.length op in
+    if n < 2 then None
+    else
+      let c = op.[0] in
+      if not (c = '-' || c = '+' || c = '*') then None
+      else
+        let rec all_same i = i = n || (op.[i] = c && all_same (i+1)) in
+        if not (all_same 1) then None
+        else match c with
+          | '-' -> Some (MINUSn op)
+          | '+' -> Some (PLUSn op)
+          | '*' -> Some (STARn op)
+          | _   -> None
+
+  (* ------------------------------------------------------------------ *)
   let lex_operators (op : string) =
+    match lex_bullet_chunk op with
+    | Some tok -> [tok]
+    | None ->
     let baseop (op : string) =
       try  fst (Hashtbl.find operators op)
       with Not_found ->

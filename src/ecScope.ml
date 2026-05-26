@@ -296,6 +296,23 @@ and proof_auc = {
   puc_jdg     : proof_state;
   puc_flags   : pucflags;
   puc_crt     : EcDecl.axiom;
+  puc_bullets : bullet_frame list option;
+    (* [None] when bullets are decoration only (legacy mode).
+       [Some stack] when [+strict_bullets] was active at proof
+       open; head = innermost frame. Each frame records the bullet
+       token, opening location, and slot accounting. *)
+}
+
+and bullet_frame = {
+  bf_token : string;
+  bf_loc   : EcLocation.t;
+  bf_floor : int;
+    (* Number of open goals that must remain when this frame's
+       subproof is fully discharged. Computed at open as
+       [opened_at_open - 1] (we focus on one goal; the others stay
+       open at outer levels until the frame's subproof collapses).
+       The frame can be popped when the current open-count drops
+       to [bf_floor] or below. *)
 }
 
 and proof_ctxt =
@@ -811,7 +828,109 @@ module Tactics = struct
             | Some src -> DocState.push_srcbl scope.sc_locdoc src
             | None -> scope.sc_locdoc; }
 
-  let process_r ?(src : string option) ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
+  (* ----------------------------------------------------------------- *)
+  (* Bullet-stack management. The "strict" mode (gated by the
+     [+strict-bullets] pragma) requires each phrase to discharge its
+     focused subgoal before moving on. The non-strict mode keeps the
+     historical behavior where bullets are pure decoration.
+
+     Frames record the number of "background" open goals at the
+     point the bullet level was opened. A frame's currently-focused
+     subgoal is fully discharged iff [open_count <= bf_background].
+     The bullet-level itself is fully closed when, in addition, the
+     last sibling has been processed; we detect that by counting open
+     goals and the depth stack. *)
+
+  let bullet_error ~loc fmt =
+    let buf  = Buffer.create 64 in
+    let fbuf = Format.formatter_of_buffer buf in
+    Format.kfprintf
+      (fun fbuf ->
+        Format.pp_print_flush fbuf ();
+        hierror ~loc "%s" (Buffer.contents buf))
+      fbuf fmt
+
+  let n_open juc = List.length (EcCoreGoal.all_hd_opened juc)
+
+  (* Validate the bullet against the current stack and return the
+     pre-phrase stack. Each frame's [bf_floor] records the open-count
+     that should remain once the frame's subproof is fully closed; the
+     frame becomes poppable when [n_open <= bf_floor]. *)
+  let open_bullet ~(bullet : string located option)
+      (juc : EcCoreGoal.proof) (stack : bullet_frame list)
+      : bullet_frame list =
+    let opened = n_open juc in
+    (* Top-of-stack floor, or 0 if the stack is empty (top-level: one
+       focused goal allowed without a bullet). A phrase may run
+       unbulleted iff [opened <= floor_top + 1]: the focused goal
+       plus the goals "outside" the current level. *)
+    let floor_top =
+      match stack with [] -> 0 | f :: _ -> f.bf_floor in
+    match bullet with
+    | None ->
+        if opened > floor_top + 1 then begin
+          let where =
+            match stack with
+            | [] -> "top level"
+            | f :: _ ->
+                Printf.sprintf "the bullet level opened by `%s' at %s"
+                  f.bf_token (EcLocation.tostring f.bf_loc) in
+          hierror
+            "previous tactic left %d open subgoals at %s; the next \
+             phrase needs a bullet to focus one of them" opened where
+        end;
+        stack
+    | Some b ->
+        let tok = unloc b in
+        let loc = loc b in
+        (* Search the stack from innermost outward for a frame matching
+           [tok]. Inner frames not yet drained block the match. *)
+        let rec scan acc = function
+          | [] -> `Open
+          | f :: rest when f.bf_token = tok -> `Match (List.rev acc, f, rest)
+          | f :: rest -> scan (f :: acc) rest
+        in
+        match scan [] stack with
+        | `Open ->
+            if opened = 0 then
+              bullet_error ~loc
+                "bullet `%s' opens a new subproof level but there are \
+                 no remaining subgoals" tok;
+            { bf_token = tok; bf_loc = loc; bf_floor = opened - 1 } :: stack
+        | `Match (inner, frame, outer) ->
+            (* Inner frames must already be drained. *)
+            List.iter (fun (f : bullet_frame) ->
+              if opened > f.bf_floor then
+                bullet_error ~loc
+                  "bullet `%s' (matches an outer level opened at %s) \
+                   skips past inner bullet `%s' opened at %s whose \
+                   subproof is not closed"
+                  tok (EcLocation.tostring frame.bf_loc)
+                  f.bf_token (EcLocation.tostring f.bf_loc))
+              inner;
+            (* The matching frame's current slot must be closed. *)
+            if opened > frame.bf_floor then
+              bullet_error ~loc
+                "bullet `%s' reused but the previous subgoal (opened at \
+                 %s) is not closed"
+                tok (EcLocation.tostring frame.bf_loc);
+            { frame with bf_loc = loc } :: outer
+
+  (* After a phrase has run, pop frames whose subproof has fully
+     closed. Cascades through nested last-sibling frames; this is
+     what lets the last sibling at any level be addressed by an
+     unbulleted phrase. *)
+  let close_phrase (juc : EcCoreGoal.proof) (stack : bullet_frame list)
+      : bullet_frame list =
+    let opened = n_open juc in
+    let rec pop = function
+      | f :: rest when opened <= f.bf_floor -> pop rest
+      | s -> s
+    in
+    pop stack
+
+  let process_r ?(src : string option) ?(bullet : string located option)
+      ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
 
     let scope =
@@ -855,6 +974,8 @@ module Tactics = struct
           EcHiGoal.tt_redlogic   = Options.get_redlogic scope;
           EcHiGoal.tt_und_delta  = Options.get_und_delta scope; } in
 
+        let bullets = omap (open_bullet ~bullet juc) pac.puc_bullets in
+
         let (hds, juc) =
           try  TTC.process ttenv tac juc
           with EcCoreGoal.TcError tcerror ->
@@ -868,7 +989,9 @@ module Tactics = struct
 
         let penv = EcCoreGoal.proofenv_of_proof juc in
 
-        let pac = { pac with puc_jdg = PSCheck juc } in
+        let bullets = omap (close_phrase juc) bullets in
+
+        let pac = { pac with puc_jdg = PSCheck juc; puc_bullets = bullets } in
         let puc = { puc with puc_active = Some (pac, pct); } in
         let scope = { scope with sc_pr_uc = Some puc; } in
         Some (penv, hds), scope
@@ -880,8 +1003,9 @@ module Tactics = struct
     let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
     snd (process_r mark mode scope ts)
 
-  let process ?(src : string option) scope mode tac =
-    process_r ?src true mode scope tac
+  let process ?(src : string option) ?(bullet : string located option)
+      scope mode tac =
+    process_r ?src ?bullet true mode scope tac
 end
 
 (* -------------------------------------------------------------------- *)
@@ -940,7 +1064,7 @@ module Ax = struct
         sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope (cont, axflags) check ?name (axd, ctxt) =
+  let start_lemma ?(strict = false) scope (cont, axflags) check ?name (axd, ctxt) =
     let puc =
       match check with
       | false -> PSNoCheck
@@ -955,7 +1079,8 @@ module Ax = struct
         ; puc_started = false
         ; puc_jdg     = puc
         ; puc_flags   = axflags
-        ; puc_crt     = axd }
+        ; puc_crt     = axd
+        ; puc_bullets = if strict then Some [] else None }
       in
         { puc_active    = Some (active, ctxt);
           puc_cont      = cont;
@@ -964,7 +1089,7 @@ module Ax = struct
       { scope with sc_pr_uc = Some puc }
 
   (* ------------------------------------------------------------------ *)
-  let rec add_r (scope : scope) (mode : proofmode) (ax : paxiom located) =
+  let rec add_r ?(strict = false) (scope : scope) (mode : proofmode) (ax : paxiom located) =
     assert (scope.sc_pr_uc = None);
 
     let env = env scope in
@@ -1024,13 +1149,13 @@ module Ax = struct
         match tc with
         | None ->
             let scope =
-              start_lemma scope ~name:(unloc ax.pa_name)
+              start_lemma ~strict scope ~name:(unloc ax.pa_name)
                 pucflags check (axd, None) in
             let scope = snd (Tactics.process1_r false `Check scope tintro) in
             None, scope
 
         | Some tc ->
-            start_lemma_with_proof scope
+            start_lemma_with_proof ~strict scope
               (Some tintro) pucflags (mode, mk_loc loc tc) check
               ~name:(unloc ax.pa_name) axd
       end
@@ -1104,10 +1229,10 @@ module Ax = struct
          (None, { scope with sc_env = puc.puc_init })
 
   (* ------------------------------------------------------------------ *)
-  and start_lemma_with_proof scope tintro pucflags (mode, tc) check ?name axd =
+  and start_lemma_with_proof ?(strict = false) scope tintro pucflags (mode, tc) check ?name axd =
     let { pl_loc = loc; pl_desc = tc } = tc in
 
-    let scope = start_lemma scope pucflags check ?name (axd, None) in
+    let scope = start_lemma ~strict scope pucflags check ?name (axd, None) in
     let scope =
       tintro |> ofold
         (fun t sc -> snd (Tactics.process1_r false `Check sc t))
@@ -1170,7 +1295,7 @@ module Ax = struct
     snd (save_r ~mode:`Abort scope)
 
   (* ------------------------------------------------------------------ *)
-  let add ?(src : string option) (scope : scope) (mode : proofmode) (ax : paxiom located) =
+  let add ?(src : string option) ?(strict = false) (scope : scope) (mode : proofmode) (ax : paxiom located) =
     let uax = unloc ax in
     let kind =
       match uax.pa_kind with
@@ -1192,10 +1317,10 @@ module Ax = struct
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
           | None -> scope.sc_locdoc; }
     in
-    add_r scope mode ax
+    add_r ~strict scope mode ax
 
   (* ------------------------------------------------------------------ *)
-  let realize (scope : scope) (mode : proofmode) (rl : prealize located) =
+  let realize ?(strict = false) (scope : scope) (mode : proofmode) (rl : prealize located) =
     check_state `InProof "activate" scope;
 
     let loc = rl.pl_loc and rl = rl.pl_desc in
@@ -1227,10 +1352,10 @@ module Ax = struct
 
     match rl.pr_proof with
     | None ->
-        None, start_lemma scope pucflags check ?name:axname (ax, Some st)
+        None, start_lemma ~strict scope pucflags check ?name:axname (ax, Some st)
 
     | Some tc ->
-        start_lemma_with_proof scope
+        start_lemma_with_proof ~strict scope
           None pucflags (mode, mk_loc loc tc) check
           ?name:axname ax
 end
