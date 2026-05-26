@@ -2802,7 +2802,13 @@ logtactic:
    { Pclear (`Include l) }
 
 | CONGR
-   { Pcongr }
+   { Pcongr PCongrDefault }
+
+| CONGR STAR
+   { Pcongr PCongrStar }
+
+| CONGR p=sform_h
+   { Pcongr (PCongrPattern p) }
 
 | TRIVIAL
    { Ptrivial }

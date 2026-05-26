@@ -1040,6 +1040,12 @@ type clear_info = [
 type pgenhave = psymbol * intropattern option * psymbol list * pformula
 
 (* -------------------------------------------------------------------- *)
+type pcongr_mode =
+  | PCongrDefault
+  | PCongrStar
+  | PCongrPattern of pformula
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
@@ -1052,7 +1058,7 @@ type logtactic =
   | Pleft
   | Pright
   | Ptrivial
-  | Pcongr
+  | Pcongr      of pcongr_mode
   | Pelim       of (prevert * pqsymbol option)
   | Papply      of (apply_info * prevert option)
   | Pcut        of pcut

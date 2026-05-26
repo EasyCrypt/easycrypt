@@ -2262,8 +2262,11 @@ let process_exists args (tc : tcenv1) =
   EcLowGoal.t_exists_intro_s args tc
 
 (* -------------------------------------------------------------------- *)
-let process_congr tc =
-  let (env, hyps, concl) = FApi.tc1_eflat tc in
+(* Common scaffolding for [congr], [congr *] and [congr /pat]: setup the
+   [t_ensure_eq] coercion (iff -> eq when needed) and the auto-discharge
+   tactic for trivial subgoals. *)
+let process_congr_setup tc =
+  let (_env, _hyps, concl) = FApi.tc1_eflat tc in
 
   if not (EcFol.is_eq_or_iff concl) then
     tc_error !!tc "goal must be an equality or an equivalence";
@@ -2282,6 +2285,15 @@ let process_congr tc =
           (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
 
   let t_subgoal = t_ors [t_reflex ~mode:`Alpha; t_assumption `Alpha; t_id] in
+
+  (f1, f2, iseq, t_ensure_eq, t_subgoal)
+
+(* -------------------------------------------------------------------- *)
+(* Default [congr]: one structural step on the head of the equality. *)
+let process_congr_default tc =
+  let (env, hyps, concl) = FApi.tc1_eflat tc in
+  let (f1, f2, iseq, t_ensure_eq, t_subgoal) = process_congr_setup tc in
+  let _ = concl in
 
   match f1.f_node, f2.f_node with
   | _, _ when EcReduction.is_alpha_eq hyps f1 f2 ->
@@ -2309,6 +2321,173 @@ let process_congr tc =
     -> EcCoreGoal.FApi.xmutate1 tc `CongrProj [f_eq f1 f2]
 
   | _, _ -> tacuerror "not a congruence"
+
+(* -------------------------------------------------------------------- *)
+(* Given a skeleton [skel] containing free locals [holes = (xi, tyi)],
+   a left vector [lvec] and a right vector [rvec] of the same length and
+   types, discharge an equality goal [f1 = f2] where
+     skel[xi := Li] is convertible to f1
+   and
+     skel[xi := Ri] is convertible to f2.
+
+   The discharge proceeds by:
+     1. ensuring the goal is an equality (vs iff);
+     2. changing it to [(\xi. skel) Li... = (\xi. skel) Ri...] (beta);
+     3. unfolding the congruence one step per hole with [t_congr];
+     4. auto-closing trivial side goals (reflexivity / assumption). *)
+let process_congr_from_skeleton ~holes ~skel ~lvec ~rvec tc =
+  let (f1, _f2, _iseq, t_ensure_eq, t_subgoal) = process_congr_setup tc in
+
+  if List.is_empty holes then
+    FApi.t_seq t_ensure_eq EcLowGoal.t_reflex tc
+  else
+    let ty = f1.f_ty in
+    let bds = List.map (fun (x, t) -> (x, EcAst.GTty t)) holes in
+    let lam = EcFol.f_lambda bds skel in
+    let app_lhs = EcFol.f_app lam lvec ty in
+    let app_rhs = EcFol.f_app lam rvec ty in
+    let newgoal = EcFol.f_eq app_lhs app_rhs in
+    let pairs   = List.combine lvec rvec in
+    let tcgr    = t_congr (lam, lam) (pairs, ty) in
+    FApi.t_seqs
+      [t_ensure_eq;
+       (fun tc -> FApi.tcenv_of_tcenv1 (EcLowGoal.t_change1 newgoal tc));
+       tcgr;
+       t_subgoal]
+      tc
+
+(* -------------------------------------------------------------------- *)
+(* [congr /pat]: pattern matches both sides; one subgoal per pattern
+   variable (skipping syntactically-equal sides). *)
+let process_congr_pattern p tc =
+  let (_env, hyps, _concl) = FApi.tc1_eflat tc in
+  let (f1, f2, _iseq, _t_ensure_eq, _t_subgoal) = process_congr_setup tc in
+
+  let (ps, ue), pat_f = TTC.tc1_process_pattern tc p in
+  let pvars = Mid.keys ps in
+  let ev0 = EcMatching.MEV.of_idents pvars `Form in
+
+  let match_side label side =
+    let ue' = EcUnify.UniEnv.copy ue in
+    let ev' = ev0 in
+    try
+      let (ue'', _, ev'') =
+        EcMatching.f_match EcMatching.fmsearch hyps (ue', ev') pat_f side
+      in (ue'', ev'')
+    with EcMatching.MatchFailure ->
+      tc_error !!tc "pattern does not match %s of the goal" label
+  in
+
+  let (ueL, evL) = match_side "left-hand side"  f1 in
+  let (ueR, evR) = match_side "right-hand side" f2 in
+
+  let env = FApi.tc1_env tc in
+  let substL = EcMatching.MEV.assubst ueL evL env in
+  let substR = EcMatching.MEV.assubst ueR evR env in
+
+  (* For each pattern variable [x], get its binding on both sides by
+     substituting [f_local x] (with a fresh unification type that the
+     subst will refine to the matched term's type). *)
+  let holes_full =
+    List.map (fun x ->
+      let probe_ty = EcUnify.UniEnv.fresh ueL in
+      let probe    = EcFol.f_local x probe_ty in
+      let li = EcCoreSubst.Fsubst.f_subst substL probe in
+      let ri = EcCoreSubst.Fsubst.f_subst substR probe in
+      (x, li.EcAst.f_ty, li, ri)
+    ) pvars
+  in
+
+  (* Drop holes whose two sides are alpha-equal: they do not generate a
+     subgoal (and including them in the skeleton would be harmless but
+     noisy). *)
+  let kept =
+    List.filter (fun (_, _, li, ri) -> not (EcReduction.is_alpha_eq hyps li ri))
+      holes_full
+  in
+
+  let holes = List.map (fun (x, t, _, _) -> (x, t)) kept in
+  let lvec  = List.map (fun (_, _, l, _) -> l) kept in
+  let rvec  = List.map (fun (_, _, _, r) -> r) kept in
+
+  (* Rebuild the skeleton from the original pattern, substituting away the
+     dropped pattern variables with their (alpha-equal) bound form. *)
+  let dropped =
+    List.filter (fun (_, _, li, ri) -> EcReduction.is_alpha_eq hyps li ri)
+      holes_full
+  in
+  let skel =
+    List.fold_left (fun acc (x, _, li, _) ->
+      EcCoreSubst.Fsubst.f_subst_local x li acc) pat_f dropped
+  in
+
+  process_congr_from_skeleton ~holes ~skel ~lvec ~rvec tc
+
+(* -------------------------------------------------------------------- *)
+(* [congr *]: walk LHS/RHS in lock-step without reduction; emit one
+   subgoal per pair of differing positions. Binders are opaque. *)
+let process_congr_star tc =
+  let (env, hyps, _concl) = FApi.tc1_eflat tc in
+  let (f1, f2, _iseq, _t_ensure_eq, _t_subgoal) = process_congr_setup tc in
+
+  let holes = ref [] in
+  let lvec  = ref [] in
+  let rvec  = ref [] in
+
+  let mk_hole (l : form) (r : form) : form =
+    let x = EcIdent.create "_x" in
+    holes := (x, l.EcAst.f_ty) :: !holes;
+    lvec  := l :: !lvec;
+    rvec  := r :: !rvec;
+    EcFol.f_local x l.EcAst.f_ty
+  in
+
+  let rec walk (l : form) (r : form) : form =
+    if EcReduction.is_alpha_eq hyps l r then
+      l
+    else
+      match l.EcAst.f_node, r.EcAst.f_node with
+      | Fapp (hL, aL), Fapp (hR, aR)
+          when    EcReduction.is_alpha_eq hyps hL hR
+               && List.length aL = List.length aR
+               && EcReduction.EqTest.for_type env l.EcAst.f_ty r.EcAst.f_ty ->
+          let args' = List.map2 walk aL aR in
+          EcFol.f_app hL args' l.EcAst.f_ty
+
+      | Fif (cL, tL, eL), Fif (cR, tR, eR) ->
+          let c' = walk cL cR in
+          let t' = walk tL tR in
+          let e' = walk eL eR in
+          EcFol.f_if c' t' e'
+
+      | Ftuple xs, Ftuple ys when List.length xs = List.length ys ->
+          let zs = List.map2 walk xs ys in
+          EcFol.f_tuple zs
+
+      | Fproj (xL, iL), Fproj (xR, iR)
+          when iL = iR
+            && EcReduction.EqTest.for_type env l.EcAst.f_ty r.EcAst.f_ty ->
+          EcFol.f_proj (walk xL xR) iL l.EcAst.f_ty
+
+      | _, _ ->
+          if not (EcReduction.EqTest.for_type env l.EcAst.f_ty r.EcAst.f_ty) then
+            tc_error !!tc "congr*: cannot equate subterms of different types";
+          mk_hole l r
+  in
+
+  let skel = walk f1 f2 in
+  let holes = List.rev !holes in
+  let lvec  = List.rev !lvec  in
+  let rvec  = List.rev !rvec  in
+
+  process_congr_from_skeleton ~holes ~skel ~lvec ~rvec tc
+
+(* -------------------------------------------------------------------- *)
+let process_congr (mode : pcongr_mode) tc =
+  match mode with
+  | PCongrDefault    -> process_congr_default tc
+  | PCongrStar       -> process_congr_star tc
+  | PCongrPattern p  -> process_congr_pattern p tc
 
 (* -------------------------------------------------------------------- *)
 let process_wlog ids wlog tc =
