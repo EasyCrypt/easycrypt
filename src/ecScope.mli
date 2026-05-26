@@ -41,6 +41,10 @@ and proof_auc = {
   puc_jdg     : proof_state;
   puc_flags   : pucflags;
   puc_crt     : EcDecl.axiom;
+  puc_bullets : EcBullets.stack option;
+    (* [None] when bullets are decoration only (legacy mode).
+       [Some stack] when [+strict_bullets] was active at proof
+       open; see [EcBullets] for the stack semantics. *)
 }
 
 and proof_ctxt =
@@ -128,11 +132,11 @@ end
 module Ax : sig
   type proofmode = [`WeakCheck | `Check | `Report]
 
-  val add     : ?src:string -> scope -> proofmode -> paxiom located -> symbol option * scope
+  val add     : ?src:string -> ?strict:bool -> scope -> proofmode -> paxiom located -> symbol option * scope
   val save    : ?src:string -> scope -> string option * scope
   val admit   : ?src:string -> scope -> string option * scope
   val abort   : ?src:string -> scope -> scope
-  val realize : scope -> proofmode -> prealize located -> symbol option * scope
+  val realize : ?strict:bool -> scope -> proofmode -> prealize located -> symbol option * scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -231,7 +235,10 @@ module Tactics : sig
   type prinfos = proofenv * (handle * handle list)
   type proofmode = Ax.proofmode
 
-  val process : ?src:string -> scope -> proofmode -> ptactic list -> prinfos option * scope
+  val process :
+       ?src:string
+    -> ?bullet:string EcLocation.located
+    -> scope -> proofmode -> ptactic list -> prinfos option * scope
   val proof   : ?src:string -> scope -> scope
 end
 
