@@ -638,6 +638,8 @@ let main () =
       Buffer.clear notices;
       let args = String.strip args in
       let last_src = ref "" in
+      let trace_prefix = ref "" in
+      let exception Trace_failed of exn in
 
       try
         (* Parse quoted or unquoted filename *)
@@ -660,27 +662,32 @@ let main () =
             | f :: rest -> (f, String.concat " " rest)
         in
 
-        (* Parse optional LINE[:COL] and flags (-nosmt) *)
-        let upto, nosmt =
-          if rest = "" then (None, false)
-          else
-            let words = String.split_on_char ' ' rest in
-            let words = List.filter (fun s -> s <> "") words in
-            let nosmt = List.mem "-nosmt" words in
-            let words = List.filter (fun s -> s <> "-nosmt") words in
-            let upto = match words with
-              | [] -> None
-              | [w] ->
-                begin match String.split_on_char ':' w with
-                | [line] ->
-                  Some (int_of_string line, None)
-                | [line; col] ->
-                  Some (int_of_string line, Some (int_of_string col))
-                | _ -> failwith "LOAD: invalid LINE[:COL] format"
-                end
-              | _ -> failwith "LOAD: unexpected arguments"
-            in
-            (upto, nosmt)
+        (* Parse optional LINE[:COL] and flags (-nosmt, -trace) *)
+        let upto, nosmt, trace =
+          let words =
+            String.split_on_char ' ' rest
+              |> List.filter (fun s -> s <> "")
+          in
+          let nosmt = List.mem "-nosmt" words in
+          let trace = List.mem "-trace" words in
+          let words =
+            List.filter
+              (fun s -> s <> "-nosmt" && s <> "-trace")
+              words
+          in
+          let upto = match words with
+            | [] -> None
+            | [w] ->
+              begin match String.split_on_char ':' w with
+              | [line] ->
+                Some (int_of_string line, None)
+              | [line; col] ->
+                Some (int_of_string line, Some (int_of_string col))
+              | _ -> failwith "LOAD: invalid LINE[:COL] format"
+              end
+            | _ -> failwith "LOAD: unexpected arguments"
+          in
+          (upto, nosmt, trace)
         in
 
         (* Validate file extension *)
@@ -711,27 +718,65 @@ let main () =
 
         let last_loc = ref None in
 
+        (* For -trace: lazy whole-file bytes, used to slice the exact
+           source text of a sentence by byte offsets. *)
+        let input_bytes = lazy (
+          let ic = open_in_bin filename in
+          let n  = in_channel_length ic in
+          let b  = Bytes.create n in
+          really_input ic b 0 n;
+          close_in ic;
+          Bytes.unsafe_to_string b)
+        in
+        let sentence_source (loc : EcLocation.t) =
+          let s = Lazy.force input_bytes in
+          let lo = max 0 loc.EcLocation.loc_bchar in
+          let hi = min (String.length s) loc.EcLocation.loc_echar in
+          if hi <= lo then "" else String.sub s lo (hi - lo)
+        in
+
+        (* For -trace: defer execution of the last sentence within the
+           prefix so we can capture goals before and after it. *)
+        let pending : (string * EP.global) option ref = ref None in
+        let flush_pending () =
+          match !pending with
+          | None -> ()
+          | Some (src, p) ->
+            last_src := src;
+            process_action ~src p;
+            last_loc := Some p.EP.gl_action.EcLocation.pl_loc;
+            pending := None
+        in
+        let step src p =
+          let loc = p.EP.gl_action.EcLocation.pl_loc in
+          if past_upto loc then raise Exit;
+          if trace then begin
+            flush_pending ();
+            pending := Some (src, p)
+          end else begin
+            last_src := src;
+            process_action ~src p;
+            last_loc := Some loc
+          end
+        in
+
         (* In -nosmt mode, admit all SMT calls during prefix loading *)
         if nosmt then EcCommands.pragma_check `WeakCheck;
 
         begin try while true do
           let (src, prog) = EcIo.xparse reader in
           let src = String.strip src in
-          last_src := src;
           match EcLocation.unloc prog with
           | EP.P_Prog (commands, locterm) ->
-            List.iter (fun p ->
-              let loc = p.EP.gl_action.EcLocation.pl_loc in
-              if past_upto loc then raise Exit;
-              process_action ~src p;
-              last_loc := Some loc
-            ) commands;
+            List.iter (step src) commands;
             if locterm then raise Exit
           | EP.P_Undo i ->
+            last_src := src;
             EcCommands.undo i
           | EP.P_Exit ->
             raise Exit
           | EP.P_DocComment doc ->
+            last_src := src;
             EcCommands.doc_comment doc
         done with
         | Exit | End_of_file -> ()
@@ -746,6 +791,88 @@ let main () =
         (* Restore full SMT checking for interactive tactics *)
         if nosmt then EcCommands.pragma_check `Check;
 
+        (* If -trace is set, the last in-prefix sentence is still
+           pending. Run it with goal capture before and after, and
+           build the BEFORE/TACTIC/AFTER/SUMMARY response body. *)
+        let body =
+          if not trace then
+            goals_to_string ()
+          else
+            let pre_state =
+              match !pending with
+              | None                            -> `Nothing
+              | Some _ when not (EcCommands.in_proof ()) -> `NotInProof
+              | Some (src, p)                   -> `Ready (src, p)
+            in
+            match pre_state with
+            | `Nothing    -> failwith "trace: nothing to trace"
+            | `NotInProof ->
+              failwith
+                "trace: target sentence is not in a proof context"
+            | `Ready (src, p) ->
+              let loc = p.EP.gl_action.EcLocation.pl_loc in
+              let (sl, sc) = loc.EcLocation.loc_start in
+              let (el, ec) = loc.EcLocation.loc_end in
+              let before_goals = EcCommands.pp_all_goals () in
+              let n1 = List.length before_goals in
+              let buf = Buffer.create 1024 in
+              let fmt = Format.formatter_of_buffer buf in
+              Format.fprintf fmt
+                "=== BEFORE: line %d (col %d) ===@\n" sl sc;
+              EcCommands.pp_current_goal_or_noproof ~all:false fmt;
+              Format.fprintf fmt
+                "@\n=== TACTIC (lines %d:%d - %d:%d) ===@\n%s@\n@\n"
+                sl sc el ec (sentence_source loc);
+              last_src := src;
+              begin
+                try
+                  process_action ~src p;
+                  last_loc := Some loc;
+                  pending := None;
+                  let after_goals = EcCommands.pp_all_goals () in
+                  let n2 = List.length after_goals in
+                  Format.fprintf fmt
+                    "=== AFTER: line %d (col %d) ===@\n" sl sc;
+                  let before_set =
+                    List.fold_left
+                      (fun s g -> EcMaps.Sstr.add g s)
+                      EcMaps.Sstr.empty before_goals
+                  in
+                  (* The new focused goal always counts as "modified"
+                     (its focus status changed even if its text matches
+                     an old sibling); the rest are printed only if
+                     they didn't appear in BEFORE. *)
+                  let to_print =
+                    match after_goals with
+                    | []          -> []
+                    | head :: tl ->
+                      head ::
+                      List.filter
+                        (fun g -> not (EcMaps.Sstr.mem g before_set))
+                        tl
+                  in
+                  begin match to_print with
+                  | [] -> Format.fprintf fmt "(no open goals)@\n"
+                  | _  ->
+                    List.iteri (fun i g ->
+                      if i > 0 then Format.fprintf fmt "@\n";
+                      Format.fprintf fmt "%s@\n" g)
+                      to_print
+                  end;
+                  Format.fprintf fmt
+                    "@\n=== SUMMARY ===@\nopen goals: %d -> %d@\n" n1 n2;
+                  Format.pp_print_flush fmt ();
+                  Buffer.contents buf
+                with e ->
+                  Format.fprintf fmt
+                    "=== AFTER: line %d (col %d) ===@\n<sentence failed>@\n"
+                    sl sc;
+                  Format.pp_print_flush fmt ();
+                  trace_prefix := Buffer.contents buf;
+                  raise (Trace_failed e)
+              end
+        in
+
         let tag =
           match !last_loc with
           | None -> ""
@@ -753,13 +880,16 @@ let main () =
             let (el, _) = loc.EcLocation.loc_end in
             Printf.sprintf " [loaded:%s:%d]" filename el
         in
-        reply_ok ~tag (goals_to_string ())
+        reply_ok ~tag body
 
       with
       | EcCommands.Restart ->
         do_initialize ();
         Hashtbl.clear checkpoints;
         reply_ok "Session restarted"
+      | Trace_failed e ->
+        let msg = format_error ~src:!last_src e in
+        reply_error (!trace_prefix ^ msg)
       | Failure s ->
         reply_error s
       | e ->
