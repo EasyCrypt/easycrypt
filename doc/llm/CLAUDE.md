@@ -56,7 +56,7 @@ These are protocol-level commands, not EasyCrypt syntax:
 
 | Command | Description |
 |---------|-------------|
-| `LOAD "file.ec" [LINE[:COL]] [-nosmt]` | Reset state, compile file (optionally skip SMT) |
+| `LOAD "file.ec" [LINE[:COL]] [-nosmt] [-trace]` | Reset state, compile file (optionally skip SMT or trace last sentence) |
 | `UNDO` | Undo the last proof step |
 | `REVERT <uuid-or-name>` | Revert to a specific state (by uuid or checkpoint name) |
 | `GOALS` | Print the current goal (first subgoal only, with remaining count) |
@@ -116,6 +116,27 @@ compilation (safe when the prefix was already verified):
 ```
 LOAD "myfile.ec" 436 -nosmt
 ```
+
+Add `-trace` to a LOAD to inspect the proof state around the last
+loaded sentence. The reply body contains four delimited blocks:
+
+```
+LOAD "myfile.ec" 42 -trace
+
+=== BEFORE: line 42 (col 0) ===
+<focused goal before the sentence>
+=== TACTIC (lines 42:0 - 42:10) ===
+<exact source text of the sentence>
+=== AFTER: line 42 (col 0) ===
+<new focused goal, plus any new sibling goals>
+=== SUMMARY ===
+open goals: N1 -> N2
+```
+
+The position comes from the existing `LINE[:COL]` argument; omit it to
+trace the file's last sentence. On tactic failure the reply uses the
+`ERROR` envelope and still includes the BEFORE/TACTIC blocks plus an
+`<sentence failed>` marker in the AFTER block.
 
 **2. Try tactics, using REVERT to restart:**
 
