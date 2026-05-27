@@ -64,6 +64,7 @@ val pp_current_goal : ?all:bool -> Format.formatter -> unit
 val pp_current_goal_or_noproof : ?all:bool -> Format.formatter -> unit
 val pp_maybe_current_goal : Format.formatter -> unit
 val pp_all_goals : unit -> string list
+val in_proof : unit -> bool
 
 (* -------------------------------------------------------------------- *)
 val pragma_verbose : bool -> unit
