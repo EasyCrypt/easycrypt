@@ -1056,8 +1056,11 @@ let pp_current_goal ?(all = false) stream =
   end
 
 (* -------------------------------------------------------------------- *)
+let in_proof () =
+  Option.is_some (S.xgoal (current ()))
+
 let pp_current_goal_or_noproof ?(all = false) stream =
-  if Option.is_some (S.xgoal (current ())) then
+  if in_proof () then
     pp_current_goal ~all stream
   else
     Format.fprintf stream "No active proof.@\n%!"
