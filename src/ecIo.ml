@@ -97,12 +97,13 @@ let finalize (ecreader : ecreader) =
   Disposable.dispose ecreader
 
 (* -------------------------------------------------------------------- *)
+let isfinal_token = function
+  | EcParser.FINAL _ -> true
+  | _ -> false
+
+(* -------------------------------------------------------------------- *)
 let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
   let lexbuf = ecreader.ecr_lexbuf in
-
-  let isfinal = function
-    | EcParser.FINAL _ -> true
-    | _ -> false in
 
   if ecreader.ecr_atstart then
     ecreader.ecr_trim <- ecreader.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum;
@@ -134,7 +135,7 @@ let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
 
   ecreader.ecr_tokens  <- prequeue @ queue;
 
-  if isfinal token then
+  if isfinal_token token then
     ecreader.ecr_atstart <- true
   else
     ecreader.ecr_atstart <- ecreader.ecr_atstart && (
@@ -176,6 +177,42 @@ let parse (ecreader : ecreader) : EcParsetree.prog =
       raise EcParser.Error
 
   in parse (EcParser.Incremental.prog ecreader.ecr_lexbuf.lex_curr_p)
+
+(* -------------------------------------------------------------------- *)
+let next_sentence_from (text : string) (start : int) : (string * int * int) option =
+  let len = String.length text in
+  if start < 0 || start >= len then
+    None
+  else
+    let sub = String.sub text start (len - start) in
+    let reader = from_string sub in
+    let ecr = Disposable.get reader in
+
+    let exception EOF in
+
+    Fun.protect
+      ~finally:(fun () -> finalize reader)
+      (fun () ->
+        try
+          begin
+            let exception Done in
+
+            try
+              while true do
+                match proj3_1 (lexer ecr) with
+                | EcParser.FINAL _ -> raise Done
+                | EcParser.EOF -> raise EOF
+                | _ -> ()
+              done
+            with Done -> ()
+          end;
+
+          let p = ecr.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum - 1 in
+          let s = String.sub sub 0 p in
+
+          Some (s, start, start + p)
+        with
+        | EcLexer.LexicalError _ | EOF -> None)
 
 (* -------------------------------------------------------------------- *)
 let xparse (ecreader : ecreader) : string * EcParsetree.prog =

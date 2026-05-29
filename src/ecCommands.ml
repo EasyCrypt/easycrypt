@@ -15,6 +15,7 @@ type pragma = {
   pm_g_prall : bool; (* true  => display all open goals *)
   pm_g_prpo  : EcPrinting.prpo_display;
   pm_check   : [`Check | `WeakCheck | `Report];
+  pm_strict_bullets : bool; (* true => bullets focus subgoals *)
 }
 
 let dpragma = {
@@ -22,6 +23,7 @@ let dpragma = {
   pm_g_prall = false ;
   pm_g_prpo  = EcPrinting.{ prpo_pr = false; prpo_po = false; };
   pm_check   = `Check;
+  pm_strict_bullets = false;
 }
 
 module Pragma : sig
@@ -61,9 +63,14 @@ let pragma_g_po_display (b : bool) =
 let pragma_check mode =
   Pragma.upd (fun pragma -> { pragma with pm_check = mode; })
 
+let pragma_strict_bullets (b : bool) =
+  Pragma.upd (fun pragma -> { pragma with pm_strict_bullets = b; })
+
 module Pragmas = struct
   let silent     = "silent"
   let verbose    = "verbose"
+
+  let strict_bullets = "strict_bullets"
 
   module Proofs = struct
     let check  = "Proofs:check"
@@ -505,7 +512,9 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom ?(src : string option) (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  let (name, scope) = EcScope.Ax.add ?src scope (Pragma.get ()).pm_check ax in
+  let pragma = Pragma.get () in
+  let strict = pragma.pm_strict_bullets in
+  let (name, scope) = EcScope.Ax.add ?src ~strict scope pragma.pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
@@ -635,8 +644,9 @@ and process_sct_close (scope : EcScope.scope) name =
 and process_tactics ?(src : string option) (scope : EcScope.scope) t =
   let mode = (Pragma.get ()).pm_check in
   match t with
-  | `Actual t -> snd (EcScope.Tactics.process ?src scope mode t)
-  | `Proof    -> EcScope.Tactics.proof ?src scope
+  | `Actual (b, t) ->
+      snd (EcScope.Tactics.process ?src ?bullet:b scope mode t)
+  | `Proof -> EcScope.Tactics.proof ?src scope
 
 (* -------------------------------------------------------------------- *)
 (* Add and store src for proofs *)
@@ -653,8 +663,9 @@ and process_save ?(src : string option) (scope : EcScope.scope) ed =
 
 (* -------------------------------------------------------------------- *)
 and process_realize (scope : EcScope.scope) pr =
-  let mode = (Pragma.get ()).pm_check in
-  let (name, scope) = EcScope.Ax.realize scope mode pr in
+  let pragma = Pragma.get () in
+  let strict = pragma.pm_strict_bullets in
+  let (name, scope) = EcScope.Ax.realize ~strict scope pragma.pm_check pr in
     name |> EcUtils.oiter
       (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
@@ -689,6 +700,9 @@ and process_option (scope : EcScope.scope) (name, value) =
     let gs = EcEnv.gstate (EcScope.env scope) in
     EcGState.setflag (unloc name) value gs; scope
 
+  | `Bool value when EcLocation.unloc name = Pragmas.strict_bullets ->
+      pragma_strict_bullets value; scope
+
   | (`Int _) as value ->
       let gs = EcEnv.gstate (EcScope.env scope) in
       EcGState.setvalue (unloc name) value gs; scope
@@ -716,14 +730,14 @@ and process_dump_why3 scope filename =
   EcScope.dump_why3 scope filename; scope
 
 (* -------------------------------------------------------------------- *)
-and process_dump scope (source, tc) =
+and process_dump scope (source, (bullet, tc)) =
   let open EcCoreGoal in
 
   let input, (p1, p2) = source.tcd_source in
 
   let goals, scope  =
     let mode = (Pragma.get ()).pm_check in
-     EcScope.Tactics.process scope mode tc
+    EcScope.Tactics.process ?bullet scope mode tc
   in
 
   let wrerror fname =
@@ -1042,8 +1056,11 @@ let pp_current_goal ?(all = false) stream =
   end
 
 (* -------------------------------------------------------------------- *)
+let in_proof () =
+  Option.is_some (S.xgoal (current ()))
+
 let pp_current_goal_or_noproof ?(all = false) stream =
-  if Option.is_some (S.xgoal (current ())) then
+  if in_proof () then
     pp_current_goal ~all stream
   else
     Format.fprintf stream "No active proof.@\n%!"
