@@ -602,6 +602,7 @@
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 %token <Lexing.position> FINAL
 %token <EcParsetree.dockind * string> DOCCOMMENT
+%token <EcQuotation.quotation> QUOTATION
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE

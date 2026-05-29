@@ -65,15 +65,17 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string * bool) list;
-  ldro_boot  : bool;
+  ldro_idirs  : (string option * string * bool) list;
+  ldro_boot   : bool;
+  ldro_quotes : (string * string) list;
 }
 
 and glb_options = {
-  o_why3     : string option;
-  o_reloc    : bool;
-  o_ovrevict : string list;
-  o_loader   : ldr_options;
+  o_why3       : string option;
+  o_reloc      : bool;
+  o_ovrevict   : string list;
+  o_loader     : ldr_options;
+  o_enable_quotes : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -86,6 +88,7 @@ type ini_options = {
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
+  ini_quotes   : (string * string) list;
 }
 
 type ini_context = {
