@@ -61,6 +61,8 @@ These are protocol-level commands, not EasyCrypt syntax:
 | `REVERT <uuid-or-name>` | Revert to a specific state (by uuid or checkpoint name) |
 | `GOALS` | Print the current goal (first subgoal only, with remaining count) |
 | `GOALS ALL` | Print all subgoals |
+| `TREE` | List open subgoals as `[N] <one-line conclusion>`, marking the focused one |
+| `TREE ALL` | Same as `TREE`, but with full goal bodies |
 | `CHECKPOINT <name>` | Save current uuid under a name for later `REVERT` |
 | `SEARCH <pattern>` | Search for lemmas matching a pattern |
 | `QUIET ON` / `QUIET OFF` | Suppress/enable automatic goal display after tactics |
@@ -263,7 +265,14 @@ SEARCH (_ %/ _)
   refers to the first unclosed goal, which may not be the intended
   one.
 - When a tactic generates multiple subgoals, each subgoal must be
-  closed in order. Use `GOALS ALL` to see them all.
+  closed in order. Use `GOALS ALL` or `TREE` to see them all.
+- When more than one subgoal is open, replies carry a
+  `[focus: k/N]` tag (e.g. `OK [uuid:42] [focus: 1/3]`) so you know
+  which one the next tactic will hit.
+- `pragma +strict_bullets` does **not** apply to REPL input. Files
+  loaded via `LOAD` still respect their own pragmas, but tactics typed
+  at the REPL prompt are never rejected for missing bullets — the
+  REPL is the focus mechanism.
 - `rewrite lemma in H` modifies hypothesis `H` in place (it does
   not consume it). If you need to preserve the original, copy it
   first: `have H' := H; rewrite lemma in H'`.
