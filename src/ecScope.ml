@@ -490,6 +490,10 @@ let xgoal (scope : scope) =
   scope.sc_pr_uc
 
 (* -------------------------------------------------------------------- *)
+let set_xgoal (scope : scope) (puc : proof_uc) =
+  { scope with sc_pr_uc = Some puc }
+
+(* -------------------------------------------------------------------- *)
 let dump_why3 (scope : scope) (filename : string) =
   try  EcSmt.dump_why3 (env scope) filename
   with
