@@ -66,6 +66,7 @@ val pp_all_goals : unit -> string list
 val in_proof : unit -> bool
 val disable_repl_bullets : unit -> unit
 val pp_tree : ?all:bool -> unit -> (int * bool * string) list
+val focus_goal : int -> (int, string) result
 
 (* -------------------------------------------------------------------- *)
 val pragma_verbose : bool -> unit

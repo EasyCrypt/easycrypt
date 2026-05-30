@@ -932,6 +932,40 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
+(* Rotate the focus of the currently active proof so that the goal at
+   1-based index [k] becomes the focused one. The change is persisted
+   in the context with a new uuid so UNDO/REVERT can roll it back.
+   Returns the new number of open goals on success, or an error
+   message on failure. *)
+let focus_goal (k : int) : (int, string) result =
+  match !context with
+  | None -> Error "no active context"
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> Error "no active proof"
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> Error "no active proof"
+      | Some (pac, pct) ->
+        match pac.EcScope.puc_jdg with
+        | EcScope.PSNoCheck -> Error "proof is in no-check mode"
+        | EcScope.PSCheck pf ->
+          let n = List.length (EcCoreGoal.all_hd_opened pf) in
+          if n = 0 then Error "no open goals"
+          else if k < 1 || k > n then
+            Error (Printf.sprintf
+              "focus: index %d out of range (1..%d)" k n)
+          else if k = 1 then Ok n
+          else begin
+            let pf = EcCoreGoal.rotate_focus k pf in
+            let pac = { pac with EcScope.puc_jdg = EcScope.PSCheck pf } in
+            let puc =
+              { puc with EcScope.puc_active = Some (pac, pct) } in
+            let scope = EcScope.set_xgoal ctxt.ct_current puc in
+            context := Some (push_context scope ctxt);
+            Ok n
+          end
+
 (* Disable bullet enforcement for REPL-driven phrases. Drops the global
    pragma so newly-opened proofs have no bullet stack, and clears the
    stack on any currently active proof so REPL phrases are not checked
