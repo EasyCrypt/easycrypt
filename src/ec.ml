@@ -1016,6 +1016,33 @@ let main () =
         Buffer.clear notices;
         reply_ok (tree_to_string ())
       end
+      else if String.starts_with line "FOCUS " || line = "NEXT" then begin
+        Buffer.clear notices;
+        let request =
+          if line = "NEXT" then `Next
+          else
+            let arg = String.strip (
+              String.sub line 6 (String.length line - 6)) in
+            try `At (int_of_string arg)
+            with Failure _ -> `Bad arg
+        in
+        match request with
+        | `Bad arg ->
+          reply_error (Printf.sprintf "FOCUS: not an integer: %s" arg)
+        | _ ->
+          let entries = EcCommands.pp_tree () in
+          let n = List.length entries in
+          let target =
+            match request with
+            | `Next -> if n <= 1 then 1 else 2
+            | `At k -> k
+            | `Bad _ -> 1
+          in
+          begin match EcCommands.focus_goal target with
+          | Ok _ -> reply_ok_goals ()
+          | Error msg -> reply_error msg
+          end
+      end
       else if String.starts_with line "CHECKPOINT " then begin
         Buffer.clear notices;
         let name = String.strip (

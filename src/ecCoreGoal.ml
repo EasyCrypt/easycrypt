@@ -1031,6 +1031,16 @@ let all_opened (pf : proof) =
 let closed (pf : proof) = List.is_empty pf.pr_opened
 
 (* -------------------------------------------------------------------- *)
+let rotate_focus (k : int) (pf : proof) =
+  let n = List.length pf.pr_opened in
+  if k < 1 || k > n then
+    invalid_arg "EcCoreGoal.rotate_focus";
+  if k = 1 then pf
+  else
+    let pre, post = List.split_at (k - 1) pf.pr_opened in
+    { pf with pr_opened = post @ pre }
+
+(* -------------------------------------------------------------------- *)
 module Exn = struct
   let recast pe _hyps f x =
     try  f x
