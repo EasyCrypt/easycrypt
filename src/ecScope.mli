@@ -87,6 +87,7 @@ val env    : scope -> EcEnv.env
 val attop  : scope -> bool
 val goal   : scope -> proof_auc option
 val xgoal  : scope -> proof_uc option
+val set_xgoal : scope -> proof_uc -> scope
 
 (* Creates a scope that is identical to the supplied one except
  * that the environment and required theories are reset to the ones
