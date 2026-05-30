@@ -65,6 +65,7 @@ These are protocol-level commands, not EasyCrypt syntax:
 | `TREE ALL` | Same as `TREE`, but with full goal bodies |
 | `FOCUS N` | Rotate focus so subgoal `[N]` (from `TREE`) becomes the focused goal |
 | `NEXT` | Rotate focus to the next subgoal (equivalent to `FOCUS 2`) |
+| `COMMIT` | Emit recorded REPL phrases as a bulleted proof body (works under `+strict_bullets`) |
 | `CHECKPOINT <name>` | Save current uuid under a name for later `REVERT` |
 | `SEARCH <pattern>` | Search for lemmas matching a pattern |
 | `QUIET ON` / `QUIET OFF` | Suppress/enable automatic goal display after tactics |
