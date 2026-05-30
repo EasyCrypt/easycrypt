@@ -932,6 +932,28 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
+(* Disable bullet enforcement for REPL-driven phrases. Drops the global
+   pragma so newly-opened proofs have no bullet stack, and clears the
+   stack on any currently active proof so REPL phrases are not checked
+   against it. Idempotent. Does not advance the undo level. *)
+let disable_repl_bullets () =
+  pragma_strict_bullets false;
+  match !context with
+  | None -> ()
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> ()
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> ()
+      | Some (pac, _) when pac.EcScope.puc_bullets = None -> ()
+      | Some (pac, pct) ->
+        let pac = { pac with EcScope.puc_bullets = None } in
+        let puc = { puc with EcScope.puc_active = Some (pac, pct) } in
+        let scope = EcScope.set_xgoal ctxt.ct_current puc in
+        context := Some { ctxt with ct_current = scope }
+
+(* -------------------------------------------------------------------- *)
 let initialize ~restart ~undo ~boot ~checkmode ~checkproof =
   assert (restart || EcUtils.is_none !context);
   if restart then Pragma.set dpragma;
@@ -1097,4 +1119,35 @@ let pp_all_goals () =
         Buffer.contents buffer) goals
   end
 
+  | _ -> []
+
+(* -------------------------------------------------------------------- *)
+(* Render the open-subgoals tree. Each entry is (index, is_focused,
+   text). [index] is 1-based, [is_focused] marks the focused goal
+   (always at index 1 with EC's current focus model), and [text] is
+   either a one-line conclusion digest (when [~all = false]) or the
+   full goal body (when [~all = true]). *)
+let pp_tree ?(all = false) () : (int * bool * string) list =
+  let scope = current () in
+  match S.xgoal scope with
+  | Some { S.puc_active = Some ({ puc_jdg = S.PSCheck pf }, _) } -> begin
+    match EcCoreGoal.opened pf with
+    | None -> []
+    | Some _ ->
+      let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+      let goals = EcCoreGoal.all_opened pf in
+      List.mapi (fun i { EcCoreGoal.g_hyps; EcCoreGoal.g_concl } ->
+        let text =
+          if all then
+            let buf = Buffer.create 256 in
+            let hc  = (EcEnv.LDecl.tohyps g_hyps, g_concl) in
+            Format.fprintf
+              (Format.formatter_of_buffer buf)
+              "%a@?" (EcPrinting.pp_goal1 ppe) hc;
+            Buffer.contents buf
+          else
+            Format.asprintf "%a" (EcPrinting.pp_form ppe) g_concl
+        in
+        (i + 1, i = 0, text)) goals
+  end
   | _ -> []

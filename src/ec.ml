@@ -513,6 +513,38 @@ let main () =
       Buffer.contents buf
     in
 
+    (* Render the focus-tree of open subgoals. [all=false] gives a
+       one-line digest per goal (conclusion truncated); [all=true]
+       gives the full goal body for each. *)
+    let tree_to_string ?(all=false) () =
+      let entries = EcCommands.pp_tree ~all () in
+      match entries with
+      | [] -> "No active proof.\n"
+      | _ ->
+        let buf = Buffer.create 256 in
+        let one_line s =
+          let s =
+            match String.index_opt s '\n' with
+            | None -> s
+            | Some k -> String.sub s 0 k
+          in
+          let limit = 80 in
+          if String.length s > limit
+          then String.sub s 0 (limit - 1) ^ "…"
+          else s
+        in
+        List.iter (fun (i, focused, text) ->
+          let marker = if focused then " <- focused" else "" in
+          if all then
+            Buffer.add_string buf
+              (Printf.sprintf "[%d]%s\n%s\n" i marker text)
+          else
+            Buffer.add_string buf
+              (Printf.sprintf "[%d] %s%s\n" i (one_line text) marker)
+        ) entries;
+        Buffer.contents buf
+    in
+
     let quiet = ref false in
 
     let checkpoints : (string, int) Hashtbl.t = Hashtbl.create 16 in
@@ -531,9 +563,17 @@ let main () =
       Buffer.clear notices
     in
 
+    let focus_tag () =
+      match EcCommands.pp_tree () with
+      | _ :: _ :: _ as entries ->
+        Printf.sprintf " [focus: 1/%d]" (List.length entries)
+      | _ -> ""
+    in
+
     let reply_ok_goals ?(all=false) () =
-      if !quiet then reply_ok ""
-      else reply_ok (goals_to_string ~all ())
+      let tag = focus_tag () in
+      if !quiet then reply_ok ~tag ""
+      else reply_ok ~tag (goals_to_string ~all ())
     in
 
     let reply_error msg =
@@ -570,6 +610,7 @@ let main () =
     (* Process EasyCrypt input from a string (one parsed program) *)
     let process_ec_input input =
       Buffer.clear notices;
+      EcCommands.disable_repl_bullets ();
       let reader = EcIo.from_string input in
       let last_src = ref "" in
       begin try
@@ -840,11 +881,14 @@ let main () =
         in
 
         let tag =
-          match !last_loc with
-          | None -> ""
-          | Some loc ->
-            let (el, _) = loc.EcLocation.loc_end in
-            Printf.sprintf " [loaded:%s:%d]" filename el
+          let loaded =
+            match !last_loc with
+            | None -> ""
+            | Some loc ->
+              let (el, _) = loc.EcLocation.loc_end in
+              Printf.sprintf " [loaded:%s:%d]" filename el
+          in
+          loaded ^ focus_tag ()
         in
         reply_ok ~tag body
 
@@ -929,6 +973,14 @@ let main () =
       else if line = "GOALS" then begin
         Buffer.clear notices;
         reply_ok (goals_to_string ())
+      end
+      else if line = "TREE ALL" then begin
+        Buffer.clear notices;
+        reply_ok (tree_to_string ~all:true ())
+      end
+      else if line = "TREE" then begin
+        Buffer.clear notices;
+        reply_ok (tree_to_string ())
       end
       else if String.starts_with line "CHECKPOINT " then begin
         Buffer.clear notices;
