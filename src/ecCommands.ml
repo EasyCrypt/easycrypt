@@ -969,23 +969,30 @@ let focus_goal (k : int) : (int, string) result =
 (* Disable bullet enforcement for REPL-driven phrases. Drops the global
    pragma so newly-opened proofs have no bullet stack, and clears the
    stack on any currently active proof so REPL phrases are not checked
-   against it. Idempotent. Does not advance the undo level. *)
-let disable_repl_bullets () =
+   against it. Idempotent. Does not advance the undo level. Returns
+   the stack that was in place (if any) at the moment the active
+   proof's bullets were first cleared; returns [None] on idempotent
+   calls (where the stack is already gone). Callers use the returned
+   stack to drive bullet-character selection in [COMMIT]. *)
+let disable_repl_bullets () : EcBullets.stack option =
   pragma_strict_bullets false;
   match !context with
-  | None -> ()
+  | None -> None
   | Some ctxt ->
     match EcScope.xgoal ctxt.ct_current with
-    | None -> ()
+    | None -> None
     | Some puc ->
       match puc.EcScope.puc_active with
-      | None -> ()
-      | Some (pac, _) when pac.EcScope.puc_bullets = None -> ()
+      | None -> None
       | Some (pac, pct) ->
-        let pac = { pac with EcScope.puc_bullets = None } in
-        let puc = { puc with EcScope.puc_active = Some (pac, pct) } in
-        let scope = EcScope.set_xgoal ctxt.ct_current puc in
-        context := Some { ctxt with ct_current = scope }
+        match pac.EcScope.puc_bullets with
+        | None -> None
+        | Some _ as prior ->
+          let pac = { pac with EcScope.puc_bullets = None } in
+          let puc = { puc with EcScope.puc_active = Some (pac, pct) } in
+          let scope = EcScope.set_xgoal ctxt.ct_current puc in
+          context := Some { ctxt with ct_current = scope };
+          prior
 
 (* -------------------------------------------------------------------- *)
 let initialize ~restart ~undo ~boot ~checkmode ~checkproof =
@@ -1114,6 +1121,34 @@ let pp_current_goal ?(all = false) stream =
 (* -------------------------------------------------------------------- *)
 let in_proof () =
   Option.is_some (S.xgoal (current ()))
+
+(* Return the list of open-goal handles at the top level of the active
+   proof, focused-first, or [] if no proof is active. *)
+let open_handles () : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.all_hd_opened pf
+  | _ -> []
+
+(* Direct DAG children of [h] in the active proof. [] if no proof. *)
+let children_of (h : EcCoreGoal.handle) : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.children_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> []
+
+(* Parent of [h] in the active proof's DAG, or [None] if [h] is the
+   root or no proof is active. *)
+let parent_of (h : EcCoreGoal.handle) : EcCoreGoal.handle option =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.parent_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> None
 
 let pp_current_goal_or_noproof ?(all = false) stream =
   if in_proof () then

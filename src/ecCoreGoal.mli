@@ -205,6 +205,12 @@ val all_opened : proof -> pregoal list
 (* Check if a proof is done *)
 val closed : proof -> bool
 
+(* Direct children of [h] in the proof DAG, in creation order. *)
+val children_of_handle : proofenv -> handle -> handle list
+
+(* Parent of [h] in the proof DAG, or [None] if [h] is the root. *)
+val parent_of_handle : proofenv -> handle -> handle option
+
 (* Rotate the list of opened goals at the top level. [rotate_focus k pf]
    makes the goal currently at 1-based index [k] the new focused goal,
    preserving the cyclic order of the others. Raises [Invalid_argument]

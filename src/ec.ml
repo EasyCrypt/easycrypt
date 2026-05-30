@@ -549,6 +549,170 @@ let main () =
 
     let checkpoints : (string, int) Hashtbl.t = Hashtbl.create 16 in
 
+    (* Transcript of REPL-typed phrases that succeeded. Each entry is
+       (uuid_before, src, parent, opens_at_entry), where:
+       - [parent] is the handle that was focused right before the
+         phrase ran ([None] iff outside a proof);
+       - [opens_at_entry] is the full open-handle list at entry time
+         (focused-first), used by COMMIT to seed the sibling map for
+         continuations whose first phrase already starts inside a
+         frame opened by the LOAD prefix.
+       Trimmed by UNDO/REVERT; cleared on LOAD/Restart. *)
+    let transcript :
+      (int * string * EcCoreGoal.handle option
+        * EcCoreGoal.handle list) list ref = ref [] in
+
+    (* The bullet stack of the active proof at the moment REPL input
+       took over. Captured the first time [disable_repl_bullets]
+       actually clears a non-empty stack; subsequent (idempotent)
+       calls return [None] and leave this snapshot unchanged. Used by
+       [COMMIT] to pick bullet characters that don't collide with
+       tokens already in scope from the LOAD prefix. Cleared on
+       LOAD/Restart along with the transcript. *)
+    let prior_bullets : EcBullets.stack option ref = ref None in
+
+    let transcript_trim target =
+      transcript :=
+        List.filter
+          (fun (uuid_before, _, _, _) -> uuid_before < target)
+          !transcript
+    in
+
+    (* Render the recorded transcript as a +strict_bullets-friendly
+       proof body. The algorithm reads the proof DAG via
+       [EcCommands.children_of]/[parent_of] (backed by [pr_parent],
+       which records the parent handle of every child at
+       [FApi.newgoal] time). Strategy:
+       - For each phrase, walk the subtree rooted at its parent
+         handle, finding every multi-child split, and register each
+         such child in [sibling_depth] at the corresponding depth.
+         Single-child links are continuations and don't bump depth.
+       - To decide whether a phrase needs a bullet, walk upward via
+         [parent_of] from its recorded parent until hitting a
+         registered sibling ancestor; if found, emit the bullet for
+         that depth and consume the registration.
+       Bullet tokens are chosen per depth, skipping any token
+       already in the LOAD prefix's [puc_bullets] stack (snapshotted
+       at the moment REPL input took over) so we never collide. *)
+    (* Token order matches PR 1017's lexer: -, +, *, --, ++, **,
+       ---, +++, *** ... *)
+    let token_at_index i =
+      let chars = [| "-"; "+"; "*" |] in
+      let rep = i / 3 + 1 in
+      let chr = chars.(i mod 3) in
+      String.concat "" (List.init rep (fun _ -> chr))
+    in
+
+    let commit_proof_text () =
+      let entries = List.rev !transcript in
+      let buf = Buffer.create 1024 in
+      let emit_indent depth =
+        for _ = 1 to depth do Buffer.add_string buf "  " done
+      in
+      let module Hmap =
+        Map.Make (struct
+          type t = EcCoreGoal.handle
+          let compare = compare
+        end)
+      in
+      let sibling_depth : int Hmap.t ref = ref Hmap.empty in
+      let current_depth = ref 0 in
+      (* Pick a bullet token for each depth, skipping tokens already
+         in scope from the LOAD prefix's bullet stack (so we never
+         collide with frames the prefix opened). State is per-COMMIT
+         so each invocation starts from a clean slate. *)
+      let in_use_tokens =
+        match !prior_bullets with
+        | None -> []
+        | Some stack ->
+          List.map (fun (f : EcBullets.frame) -> f.bf_token) stack
+      in
+      let depth_cache : (int, string) Hashtbl.t = Hashtbl.create 8 in
+      let next_tok_idx = ref 0 in
+      let assigned_tokens = ref [] in
+      let bullet_for_depth d =
+        match Hashtbl.find_opt depth_cache d with
+        | Some t -> t
+        | None ->
+          let rec pick () =
+            let t = token_at_index !next_tok_idx in
+            incr next_tok_idx;
+            if List.mem t in_use_tokens || List.mem t !assigned_tokens
+            then pick ()
+            else t
+          in
+          let t = pick () in
+          assigned_tokens := t :: !assigned_tokens;
+          Hashtbl.add depth_cache d t;
+          t
+      in
+      (* Seed: if the first recorded phrase entered a state with
+         multiple open goals, the LOAD prefix opened a frame whose
+         siblings are still pending. Register all of them as depth-1
+         pending siblings so the first phrase's parent gets a bullet. *)
+      (match entries with
+       | (_, _, Some _, (_ :: _ :: _ as opens)) :: _ ->
+         List.iter
+           (fun h -> sibling_depth := Hmap.add h 1 !sibling_depth)
+           opens
+       | _ -> ());
+      List.iter (fun (_uuid, src, parent_opt, _opens) ->
+        match parent_opt with
+        | None ->
+          Buffer.add_string buf src;
+          Buffer.add_char buf '\n'
+        | Some parent ->
+          (* Walk upward through pr_parent until we find a registered
+             sibling ancestor, or run out. If found, emit a bullet at
+             that depth and consume the registration. *)
+          let rec find_ancestor h =
+            match Hmap.find_opt h !sibling_depth with
+            | Some d -> Some (h, d)
+            | None ->
+              match EcCommands.parent_of h with
+              | Some p -> find_ancestor p
+              | None -> None
+          in
+          (match find_ancestor parent with
+           | Some (h, d) ->
+             emit_indent (d - 1);
+             Buffer.add_string buf (bullet_for_depth d);
+             Buffer.add_char buf ' ';
+             current_depth := d;
+             sibling_depth := Hmap.remove h !sibling_depth
+           | None ->
+             emit_indent !current_depth);
+          Buffer.add_string buf src;
+          Buffer.add_char buf '\n';
+          (* A phrase can chain multiple sub-validations internally
+             (e.g. [move=> hp hq; split.] is VIntros -> VApply(split)
+             on a single recorded phrase). Walk single-child
+             validations until we hit a real split (>=2 children) or
+             an open leaf. *)
+          (* Walk the entire subtree rooted at [parent], finding every
+             multi-child node, and register its children at the
+             corresponding nesting depth. A compound phrase like
+             [split; split.] can produce nested splits within a single
+             phrase; both levels of children need to be registered.
+             Single-child links don't bump the depth (continuations);
+             multi-child links do. *)
+          let rec walk h d =
+            match EcCommands.children_of h with
+            | [c] -> walk c d
+            | (_ :: _ :: _) as cs ->
+              List.iter
+                (fun c ->
+                  sibling_depth :=
+                    Hmap.add c d !sibling_depth;
+                  walk c (d + 1))
+                cs
+            | [] -> ()
+          in
+          walk parent (!current_depth + 1)
+      ) entries;
+      Buffer.contents buf
+    in
+
     let reply_ok ?(tag="") body =
       let n = Buffer.contents notices in
       Printf.printf "OK [uuid:%d]%s\n" (EcCommands.uuid ()) tag;
@@ -589,9 +753,20 @@ let main () =
       Buffer.clear notices
     in
 
-    (* Process a single EasyCrypt command, respecting gl_fail *)
-    let process_action ~src (p : EP.global) =
+    (* Process a single EasyCrypt command, respecting gl_fail. When
+       [~record:true], capture the parent handle (the focused goal
+       before the phrase ran) and append a transcript entry on
+       success. COMMIT will use [EcCommands.children_of] on each
+       parent to walk the proof DAG and recover bullet structure. *)
+    let process_action ?(record=false) ~src (p : EP.global) =
       let loc = p.EP.gl_action.EcLocation.pl_loc in
+      let pre_uuid = EcCommands.uuid () in
+      let opens_pre =
+        if record then EcCommands.open_handles () else []
+      in
+      let parent =
+        match opens_pre with h :: _ -> Some h | [] -> None
+      in
       let succeeded = ref false in
       begin try
         ignore (EcCommands.process ~src p.EP.gl_action : float option);
@@ -604,13 +779,21 @@ let main () =
       if !succeeded && p.EP.gl_fail then
         raise (EcScope.toperror_of_exn ~gloc:loc
           (EcScope.HiScopeError (None,
-            "this command is expected to fail")))
+            "this command is expected to fail")));
+      if record && !succeeded && not p.EP.gl_fail then
+        transcript := (pre_uuid, src, parent, opens_pre) :: !transcript
     in
 
     (* Process EasyCrypt input from a string (one parsed program) *)
     let process_ec_input input =
       Buffer.clear notices;
-      EcCommands.disable_repl_bullets ();
+      (* On the first REPL phrase of each proof, capture the bullet
+         stack that the LOAD prefix left so COMMIT can avoid token
+         collisions with it. Subsequent calls return [None] and don't
+         clobber the snapshot. *)
+      (match EcCommands.disable_repl_bullets () with
+       | None -> ()
+       | Some _ as snapshot -> prior_bullets := snapshot);
       let reader = EcIo.from_string input in
       let last_src = ref "" in
       begin try
@@ -619,10 +802,11 @@ let main () =
         last_src := src;
         begin match EcLocation.unloc prog with
         | EP.P_Prog (commands, _) ->
-          List.iter (process_action ~src) commands;
+          List.iter (process_action ~record:true ~src) commands;
           reply_ok_goals ()
         | EP.P_Undo i ->
           EcCommands.undo i;
+          transcript_trim i;
           reply_ok_goals ()
         | EP.P_Exit ->
           EcIo.finalize reader; exit 0
@@ -633,6 +817,8 @@ let main () =
       with
       | EcCommands.Restart ->
         do_initialize ();
+        transcript := [];
+        prior_bullets := None;
         reply_ok "Session restarted"
       | e ->
         reply_error (format_error ~src:!last_src e)
@@ -709,6 +895,8 @@ let main () =
         (* Reset proof engine and process file *)
         do_initialize ();
         Hashtbl.clear checkpoints;
+        transcript := [];
+        prior_bullets := None;
         EcCommands.addidir (Filename.dirname filename);
 
         let reader = EcIo.from_file filename in
@@ -896,6 +1084,8 @@ let main () =
       | EcCommands.Restart ->
         do_initialize ();
         Hashtbl.clear checkpoints;
+        transcript := [];
+        prior_bullets := None;
         reply_ok "Session restarted"
       | Trace_failed e ->
         let msg = format_error ~src:!last_src e in
@@ -962,6 +1152,7 @@ let main () =
         let uuid = EcCommands.uuid () in
         if uuid > 0 then begin
           EcCommands.undo (uuid - 1);
+          transcript_trim (uuid - 1);
           reply_ok_goals ()
         end else
           reply_error "nothing to undo"
@@ -981,6 +1172,10 @@ let main () =
       else if line = "TREE" then begin
         Buffer.clear notices;
         reply_ok (tree_to_string ())
+      end
+      else if line = "COMMIT" then begin
+        Buffer.clear notices;
+        reply_ok (commit_proof_text ())
       end
       else if String.starts_with line "FOCUS " || line = "NEXT" then begin
         Buffer.clear notices;
@@ -1040,6 +1235,7 @@ let main () =
               "REVERT: uuid %d out of range [0, %d]" target uuid)
           else begin
             EcCommands.undo target;
+            transcript_trim target;
             reply_ok_goals ()
           end
         end
