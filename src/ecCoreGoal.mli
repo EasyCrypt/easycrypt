@@ -207,6 +207,12 @@ val all_opened : proof -> pregoal list
 (* Check if a proof is done *)
 val closed : proof -> bool
 
+(* Rotate the list of opened goals at the top level. [rotate_focus k pf]
+   makes the goal currently at 1-based index [k] the new focused goal,
+   preserving the cyclic order of the others. Raises [Invalid_argument]
+   if [k] is out of range. *)
+val rotate_focus : int -> proof -> proof
+
 (* -------------------------------------------------------------------- *)
 val tc_error :
      proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
