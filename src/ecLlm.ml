@@ -692,38 +692,99 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
   (* ------------------------------------------------------------------ *)
   (* Main loop: line-by-line dispatcher. *)
 
-  do_initialize ();
+  (* ------------------------------------------------------------------ *)
+  (* Surface command vocabulary. Parsing turns each stdin line into one
+     of these, and dispatch is a flat pattern-match. Argument
+     parsing/validation lives in [Parse]; commands that interact with
+     mutable state (checkpoints table, multi-line buffer) carry only
+     the raw user-supplied data and let [Dispatch] do the lookup. *)
+  let module Parse = struct
+    type command =
+      | Quit
+      | Help
+      | Undo
+      | Goals      of [`One | `All]
+      | Tree       of [`One | `All]
+      | Commit
+      | Focus      of int
+      | Next
+      | Checkpoint of string
+      | Revert     of string   (* uuid-or-name; Dispatch resolves *)
+      | Quiet      of bool
+      | Search     of string   (* trailing "." already stripped *)
+      | Load       of string   (* raw arg tail; Load.handle parses *)
+      | Ec         of string   (* fall-through: raw EasyCrypt input *)
+      | Begin_multi
+      | Done_multi
+      | Multi_line of string
+      | Blank
 
-  Printf.printf "READY [uuid:%d]\n<END>\n%!" (EcCommands.uuid ());
+    exception Parse_error of string
 
+    let rest n line =
+      String.strip (String.sub line n (String.length line - n))
+
+    let parse_focus arg =
+      try Focus (int_of_string arg)
+      with Failure _ ->
+        raise (Parse_error
+          (Printf.sprintf "FOCUS: not an integer: %s" arg))
+
+    let parse_checkpoint name =
+      if name = "" then
+        raise (Parse_error "CHECKPOINT: missing name");
+      Checkpoint name
+
+    let parse_search query =
+      let query =
+        if String.ends_with query "."
+        then String.sub query 0 (String.length query - 1)
+        else query
+      in
+      Search query
+
+    let of_line ~multi_active (raw : string) : command =
+      let line = String.strip raw in
+      if multi_active then
+        if line = "<DONE>" then Done_multi
+        else Multi_line line
+      else
+        match line with
+        | "<BEGIN>"   -> Begin_multi
+        | ""          -> Blank
+        | "QUIT"      -> Quit
+        | "HELP"      -> Help
+        | "UNDO"      -> Undo
+        | "GOALS"     -> Goals `One
+        | "GOALS ALL" -> Goals `All
+        | "TREE"      -> Tree `One
+        | "TREE ALL"  -> Tree `All
+        | "COMMIT"    -> Commit
+        | "NEXT"      -> Next
+        | "QUIET ON"  -> Quiet true
+        | "QUIET OFF" -> Quiet false
+        | _ when String.starts_with line "FOCUS "      ->
+          parse_focus      (rest 6  line)
+        | _ when String.starts_with line "CHECKPOINT " ->
+          parse_checkpoint (rest 11 line)
+        | _ when String.starts_with line "REVERT "     ->
+          Revert            (rest 7  line)
+        | _ when String.starts_with line "SEARCH "     ->
+          parse_search     (rest 7  line)
+        | _ when String.starts_with line "LOAD "       ->
+          Load              (rest 5  line)
+        | _ -> Ec line
+  end in
+
+  (* ------------------------------------------------------------------ *)
+  (* Command handlers. Each takes (already-parsed) data and produces a
+     wire reply via [Wire] (or exits the process). Multi-line state is
+     held here so [Parse] can stay pure. *)
   let multi_buf = Buffer.create 256 in
-  let in_multi = ref false in
+  let in_multi  = ref false in
 
-  begin try while true do
-    let line = input_line stdin in
-    let line = String.strip line in
-
-    if line = "<BEGIN>" then begin
-      Buffer.clear multi_buf;
-      in_multi := true
-    end
-    else if line = "<DONE>" && !in_multi then begin
-      let input = Buffer.contents multi_buf in
-      Buffer.clear multi_buf;
-      in_multi := false;
-      if input <> "" then process_ec_input input
-    end
-    else if !in_multi then begin
-      if Buffer.length multi_buf > 0 then
-        Buffer.add_char multi_buf ' ';
-      Buffer.add_string multi_buf line
-    end
-
-    else if line = "" then
-      ()
-    else if line = "QUIT" then
-      exit 0
-    else if line = "HELP" then begin
+  let module Dispatch = struct
+    let do_help () =
       Buffer.clear notices;
       let buf = Buffer.create 4096 in
       let path = llm_guide_path () in
@@ -737,8 +798,8 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
       with Sys_error e ->
         Wire.reply_error (Printf.sprintf "cannot read guide: %s" e)
       end
-    end
-    else if line = "UNDO" then begin
+
+    let do_undo () =
       Buffer.clear notices;
       let uuid = EcCommands.uuid () in
       if uuid > 0 then begin
@@ -747,78 +808,38 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
         Wire.reply_ok_goals ()
       end else
         Wire.reply_error "nothing to undo"
-    end
-    else if line = "GOALS ALL" then begin
+
+    let do_focus_request request =
+      (* [request] is the user's intent normalized; [`Next] is "second
+         sibling unless only one open". *)
       Buffer.clear notices;
-      Wire.reply_ok (Goals.goals_to_string ~all:true ())
-    end
-    else if line = "GOALS" then begin
-      Buffer.clear notices;
-      Wire.reply_ok (Goals.goals_to_string ())
-    end
-    else if line = "TREE ALL" then begin
-      Buffer.clear notices;
-      Wire.reply_ok (Goals.tree_to_string ~all:true ())
-    end
-    else if line = "TREE" then begin
-      Buffer.clear notices;
-      Wire.reply_ok (Goals.tree_to_string ())
-    end
-    else if line = "COMMIT" then begin
-      Buffer.clear notices;
-      Wire.reply_ok (Commit.proof_text ())
-    end
-    else if String.starts_with line "FOCUS " || line = "NEXT" then begin
-      Buffer.clear notices;
-      let request =
-        if line = "NEXT" then `Next
-        else
-          let arg = String.strip (
-            String.sub line 6 (String.length line - 6)) in
-          try `At (int_of_string arg)
-          with Failure _ -> `Bad arg
-      in
-      match request with
-      | `Bad arg ->
-        Wire.reply_error (Printf.sprintf "FOCUS: not an integer: %s" arg)
-      | _ ->
-        let entries = EcCommands.pp_tree () in
-        let n = List.length entries in
-        let target =
-          match request with
-          | `Next -> if n <= 1 then 1 else 2
-          | `At k -> k
-          | `Bad _ -> 1
-        in
-        begin match EcCommands.focus_goal target with
-        | Ok _ -> Wire.reply_ok_goals ()
-        | Error msg -> Wire.reply_error msg
-        end
-    end
-    else if String.starts_with line "CHECKPOINT " then begin
-      Buffer.clear notices;
-      let name = String.strip (
-        String.sub line 11 (String.length line - 11)) in
-      if name = "" then
-        Wire.reply_error "CHECKPOINT: missing name"
-      else begin
-        Hashtbl.replace checkpoints name (EcCommands.uuid ());
-        Wire.reply_ok (Printf.sprintf
-          "checkpoint '%s' set at uuid %d" name (EcCommands.uuid ()))
-      end
-    end
-    else if String.starts_with line "REVERT " then begin
-      Buffer.clear notices;
-      let n = String.strip (
-        String.sub line 7 (String.length line - 7)) in
+      let entries = EcCommands.pp_tree () in
+      let n = List.length entries in
       let target =
-        try Some (int_of_string n)
-        with Failure _ -> Hashtbl.find_opt checkpoints n
+        match request with
+        | `Next -> if n <= 1 then 1 else 2
+        | `At k -> k
       in
-      begin match target with
+      match EcCommands.focus_goal target with
+      | Ok _      -> Wire.reply_ok_goals ()
+      | Error msg -> Wire.reply_error msg
+
+    let do_checkpoint name =
+      Buffer.clear notices;
+      Hashtbl.replace checkpoints name (EcCommands.uuid ());
+      Wire.reply_ok (Printf.sprintf
+        "checkpoint '%s' set at uuid %d" name (EcCommands.uuid ()))
+
+    let do_revert spec =
+      Buffer.clear notices;
+      let target =
+        try Some (int_of_string spec)
+        with Failure _ -> Hashtbl.find_opt checkpoints spec
+      in
+      match target with
       | None ->
         Wire.reply_error (Printf.sprintf
-          "REVERT: '%s' is not a valid uuid or checkpoint name" n)
+          "REVERT: '%s' is not a valid uuid or checkpoint name" spec)
       | Some target ->
         let uuid = EcCommands.uuid () in
         if target < 0 || target > uuid then
@@ -829,32 +850,78 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
           Transcript.trim target;
           Wire.reply_ok_goals ()
         end
-      end
-    end
-    else if line = "QUIET ON" then begin
+
+    let do_quiet on =
       Buffer.clear notices;
-      quiet := true;
+      quiet := on;
       Wire.reply_ok ""
-    end
-    else if line = "QUIET OFF" then begin
-      Buffer.clear notices;
-      quiet := false;
-      Wire.reply_ok ""
-    end
-    else if String.starts_with line "SEARCH " then begin
-      let query = String.strip (
-        String.sub line 7 (String.length line - 7)) in
-      let query =
-        if String.ends_with query "."
-        then String.sub query 0 (String.length query - 1)
-        else query
-      in
+
+    let do_search query =
       process_ec_input (Printf.sprintf "search %s." query)
-    end
-    else if String.starts_with line "LOAD " then
-      Load.handle (String.sub line 5 (String.length line - 5))
-    else
-      process_ec_input line
+
+    let do_begin_multi () =
+      Buffer.clear multi_buf;
+      in_multi := true
+
+    let do_done_multi () =
+      let input = Buffer.contents multi_buf in
+      Buffer.clear multi_buf;
+      in_multi := false;
+      if input <> "" then process_ec_input input
+
+    let do_multi_line s =
+      if Buffer.length multi_buf > 0 then
+        Buffer.add_char multi_buf ' ';
+      Buffer.add_string multi_buf s
+
+    let run (cmd : Parse.command) =
+      match cmd with
+      | Blank        -> ()
+      | Quit         -> exit 0
+      | Help         -> do_help ()
+      | Undo         -> do_undo ()
+      | Goals `One   ->
+        Buffer.clear notices;
+        Wire.reply_ok (Goals.goals_to_string ())
+      | Goals `All   ->
+        Buffer.clear notices;
+        Wire.reply_ok (Goals.goals_to_string ~all:true ())
+      | Tree `One    ->
+        Buffer.clear notices;
+        Wire.reply_ok (Goals.tree_to_string ())
+      | Tree `All    ->
+        Buffer.clear notices;
+        Wire.reply_ok (Goals.tree_to_string ~all:true ())
+      | Commit       ->
+        Buffer.clear notices;
+        Wire.reply_ok (Commit.proof_text ())
+      | Focus k      -> do_focus_request (`At k)
+      | Next         -> do_focus_request `Next
+      | Checkpoint n -> do_checkpoint n
+      | Revert s     -> do_revert s
+      | Quiet on     -> do_quiet on
+      | Search q     -> do_search q
+      | Load args    -> Load.handle args
+      | Ec input     -> process_ec_input input
+      | Begin_multi  -> do_begin_multi ()
+      | Done_multi   -> do_done_multi ()
+      | Multi_line s -> do_multi_line s
+  end in
+
+  (* ------------------------------------------------------------------ *)
+  (* Main loop. *)
+
+  do_initialize ();
+
+  Printf.printf "READY [uuid:%d]\n<END>\n%!" (EcCommands.uuid ());
+
+  begin try while true do
+    let line = input_line stdin in
+    (try
+       let cmd = Parse.of_line ~multi_active:!in_multi line in
+       Dispatch.run cmd
+     with Parse.Parse_error msg ->
+       Wire.reply_error msg)
   done with
   | End_of_file -> ()
   end;
