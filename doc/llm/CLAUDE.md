@@ -61,9 +61,9 @@ These are protocol-level commands, not EasyCrypt syntax:
 | `REVERT <uuid-or-name>` | Revert to a specific state (by uuid or checkpoint name) |
 | `GOALS` | Print the current goal (first subgoal only, with remaining count) |
 | `GOALS ALL` | Print all subgoals |
-| `TREE` | List open subgoals as `[N] <one-line conclusion>`, marking the focused one |
+| `TREE` | List open subgoals with dotted-path labels showing nesting, marking the focused one |
 | `TREE ALL` | Same as `TREE`, but with full goal bodies |
-| `FOCUS N` | Rotate focus so subgoal `[N]` (from `TREE`) becomes the focused goal |
+| `FOCUS P` | Rotate focus to the leaf addressed by path `P` (`N` or `N1.N2.N3...`) |
 | `NEXT` | Rotate focus to the next subgoal (equivalent to `FOCUS 2`) |
 | `COMMIT` | Emit recorded REPL phrases as a bulleted proof body (works under `+strict_bullets`) |
 | `CHECKPOINT <name>` | Save current uuid under a name for later `REVERT` |
