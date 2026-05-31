@@ -67,4 +67,4 @@ print CTest.
                            
 lemma xor2_false (b: bool) : b ^^ b = CTest.ofint 0.
                            
-bdep solve. qed.
+circuit. qed.
