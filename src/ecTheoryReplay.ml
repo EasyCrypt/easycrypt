@@ -429,19 +429,29 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             let ue    = EcUnify.UniEnv.create (Some nargs) in
             let ntyd  = EcTyping.transty EcTyping.tp_tydecl env ue ntyd in
             let decl  =
-              { tyd_params  = nargs;
-                tyd_type    = Concrete ntyd;
-                tyd_loca    = otyd.tyd_loca;
-                tyd_subtype = None; }
+              { tyd_params   = nargs;
+                tyd_type     = Concrete ntyd;
+                tyd_loca     = otyd.tyd_loca;
+                tyd_clinline = (mode <> `Alias);
+                tyd_subtype  = None; }
 
             in (decl, ntyd)
 
         | `ByPath p -> begin
             match EcEnv.Ty.by_path_opt p env with
             | Some reftyd ->
-                let tyargs = List.map tvar reftyd.tyd_params in
-                let body   = tconstr p tyargs in
-                let decl   = { reftyd with tyd_type = Concrete body; } in
+                let body =
+                  if reftyd.tyd_clinline then
+                    (match reftyd.tyd_type with
+                     | Concrete body -> body
+                     | _ -> assert false)
+                  else
+                    let tyargs = List.map tvar reftyd.tyd_params in
+                    tconstr p tyargs in
+                let decl =
+                  { reftyd with
+                      tyd_type     = Concrete body;
+                      tyd_clinline = (mode <> `Alias); } in
                 (decl, body)
 
             | _ -> assert false
@@ -450,10 +460,11 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
         | `Direct ty -> begin
           assert (List.is_empty otyd.tyd_params);
           let decl  =
-            { tyd_params  = [];
-              tyd_type    = Concrete ty;
-              tyd_loca    = otyd.tyd_loca;
-              tyd_subtype = None; }
+            { tyd_params   = [];
+              tyd_type     = Concrete ty;
+              tyd_loca     = otyd.tyd_loca;
+              tyd_clinline = (mode <> `Alias);
+              tyd_subtype  = None; }
 
           in (decl, ty)
     end
