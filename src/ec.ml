@@ -535,34 +535,8 @@ let main () =
 
       end
 
-    | `Llm llmopts -> begin
-        let name = llmopts.llmo_input in
-
-        begin try
-          let ext = Filename.extension name in
-          ignore (EcLoader.getkind ext : EcLoader.kind)
-        with EcLoader.BadExtension ext ->
-          Format.eprintf "do not know what to do with %s@." ext;
-          exit 1
-        end;
-
-        let lastgoals = llmopts.llmo_lastgoals in
-        let terminal =
-          lazy (T.from_channel ~name ~progress:`Silent ~lastgoals (open_in name))
-        in
-
-        { prvopts     = llmopts.llmo_provers
-        ; input       = Some name
-        ; terminal    = terminal
-        ; interactive = false
-        ; eco         = true
-        ; gccompact   = None
-        ; docgen      = false
-        ; outdirp     = None
-        ; upto        = llmopts.llmo_upto
-        ; trace       = None }
-
-      end
+    | `Llm llmopts ->
+        EcLlm.run ~relocdir ~boot:ldropts.ldro_boot llmopts
 
     | `Runtest _ ->
         (* Eagerly executed *)
