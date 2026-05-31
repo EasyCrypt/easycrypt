@@ -67,11 +67,11 @@ let abs_tydecl ?(params = `Int 0) lc =
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params   = params
-  ; tyd_type     = Abstract
-  ; tyd_loca     = lc
-  ; tyd_clinline = false
-  ; tyd_subtype  = None }
+  { tyd_params   = params;
+    tyd_type     = Abstract;
+    tyd_loca     = lc;
+    tyd_clinline = false;
+    tyd_subtype  = None; }
 
 (* -------------------------------------------------------------------- *)
 let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =

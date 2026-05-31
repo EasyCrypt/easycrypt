@@ -496,16 +496,15 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
         | `ByPath p -> begin
             match EcEnv.Ty.by_path_opt p env with
             | Some reftyd ->
-              let body =
-                if reftyd.tyd_clinline then
-                  (match reftyd.tyd_type with
-                  | Concrete body -> body
-                  | _ -> assert false)
-                else
-                  let tyargs =
-                    List.map tvar reftyd.tyd_params in
-                  tconstr p tyargs in
-                let decl   =
+                let body =
+                  if reftyd.tyd_clinline then
+                    (match reftyd.tyd_type with
+                     | Concrete body -> body
+                     | _ -> assert false)
+                  else
+                    let tyargs = List.map tvar reftyd.tyd_params in
+                    tconstr p tyargs in
+                let decl =
                   { reftyd with
                       tyd_type     = Concrete body;
                       tyd_clinline = (mode <> `Alias); } in
@@ -520,9 +519,8 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             { tyd_params   = [];
               tyd_type     = Concrete ty;
               tyd_loca     = otyd.tyd_loca;
-              tyd_clinline = false; (* FIXME: check value here tyd_clinline PR *)
-              tyd_subtype  = None;
-            }
+              tyd_clinline = (mode <> `Alias);
+              tyd_subtype  = None; }
           in (decl, ty)
     end
       in

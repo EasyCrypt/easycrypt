@@ -2300,11 +2300,8 @@ module Ty = struct
         record.ELI.rc_tparams, Record (scheme, record.ELI.rc_fields)
     in
 
-    let tydecl =
-      { tyd_params; tyd_type; tyd_loca;
-        tyd_clinline = false; tyd_subtype = None; } in
-
-    bind scope (unloc name, tydecl)
+    bind scope (unloc name,
+      { tyd_params; tyd_type; tyd_loca; tyd_clinline = false; tyd_subtype = None; })
 
   (* ------------------------------------------------------------------ *)
   let add_subtype (scope : scope) ({ pl_desc = subtype } : psubtype located) =
