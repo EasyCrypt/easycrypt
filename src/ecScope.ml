@@ -2297,7 +2297,7 @@ module Ty = struct
     in
 
     bind scope (unloc name,
-      { tyd_params; tyd_type; tyd_loca; tyd_subtype = None; })
+      { tyd_params; tyd_type; tyd_loca; tyd_clinline = false; tyd_subtype = None; })
 
   (* ------------------------------------------------------------------ *)
   let add_subtype (scope : scope) ({ pl_desc = subtype } : psubtype located) =
@@ -2326,10 +2326,11 @@ module Ty = struct
 
     let scope =
       let decl = EcDecl.{
-        tyd_params  = [];
-        tyd_type    = Abstract;
-        tyd_loca    = `Global;
-        tyd_subtype = Some (carrier, pred);
+        tyd_params   = [];
+        tyd_type     = Abstract;
+        tyd_loca     = `Global;
+        tyd_clinline = false;
+        tyd_subtype  = Some (carrier, pred);
       } in bind scope (unloc subtype.pst_name, decl) in
 
     let evclone =

@@ -35,10 +35,11 @@ type ty_body =
 
 
 type tydecl = {
-  tyd_params  : ty_params;
-  tyd_type    : ty_body;
-  tyd_loca    : locality;
-  tyd_subtype : (EcTypes.ty * EcCoreFol.form) option;
+  tyd_params   : ty_params;
+  tyd_type     : ty_body;
+  tyd_loca     : locality;
+  tyd_clinline : bool;
+  tyd_subtype  : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 let tydecl_as_concrete (td : tydecl) =
@@ -66,10 +67,11 @@ let abs_tydecl ?(params = `Int 0) lc =
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params  = params;
-    tyd_type    = Abstract;
-    tyd_loca    = lc;
-    tyd_subtype = None; }
+  { tyd_params   = params;
+    tyd_type     = Abstract;
+    tyd_loca     = lc;
+    tyd_clinline = false;
+    tyd_subtype  = None; }
 
 (* -------------------------------------------------------------------- *)
 let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =

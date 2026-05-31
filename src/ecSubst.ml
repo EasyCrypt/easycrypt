@@ -873,10 +873,11 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
       (fun (carrier, pred) -> (subst_ty s carrier, subst_form s pred))
       tyd.tyd_subtype in
 
-  { tyd_params  = tparams;
-    tyd_type    = body;
-    tyd_loca    = tyd.tyd_loca;
-    tyd_subtype = subtype; }
+  { tyd_params   = tparams;
+    tyd_type     = body;
+    tyd_loca     = tyd.tyd_loca;
+    tyd_clinline = tyd.tyd_clinline;
+    tyd_subtype  = subtype; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =

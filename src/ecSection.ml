@@ -870,8 +870,9 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let to_gen = { to_gen with tg_subst} in
     let tydecl = {
         tyd_params; tyd_type;
-        tyd_loca    = `Global;
-        tyd_subtype = tydecl.tyd_subtype; } in
+        tyd_loca     = `Global;
+        tyd_clinline = tydecl.tyd_clinline;
+        tyd_subtype  = tydecl.tyd_subtype; } in
     to_gen, Some (Th_type (name, tydecl))
 
   | `Declare ->
