@@ -177,7 +177,69 @@ REVERT before_split
 apply H.        ← try a different approach
 ```
 
-**4. Use QUIET mode to save tokens during bulk tactic application:**
+**4. Inspect and navigate nested subgoals with `TREE` and `FOCUS`:**
+
+When a tactic opens multiple subgoals, the engine focuses the first
+one. By default subsequent tactics act on it; siblings wait their
+turn. Use `TREE` to see the structure, including nested splits:
+
+```
+TREE
+→ OK [uuid:N]
+    [1.1.1] x = 0 <- focused
+    [1.1.2] y = 1
+  [1.2] z = 2
+[2] w = 3
+<END>
+```
+
+The labels are dotted paths. `FOCUS P` rotates focus to the leaf at
+path `P`:
+
+```
+FOCUS 1.2        ← work on `z = 2`
+FOCUS 2          ← work on `w = 3`
+FOCUS 1.1.1      ← back to `x = 0`
+```
+
+`FOCUS k` (a single integer) targets the k-th open goal in the flat
+listing. `NEXT` is shorthand for `FOCUS 2`. Selecting an internal
+frame errors (`FOCUS: path must select a leaf goal, not a frame`).
+
+Replies carry a `[focus: k/N]` tag when more than one goal is open
+(e.g. `OK [uuid:42] [focus: 1/3]`) so you always know which goal the
+next tactic will hit. **TREE labels are not stable across focus
+changes** — `FOCUS 1.2` from one state may name a different goal in
+another, because the tree always shows the focused goal first.
+
+**5. Build a `+strict_bullets`-friendly proof with `COMMIT`:**
+
+The REPL records every successful interactive phrase. `COMMIT` walks
+the proof DAG and emits the recorded tactics with bullets inserted
+at every multi-child split. The output is a proof body that compiles
+under `pragma +strict_bullets`:
+
+```
+LOAD "myfile.ec" 42
+split.
+- rewrite H. trivial.    ← REPL accepts the unbulleted form
+- exact hq.
+COMMIT
+→ OK [uuid:N]
+split.
+- rewrite H. trivial.
+- exact hq.
+<END>
+```
+
+Bullet characters cycle through `-`, `+`, `*`, `--`, `++`, `**`, ...
+and are chosen to avoid colliding with any frames the LOAD prefix
+already opened. Use `COMMIT` once the proof is complete (or at any
+checkpoint) and paste the result back into the source file.
+
+`UNDO` / `REVERT` trim the COMMIT transcript automatically.
+
+**6. Use QUIET mode to save tokens during bulk tactic application:**
 
 ```
 QUIET ON
@@ -188,7 +250,7 @@ QUIET OFF
 GOALS
 ```
 
-**5. Search for lemmas using patterns:**
+**7. Search for lemmas using patterns:**
 
 EasyCrypt `search` uses pattern syntax, not keywords. Use `_` as
 wildcard:
@@ -267,8 +329,10 @@ SEARCH (_ %/ _)
 - `by` closes **all** remaining subgoals. If it fails, the error
   refers to the first unclosed goal, which may not be the intended
   one.
-- When a tactic generates multiple subgoals, each subgoal must be
-  closed in order. Use `GOALS ALL` or `TREE` to see them all.
+- When a tactic generates multiple subgoals, the engine focuses the
+  first one. Address them in any order via `FOCUS path`, or in the
+  default order by closing each in turn. Use `TREE` or `GOALS ALL`
+  to see what's open.
 - When more than one subgoal is open, replies carry a
   `[focus: k/N]` tag (e.g. `OK [uuid:42] [focus: 1/3]`) so you know
   which one the next tactic will hit.
