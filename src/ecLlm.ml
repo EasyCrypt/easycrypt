@@ -434,9 +434,10 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
       let exception Trace_failed of exn in
 
       try
+        if args = "" then failwith "LOAD: missing filename";
         (* Parse quoted or unquoted filename. *)
         let filename, rest =
-          if String.length args > 0 && args.[0] = '"' then
+          if args.[0] = '"' then
             let close =
               try String.index_from args 1 '"'
               with Not_found ->
@@ -453,6 +454,7 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
             | [f] -> (f, "")
             | f :: rest -> (f, String.concat " " rest)
         in
+        if filename = "" then failwith "LOAD: missing filename";
 
         (* Parse optional LINE[:COL] and flags (-nosmt, -trace). *)
         let upto, nosmt, trace =
@@ -721,10 +723,23 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
 
     exception Parse_error of string
 
-    let rest n line =
-      String.strip (String.sub line n (String.length line - n))
+    (* Match [kw] as a prefix: succeeds on exactly [kw] (no argument)
+       or [kw ^ " " ^ ...] (with argument), returning the stripped
+       argument tail. Returns [None] otherwise. This recognises both
+       "CHECKPOINT" and "CHECKPOINT foo" the same way, so we can
+       diagnose the missing-name case ourselves instead of falling
+       through to EC's parser. *)
+    let keyword_arg kw line =
+      if line = kw then Some ""
+      else if String.starts_with line (kw ^ " ") then
+        let n = String.length kw + 1 in
+        Some (String.strip
+          (String.sub line n (String.length line - n)))
+      else None
 
     let parse_focus arg =
+      if arg = "" then
+        raise (Parse_error "FOCUS: missing argument");
       try Focus (int_of_string arg)
       with Failure _ ->
         raise (Parse_error
@@ -735,13 +750,26 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
         raise (Parse_error "CHECKPOINT: missing name");
       Checkpoint name
 
+    let parse_revert spec =
+      if spec = "" then
+        raise (Parse_error
+          "REVERT: missing uuid or checkpoint name");
+      Revert spec
+
     let parse_search query =
+      if query = "" then
+        raise (Parse_error "SEARCH: missing query");
       let query =
         if String.ends_with query "."
         then String.sub query 0 (String.length query - 1)
         else query
       in
       Search query
+
+    let parse_load args =
+      (* [Load.handle] accepts an empty argument and reports a
+         specific error; keep that responsibility there. *)
+      Load args
 
     let of_line ~multi_active (raw : string) : command =
       let line = String.strip raw in
@@ -763,17 +791,13 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
         | "NEXT"      -> Next
         | "QUIET ON"  -> Quiet true
         | "QUIET OFF" -> Quiet false
-        | _ when String.starts_with line "FOCUS "      ->
-          parse_focus      (rest 6  line)
-        | _ when String.starts_with line "CHECKPOINT " ->
-          parse_checkpoint (rest 11 line)
-        | _ when String.starts_with line "REVERT "     ->
-          Revert            (rest 7  line)
-        | _ when String.starts_with line "SEARCH "     ->
-          parse_search     (rest 7  line)
-        | _ when String.starts_with line "LOAD "       ->
-          Load              (rest 5  line)
-        | _ -> Ec line
+        | _ ->
+          match keyword_arg "FOCUS"      line with Some a -> parse_focus      a | None ->
+          match keyword_arg "CHECKPOINT" line with Some a -> parse_checkpoint a | None ->
+          match keyword_arg "REVERT"     line with Some a -> parse_revert     a | None ->
+          match keyword_arg "SEARCH"     line with Some a -> parse_search     a | None ->
+          match keyword_arg "LOAD"       line with Some a -> parse_load       a | None ->
+          Ec line
   end in
 
   (* ------------------------------------------------------------------ *)
