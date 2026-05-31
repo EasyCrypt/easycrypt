@@ -3359,9 +3359,9 @@ eqobs_in_eqpost:
 
 eqobs_in:
 | pos=eqobs_in_pos? i=eqobs_in_eqinv p=eqobs_in_eqpost? {
-    { sim_pos  = pos;
-      sim_hint = i;
-      sim_eqs  = p; }
+    { psim_pos  = pos;
+      psim_hint = i;
+      psim_eqs  = p; }
 }
 
 pgoptionkw:

@@ -739,10 +739,10 @@ type conseq_contra =
 type conseq_ppterm = (conseq_contra * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
-type sim_info = {
-  sim_pos  : pcodegap1 pair option;
-  sim_hint : (pgamepath option pair * pformula) list * pformula option;
-  sim_eqs  : pformula option
+type psim_info = {
+  psim_pos  : pcodegap1 pair option;
+  psim_hint : (pgamepath option pair * pformula) list * pformula option;
+  psim_eqs  : pformula option
 }
 
 (* -------------------------------------------------------------------- *)
@@ -823,7 +823,7 @@ type phltactic =
   | Pfel           of (pcodegap1 * fel_info)
   | Phoare
   | Pprbounded
-  | Psim           of crushmode option* sim_info
+  | Psim           of crushmode option* psim_info
   | Ptrans_stmt    of trans_info
   | Prw_equiv      of rw_eqv_info
   | Psymmetry

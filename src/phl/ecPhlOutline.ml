@@ -12,7 +12,7 @@ open EcLowPhlGoal
 let t_auto_equiv_sim =
   t_seqs [
     EcPhlInline.process_inline (`ByName (None, None, ([], None)));
-    EcPhlEqobs.process_eqobs_in None {sim_pos = None; sim_hint = ([], None); sim_eqs = None};
+    EcPhlEqobs.process_eqobs_in None {psim_pos = None; psim_hint = ([], None); psim_eqs = None};
     EcPhlAuto.t_auto;
     EcLowGoal.t_crush;
     EcHiGoal.process_done;
