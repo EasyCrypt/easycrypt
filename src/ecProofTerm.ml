@@ -291,16 +291,17 @@ exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
 type occmode = {
   k_keyed : bool;
   k_conv  : bool;
+  k_delta : bool;
 }
 
-let om_rigid = { k_keyed = true; k_conv = false; }
+let om_rigid = { k_keyed = true; k_conv = false; k_delta = true; }
 
 let pf_find_occurence
   (pt : pt_env) ?(full = true) ?(rooted = false) ?occmode ~ptn subject
 =
   let module E = struct exception MatchFound of form end in
 
-  let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
+  let occmode = odfl { k_keyed = false; k_conv = true; k_delta = true; } occmode in
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
   let ho =
@@ -339,7 +340,10 @@ let pf_find_occurence
     then EcMatching.fmrigid
     else EcMatching.fmdelta in
 
-  let mode = { mode with fm_conv = occmode.k_conv } in
+  let mode = { mode with
+    fm_conv  = occmode.k_conv;
+    fm_delta = mode.fm_delta && occmode.k_delta;
+  } in
 
   let trymatch mode bds tp =
     if not (keycheck tp key) then `Continue else
@@ -382,9 +386,9 @@ let pf_find_occurence
 
 (* -------------------------------------------------------------------- *)
 let default_modes = [
-  { k_keyed =  true; k_conv = false; };
-  { k_keyed =  true; k_conv =  true; };
-  { k_keyed = false; k_conv =  true; };
+  { k_keyed =  true; k_conv = false; k_delta = true; };
+  { k_keyed =  true; k_conv =  true; k_delta = true; };
+  { k_keyed = false; k_conv =  true; k_delta = true; };
 ]
 
 let pf_find_occurence_lazy

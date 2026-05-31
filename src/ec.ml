@@ -252,6 +252,11 @@ let main () =
             |> List.map (fun prover -> ["-p"; prover])
             |> List.flatten in
 
+          let quorum =
+            input.runo_provers.prvo_quorum
+            |> omap (fun i -> ["-quorum"; string_of_int i])
+            |> odfl [] in
+
           let pragmas =
             input.runo_provers.prvo_pragmas
             |> List.map (fun pragmas -> ["-pragmas"; pragmas])
@@ -265,11 +270,6 @@ let main () =
           let profile =
             if input.runo_provers.prvo_profile then
               ["-profile"]
-            else [] in
-
-          let iterate =
-            if input.runo_provers.prvo_iterate then
-              ["-iterate"]
             else [] in
 
           let why3srv =
@@ -308,9 +308,9 @@ let main () =
 
           List.flatten [
             maxjobs; timeout; cpufactor; ppwidth;
-            provers; pragmas; checkall ; profile;
-            iterate; why3srv; why3     ; reloc  ;
-            noevict; boot   ; idirs    ;
+            provers; quorum ; pragmas  ; checkall;
+            profile; why3srv  ; why3    ;
+            reloc  ; noevict; boot     ; idirs   ;
           ]
         in
 
@@ -463,8 +463,8 @@ let main () =
       EcCommands.cm_cpufactor = odfl 1 prvopts.prvo_cpufactor;
       EcCommands.cm_nprovers  = odfl 4 prvopts.prvo_maxjobs;
       EcCommands.cm_provers   = prvopts.prvo_provers;
+      EcCommands.cm_quorum    = prvopts.prvo_quorum;
       EcCommands.cm_profile   = prvopts.prvo_profile;
-      EcCommands.cm_iterate   = prvopts.prvo_iterate;
     } in
 
     (* Notice buffer: collects messages during command processing *)
@@ -988,7 +988,7 @@ let main () =
             Some [State.{ position = 0; goals = None; messages = [] }]
           else None in
 
-        { prvopts     = {cmpopts.cmpo_provers with prvo_iterate = true}
+        { prvopts     = cmpopts.cmpo_provers
         ; input       = Some name
         ; terminal    = terminal
         ; interactive = false
@@ -1002,9 +1002,7 @@ let main () =
       end
 
     | `Llm llmopts ->
-        run_llm_repl
-          {llmopts with llmo_provers =
-            {llmopts.llmo_provers with prvo_iterate = true}}
+        run_llm_repl llmopts
 
     | `Runtest _ ->
         (* Eagerly executed *)
@@ -1029,11 +1027,11 @@ let main () =
           prvo_timeout = None;
           prvo_cpufactor = None;
           prvo_provers = None;
+          prvo_quorum = None;
           prvo_pragmas = [];
           prvo_ppwidth = None;
           prvo_checkall = false;
           prvo_profile = false;
-          prvo_iterate = false;
           prvo_why3server = None; }
         in
 
@@ -1185,8 +1183,8 @@ let main () =
               EcCommands.cm_cpufactor = odfl 1 (state.prvopts.prvo_cpufactor);
               EcCommands.cm_nprovers  = odfl 4 (state.prvopts.prvo_maxjobs);
               EcCommands.cm_provers   = state.prvopts.prvo_provers;
+              EcCommands.cm_quorum    = state.prvopts.prvo_quorum;
               EcCommands.cm_profile   = state.prvopts.prvo_profile;
-              EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
             } in
 
             let checkproof = not state.docgen in

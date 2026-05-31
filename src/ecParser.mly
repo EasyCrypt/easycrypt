@@ -152,7 +152,6 @@
 
   type smt = [
     | `ALL
-    | `ITERATE
     | `QUORUM         of int
     | `MAXLEMMAS      of int option
     | `MAXPROVERS     of int
@@ -198,7 +197,6 @@
            "verbose"       ;
            "lazy"          ;
            "full"          ;
-           "iterate"       ;
            "dumpin"        ;
            "selected"      ;
            "debug"         ]
@@ -258,7 +256,6 @@
       | "lazy"           -> `VERSION        (get_as_none s o; `Lazy)
       | "full"           -> `VERSION        (get_as_none s o; `Full)
       | "all"            -> get_as_none s o; (`ALL)
-      | "iterate"        -> get_as_none s o; (`ITERATE)
       | "selected"       -> get_as_none s o; (`SELECTED)
       | "debug"          -> get_as_none s o; (`DEBUG)
       | _                ->  assert false
@@ -274,7 +271,6 @@
       let unwanted = ref None in
       let verbose  = ref None in
       let version  = ref None in
-      let iterate  = ref None in
       let dumpin   = ref None in
       let selected = ref None in
       let debug    = ref None in
@@ -318,7 +314,6 @@
         | `UNWANTEDLEMMAS d -> unwanted := Some d
         | `VERBOSE        v -> verbose  := Some v
         | `VERSION        v -> version  := Some v
-        | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
         | `DUMPIN         f -> dumpin   := Some f
         | `SELECTED         -> selected := Some true
@@ -340,7 +335,6 @@
         pprov_version   = !version;
         plem_all        = !all;
         plem_max        = !mlemmas;
-        plem_iterate    = !iterate;
         plem_wanted     = !wanted;
         plem_unwanted   = !unwanted;
         plem_dumpin     = !dumpin;
@@ -2425,11 +2419,11 @@ rwarg1:
 | SLASHTILDEQ
    { RWSimpl `Variant }
 
-| s=rwside r=rwrepeat? o=rwocc? p=bracket(form_h)? fp=rwpterms
-   { RWRw ((s, r, o, p), fp) }
+| side=rwside repeat=rwrepeat? occurrence=rwocc? match_=bracket(rwmatch)? fp=rwpterms
+   { RWRw ({ side; repeat; occurrence; match_ }, fp) }
 
-| s=rwside r=rwrepeat? o=rwocc? SLASH rigid=iboption(TILD) x=sform_h %prec prec_tactic
-   { RWDelta (rigid, (s, r, o, None), x); }
+| side=rwside repeat=rwrepeat? occurrence=rwocc? SLASH rigid=iboption(TILD) fp=sform_h %prec prec_tactic
+   { RWDelta (rigid, { side; repeat; occurrence; match_ = None }, fp); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }
@@ -2454,6 +2448,13 @@ rwarg1:
         let msg = "invalid rw-tactic: " ^ (unloc x) in
         parse_error (loc x) (Some msg)
   }
+
+rwmatch:
+| p=form_h
+    { RWM_Plain p }
+
+| x=ident IN p=form_h
+    { RWM_Context (x, p) }
 
 rwpterms:
 | f=pterm
@@ -2825,7 +2826,13 @@ logtactic:
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | SPLIT i=word?
-    { Psplit i }
+    { Psplit (`Default i) }
+
+| SPLIT STAR
+    { Psplit (`All `Maybe) }
+
+| SPLIT PLUS
+    { Psplit (`All `One) }
 
 | FIELD eqs=ident*
     { Pfield eqs }
@@ -3120,6 +3127,9 @@ direction:
 
 | ALIAS s=side? x=lident CEQ p=sform_h AT o=codepos
     { Psetmatch (s, o, x, p) }
+
+| SIMPLIFY IF s=side? o=codepos?
+    { PsimplifyIf (s, o) }
 
 | WEAKMEM s=side? h=loc(ipcore_name) p=param_decl
     { Pweakmem(s, h, p) }
@@ -3992,6 +4002,8 @@ global_action:
 | cr_binding       { Gcrbinding   $1 } 
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
+| EXPECT s=loc(STRING) BY PRINT p=print
+    { Gexpect (s, p) }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }

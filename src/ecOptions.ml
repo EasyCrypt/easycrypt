@@ -11,7 +11,6 @@ type command = [
   | `Runtest of run_option
   | `Why3Config
   | `DocGen of doc_option
-  | `Lsp
   | `Llm of llm_option
 ]
 
@@ -60,11 +59,11 @@ and prv_options = {
   prvo_timeout    : int option;
   prvo_cpufactor  : int option;
   prvo_provers    : string list option;
+  prvo_quorum     : int option;
   prvo_pragmas    : string list;
   prvo_ppwidth    : int option;
   prvo_checkall   : bool;
   prvo_profile    : bool;
-  prvo_iterate    : bool;
   prvo_why3server : string option;
 }
 
@@ -86,6 +85,7 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
+  ini_quorum   : int option;
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
@@ -107,6 +107,8 @@ module Ini : sig
 
   val get_provers : ini_context -> string list
 
+  val get_quorum : ini_context -> int option
+
   val get_timeout : ini_context -> int option
 
   val get_idirs : ini_context -> (string option * string) list
@@ -121,6 +123,8 @@ module Ini : sig
   val get_all_ovrevict : ini_context list -> string list
 
   val get_all_provers : ini_context list -> string list
+
+  val get_all_quorum : ini_context list -> int option
 
   val get_all_timeout : ini_context list -> int option
 
@@ -153,6 +157,9 @@ end = struct
   let get_provers (ini : ini_context) =
     ini.inic_ini.ini_provers
 
+  let get_quorum (ini : ini_context) =
+    ini.inic_ini.ini_quorum
+
   let get_timeout (ini : ini_context) =
     ini.inic_ini.ini_timeout
 
@@ -178,6 +185,9 @@ end = struct
 
   let get_all_provers (ini : ini_context list) =
     List.flatten (List.map get_provers ini)
+
+  let get_all_quorum (ini : ini_context list) =
+    List.find_map_opt get_quorum ini
 
   let get_all_timeout (ini : ini_context list) =
     List.find_map_opt get_timeout ini
@@ -393,13 +403,13 @@ let specs = {
     ("provers", "Options related to provers", [
       `Spec ("p"          , `String, "Add a prover to the set of provers");
       `Spec ("max-provers", `Int   , "Maximum number of prover running in the same time");
+      `Spec ("quorum",      `Int   , "Set prover quorum");
       `Spec ("timeout"    , `Int   , "Set the SMT timeout");
       `Spec ("cpu-factor" , `Int   , "Set the timeout CPU factor");
       `Spec ("check-all"  , `Flag  , "Force checking all files");
       `Spec ("pragmas"    , `String, "Comma-separated list of pragmas");
       `Spec ("pp-width"   , `Int   , "pretty-printing width");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations");
-      `Spec ("iterate"    , `Flag  , "Force to iterate smt call");
       `Spec ("server"     , `String, "Connect to an external Why3 server");
     ]);
 
@@ -511,6 +521,11 @@ let prv_options_of_values ini values =
       end;
       prvo_cpufactor = get_int "cpu-factor" values;
       prvo_provers   = provers;
+      prvo_quorum    = begin
+        match get_int "quorum" values with
+        | None -> Ini.get_all_quorum ini
+        | Some _ as i -> i
+      end;
       prvo_pragmas   = get_string_list "pragmas" values;
       prvo_ppwidth   = begin
         match get_int "pp-width" values with
@@ -519,7 +534,6 @@ let prv_options_of_values ini values =
       end;
       prvo_checkall   = get_flag "check-all" values;
       prvo_profile    = get_flag "profile" values;
-      prvo_iterate    = get_flag "iterate" values;
       prvo_why3server = get_string "why3server" values;
     }
 
@@ -724,6 +738,7 @@ let read_ini_file (filename : string) =
       ini_why3     = tryget  "why3conf";
       ini_ovrevict = trylist "no-evict";
       ini_provers  = trylist "provers" ;
+      ini_quorum   = tryint  "quorum"  ;
       ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
       ini_rdirs    = List.map parse_idir (trylist "rdirs"); 
@@ -733,6 +748,7 @@ let read_ini_file (filename : string) =
     ini_why3     = omap expand ini.ini_why3;
     ini_ovrevict = ini.ini_ovrevict;
     ini_provers  = ini.ini_provers;
+    ini_quorum   = ini.ini_quorum;
     ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
     ini_rdirs    = ini.ini_rdirs; 

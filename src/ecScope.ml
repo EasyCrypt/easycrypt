@@ -645,7 +645,6 @@ module Prover = struct
     po_verbose    : int option;
     pl_all        : bool option;
     pl_max        : int option;
-    pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
     pl_dumpin     : string located option;
@@ -663,7 +662,6 @@ module Prover = struct
     po_verbose   = None;
     pl_all       = None;
     pl_max       = None;
-    pl_iterate   = None;
     pl_wanted    = None;
     pl_unwanted  = None;
     pl_dumpin    = None;
@@ -704,7 +702,6 @@ module Prover = struct
         | None  , None   -> None
         | None  , Some _ -> Some 0
         end;
-      pl_iterate   = ppr.plem_iterate;
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
       pl_dumpin    = ppr.plem_dumpin;
@@ -724,7 +721,6 @@ module Prover = struct
     let pr_verbose   = max 0 (odfl dft.pr_verbose options.po_verbose) in
     let pr_all       = odfl dft.pr_all options.pl_all in
     let pr_max       = odfl dft.pr_max options.pl_max in
-    let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
     let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
     let pr_selected  = odfl dft.pr_selected options.pl_selected in
@@ -739,7 +735,7 @@ module Prover = struct
       in List.fold_left do_ar l (snd options.po_provers) in
 
     { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
-      pr_verbose ; pr_all     ; pr_max      ; pr_iterate  ;
+      pr_verbose ; pr_all     ; pr_max      ;
       pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum   ;
       pr_dumpin  ;
       gn_debug   ; }
@@ -1439,8 +1435,8 @@ module Op = struct
     let add_distr_tag
         (pred : path) (bases : string list) (tag : string) (suffix : string) scope
     =
-      if not (EcAlgTactic.is_module_loaded (env scope)) then
-        hierror "for tag %s, load Distr first" tag;
+      if EcEnv.Op.by_path_opt pred (env scope) = None then
+         hierror "for tag %s, load Distr first" tag;
 
       let oppath   = EcPath.pqname (path scope) (unloc op.po_name) in
       let nparams  = List.map EcIdent.fresh tyop.op_tparams in
@@ -2306,7 +2302,7 @@ module Ty = struct
 
     let tydecl =
       { tyd_params; tyd_type; tyd_loca;
-        tyd_clinline = false; } in
+        tyd_clinline = false; tyd_subtype = None; } in
 
     bind scope (unloc name, tydecl)
 
@@ -2315,17 +2311,9 @@ module Ty = struct
     let loced x = mk_loc _dummy x in
     let env = env scope in
 
-    let scope =
-      let decl = EcDecl.{
-        tyd_params   = [];
-        tyd_type     = Abstract;
-        tyd_loca     = `Global; (* FIXME:SUBTYPE *)
-        tyd_clinline = false; (* FIXME: tyd_clinline PR *)
-      } in bind scope (unloc subtype.pst_name, decl) in
-
     let carrier =
       let ue = EcUnify.UniEnv.create None in
-      transty tp_tydecl env ue subtype.pst_carrier in
+      transty tp_nothing env ue subtype.pst_carrier in
 
     let pred =
       let x = EcIdent.create (fst subtype.pst_pred).pl_desc in
@@ -2335,9 +2323,22 @@ module Ty = struct
       if not (EcUnify.UniEnv.closed ue) then
         hierror ~loc:(snd subtype.pst_pred).pl_loc
           "the predicate contains free type variables";
+      if EcUnify.UniEnv.tparams ue <> [] then
+        hierror ~loc:(snd subtype.pst_pred).pl_loc
+          "Polymorphic predicates are not allowed. \
+           Use clones if you want to make a polymorphic subtype.";
       let uidmap = EcUnify.UniEnv.close ue in
       let fs = Tuni.subst uidmap in
       f_lambda [(x, GTty carrier)] (Fsubst.f_subst fs pred) in
+
+    let scope =
+      let decl = EcDecl.{
+        tyd_params   = [];
+        tyd_type     = Abstract;
+        tyd_loca     = `Global;
+        tyd_clinline = false;
+        tyd_subtype  = Some (carrier, pred);
+      } in bind scope (unloc subtype.pst_name, decl) in
 
     let evclone =
       { EcThCloning.evc_empty with
@@ -3268,11 +3269,11 @@ module Search = struct
                     let es = e_subst tip in
                     let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
                     let bd  = EcFol.form_of_expr (es nt.ont_body) in
-                    let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
+                    List.iter (fun (id, ty) -> ps := Mid.add id ty !ps) xs;
 
-                    match fp.f_node with
+                    match bd.f_node with
                     | Fop (pf, _) -> (pf :: paths, pts)
-                    | _ -> (paths, (ps, ue, fp) ::pts)
+                    | _ -> (paths, (ps, ue, bd) ::pts)
                   end
 
                   | _ -> (p :: paths, pts) in

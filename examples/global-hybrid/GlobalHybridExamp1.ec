@@ -13,6 +13,10 @@
 require import AllCore Real Distr StdOrder StdBigop GlobalHybrid.
 import RealOrder Bigreal BRA.
 
+clone include GlobalHybrid with
+  type input <- unit  (* no additional input *)
+proof *.
+
 op n : {int | 1 <= n} as ge1_n.
 
 type t.  (* we want t to have 2 ^ n elements, including def *)
@@ -24,13 +28,13 @@ op [lossless] dt : t distr.
 axiom mu1_dt (x : t) : mu1 dt x = 1%r / (2 ^ n)%r.
 
 lemma dt_uni : is_uniform dt.
-proof. move => x y _ _; by rewrite !mu1_dt. qed.
+proof. by move => x y _ _; by rewrite !mu1_dt. qed.
 
 lemma dt_fu : is_full dt.
 proof.
 rewrite funi_ll_full.
-move => x y; by rewrite !mu1_dt.
-rewrite dt_ll.
++ by move => x y; by rewrite !mu1_dt.
+by rewrite dt_ll.
 qed.
 
 op m : {int | 1 <= m} as ge1_m.
@@ -65,7 +69,7 @@ lemma GReal_GIdeal &m :
 *)
 
 module Hybrid : HYBRID = {
-  proc main(i : int) : bool = {
+  proc main(y : unit, i : int) : bool = {
     var b <- true;
     var x : t;
     (* start from i: *)
@@ -81,18 +85,18 @@ module Hybrid : HYBRID = {
 }.
 
 lemma GReal_Hybrid_1 &m :
-  Pr[GReal.main() @ &m : res] = Pr[Hybrid.main(1) @ &m : res].
+  Pr[GReal.main() @ &m : res] = Pr[Hybrid.main((), 1) @ &m : res].
 proof.
 byequiv => //; proc.
 seq 2 1 : (={b, i} /\ i{1} = 1); first auto.
-sim.
+by sim.
 qed.
 
 lemma Hybrid_m &m :
-  Pr[Hybrid.main(m) @ &m : res] = Pr[GIdeal.main() @ &m : res].
+  Pr[Hybrid.main((), m) @ &m : res] = Pr[GIdeal.main() @ &m : res].
 proof.
 byequiv => //; proc; sp 1 0.
-rcondf{1} 1; auto.
+by rcondf{1} 1; auto.
 qed.
 
 (* we use upto bad reasoning *)
@@ -147,31 +151,35 @@ module GBad2 = {
 
 lemma Hybrid_step (i' : int) &m :
   1 <= i' < m =>
-  `|Pr[Hybrid.main(i') @ &m : res] - Pr[Hybrid.main(i' + 1) @ &m : res]| <=
+  `|Pr[Hybrid.main((), i') @ &m : res] -
+    Pr[Hybrid.main((), i' + 1) @ &m : res]| <=
   1%r / (2 ^ n)%r.
 proof.
-move => [ge1_i' lt_i'_m]. 
-have -> : Pr[Hybrid.main(i') @ &m : res] = Pr[GBad1.main(i') @ &m : res].
-  byequiv => //; proc; sp 1 2.
+move => [ge1_i' lt_i'_m].
+have -> :
+  Pr[Hybrid.main((), i') @ &m : res] = Pr[GBad1.main(i') @ &m : res].
++ byequiv => //; proc; sp 1 2.
   rcondt{1} 1; first auto.
-  sim.
-have -> : Pr[Hybrid.main(i' + 1) @ &m : res] = Pr[GBad2.main(i') @ &m : res].
-  byequiv => //; proc; sp 1 2.
+  by sim.
+have -> :
+  Pr[Hybrid.main((), i' + 1) @ &m : res] =
+  Pr[GBad2.main(i') @ &m : res].
++ byequiv => //; proc; sp 1 2.
   seq 0 3 : (={i, b}); first auto.
-  sim.
+  by sim.
 rewrite (ler_trans Pr[GBad2.main(i') @ &m : GBad2.bad]).
-byequiv
-  (_ :
-   ={i} ==> GBad1.bad{1} = GBad2.bad{2} /\ (! GBad2.bad{2} => ={res})) :
-  GBad1.bad => //.
-proc.
-seq 5 5 :
-  (GBad1.bad{1} = GBad2.bad{2} /\ ={i} /\
-   (!GBad2.bad{2} => ={b})); first auto.
-case (GBad1.bad{1}).
-while (={i}); auto.
-while (={i, b}); auto; smt().
-smt().
++ byequiv
+    (:
+     ={i} ==> GBad1.bad{1} = GBad2.bad{2} /\ (! GBad2.bad{2} => ={res})) :
+    GBad1.bad => //.
+  + proc.
+    seq 5 5 :
+      (GBad1.bad{1} = GBad2.bad{2} /\ ={i} /\
+       (!GBad2.bad{2} => ={b})); first auto.
+    case (GBad1.bad{1}).
+    + by while (={i}); auto.
+    by while (={i, b}); auto; smt().
+  by smt().
 byphoare => //; proc; sp.
 seq 3 :
   GBad2.bad
@@ -179,14 +187,14 @@ seq 3 :
   1%r
   (1%r - (1%r / (2 ^ n)%r))
   0%r.
-auto.
-wp; rnd (pred1 def); auto; smt(mu1_dt).
-conseq (_ : _ ==> _ : = 1%r).
-while (true) (m - i) => [z |].
-auto; smt(dt_ll).
-auto; smt().
-hoare; while (true); auto.
-trivial.
++ by auto.
++ by wp; rnd (pred1 def); auto; smt(mu1_dt).
++ conseq (: _ ==> _ : = 1%r).
+  while (true) (m - i) => [z |].
+  + by auto; smt(dt_ll).
+  by auto; smt().
++ by hoare; while (true); auto.
+done.
 qed.
 
 lemma GReal_GIdeal &m :
@@ -194,6 +202,6 @@ lemma GReal_GIdeal &m :
   (m - 1)%r * (1%r / (2 ^ n)%r).
 proof.
 rewrite (GReal_Hybrid_1 &m) -(Hybrid_m &m).
-rewrite (hybrid_simp _ _ Hybrid) 1:ge1_m => i ge1_i_lt_m.
+rewrite (hybrid_simp _ _ _ Hybrid) 1:ge1_m => i ge1_i_lt_m.
 by rewrite Hybrid_step.
 qed.

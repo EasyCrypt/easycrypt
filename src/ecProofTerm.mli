@@ -118,6 +118,7 @@ exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
 type occmode = {
   k_keyed : bool;
   k_conv  : bool;
+  k_delta : bool;
 }
 
 val om_rigid : occmode

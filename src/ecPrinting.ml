@@ -2470,7 +2470,8 @@ let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) =
   (match br with
   | `Cond true -> "."
   | `Cond false -> "?"
-  | `Match cp -> Format.sprintf "#%s." cp)
+  | `Match cp -> Format.sprintf "#%s." cp
+  | `MatchByPos ix -> Format.sprintf "#%i" ix)
 
 let pp_codepos_step (ppe: PPEnv.t) (fmt: Format.formatter) ((cp, br): CP.codepos_step) = 
   Format.fprintf fmt "%a%a" (pp_codepos1 ppe) cp pp_codepos_brsel br

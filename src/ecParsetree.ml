@@ -834,6 +834,7 @@ type phltactic =
   | Poutline       of outline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * pcodepos * int option)
+  | PsimplifyIf    of (oside * pcodepos option)
   | Pasgncase      of (oside * pcodepos)
   | Prnd           of oside * psemrndpos option * rnd_tac_info_f
   | Prndsem        of bool * oside * pcodegap1
@@ -932,7 +933,6 @@ type pprover_infos = {
   pprov_version   : [`Lazy | `Full] option;
   plem_all        : bool option;
   plem_max        : int option option;
-  plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
   plem_dumpin     : string located option;
@@ -950,7 +950,6 @@ let empty_pprover = {
   pprov_version   = None;
   plem_all        = None;
   plem_max        = None;
-  plem_iterate    = None;
   plem_wanted     = None;
   plem_unwanted   = None;
   plem_dumpin     = None;
@@ -975,11 +974,20 @@ and rwarg1 =
   | RWApp    of ppterm
   | RWTactic of rwtactic
 
-and rwoptions = rwside * trepeat option * rwocc * pformula option
+and rwmatch =
+  | RWM_Plain   of pformula
+  | RWM_Context of psymbol * pformula
+
 and rwside    = [`LtoR | `RtoL]
 and rwocc     = rwocci option
 and rwocci    = [`Inclusive of Sint.t | `Exclusive of Sint.t | `All]
 and rwtactic  = [`Ring | `Field]
+
+and rwoptions =
+  { side       : rwside
+  ; repeat     : trepeat option
+  ; occurrence : rwocc
+  ; match_     : rwmatch option }
 
 (* -------------------------------------------------------------------- *)
 let norm_rwocci (x : rwocci) =
@@ -1079,7 +1087,7 @@ type logtactic =
   | Preflexivity
   | Passumption
   | Psmt        of pprover_infos
-  | Psplit      of int option
+  | Psplit      of [ `Default of int option | `All of [ `Maybe | `One ] ]
   | Pfield      of psymbol list
   | Pring       of psymbol list
   | Palg_norm
@@ -1425,6 +1433,7 @@ type global_action =
   | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
+  | Gexpect      of (string located * pprint)
   | Gsearch      of pformula list
   | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)

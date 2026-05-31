@@ -3,18 +3,23 @@ require import AllCore List IntDiv Binomial Ring StdOrder.
 (*---*) import IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
-op allperms_r (n : unit list) (s : 'a list) : 'a list list.
+op [smt_opaque] allperms_r (n : unit list) (s : 'a list) : 'a list list =
+  with n = [] =>
+    [[]]
+  with n = _ :: n =>
+    flatten (map (fun x => map ((::) x) (allperms_r n (rem x s))) (undup s)).
 
-axiom allperms_r0 (s : 'a list) :
-  allperms_r [] s = [[]].
+lemma allperms_r0 (s : 'a list) :
+  allperms_r [] s = [[]]
+by done. 
 
-axiom allperms_rS (x : unit) (n : unit list) (s : 'a list) :
+lemma allperms_rS (x : unit) (n : unit list) (s : 'a list) :
   allperms_r (x :: n) s = flatten (
-    map (fun x => map ((::) x) (allperms_r n (rem x s))) (undup s)).
+    map (fun x => map ((::) x) (allperms_r n (rem x s))) (undup s))
+by done.
 
+(* -------------------------------------------------------------------- *)
 op allperms (s : 'a list) = allperms_r (nseq (size s) tt) s.
-
-hint rewrite ap_r : allperms_r0 allperms_rS.
 
 (* -------------------------------------------------------------------- *)
 lemma allperms_rP n (s t : 'a list) : size s = size n =>
@@ -51,7 +56,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma uniq_allperms_r n (s : 'a list) : uniq (allperms_r n s).
 proof.
-elim: n s => [|? n ih] s; rewrite ?ap_r  //.
+elim: n s => [|? n ih] s; rewrite ?ap_r  //=.
 apply/uniq_flatten_map/undup_uniq.
   by move=> x /=; apply/map_inj_in_uniq/ih => a b _ _ [].
 move=> x y; rewrite !mem_undup => sx sy /= /hasP[t].
@@ -79,7 +84,7 @@ require import StdBigop.
 lemma size_allperms_uniq_r n (s : 'a list) : size s = size n => uniq s =>
   size (allperms_r n s) = fact (size s).
 proof.
-elim: n s => /= [|? n ih] s; rewrite ?ap_r /=.
+elim: n s => /= [s|n ih s].
   by move/size_eq0=> -> /=; rewrite fact0.
 case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
 (pose s' := undup _)=> /=; move/addrI=> eq_sz [Nsz uqs].

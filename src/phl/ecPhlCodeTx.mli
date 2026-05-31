@@ -21,6 +21,6 @@ val process_set       : oside * pcodepos * bool * psymbol * pexpr -> backward
 val process_set_match : oside * pcodepos * psymbol * pformula -> backward
 val process_cfold     : pcfold -> backward
 val process_case      : oside * pcodepos -> backward
-
+val process_transform_if : oside * pcodepos option -> backward
 (* -------------------------------------------------------------------- *)
 val process_weakmem : (oside * psymbol * fun_params) -> backward

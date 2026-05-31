@@ -87,6 +87,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       tyd_type     = Abstract;
       tyd_loca     = lc;
       tyd_clinline = false;
+      tyd_subtype  = None;
     } in
       EcEnv.Ty.bind (unloc name) myself env
   in

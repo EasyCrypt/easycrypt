@@ -488,7 +488,8 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
               { tyd_params   = nargs;
                 tyd_type     = Concrete ntyd;
                 tyd_loca     = otyd.tyd_loca;
-                tyd_clinline = (mode <> `Alias); }
+                tyd_clinline = (mode <> `Alias);
+                tyd_subtype  = None; }
 
             in (decl, ntyd)
 
@@ -518,8 +519,9 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
           let decl  =
             { tyd_params   = [];
               tyd_type     = Concrete ty;
-              tyd_loca     = otyd.tyd_loca; 
+              tyd_loca     = otyd.tyd_loca;
               tyd_clinline = false; (* FIXME: check value here tyd_clinline PR *)
+              tyd_subtype  = None;
             }
           in (decl, ty)
     end

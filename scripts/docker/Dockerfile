@@ -1,6 +1,43 @@
-# syntax = devthefuture/dockerfile-x
+ARG BASE_LAYER=base
+ARG BASE_BUILD_LAYER=base-build
+ARG BUILD_LAYER=build
 
-FROM ./Dockerfile.base as base-build
+# Base environment
+FROM debian:stable AS base
+
+LABEL org.opencontainers.image.maintainer="Pierre-Yves Strub <pierre-yves@strub.nu>"
+
+ARG user=charlie
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN \
+	apt-get -q -y update && \
+	apt-get -q -y upgrade && \
+	apt-get -q -y install sudo && \
+	apt-get -q -y clean
+
+COPY --chown=root:root --chmod=0400 docker-parts/sudoers /etc/sudoers.d/
+
+RUN \
+	useradd -ms /bin/bash -d /home/$user -g root -G sudo -u 1001 $user
+
+RUN \
+	apt-get -q -y install opam && \
+	apt-get -q -y clean
+
+USER    $user
+WORKDIR /home/$user
+
+ENV OPAMYES=true OPAMVERBOSE=0 OPAMJOBS=4
+
+ARG OCAML_VERSION=4.14.2
+
+RUN \
+	opam init --disable-sandboxing --compiler=ocaml-base-compiler.${OCAML_VERSION}
+
+# Build environment
+FROM ${BASE_LAYER} AS base-build
 
 RUN \
 	sudo apt-get -q -y install wget curl python3 python3-pip python3-yaml && \
@@ -11,38 +48,21 @@ RUN \
 	opam install --deps-only --confirm-level=unsafe-yes easycrypt && \
 	opam clean
 
-COPY --chmod=0755 --chown=1001:0 docker-parts/alt-ergo bin/run-alt-ergo
-
 ENV PATH="/home/charlie/bin:$PATH"
 
+FROM ${BASE_BUILD_LAYER} AS build
+
 RUN \
-	version=2.6.2 && \
-	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
-	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
-	opam install --switch=alt-ergo-${version} --deps-only --confirm-level=unsafe-yes alt-ergo && \
-	opam install --switch=alt-ergo-${version} alt-ergo && \
-	opam clean   --switch=alt-ergo-${version} && \
-	ln -s run-alt-ergo ~/bin/alt-ergo-${version}
+	version=2.6.3 && \
+  wget -O alt-ergo https://github.com/OCamlPro/alt-ergo/releases/download/v${version}/alt-ergo-v${version}-x86_64-linux-musl && \
+  sudo install -m 0755 alt-ergo /usr/local/bin/alt-ergo-${version} && \
+  rm -f alt-ergo
 
 RUN \
 	version=2.5.4 && \
-	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
-	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
-	opam install --switch=alt-ergo-${version} --deps-only --confirm-level=unsafe-yes alt-ergo && \
-	opam install --switch=alt-ergo-${version} alt-ergo && \
-	opam clean   --switch=alt-ergo-${version} && \
-	ln -s run-alt-ergo ~/bin/alt-ergo-${version}
-
-RUN \
-	version=2.4.3 && \
-	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
-	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
-	opam install --switch=alt-ergo-${version} --deps-only --confirm-level=unsafe-yes alt-ergo && \
-	opam install --switch=alt-ergo-${version} alt-ergo && \
-	opam clean   --switch=alt-ergo-${version} && \
-	ln -s run-alt-ergo ~/bin/alt-ergo-${version}
-
-FROM base-build as main-linux-amd64
+  wget -O alt-ergo https://github.com/OCamlPro/alt-ergo/releases/download/v${version}/alt-ergo-v${version}-x86_64-linux-musl && \
+  sudo install -m 0755 alt-ergo /usr/local/bin/alt-ergo-${version} && \
+  rm -f alt-ergo
 
 RUN \
 	version=1.8 && \
@@ -51,22 +71,22 @@ RUN \
 	rm -f cvc4
 
 RUN \
-	version=1.3.3 && \
-	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.2/cvc5-Linux-x86_64-libcxx-static.zip && \
+	version=1.3.4 && \
+	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-${version}/cvc5-Linux-x86_64-libcxx-static.zip && \
   unzip -j cvc5.zip cvc5-Linux-x86_64-libcxx-static/bin/cvc5 && \
 	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
 	rm -f cvc5 cvc5.zip
 
 RUN \
 	version=1.2.1 && \
-	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-1.2.1/cvc5-Linux-x86_64-static.zip && \
+	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-${version}/cvc5-Linux-x86_64-static.zip && \
   unzip -j cvc5.zip cvc5-Linux-x86_64-static/bin/cvc5 && \
 	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
 	rm -f cvc5 cvc5.zip
 
 RUN \
 	version=1.1.2 && \
-	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-1.1.2/cvc5-Linux-static.zip && \
+	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-${version}/cvc5-Linux-static.zip && \
   unzip -j cvc5.zip cvc5-Linux-static/bin/cvc5 && \
 	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
 	rm -f cvc5 cvc5.zip
@@ -119,7 +139,16 @@ RUN \
 	sudo install -m 0755 z3 /usr/local/bin/z3-${version} && \
 	rm -f z3 z3.zip
 
-FROM main-linux-amd64
-
 RUN \
 	opam exec -- why3 config detect
+
+# Test environment
+FROM ${BUILD_LAYER} AS test
+
+ARG EC_VERSION=main
+ARG EC_REPO=https://github.com/EasyCrypt/easycrypt.git#${EC_VERSION}
+
+RUN \
+	opam pin add -n easycrypt ${EC_REPO} && \
+	opam install -v easycrypt && \
+	rm -rf .opam/packages.dev/*

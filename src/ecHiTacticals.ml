@@ -136,7 +136,9 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Preflexivity        -> process_reflexivity
     | Passumption         -> process_assumption
     | Psmt pi             -> process_smt ~loc:(loc t) ttenv (Some pi)
-    | Psplit i            -> process_split ?i
+    | Psplit (`Default i) -> process_split ?i
+    | Psplit (`All `Maybe)-> process_split_all ~must:false
+    | Psplit (`All `One)  -> process_split_all ~must:true
     | Pfield st           -> process_algebra `Solve `Field st
     | Pring st            -> process_algebra `Solve `Ring  st
     | Palg_norm           -> EcStrongRing.t_alg_eq
@@ -200,6 +202,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pinterleave info          -> EcPhlSwap.process_interleave info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
+    | PsimplifyIf info          -> EcPhlCodeTx.process_transform_if info
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
