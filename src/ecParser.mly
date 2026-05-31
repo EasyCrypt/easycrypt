@@ -2422,8 +2422,8 @@ rwarg1:
 | side=rwside repeat=rwrepeat? occurrence=rwocc? match_=bracket(rwmatch)? fp=rwpterms
    { RWRw ({ side; repeat; occurrence; match_ }, fp) }
 
-| side=rwside repeat=rwrepeat? occurrence=rwocc? SLASH rigid=iboption(TILD) fp=sform_h %prec prec_tactic
-   { RWDelta (rigid, { side; repeat; occurrence; match_ = None }, fp); }
+| side=rwside repeat=rwrepeat? occurrence=rwocc? SLASH fp=sform_h %prec prec_tactic
+   { RWDelta ({ side; repeat; occurrence; match_ = None }, fp); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }
