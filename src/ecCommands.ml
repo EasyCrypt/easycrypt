@@ -121,9 +121,8 @@ module Loader : sig
 
   val addidir : ?namespace:namespace -> ?recursive:bool -> string -> loader -> unit
   val aslist  : loader -> ((namespace option * string) * idx_t) list
-  val locate  : ?namespaces:namespace option list -> 
-                ?kinds:(EcLoader.kind list) -> string ->
-                 loader -> (namespace option * string * kind) option
+  val locate  : ?namespaces:namespace option list -> string ->
+                  loader -> (namespace option * string * kind) option
 
   val push      : string -> loader -> unit
   val pop       : loader -> context1 option
@@ -182,8 +181,8 @@ end = struct
   let aslist (ld : loader) =
     EcLoader.aslist ld.ld_core
 
-  let locate ?namespaces ?kinds (path : string) (ld : loader) =
-    EcLoader.locate ?namespaces ?kinds path ld.ld_core
+  let locate ?namespaces (path : string) (ld : loader) =
+    EcLoader.locate ?namespaces path ld.ld_core
 
   let push (p : string) (ld : loader) =
     let ctxt1 = { cpath = ld.ld_cpath; filename = norm p; } in
@@ -566,7 +565,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
     then [Loader.namespace ld; None]
     else [nm] in
 
-  match Loader.locate ~kinds:[`Ec; `EcA] ~namespaces:nm sysname ld with
+  match Loader.locate ~namespaces:nm sysname ld with
   | None ->
       EcScope.hierror "cannot locate theory `%s'" sysname
 
