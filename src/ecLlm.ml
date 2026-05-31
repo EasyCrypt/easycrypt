@@ -146,14 +146,108 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
       Format.pp_print_flush fmt ();
       Buffer.contents buf
 
-    (* Render the focus-tree of open subgoals. [all=false] gives a
-       one-line digest per goal; [all=true] gives the full goal body. *)
-    let tree_to_string ?(all=false) () =
-      let entries = EcCommands.pp_tree ~all () in
-      match entries with
-      | [] -> "No active proof.\n"
-      | _ ->
-        let buf = Buffer.create 256 in
+    (* Inline focus annotation ([focus: 1/N]) appended to reply tags
+       whenever the active proof has >=2 open subgoals. *)
+    let focus_tag () =
+      match EcCommands.pp_tree () with
+      | _ :: _ :: _ as entries ->
+        Printf.sprintf " [focus: 1/%d]" (List.length entries)
+      | _ -> ""
+  end in
+
+  (* ------------------------------------------------------------------ *)
+  (* Frame tree: group currently-open goals by their shared multi-child
+     ancestors. Used by [Tree] (rendering) and [Focus] (path lookup).
+     The tree is a *derivation*: it depends only on [pr_opened] and
+     [parent_of], no recorded transcript. *)
+  let module FrameTree = struct
+    (* Internal nodes are split-point frames; leaves carry a handle
+       (the open goal), its index in [pr_opened] (1-based, used by
+       [EcCoreGoal.rotate_focus]), and its rendered text. *)
+    type node =
+      | Frame of node list                (* >=2 child branches *)
+      | Leaf  of
+          { idx     : int                 (* 1-based in pr_opened *)
+          ; focused : bool                (* idx = 1 *)
+          ; text    : string }            (* one-line conclusion *)
+
+    (* Multi-child ancestors of [h], outermost first (= root-most
+       split first, deepest split last). This ordering means leaves
+       sharing the same OUTER frame will agree on the chain's first
+       element, which is what [group] partitions on. *)
+    let split_chain h =
+      let rec walk h acc =
+        match EcCommands.parent_of h with
+        | None -> acc
+        | Some p ->
+          match EcCommands.children_of p with
+          | [_] -> walk p acc
+          | _   -> walk p (p :: acc)
+      in
+      (* [walk] prepends each ancestor as we go up; the result has
+         outermost at the FRONT (we add it last). No reverse needed. *)
+      walk h []
+
+    (* Build the tree by grouping leaves with a common ancestor prefix.
+       [leaves] is a list of (chain, leaf) in [pr_opened] order. The
+       grouping is done recursively on the head of each chain. *)
+    let rec group (leaves : (EcCoreGoal.handle list * node) list) : node list =
+      let rec runs acc = function
+        | [] -> List.rev acc
+        | (chain, leaf) :: rest ->
+          match chain with
+          | [] -> runs (`Bare leaf :: acc) rest
+          | hd :: tl ->
+            let same_head, others =
+              List.partition_map (fun (c, l) ->
+                match c with
+                | h :: tail when EcCoreGoal.eq_handle h hd ->
+                  Left (tail, l)
+                | _ -> Right (c, l))
+                rest
+            in
+            runs (`Group ((tl, leaf) :: same_head) :: acc) others
+      in
+      List.map
+        (function
+          | `Bare leaf -> leaf
+          | `Group children -> Frame (group children))
+        (runs [] leaves)
+
+    (* Strip leading singleton frames so the top-level forest's
+       indices match what the user thinks of as "top-level subgoals
+       of the current frame." When all open leaves descend from a
+       single outermost split, the top-level forest has one Frame
+       containing the actual user-visible siblings; unwrap it. *)
+    let rec unwrap forest =
+      match forest with
+      | [Frame children] -> unwrap children
+      | _ -> forest
+
+    let build () =
+      let handles = EcCommands.open_handles () in
+      let texts = EcCommands.pp_tree () in
+      if handles = [] then []
+      else
+        let leaves =
+          List.mapi (fun i (h, (_, focused, text)) ->
+            let leaf = Leaf { idx = i + 1; focused; text } in
+            (split_chain h, leaf))
+            (List.combine handles texts)
+        in
+        unwrap (group leaves)
+
+    (* Render the tree with dotted-path labels matching what FOCUS
+       accepts. [all] requests full goal bodies (we re-query via
+       [pp_tree ~all:true] keyed by leaf index). *)
+    let render ?(all=false) () =
+      let forest = build () in
+      if forest = [] then "No active proof.\n"
+      else
+        let texts_all =
+          if all then Some (EcCommands.pp_tree ~all:true ())
+          else None
+        in
         let one_line s =
           let s =
             match String.index_opt s '\n' with
@@ -165,25 +259,60 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
           then String.sub s 0 (limit - 1) ^ "…"
           else s
         in
-        List.iter (fun (i, focused, text) ->
-          let marker = if focused then " <- focused" else "" in
-          if all then
-            Buffer.add_string buf
-              (Printf.sprintf "[%d]%s\n%s\n" i marker text)
-          else
-            Buffer.add_string buf
-              (Printf.sprintf "[%d] %s%s\n" i (one_line text) marker)
-        ) entries;
+        let buf = Buffer.create 256 in
+        let rec emit ~depth ~path = function
+          | Leaf { idx; focused; text } ->
+            let label = String.concat "." (List.rev_map string_of_int path) in
+            let marker = if focused then " <- focused" else "" in
+            for _ = 1 to depth do Buffer.add_string buf "  " done;
+            (match texts_all with
+             | None ->
+               Buffer.add_string buf
+                 (Printf.sprintf "[%s] %s%s\n"
+                    label (one_line text) marker)
+             | Some entries ->
+               let (_, _, full) =
+                 List.nth entries (idx - 1)
+               in
+               Buffer.add_string buf
+                 (Printf.sprintf "[%s]%s\n%s\n" label marker full))
+          | Frame children ->
+            List.iteri (fun i child ->
+              emit ~depth:(depth + 1) ~path:((i + 1) :: path) child)
+              children
+        in
+        List.iteri (fun i node ->
+          emit ~depth:0 ~path:[i + 1] node)
+          forest;
         Buffer.contents buf
 
-    (* Inline focus annotation ([focus: 1/N]) appended to reply tags
-       whenever the active proof has >=2 open subgoals. *)
-    let focus_tag () =
-      match EcCommands.pp_tree () with
-      | _ :: _ :: _ as entries ->
-        Printf.sprintf " [focus: 1/%d]" (List.length entries)
-      | _ -> ""
+    (* Resolve a dotted path against the tree. Returns [Ok idx] where
+       [idx] is the 1-based position in [pr_opened] of the selected
+       leaf, or [Error msg]. *)
+    let resolve_path (path : int list) : (int, string) result =
+      let forest = build () in
+      let rec walk ~components nodes =
+        match components with
+        | [] -> Error "FOCUS: path must select a leaf goal"
+        | k :: rest ->
+          if k < 1 || k > List.length nodes then
+            Error (Printf.sprintf
+              "FOCUS: index %d out of range (1..%d)"
+              k (List.length nodes))
+          else
+            match List.nth nodes (k - 1), rest with
+            | Leaf { idx; _ }, [] -> Ok idx
+            | Leaf _, _ ->
+              Error "FOCUS: path overshoots a leaf goal"
+            | Frame _, [] ->
+              Error "FOCUS: path must select a leaf goal, \
+                     not a frame"
+            | Frame kids, _ -> walk ~components:rest kids
+      in
+      if forest = [] then Error "FOCUS: no active proof"
+      else walk ~components:path forest
   end in
+
 
   (* ------------------------------------------------------------------ *)
   (* OK/ERROR/<END> wire envelope. *)
@@ -708,7 +837,7 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
       | Goals      of [`One | `All]
       | Tree       of [`One | `All]
       | Commit
-      | Focus      of int
+      | Focus      of int list  (* dotted path; [k] = "FOCUS k" *)
       | Next
       | Checkpoint of string
       | Revert     of string   (* uuid-or-name; Dispatch resolves *)
@@ -740,10 +869,17 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
     let parse_focus arg =
       if arg = "" then
         raise (Parse_error "FOCUS: missing argument");
-      try Focus (int_of_string arg)
-      with Failure _ ->
+      let parts = String.split_on_char '.' arg in
+      let path =
+        try List.map int_of_string parts
+        with Failure _ ->
+          raise (Parse_error
+            (Printf.sprintf "FOCUS: not a path of integers: %s" arg))
+      in
+      if List.exists (fun k -> k < 1) path then
         raise (Parse_error
-          (Printf.sprintf "FOCUS: not an integer: %s" arg))
+          (Printf.sprintf "FOCUS: path indices must be >= 1: %s" arg));
+      Focus path
 
     let parse_checkpoint name =
       if name = "" then
@@ -834,19 +970,24 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
         Wire.reply_error "nothing to undo"
 
     let do_focus_request request =
-      (* [request] is the user's intent normalized; [`Next] is "second
-         sibling unless only one open". *)
+      (* [request] is the user's intent normalized:
+         - [`Next]   = rotate to the second open goal (or stay if <=1)
+         - [`Path p] = resolve dotted path [p] against the frame tree
+                       and focus the matching leaf. *)
       Buffer.clear notices;
-      let entries = EcCommands.pp_tree () in
-      let n = List.length entries in
-      let target =
+      let resolved =
         match request with
-        | `Next -> if n <= 1 then 1 else 2
-        | `At k -> k
+        | `Next ->
+          let n = List.length (EcCommands.open_handles ()) in
+          Ok (if n <= 1 then 1 else 2)
+        | `Path path -> FrameTree.resolve_path path
       in
-      match EcCommands.focus_goal target with
-      | Ok _      -> Wire.reply_ok_goals ()
+      match resolved with
       | Error msg -> Wire.reply_error msg
+      | Ok target ->
+        match EcCommands.focus_goal target with
+        | Ok _      -> Wire.reply_ok_goals ()
+        | Error msg -> Wire.reply_error msg
 
     let do_checkpoint name =
       Buffer.clear notices;
@@ -912,14 +1053,14 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
         Wire.reply_ok (Goals.goals_to_string ~all:true ())
       | Tree `One    ->
         Buffer.clear notices;
-        Wire.reply_ok (Goals.tree_to_string ())
+        Wire.reply_ok (FrameTree.render ())
       | Tree `All    ->
         Buffer.clear notices;
-        Wire.reply_ok (Goals.tree_to_string ~all:true ())
+        Wire.reply_ok (FrameTree.render ~all:true ())
       | Commit       ->
         Buffer.clear notices;
         Wire.reply_ok (Commit.proof_text ())
-      | Focus k      -> do_focus_request (`At k)
+      | Focus path   -> do_focus_request (`Path path)
       | Next         -> do_focus_request `Next
       | Checkpoint n -> do_checkpoint n
       | Revert s     -> do_revert s
