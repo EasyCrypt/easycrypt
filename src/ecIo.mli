@@ -13,7 +13,6 @@ val parse    : ecreader -> EcParsetree.prog
 val parseall : ecreader -> EcParsetree.global list
 val drain    : ecreader -> unit
 val lexbuf   : ecreader -> Lexing.lexbuf
-val next_sentence_from : string -> int -> (string * int * int) option
 
 (* -------------------------------------------------------------------- *)
 val lex_single_token : string -> EcParser.token option
