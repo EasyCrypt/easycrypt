@@ -494,10 +494,8 @@ let circuit_of_form
    (f_      : EcAst.form) 
   : circuit =
 
-  let module AIFH = EcAlphaInvHashtbl.Make(struct let hyps = hyps end) in
-
   (* Form level cache, local to each high-level call *)
-  let cache : circuit AIFH.Htbl.t = AIFH.Htbl.create 700 in
+  let cache : circuit EcAlphaInvHashtbl.t = EcAlphaInvHashtbl.create hyps 700 in
   let op_cache : circuit Mp.t ref = ref Mp.empty in
   let redmode = circ_red hyps in
   let env = toenv hyps in
@@ -598,7 +596,7 @@ let circuit_of_form
     | Fapp (f, fs) -> 
     (* TODO: Maybe add cache statistics? *)
     (* TODO: Maybe cache all forms       *)
-    begin match AIFH.Htbl.find_opt cache f_ with 
+    begin match EcAlphaInvHashtbl.find_opt cache f_ with
     | Some circ -> circ
     | None -> 
       let circ = begin match f with
@@ -655,7 +653,7 @@ let circuit_of_form
           let fcs = List.map (doit st) fs in
           circuit_compose f_c fcs
       end in
-        AIFH.Htbl.add cache f_ circ;
+        EcAlphaInvHashtbl.add cache f_ circ;
         circ
       end
       
@@ -768,7 +766,7 @@ let circuit_of_form
   (* State cleanup *)
   begin
     op_cache := Mp.empty;
-    AIFH.clear cache
+    EcAlphaInvHashtbl.clear cache
   end;
   res
   

@@ -2,14 +2,20 @@
 open EcAst
 
 (* -------------------------------------------------------------------- *)
-(* Hash-table over formulas keyed by alpha-equivalence (and conversion)
-   in a fixed hypotheses context [Ctxt.hyps]. The hash is invariant under
-   the renaming of bound variables, so alpha-equivalent formulas share a
-   table entry. *)
-module Make (Ctxt : sig val hyps : EcEnv.LDecl.hyps end) : sig
-  (* The formula-keyed hash-table (keys compared up to alpha-equivalence). *)
-  module Htbl : Batteries.Hashtbl.S with type key = form
+(* A hash-table over formulas keyed by alpha-equivalence (in the
+   hypotheses context given at creation). Bound variables are hashed by
+   de-Bruijn level, so alpha-equivalent formulas share an entry. *)
 
-  (* Clear the table (and the internal de-Bruijn ident cache). *)
-  val clear : 'a Htbl.t -> unit
-end
+(* Alpha-invariant, bounded hash of a formula. *)
+val hash : form -> int
+
+(* -------------------------------------------------------------------- *)
+type 'a t
+
+(* [create hyps size] builds an empty table whose key equality is
+   [EcReduction.is_alpha_eq hyps]. *)
+val create : EcEnv.LDecl.hyps -> int -> 'a t
+
+val clear    : 'a t -> unit
+val add      : 'a t -> form -> 'a -> unit
+val find_opt : 'a t -> form -> 'a option
