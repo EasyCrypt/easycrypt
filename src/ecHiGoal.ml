@@ -2262,7 +2262,8 @@ let process_exists args (tc : tcenv1) =
   EcLowGoal.t_exists_intro_s args tc
 
 (* -------------------------------------------------------------------- *)
-let process_congr tc =
+(* Default [congr]: one structural step on the head of the equality. *)
+let process_congr_default tc =
   let (env, hyps, concl) = FApi.tc1_eflat tc in
 
   if not (EcFol.is_eq_or_iff concl) then
@@ -2309,6 +2310,31 @@ let process_congr tc =
     -> EcCoreGoal.FApi.xmutate1 tc `CongrProj [f_eq f1 f2]
 
   | _, _ -> tacuerror "not a congruence"
+
+(* -------------------------------------------------------------------- *)
+(* [congr pat]: thin wrapper around [EcLowGoal.t_congr_pattern]. *)
+let process_congr_pattern p tc =
+  let concl = FApi.tc1_goal tc in
+  if not (EcFol.is_eq_or_iff concl) then
+    tc_error !!tc "goal must be an equality or an equivalence";
+  let (ps, ue), pat = TTC.tc1_process_pattern tc p in
+  let pvars = Mid.keys ps in
+  EcLowGoal.t_congr_pattern ~pat ~pvars ~ue tc
+
+(* -------------------------------------------------------------------- *)
+(* [congr *]: thin wrapper around [EcLowGoal.t_congr_star]. *)
+let process_congr_star tc =
+  let concl = FApi.tc1_goal tc in
+  if not (EcFol.is_eq_or_iff concl) then
+    tc_error !!tc "goal must be an equality or an equivalence";
+  EcLowGoal.t_congr_star tc
+
+(* -------------------------------------------------------------------- *)
+let process_congr (mode : pcongr_mode) tc =
+  match mode with
+  | PCongrDefault    -> process_congr_default tc
+  | PCongrStar       -> process_congr_star tc
+  | PCongrPattern p  -> process_congr_pattern p tc
 
 (* -------------------------------------------------------------------- *)
 let process_wlog ids wlog tc =

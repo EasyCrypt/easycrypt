@@ -383,9 +383,9 @@ let t_equiv_deno_bad2 pre bad1 tc =
           t_intros_i [hcpre; hequiv] @!
             t_real_le_trans fabs' @+
             [ t_apply_prept (`UG real_eq_le) @!
-                process_congr @! (* abs *)
-                process_congr @~ (* add *)
-                (t_last process_congr) @~+ (* opp *)
+                (process_congr PCongrDefault) @! (* abs *)
+                (process_congr PCongrDefault) @~ (* add *)
+                (t_last (process_congr PCongrDefault)) @~+ (* opp *)
                 [ t_pr_rewrite_i ("mu_split", Some bad1) @! t_reflex;
                   t_pr_rewrite_i ("mu_split", Some bad2) @! t_reflex ] ;
               t_apply_prept (`UG real_upto) @+

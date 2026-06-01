@@ -2569,6 +2569,181 @@ let t_congr (f1, f2) (args, ty) tc =
   doit (List.rev args) ty tc
 
 (* -------------------------------------------------------------------- *)
+(* Read the equality (or iff) at the head of the goal and return:
+   - the two sides [f1, f2];
+   - [t_ensure_eq], a tactic that coerces an iff goal to an eq goal;
+   - [t_subgoal], the auto-discharge tactic for trivial side goals
+     (alpha-reflexivity and alpha-assumption).
+   It is the caller's responsibility to have checked that the goal is an
+   equality or an equivalence (e.g. via [EcFol.is_eq_or_iff]). *)
+let congr_split_eq_or_iff tc =
+  let concl = FApi.tc1_goal tc in
+  assert (EcFol.is_eq_or_iff concl);
+
+  let ((f1, f2), iseq) =
+    if   EcFol.is_eq concl
+    then (EcFol.destr_eq  concl, true )
+    else (EcFol.destr_iff concl, false) in
+
+  let t_ensure_eq =
+    if iseq then t_id
+    else
+      (fun tc ->
+        let hyps = FApi.tc1_hyps tc in
+        Apply.t_apply_bwd_r
+          (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
+
+  let t_subgoal =
+    FApi.t_ors [t_reflex ~mode:`Alpha; t_assumption `Alpha; t_id] in
+
+  (f1, f2, t_ensure_eq, t_subgoal)
+
+(* -------------------------------------------------------------------- *)
+(* Discharge an equality goal whose two sides are [skel[xi := Li]] and
+   [skel[xi := Ri]] (up to beta), by:
+     1. coercing iff to eq if needed;
+     2. changing the goal to [(\xi. skel) Li... = (\xi. skel) Ri...];
+     3. unfolding the congruence one step per hole with [t_congr];
+     4. auto-closing trivial side goals.
+   The goal type is read from [f1.f_ty]; [holes], [lvec] and [rvec] must
+   have the same length, and each [Li/Ri] must have the type of [xi]. *)
+let t_congr_from_skeleton ~holes ~skel ~lvec ~rvec tc =
+  let (f1, _f2, t_ensure_eq, t_subgoal) = congr_split_eq_or_iff tc in
+
+  if List.is_empty holes then
+    FApi.t_seq t_ensure_eq t_reflex tc
+  else
+    let ty = f1.f_ty in
+    let bds = List.map (fun (x, t) -> (x, GTty t)) holes in
+    let lam = f_lambda bds skel in
+    let app_lhs = f_app lam lvec ty in
+    let app_rhs = f_app lam rvec ty in
+    let newgoal = f_eq app_lhs app_rhs in
+    let pairs   = List.combine lvec rvec in
+    let tcgr    = t_congr (lam, lam) (pairs, ty) in
+    FApi.t_seqs
+      [t_ensure_eq;
+       (fun tc -> FApi.tcenv_of_tcenv1 (t_change1 newgoal tc));
+       tcgr;
+       t_subgoal]
+      tc
+
+(* -------------------------------------------------------------------- *)
+(* [congr pat]: pattern matches both sides of an equality/iff goal; one
+   subgoal per pattern variable (skipping syntactically-equal sides).
+   - [pat] is the elaborated pattern formula (containing free [f_local]s
+     for each pattern variable);
+   - [pvars] is the list of pattern-variable identifiers;
+   - [ue] is the unification environment from pattern elaboration. *)
+let t_congr_pattern ~pat ~pvars ~ue tc =
+  let (env, hyps, _concl) = FApi.tc1_eflat tc in
+  let (f1, f2, _, _) = congr_split_eq_or_iff tc in
+
+  let ev0 = MEV.of_idents pvars `Form in
+
+  let match_side label side =
+    let ue' = EcUnify.UniEnv.copy ue in
+    try
+      let (ue'', _, ev'') =
+        f_match fmsearch hyps (ue', ev0) pat side
+      in (ue'', ev'')
+    with MatchFailure ->
+      tc_error !!tc "pattern does not match %s of the goal" label
+  in
+
+  let (ueL, evL) = match_side "left-hand side"  f1 in
+  let (ueR, evR) = match_side "right-hand side" f2 in
+
+  let substL = MEV.assubst ueL evL env in
+  let substR = MEV.assubst ueR evR env in
+
+  let holes_full =
+    List.map (fun x ->
+      let probe_ty = EcUnify.UniEnv.fresh ueL in
+      let probe    = f_local x probe_ty in
+      let li = Fsubst.f_subst substL probe in
+      let ri = Fsubst.f_subst substR probe in
+      (x, li.f_ty, li, ri)
+    ) pvars
+  in
+
+  let kept, dropped =
+    List.partition
+      (fun (_, _, li, ri) -> not (is_alpha_eq hyps li ri))
+      holes_full
+  in
+
+  let holes = List.map (fun (x, t, _, _) -> (x, t)) kept in
+  let lvec  = List.map (fun (_, _, l, _) -> l) kept in
+  let rvec  = List.map (fun (_, _, _, r) -> r) kept in
+
+  let skel =
+    List.fold_left
+      (fun acc (x, _, li, _) -> Fsubst.f_subst_local x li acc)
+      pat dropped
+  in
+
+  t_congr_from_skeleton ~holes ~skel ~lvec ~rvec tc
+
+(* -------------------------------------------------------------------- *)
+(* [congr *]: walk LHS/RHS in lock-step without reduction; emit one
+   subgoal per pair of differing positions. Binders are opaque. *)
+let t_congr_star tc =
+  let (env, hyps, _concl) = FApi.tc1_eflat tc in
+  let (f1, f2, _, _) = congr_split_eq_or_iff tc in
+
+  let holes = ref [] in
+  let lvec  = ref [] in
+  let rvec  = ref [] in
+
+  let mk_hole (l : form) (r : form) : form =
+    let x = EcIdent.create "_x" in
+    holes := (x, l.f_ty) :: !holes;
+    lvec  := l :: !lvec;
+    rvec  := r :: !rvec;
+    f_local x l.f_ty
+  in
+
+  let rec walk (l : form) (r : form) : form =
+    if is_alpha_eq hyps l r then
+      l
+    else
+      match l.f_node, r.f_node with
+      | Fapp (hL, aL), Fapp (hR, aR)
+          when    is_alpha_eq hyps hL hR
+               && List.length aL = List.length aR
+               && EqTest.for_type env l.f_ty r.f_ty ->
+          let args' = List.map2 walk aL aR in
+          f_app hL args' l.f_ty
+
+      | Fif (cL, tL, eL), Fif (cR, tR, eR) ->
+          let c' = walk cL cR in
+          let t' = walk tL tR in
+          let e' = walk eL eR in
+          f_if c' t' e'
+
+      | Ftuple xs, Ftuple ys when List.length xs = List.length ys ->
+          let zs = List.map2 walk xs ys in
+          f_tuple zs
+
+      | Fproj (xL, iL), Fproj (xR, iR)
+          when iL = iR && EqTest.for_type env l.f_ty r.f_ty ->
+          f_proj (walk xL xR) iL l.f_ty
+
+      | _, _ ->
+          if not (EqTest.for_type env l.f_ty r.f_ty) then
+            tc_error !!tc "congr*: cannot equate subterms of different types";
+          mk_hole l r
+  in
+
+  let skel = walk f1 f2 in
+  let holes = List.rev !holes in
+  let lvec  = List.rev !lvec  in
+  let rvec  = List.rev !rvec  in
+
+  t_congr_from_skeleton ~holes ~skel ~lvec ~rvec tc
+
+(* -------------------------------------------------------------------- *)
 type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 (* -------------------------------------------------------------------- *)
