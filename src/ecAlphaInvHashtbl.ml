@@ -1,145 +1,160 @@
 (* -------------------------------------------------------------------- *)
-(* Hash-table over formulas whose key equality is alpha-equivalence (and
-   conversion) in a fixed hypotheses context. The companion [hash] is
-   invariant under the renaming of bound variables: when descending under
-   a binder, each bound variable is substituted by a canonical de-Bruijn
-   level identifier before being hashed, so that alpha-equivalent
-   formulas hash equal (a requirement for [Hashtbl.Make]). *)
+(* Hash-table over formulas whose key equality is alpha-equivalence in a
+   fixed hypotheses context.
+
+   The companion [hash] is invariant under the renaming of bound
+   variables: a bound occurrence is hashed by the de-Bruijn *level* of
+   its binder (an integer, intrinsically stable) rather than by its name,
+   so alpha-equivalent formulas hash equal -- the requirement imposed by
+   [Hashtbl.Make]. Free variables, operators and types are stable under
+   alpha-renaming and are hashed as-is.
+
+   Like [Hashtbl.hash] (= [Hashtbl.hash_param 10 100]) the traversal is
+   *bounded*: it folds at most [nmeaningful] leaves and visits at most
+   [nnodes] nodes, so hashing is O(1) on arbitrarily large formulas. A
+   bounded hash is still consistent with the equality (it only ever
+   *coarsens*, never distinguishes alpha-equal forms); on a bucket
+   collision [Hashtbl.Make] falls back to [is_alpha_eq]. *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcAst
-open EcCoreFol
 open EcIdent
 open EcEnv.LDecl
 
 (* -------------------------------------------------------------------- *)
-module Map = Batteries.Map
+(* Same budget as [Hashtbl.hash]. *)
+let nmeaningful = 10
+let nnodes      = 100
 
 (* -------------------------------------------------------------------- *)
 module Make (Ctxt : sig val hyps : hyps end) = struct
-    type state = {
-      level: int;
-      subst: EcSubst.subst;
-    }
 
-    let empty_state : state = {level = 0; subst = EcSubst.empty}
+  (* [bound] maps each in-scope bound variable to the de-Bruijn level of
+     its binder; [depth] is the number of binders entered so far (the
+     level to assign to the next one). *)
+  type env = {
+    depth : int;
+    bound : int Mid.t;
+  }
 
-    let bruijn_idents : (int, ident) Map.t ref = ref Map.empty
+  let empty_env : env = { depth = 0; bound = Mid.empty }
 
-    let clean_bruijn_idents : unit -> unit =
-      fun () -> bruijn_idents := Map.empty
+  let bind_id (e : env) (id : ident) : env =
+    { depth = e.depth + 1; bound = Mid.add id e.depth e.bound }
 
-    let ident_of_debruijn_level (i: int) : ident =
-      match Map.find_opt i !bruijn_idents with
-      | Some id -> id
-      | None -> let id = create (string_of_int i) in
-        bruijn_idents := Map.add i id !bruijn_idents;
-        id
+  let bind_ids (e : env) (ids : ident list) : env =
+    List.fold_left bind_id e ids
 
-    let add_to_state (id: ident) (ty: ty) (st: state) =
-      let new_id = ident_of_debruijn_level st.level in
-      let level = st.level + 1 in
-      let subst = EcSubst.add_flocal st.subst id (f_local new_id ty) in
-      { level; subst }, new_id
+  let hash_form (f0 : form) : int =
+    (* Mutable budget, mirroring [Hashtbl.hash_param]. *)
+    let nmeaningful = ref nmeaningful in
+    let nnodes      = ref nnodes      in
 
-    let rec hash (st:state) (f: form) : int =
-      let hnode = match f.f_node with
-      | Fquant (qnt, bnds, f)  ->
-        let st, bnds =
-          List.fold_left_map (fun st (orig_id, gty) ->
-            match gty with
-            | GTty ty ->
-              let st, new_id = add_to_state orig_id ty st in
-              st, (new_id, gty)
-            | _ ->
-              st, (orig_id, gty)
-          ) st bnds
-        in Why3.Hashcons.combine2 (qt_hash qnt) (b_hash bnds) (hash st (EcSubst.subst_form st.subst f))
-      | Fif (cond, tb, fb)  ->
-          let hash = hash st in
-          Why3.Hashcons.combine2 (hash cond) (hash tb) (hash fb)
-      | Fmatch (_, _, _)  -> assert false
-      | Flet (lp, value, body)  ->
-          begin match lp with
-          | LSymbol (orig_id, ty) ->
-            let hval = hash st value in
-            let st, new_id = add_to_state orig_id ty st in
-            let hbody = hash st (EcSubst.subst_form st.subst body) in
-            let hlp = lp_hash (LSymbol (new_id, ty)) in
-            Why3.Hashcons.combine2 hlp hval hbody
-          | LTuple bnds ->
-            let hval = hash st value in
-            let st, new_ids = List.fold_left_map (fun st (id, ty) -> add_to_state id ty st) st bnds in
-            let hbody = hash st (EcSubst.subst_form st.subst body) in
-            let hbinds = lp_hash @@ LTuple (List.combine new_ids (List.snd bnds)) in
-            Why3.Hashcons.combine2 hbinds hval hbody
-          | LRecord (_, _) -> assert false
-          end
-      | Fapp (op, args)  ->
-        let hop = hash st op in
-        Why3.Hashcons.combine_list (hash st) hop args
-      | Ftuple comps  ->
-        Why3.Hashcons.combine_list (hash st) 0 comps
-      | Fproj (tp, i)  ->
-        Why3.Hashcons.combine (hash st tp) i
-      | FhoareF _hF ->
-          assert false
-(*      FIXME: do we want this case and the one below?
-        let hpre = doit st (hf_pr hF).inv in
-        let hpo = doit st (hf_po hF).inv in
-        let hf = x_hash hF.hf_f in
-        let hm = id_hash hF.hf_m in
-        Why3.Hashcons.combine3 hpre hpo hf hm
-*)
-      | FhoareS _hS ->
-          assert false
-(*
-        let hme = me_hash hS.hs_m in
-        let hpre = doit st (hs_pr hS).inv in
-        let hpo = doit st (hs_po hS).inv in
-        let hs = s_hash
-        f_hoareS me {inv=npre;m} hs.hs_s {inv=npo;m}
-*)
-      | FbdHoareF _  -> assert false
-      | FbdHoareS _  -> assert false
-      | FeHoareF _  -> assert false
-      | FeHoareS _  -> assert false
-      | FequivF _ef ->
-        assert false
-(*      FIXME: do we want these cases?
-        let npre = doit st (ef_pr ef).inv in
-        let npo = doit st (ef_po ef).inv in
-        f_equivF {inv=npre;ml=ef.ef_ml;mr=ef.ef_mr} ef.ef_fl ef.ef_fr {inv=npo;ml=ef.ef_ml;mr=ef.ef_mr}
-*)
-      | FequivS _es  ->
-        assert false
-(*
-        let ml, mel = es.es_ml in
-        let mr, mer = es.es_mr in
-        let npre = doit st (es_pr es).inv in
-        let npo = doit st (es_po es).inv in
-        f_equivS mel mer {inv=npre;ml;mr} es.es_sl es.es_sr {inv=npo;ml;mr}
-*)
-      | FeagerF _  -> assert false
-      | Fpr _ ->  assert false
-      | Fint _
-      | Flocal _
-      | Fpvar (_, _)
-      | Fglob (_, _)
-      | Fop (_, _) -> f_hash f (* FIXME: maybe do these cases as well? *)
-      in Why3.Hashcons.combine hnode (ty_hash f.f_ty)
+    let acc = ref 0 in
+    let combine (h : int) = acc := Why3.Hashcons.combine !acc h in
 
-    module Htbl = Batteries.Hashtbl.Make(struct
+    (* Fold a "meaningful" leaf, respecting the [nmeaningful] budget. *)
+    let leaf (h : int) =
+      if !nmeaningful > 0 then begin
+        decr nmeaningful; combine h
+      end
+    in
+
+    let rec hash (e : env) (f : form) : unit =
+      if !nnodes <= 0 || !nmeaningful <= 0 then () else begin
+        decr nnodes;
+        (* The result type is always (cheaply) folded in: it distinguishes
+           e.g. [fun (x:bool)=>x] from [fun (x:int)=>x]. *)
+        leaf (ty_hash f.f_ty);
+        match f.f_node with
+        | Fint i ->
+          leaf (EcBigInt.hash i)
+
+        | Flocal id ->
+          (* Bound -> hash the binder's level (alpha-invariant);
+             free -> hash the identifier. *)
+          leaf (match Mid.find_opt id e.bound with
+                | Some lvl -> Why3.Hashcons.combine 1 lvl
+                | None     -> Why3.Hashcons.combine 2 (id_hash id))
+
+        | Fpvar (pv, _m) ->
+          (* The memory is alpha-bindable; ignore it, keep the variable. *)
+          leaf (pv_hash pv)
+
+        | Fglob (mp, _m) ->
+          leaf (id_hash mp)
+
+        | Fop (p, tys) ->
+          leaf (EcPath.p_hash p);
+          List.iter (fun ty -> leaf (ty_hash ty)) tys
+
+        | Fif (c, t, f) ->
+          hash e c; hash e t; hash e f
+
+        | Fmatch (c, bs, ty) ->
+          leaf (ty_hash ty);
+          hash e c; List.iter (hash e) bs
+
+        | Fquant (qt, bd, f) ->
+          leaf (qt_hash qt);
+          let e =
+            List.fold_left (fun e (id, gty) ->
+              leaf (gty_hash gty); bind_id e id) e bd
+          in hash e f
+
+        | Flet (lp, v, body) ->
+          hash e v;
+          let e =
+            match lp with
+            | LSymbol (id, ty)   -> leaf (ty_hash ty); bind_id e id
+            | LTuple  ids        ->
+              List.fold_left
+                (fun e (id, ty) -> leaf (ty_hash ty); bind_id e id) e ids
+            | LRecord (p, ids)   ->
+              leaf (EcPath.p_hash p);
+              List.fold_left (fun e (id, ty) ->
+                leaf (ty_hash ty);
+                match id with Some id -> bind_id e id | None -> e) e ids
+          in hash e body
+
+        | Fapp (f, args) ->
+          hash e f; List.iter (hash e) args
+
+        | Ftuple comps ->
+          List.iter (hash e) comps
+
+        | Fproj (f, i) ->
+          leaf i; hash e f
+
+        (* Forms binding memories / containing statements. These never
+           reach the circuit cache (circuit translation rejects them), so
+           a coarse, memory-invariant hash on the kind + result type is
+           enough: it is trivially consistent with [is_alpha_eq] (it can
+           only coarsen) and avoids canonicalizing memories and hashing
+           statements. *)
+        | FhoareF   _ -> leaf 101
+        | FhoareS   _ -> leaf 102
+        | FbdHoareF _ -> leaf 103
+        | FbdHoareS _ -> leaf 104
+        | FeHoareF  _ -> leaf 105
+        | FeHoareS  _ -> leaf 106
+        | FequivF   _ -> leaf 107
+        | FequivS   _ -> leaf 108
+        | FeagerF   _ -> leaf 109
+        | Fpr       _ -> leaf 110
+      end
+    in
+
+    hash empty_env f0;
+    !acc
+
+  module Htbl = Batteries.Hashtbl.Make(struct
     type t = form
 
     let equal f1 f2 = EcReduction.is_alpha_eq Ctxt.hyps f1 f2
+    let hash f = hash_form f
+  end)
 
-    let hash f = hash empty_state f
-
-    end)
-
-  let clear htbl =
-    clean_bruijn_idents ();
-    Htbl.clear htbl
+  let clear htbl = Htbl.clear htbl
 end
