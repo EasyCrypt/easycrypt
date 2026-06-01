@@ -145,7 +145,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pexists fs          -> process_exists fs
     | Pleft               -> process_left
     | Pright              -> process_right
-    | Pcongr              -> process_congr
+    | Pcongr mode         -> process_congr mode
     | Ptrivial            -> process_trivial
     | Pelim pe            -> process_elim pe
     | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe

@@ -37,6 +37,13 @@ type osymbol_r   = psymbol option
 type osymbol     = osymbol_r located
 
 (* -------------------------------------------------------------------- *)
+(* A bullet at the start of a `.`-terminated tactic phrase. The kind
+   identifies the bullet character (`-`, `+`, `*`); the count is the
+   number of repetitions (`>= 1`). *)
+type bullet_kind = [ `Minus | `Plus | `Star ]
+type bullet = { b_kind : bullet_kind; b_count : int; }
+
+(* -------------------------------------------------------------------- *)
 type pcp_match = [
   | `If
   | `While
@@ -1083,6 +1090,12 @@ type clear_info = [
 type pgenhave = psymbol * intropattern option * psymbol list * pformula
 
 (* -------------------------------------------------------------------- *)
+type pcongr_mode =
+  | PCongrDefault
+  | PCongrStar
+  | PCongrPattern of pformula
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
@@ -1095,7 +1108,7 @@ type logtactic =
   | Pleft
   | Pright
   | Ptrivial
-  | Pcongr
+  | Pcongr      of pcongr_mode
   | Pelim       of (prevert * pqsymbol option)
   | Papply      of (apply_info * prevert option)
   | Pcut        of pcut
@@ -1448,8 +1461,8 @@ type global_action =
   | GsctOpen     of osymbol_r
   | GsctClose    of osymbol_r
   | Grealize     of prealize located
-  | Gtactics     of [`Proof | `Actual of ptactic list]
-  | Gtcdump      of (tcdump * ptactic list)
+  | Gtactics     of [`Proof | `Actual of bullet located option * ptactic list]
+  | Gtcdump      of (tcdump * (bullet located option * ptactic list))
   | Gprover_info of pprover_infos
   | Gsave        of save located
   | Gpragma      of psymbol

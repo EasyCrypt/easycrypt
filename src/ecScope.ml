@@ -296,6 +296,10 @@ and proof_auc = {
   puc_jdg     : proof_state;
   puc_flags   : pucflags;
   puc_crt     : EcDecl.axiom;
+  puc_bullets : EcBullets.stack option;
+    (* [None] when bullets are decoration only (legacy mode).
+       [Some stack] when [+strict_bullets] was active at proof
+       open; see [EcBullets] for the stack semantics. *)
 }
 
 and proof_ctxt =
@@ -815,7 +819,8 @@ module Tactics = struct
             | Some src -> DocState.push_srcbl scope.sc_locdoc src
             | None -> scope.sc_locdoc; }
 
-  let process_r ?(src : string option) ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
+  let process_r ?(src : string option) ?(bullet : bullet located option)
+      ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
 
     let scope =
@@ -859,6 +864,12 @@ module Tactics = struct
           EcHiGoal.tt_redlogic   = Options.get_redlogic scope;
           EcHiGoal.tt_und_delta  = Options.get_und_delta scope; } in
 
+        let bullets =
+          try omap (EcBullets.open_phrase ~bullet juc) pac.puc_bullets
+          with EcBullets.BulletError (loc, err) ->
+            hierror ?loc "%a" EcBullets.pp_error err
+        in
+
         let (hds, juc) =
           try  TTC.process ttenv tac juc
           with EcCoreGoal.TcError tcerror ->
@@ -872,7 +883,9 @@ module Tactics = struct
 
         let penv = EcCoreGoal.proofenv_of_proof juc in
 
-        let pac = { pac with puc_jdg = PSCheck juc } in
+        let bullets = omap (EcBullets.close_phrase juc) bullets in
+
+        let pac = { pac with puc_jdg = PSCheck juc; puc_bullets = bullets } in
         let puc = { puc with puc_active = Some (pac, pct); } in
         let scope = { scope with sc_pr_uc = Some puc; } in
         Some (penv, hds), scope
@@ -884,8 +897,9 @@ module Tactics = struct
     let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
     snd (process_r mark mode scope ts)
 
-  let process ?(src : string option) scope mode tac =
-    process_r ?src true mode scope tac
+  let process ?(src : string option) ?(bullet : bullet located option)
+      scope mode tac =
+    process_r ?src ?bullet true mode scope tac
 end
 
 (* -------------------------------------------------------------------- *)
@@ -944,7 +958,7 @@ module Ax = struct
         sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope (cont, axflags) check ?name (axd, ctxt) =
+  let start_lemma ?(strict = false) scope (cont, axflags) check ?name (axd, ctxt) =
     let puc =
       match check with
       | false -> PSNoCheck
@@ -959,7 +973,8 @@ module Ax = struct
         ; puc_started = false
         ; puc_jdg     = puc
         ; puc_flags   = axflags
-        ; puc_crt     = axd }
+        ; puc_crt     = axd
+        ; puc_bullets = if strict then Some [] else None }
       in
         { puc_active    = Some (active, ctxt);
           puc_cont      = cont;
@@ -968,7 +983,7 @@ module Ax = struct
       { scope with sc_pr_uc = Some puc }
 
   (* ------------------------------------------------------------------ *)
-  let rec add_r (scope : scope) (mode : proofmode) (ax : paxiom located) =
+  let rec add_r ?(strict = false) (scope : scope) (mode : proofmode) (ax : paxiom located) =
     assert (scope.sc_pr_uc = None);
 
     let env = env scope in
@@ -1028,13 +1043,13 @@ module Ax = struct
         match tc with
         | None ->
             let scope =
-              start_lemma scope ~name:(unloc ax.pa_name)
+              start_lemma ~strict scope ~name:(unloc ax.pa_name)
                 pucflags check (axd, None) in
             let scope = snd (Tactics.process1_r false `Check scope tintro) in
             None, scope
 
         | Some tc ->
-            start_lemma_with_proof scope
+            start_lemma_with_proof ~strict scope
               (Some tintro) pucflags (mode, mk_loc loc tc) check
               ~name:(unloc ax.pa_name) axd
       end
@@ -1108,10 +1123,10 @@ module Ax = struct
          (None, { scope with sc_env = puc.puc_init })
 
   (* ------------------------------------------------------------------ *)
-  and start_lemma_with_proof scope tintro pucflags (mode, tc) check ?name axd =
+  and start_lemma_with_proof ?(strict = false) scope tintro pucflags (mode, tc) check ?name axd =
     let { pl_loc = loc; pl_desc = tc } = tc in
 
-    let scope = start_lemma scope pucflags check ?name (axd, None) in
+    let scope = start_lemma ~strict scope pucflags check ?name (axd, None) in
     let scope =
       tintro |> ofold
         (fun t sc -> snd (Tactics.process1_r false `Check sc t))
@@ -1174,7 +1189,7 @@ module Ax = struct
     snd (save_r ~mode:`Abort scope)
 
   (* ------------------------------------------------------------------ *)
-  let add ?(src : string option) (scope : scope) (mode : proofmode) (ax : paxiom located) =
+  let add ?(src : string option) ?(strict = false) (scope : scope) (mode : proofmode) (ax : paxiom located) =
     let uax = unloc ax in
     let kind =
       match uax.pa_kind with
@@ -1196,10 +1211,10 @@ module Ax = struct
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
           | None -> scope.sc_locdoc; }
     in
-    add_r scope mode ax
+    add_r ~strict scope mode ax
 
   (* ------------------------------------------------------------------ *)
-  let realize (scope : scope) (mode : proofmode) (rl : prealize located) =
+  let realize ?(strict = false) (scope : scope) (mode : proofmode) (rl : prealize located) =
     check_state `InProof "activate" scope;
 
     let loc = rl.pl_loc and rl = rl.pl_desc in
@@ -1231,10 +1246,10 @@ module Ax = struct
 
     match rl.pr_proof with
     | None ->
-        None, start_lemma scope pucflags check ?name:axname (ax, Some st)
+        None, start_lemma ~strict scope pucflags check ?name:axname (ax, Some st)
 
     | Some tc ->
-        start_lemma_with_proof scope
+        start_lemma_with_proof ~strict scope
           None pucflags (mode, mk_loc loc tc) check
           ?name:axname ax
 end

@@ -604,6 +604,7 @@
 %token WP
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
+%token <int> PLUSn MINUSn STARn
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 %token <Lexing.position> FINAL
 %token <EcParsetree.dockind * string> DOCCOMMENT
@@ -628,10 +629,10 @@
 %left  LOP1
 %right ROP1
 %right QUESTION
-%left  LOP2 MINUS PLUS PLUSGT
+%left  LOP2 MINUS PLUS PLUSGT MINUSn PLUSn
 %right ROP2
 %right RARROW
-%left  LOP3 STAR SLASH
+%left  LOP3 STAR SLASH STARn
 %right ROP3
 %left  LOP4 AT AMP HAT BACKSLASH
 %right ROP4
@@ -838,10 +839,12 @@ inlinepat:
 | LE { "<=" }
 
 %inline uniop:
-| x=NOP { Printf.sprintf "[%s]" x }
-| NOT   { "[!]" }
-| PLUS  { "[+]" }
-| MINUS { "[-]" }
+| x=NOP    { Printf.sprintf "[%s]" x }
+| NOT      { "[!]" }
+| PLUS     { "[+]" }
+| MINUS    { "[-]" }
+| n=PLUSn  { Printf.sprintf "[%s]" (String.make n '+') }
+| n=MINUSn { Printf.sprintf "[%s]" (String.make n '-') }
 
 %inline sbinop:
 | EQ        { "="   }
@@ -851,6 +854,9 @@ inlinepat:
 | STAR      { "*"   }
 | SLASH     { "/"   }
 | AT        { "@"   }
+| n=PLUSn   { String.make n '+' }
+| n=MINUSn  { String.make n '-' }
+| n=STARn   { String.make n '*' }
 | OR        { "\\/" }
 | ORA       { "||"  }
 | AND       { "/\\" }
@@ -2811,7 +2817,13 @@ logtactic:
    { Pclear (`Include l) }
 
 | CONGR
-   { Pcongr }
+   { Pcongr PCongrDefault }
+
+| CONGR STAR
+   { Pcongr PCongrStar }
+
+| CONGR p=sform_h
+   { Pcongr (PCongrPattern p) }
 
 | TRIVIAL
    { Ptrivial }
@@ -3605,11 +3617,17 @@ tactics0:
 | ts=tactics   { Pseq ts }
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
+%inline bullet:
+| b=loc(MINUS)  { mk_loc b.pl_loc { b_kind = `Minus; b_count = 1          } }
+| b=loc(PLUS)   { mk_loc b.pl_loc { b_kind = `Plus ; b_count = 1          } }
+| b=loc(STAR)   { mk_loc b.pl_loc { b_kind = `Star ; b_count = 1          } }
+| b=loc(MINUSn) { mk_loc b.pl_loc { b_kind = `Minus; b_count = b.pl_desc  } }
+| b=loc(PLUSn)  { mk_loc b.pl_loc { b_kind = `Plus ; b_count = b.pl_desc  } }
+| b=loc(STARn)  { mk_loc b.pl_loc { b_kind = `Star ; b_count = b.pl_desc  } }
+
 toptactic:
-| PLUS  t=tactics { t }
-| STAR  t=tactics { t }
-| MINUS t=tactics { t }
-|       t=tactics { t }
+| b=bullet t=tactics { (Some b, t) }
+|          t=tactics { (None,   t) }
 
 tactics_or_prf:
 | t=toptactic  { `Actual t }
