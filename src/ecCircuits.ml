@@ -204,8 +204,6 @@ let rec pp_circ_error ppe fmt (err : circuit_error) =
           (pp_memtype ppe) mt
     end
 
-let ty_of_path (p : path) : ty = EcTypes.tconstr p []
-
 let rec ctype_of_ty (env : env) (ty : ty) : ctype =
   match ty.ty_node with
   | Ttuple tys -> CTuple (List.map (ctype_of_ty env) tys)
@@ -223,18 +221,8 @@ let rec ctype_of_ty (env : env) (ty : ty) : ctype =
     | Some (_, {size = _, None}) -> circ_error (AbstractTyBinding (`Ty ty))
   end
 
-let width_of_type (env : env) (t : ty) : int =
-  let cty = ctype_of_ty env t in
-  EcLowCircuits.size_of_ctype cty
-
-let input_of_type ~name (env : env) (t : ty) : circuit =
-  let ct = ctype_of_ty env t in
-  input_of_ctype ~name ct
-
 (* Should correspond to QF_ABV *)
 module BVOps = struct
-  let temp_symbol = "temp_circ_input"
-
   let circuit_of_parametric_bvop
       (env : env)
       (op : [`Path of path | `BvBind of EcDecl.crb_bvoperator])
@@ -488,49 +476,6 @@ let form_is_iter (f : form) : bool =
   | _ -> false
 
 (* Expands iter, fold and iteri (for integer arguments) *)
-let expand_iter_form (hyps : hyps) (f : form) : form =
-  let redmode = circ_red hyps in
-  let env = toenv hyps in
-  let ppenv = EcPrinting.PPEnv.ofenv env in
-  let ( @!! ) f fs = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
-
-  let res =
-    match f.f_node with
-    | Fapp ({f_node = Fop (p, _)}, [rep; fn; base])
-      when p = EcCoreLib.CI_Int.p_iteri ->
-      let rep = int_of_form hyps rep in
-      let is = List.init (BI.to_int rep) BI.of_int in
-      EcEnv.notify env `Debug "Done generating functions!@.";
-      let f =
-        List.fold_left
-          (fun f i ->
-            EcEnv.notify env `Debug "Expanding iter... Step #%d@.Form: %a@."
-              (BI.to_int i)
-              (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps)))
-              f;
-            fn @!! [f_int i; f])
-          base is
-      in
-      f
-    | Fapp ({f_node = Fop (p, _)}, [rep; fn; base])
-      when p = EcCoreLib.CI_Int.p_iter ->
-      let rep = int_of_form hyps rep in
-      let is = List.init (BI.to_int rep) BI.of_int in
-      let f = List.fold_left (fun f _i -> fn @!! [f]) base is in
-      f
-    | Fapp ({f_node = Fop (p, _)}, [fn; base; rep])
-      when p = EcCoreLib.CI_Int.p_fold ->
-      let rep = int_of_form hyps rep in
-      let is = List.init (BI.to_int rep) BI.of_int in
-      let f = List.fold_left (fun f _i -> fn @!! [f]) base is in
-      f
-    | _ -> raise (DestrError "iter")
-  in
-  EcEnv.notify env `Debug "Expanded iter form: @.%a@."
-    EcPrinting.(pp_form ppenv)
-    res;
-  res
-
 let circuit_of_form
     (st : state)
     (* Program variable values *) (hyps : hyps)
@@ -856,23 +801,6 @@ let circuit_simplify_equality
 
 (* FIXME: add support for spec bindings for abstract/opaque operators 
     = convert from Fop rather than from op body *)
-let circuit_of_path (st : state) (hyps : hyps) (p : path) : circuit =
-  let f = EcEnv.Op.by_path p (toenv hyps) in
-  let f =
-    match f.op_kind with
-    | OB_oper (Some (OP_Plain f)) -> f
-    | _ -> circ_error (MissingOpBody p)
-  in
-  circuit_of_form st hyps f
-
-let vars_of_memtype (mt : memtype) =
-  let (Lmt_concrete lmt) = mt in
-  List.filter_map
-    (function
-      | {ov_name = Some name; ov_type = ty} -> Some {v_name = name; v_type = ty}
-      | _ -> None)
-    (Option.get lmt).lmt_decl
-
 let process_instr (hyps : hyps) (mem : memory) ~(st : state) (inst : instr) :
     state =
   EcEnv.notify (toenv hyps) `Debug "[W] Processing : %a@."
@@ -1013,34 +941,7 @@ let circ_simplify_form_bitstring_equality
   in
   check f
 
-(* Mli stuff needed: *)
-let compute ~(sign : bool) (c : circuit) (args : zint list) : zint =
-  match compute ~sign c (List.map (fun z -> arg_of_zint z) args) with
-  | Some z -> z
-  | None -> circ_error CantConvertToConstant
-
-let circ_equiv ?(pcond : circuit option) c1 c2 = circ_equiv ?pcond c1 c2
-let circ_sat = circ_sat
 let circ_taut = circ_taut
-
-let circuit_to_string ((circ, inps) : circuit) : string =
-  Format.asprintf "(%a => %a)"
-    EcPrinting.(pp_list ", " pp_cinp)
-    inps pp_circ circ
-
-let circuit_ueq = fun c1 c2 -> (circuit_eq c1 c2 :> circuit)
-let circuit_has_uninitialized = circuit_has_uninitialized
-let circuit_to_file = circuit_to_file
-
-let circuit_slice (c : circuit) (size : int) (offset : int) =
-  circuit_slice ~size c offset
-
-let circuit_flatten (({type_; _}, _) as c : circuit) =
-  convert_type (CBitstring (size_of_ctype type_)) c
-
-let state_get = state_get_pv
-let state_get_opt = state_get_pv_opt
-let state_get_all = fun st -> state_get_all_pv st |> List.snd
 
 let circuit_state_of_memenv
     ?(st : state = empty_state)
