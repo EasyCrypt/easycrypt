@@ -11,6 +11,11 @@ open EcLowCircuits
 module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
+(* [stopwatch env] returns a [lap msg] function reporting the time since
+   the previous lap. A no-op unless the [Circuit:timing] flag is set. *)
+val stopwatch : env -> (string -> unit)
+
+(* -------------------------------------------------------------------- *)
 type circuit_conversion_call = [
   | `Convert of form
   | `ToArg of form
@@ -78,9 +83,9 @@ val circ_taut  : circuit -> bool
 (* Generate circuits *)
 (* Form processors *)
 val circuit_of_form : state -> hyps -> form -> circuit
-val circuit_check_posts : ?do_time:bool -> env:env -> pres:circuit list -> circuit list -> bool
-val circuits_of_equality : ?do_time:bool -> st:state -> hyps:hyps -> form -> form -> circuit list
-val circuit_simplify_equality : ?do_time:bool -> st:state -> hyps:hyps -> pres:circuit list -> form -> form -> bool
+val circuit_check_posts : env:env -> pres:circuit list -> circuit list -> bool
+val circuits_of_equality : st:state -> hyps:hyps -> form -> form -> circuit list
+val circuit_simplify_equality : st:state -> hyps:hyps -> pres:circuit list -> form -> form -> bool
 val circ_simplify_form_bitstring_equality :
   ?st:state ->
   ?pres:circuit list -> hyps -> form -> form

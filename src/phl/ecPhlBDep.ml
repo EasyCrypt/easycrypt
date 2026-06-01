@@ -18,11 +18,6 @@ module Option = Batteries.Option
 (* -------------------------------------------------------------------- *)
 let int_of_form = EcCircuits.int_of_form
 
-let time (env: env) (t: float) (msg: string) : float =
-  let new_t = Unix.gettimeofday () in
-  EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
-  new_t
-
 (* FIXME: move? V *)
 let form_list_from_iota (hyps: hyps) (f: form) : form list =
   match f.f_node with
@@ -166,26 +161,20 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
 (* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve
   (tc : tcenv1) =
-  let time (env: env) (t: float) (msg: string) : float =
-    let new_t = Unix.gettimeofday () in
-    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
-    new_t
-  in
-
   let hyps = (FApi.tc1_hyps tc) in
   let goal = (FApi.tc1_goal tc) in
   let env  = (FApi.tc1_env tc) in
-  match goal.f_node with 
+  match goal.f_node with
   | FhoareS hs -> begin try
-    let tm = Unix.gettimeofday () in
+    let lap = EcCircuits.stopwatch env in
     let st = set_logger empty_state (EcEnv.notify env `Debug "%s") in
     let st = circuit_state_of_hyps ~st hyps in
     let st, cpres = process_pre ~st tc (hs_pr hs).inv in
-    let tm = time (toenv hyps) tm "Done with precondition processing" in
+    lap "Done with precondition processing";
 
     (* Get open state *)
     let st = state_of_prog hyps (fst hs.hs_m) ~st hs.hs_s.s_node in
-    let _tm = time (toenv hyps) tm "Done with program circuit gen" in
+    lap "Done with program circuit gen";
 
     if not (POE.is_empty (hs_po hs).hsi_inv) then
       tc_error !!tc "exception not supported";
@@ -201,7 +190,7 @@ let t_bdep_solve
       tc_error (FApi.tc1_penv tc) "circuit solve failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
     end
   | FequivS es -> begin try
-      let tm = Unix.gettimeofday () in
+      let lap = EcCircuits.stopwatch env in
 
       let st = set_logger empty_state (EcEnv.notify env `Debug "%s") in
 
@@ -210,14 +199,14 @@ let t_bdep_solve
       let st = circuit_state_of_memenv ~st (FApi.tc1_env tc) es.es_mr in
 
       let st, cpres = process_pre ~st tc (es_pr es).inv in
-      let tm = time (toenv hyps) tm "Done with precondition processing" in
+      lap "Done with precondition processing";
 
       (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
       let st = state_of_prog hyps (fst es.es_ml) ~st es.es_sl.s_node in
-      let tm = time (toenv hyps) tm "Done with left program circuit gen" in
+      lap "Done with left program circuit gen";
 
       let st = state_of_prog hyps (fst es.es_mr) ~st es.es_sr.s_node in
-      let _tm = time (toenv hyps) tm "Done with right program circuit gen" in
+      lap "Done with right program circuit gen";
 
       if solve_post ~st ~pres:cpres hyps (es_po es).inv
       then 
@@ -244,26 +233,20 @@ let t_bdep_solve
     end
 
 let t_bdep_simplify (tc: tcenv1) =
-  let time (env: env) (t: float) (msg: string) : float =
-    let new_t = Unix.gettimeofday () in
-    (* FIXME: change log level to debug? maybe not *)
-    EcEnv.notify ~immediate:true env `Info "%s, took %f s@." msg (new_t -. t);
-    new_t
-  in
   let hyps = (FApi.tc1_hyps tc) in
   let goal = (FApi.tc1_goal tc) in
   let env  = (FApi.tc1_env  tc) in
-  match goal.f_node with 
+  match goal.f_node with
   | FhoareS hs -> begin
     if not (POE.is_empty (hs_po hs).hsi_inv) then
       tc_error !!tc "exceptions not supported";
     try
       let m = fst hs.hs_m in
-      let tm = Unix.gettimeofday () in
+      let lap = EcCircuits.stopwatch env in
       let st = circuit_state_of_hyps hyps in
       let st = circuit_state_of_memenv ~st env hs.hs_m in
       let st, pres = process_pre ~st tc (hs_pr hs).inv in
-      let tm = time env tm "Done with precondition processing" in
+      lap "Done with precondition processing";
 
       let st = EcCircuits.state_of_prog ~st hyps (fst hs.hs_m) hs.hs_s.s_node in
       let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps (POE.lower (hs_po hs)).inv in
@@ -271,11 +254,11 @@ let t_bdep_simplify (tc: tcenv1) =
       EcEnv.notify env `Debug "[W] Post after simplify (before circuit pass):@. %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) post;
 
-      let tm = time env tm "Done with first simplify" in
+      lap "Done with first simplify";
       let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ~pres hyps post in
-      let tm = time env tm "Done with circuit simplify" in
+      lap "Done with circuit simplify";
       let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
-      let _tm = time env tm "Done with second simplify" in
+      lap "Done with second simplify";
       let new_goal = f_hoareS (snd hs.hs_m) {inv=(hs_pr hs).inv; m} hs.hs_s (POE.lift {inv=f; m}) in
 
       EcEnv.notify env `Debug "[W] Goal after simplify:@. %a@."
@@ -298,7 +281,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
 
     let open EcAst in
 
-    let tm = Unix.gettimeofday () in
+    let lap = EcCircuits.stopwatch (tc1_env tc) in
 
     let solved = ref 0 in
 
@@ -412,8 +395,8 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
     in
 
     match do_all goals with
-    | None -> 
-      EcEnv.notify ~immediate:true (tc1_env tc) `Warning "[W] Extens took %f seconds@." (Unix.gettimeofday () -. tm);
+    | None ->
+      lap "Extens";
       close (tcenv_of_tcenv1 tc) VBdep
     | Some gfail ->
       tc_error (tc1_penv tc) "Failed to close goal:@. %a@." 

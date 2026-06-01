@@ -16,6 +16,25 @@ module Set = Batteries.Set
 module Option = Batteries.Option
 
 (* -------------------------------------------------------------------- *)
+(* Profiling helper. [stopwatch env] returns a function [lap msg] that
+   reports the time elapsed since the previous lap (or since creation).
+   It is a no-op unless the [Circuit:timing] flag is set (default off),
+   so it can be enabled globally with [pragma Circuit:timing.]. *)
+let stopwatch (env : env) : string -> unit =
+  if not (EcGState.get_circuit_timing (EcEnv.gstate env)) then
+    fun _ -> ()
+  else begin
+    let last = ref (Unix.gettimeofday ()) in
+    fun (msg : string) ->
+      let now = Unix.gettimeofday () in
+      (* Emitted at [`Warning] so it shows even at the default
+         (compile-mode) verbosity; gated by the [Circuit:timing] flag. *)
+      EcEnv.notify ~immediate:true env `Warning
+        "[timing] %s: %.3fs@." msg (now -. !last);
+      last := now
+  end
+
+(* -------------------------------------------------------------------- *)
 let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
   {base_red with delta_p = (fun pth ->
   if (EcEnv.Circuit.reverse_operator (LDecl.toenv hyps) pth |> List.is_empty) then
@@ -721,54 +740,44 @@ let circuit_of_form
   end;
   res
   
-let circuit_check_posts ?(do_time = true) ~(env: env) ~(pres: circuit list) (posts: circuit list) = 
-  let tm = ref (Unix.gettimeofday ()) in
-  let time (env: env) (t: float ref) (msg: string) : unit =
-    let new_t = Unix.gettimeofday () in
-    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t); 
-    t := new_t
-  in
+let circuit_check_posts ~(env: env) ~(pres: circuit list) (posts: circuit list) =
+  let lap = stopwatch env in
 
   EcEnv.notify env `Debug "Number of checks before batching: %d@." (List.length posts);
   let posts = batch_checks ~mode:`BySub posts in
   EcEnv.notify env `Debug "Number of checks after batching: %d@." (List.length posts);
-  if do_time then time env tm "Done with lane compression";
-  if fillet_tauts pres posts then 
+  lap "Done with lane compression";
+  if fillet_tauts pres posts then
     begin
-      if do_time then time env tm "Done with equivalence checking (structural equality + SMT)";
+      lap "Done with equivalence checking (structural equality + SMT)";
       true
     end
-  else 
+  else
     begin
-      if do_time then time env tm "Failed equivalence check";
+      lap "Failed equivalence check";
       false
     end
 
-let circuits_of_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) (f1: form) (f2: form) : circuit list =
-  let tm = ref (Unix.gettimeofday ()) in
+let circuits_of_equality ~(st: state) ~(hyps: hyps) (f1: form) (f2: form) : circuit list =
   let env = toenv hyps in
-  let time (env: env) (t: float ref) (msg: string) : unit =
-    let new_t = Unix.gettimeofday () in
-    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t); 
-    t := new_t
-  in
+  let lap = stopwatch env in
 
   EcEnv.notify env `Debug "Filletting circuit...@.";
   let c1 = circuit_of_form st hyps f1 |> state_close_circuit st in
-  if do_time then time env tm "Left side circuit generation done";
+  lap "Left side circuit generation done";
   let c2 = circuit_of_form st hyps f2 |> state_close_circuit st in
-  if do_time then time env tm "Right side circuit generation done";
+  lap "Right side circuit generation done";
 
   assert (Option.is_none @@ circuit_has_uninitialized c1);
   assert (Option.is_none @@ circuit_has_uninitialized c2);
   let posts = circuit_eqs c1 c2 in
-  if do_time then time env tm "Done with postcondition circuit generation";
+  lap "Done with postcondition circuit generation";
   posts
 
 
-let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
-  let posts = circuits_of_equality ~do_time ~st ~hyps f1 f2 in
-  circuit_check_posts ~do_time ~env:(toenv hyps) ~pres posts
+let circuit_simplify_equality ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
+  let posts = circuits_of_equality ~st ~hyps f1 f2 in
+  circuit_check_posts ~env:(toenv hyps) ~pres posts
   
   
 (* FIXME: add support for spec bindings for abstract/opaque operators 
@@ -792,14 +801,12 @@ let vars_of_memtype (mt : memtype) =
 
 let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : state =
   EcEnv.notify (toenv hyps) `Debug "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv (toenv hyps))) inst;
-  (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
-    | Sasgn (LvVar (PVloc v, _ty), e) -> 
+    | Sasgn (LvVar (PVloc v, _ty), e) ->
       let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form st hyps) in
       let st = update_state_pv st mem v c in
       st
-      (* EcEnv.notify env `Debug "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
       let st = List.fold_left (fun st (v, e) ->
         let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form st hyps) in
