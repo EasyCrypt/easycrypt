@@ -188,23 +188,6 @@ let input_of_type ~name (env: env) (t: ty) : circuit =
 (* Should correspond to QF_ABV *) 
 module BVOps = struct
   let temp_symbol = "temp_circ_input"
-  
-  let is_of_int (env: env) (p: path) : bool = 
-    match EcEnv.Circuit.reverse_bitstring_operator env p with
-    | Some (_, `OfInt) -> true
-    | _ -> false
-
-  let op_is_parametric_bvop (env: env) (op: path) : bool =
-    match EcEnv.Circuit.lookup_bvoperator_path env op with 
-    | Some { kind = `ASliceGet _ } 
-    | Some { kind = `ASliceSet _ } 
-    | Some { kind = `Extract _ }
-    | Some { kind = `Insert _ }
-    | Some { kind = `Map _ } 
-    | Some { kind = `Get _ } 
-    | Some { kind = `AInit _ } 
-    | Some { kind = `Init _ } -> true
-    | _ -> false
 
   let circuit_of_parametric_bvop (env : env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) (args: arg list) : circuit =
     let op = match op with
@@ -216,31 +199,6 @@ module BVOps = struct
     in
     circuit_of_parametric_bvop op args
     
-  let op_is_bvop (env: env) (op : path) : bool =
-    match EcEnv.Circuit.lookup_bvoperator_path env op with
-    | Some { kind = `Add _ }      | Some { kind = `Sub _ } 
-    | Some { kind = `Mul _ }      | Some { kind = `Div _ }  
-    | Some { kind = `Rem _ }      | Some { kind = `Shl _ }  
-    | Some { kind = `Shr _ }      | Some { kind = `Rol _ }  
-    | Some { kind = `Shrs _ }     | Some { kind = `Shls _ }  
-    | Some { kind = `Ror _ }      | Some { kind = `And _ }  
-    | Some { kind = `Or _ }       | Some { kind = `Xor _ }  
-    | Some { kind = `Not _ }      | Some { kind = `Lt _ } 
-    | Some { kind = `Le _ }       | Some { kind = `Extend _ } 
-    | Some { kind = `Truncate _ } | Some { kind = `Concat _ } 
-    | Some { kind = `A2B _ }      | Some { kind = `B2A _ } 
-    | Some { kind = `Opp _ } -> true
-    | Some { kind = 
-        `ASliceGet _ 
-      | `ASliceSet _ 
-      | `Extract _ 
-      | `Insert _ 
-      | `Map _ 
-      | `AInit _ 
-      | `Get _ 
-      | `Init _  } 
-    | None -> false 
-
   let circuit_of_bvop (env: env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) : circuit = 
     let op = match op with
     | `BvBind op -> op
@@ -256,11 +214,6 @@ open BVOps
 module BitstringOps = struct
   type binding = crb_bitstring_operator 
 
-  let op_is_bsop (env: env) (op: path) : bool = 
-    match EcEnv.Circuit.reverse_bitstring_operator env op with
-    | Some (_, `OfInt) -> true 
-    | _ -> false
-
   let circuit_of_bsop (env: env) (op: [`Path of path | `BSBinding of binding]) (args: arg list) : circuit =
     let bnd = match op with
     | `BSBinding bnd -> bnd
@@ -269,7 +222,8 @@ module BitstringOps = struct
       | None -> circ_error (MissingOpBinding p)
       end
     in
-    (* assert false => should be guarded by a previous call to op_is_bsop *)
+    (* [classify_paramop] only ever yields the [`OfInt] bitstring
+       operator, so the other arms are unreachable here. *)
     match bnd with
     | _bs, `From -> assert false (* doesn't translate to circuit *)
     | {size = (_, Some size)}, `OfInt -> begin match args with
@@ -289,13 +243,6 @@ module ArrayOps = struct
   type binding = crb_array_operator 
 
   
-  let op_is_arrayop (env: env) (op: path) : bool = 
-    match EcEnv.Circuit.reverse_array_operator env op with
-    | Some (_, `Get) -> true
-    | Some (_, `Set) -> true
-    | Some (_, `OfList) -> true
-    | _ -> false
-
   let circuit_of_arrayop (env: env) (op: [`Path of path | `ABinding of binding]) (args: arg list) : circuit =
     let op = match op with
     | `ABinding bnd -> bnd
@@ -304,7 +251,8 @@ module ArrayOps = struct
       | None -> circ_error (MissingOpBinding p)
     end
     in
-    (* assert false => should be guarded by a call to op_is_arrayop *)
+    (* [classify_paramop] only yields the [`Get]/[`Set]/[`OfList] array
+       operators, so the other arms are unreachable here. *)
     match op with
     | (_arr, `ToList) -> assert false (* We do not translate this to circuit *)
     | (_arr, `Get) -> begin match args with
@@ -356,63 +304,63 @@ module CircuitSpec = struct
     let arg_tys, ret_ty = unroll_fty op.op_ty in 
     let arg_tys = List.map (ctype_of_ty env) arg_tys in
     let ret_ty = ctype_of_ty env ret_ty in
-    circuit_from_spec ~name (arg_tys, ret_ty) c.circuit 
-    
-  let op_has_spec env pth =
-    Option.is_some @@ EcEnv.Circuit.reverse_circuit env pth
+    circuit_from_spec ~name (arg_tys, ret_ty) c.circuit
 end
 open CircuitSpec
 
-let op_is_base (env: env) (p: path) : bool =
-  op_is_bvop env p || 
-  op_has_spec env p
+(* A bound bv-operator is "parametric" (applied to constant arguments,
+   e.g. slice indices) or "base" (a plain bitvector operation) depending
+   on its kind. *)
+let bvop_is_parametric (op : EcDecl.crb_bvoperator) : bool =
+  match op.kind with
+  | `ASliceGet _ | `ASliceSet _ | `Extract _ | `Insert _
+  | `Map _ | `Get _ | `AInit _ | `Init _ -> true
+  | _ -> false
 
-let circuit_of_baseop (env: env) (p: path) : circuit =
-  if op_is_bvop env p then 
-    circuit_of_bvop env (`Path p)
-  else if op_has_spec env p then
-    circuit_from_spec env (`Path p)
-  else 
-    assert false (* Should be guarded by call to op_is_base *)
+(* Operators that translate to a circuit when applied to NO arguments. *)
+type baseop =
+  | BBvOp of EcDecl.crb_bvoperator
+  | BSpec of EcDecl.crb_circuit
 
-let op_is_parametric_base (env: env) (p: path) = 
-  op_is_parametric_bvop env p ||
-  op_is_arrayop env p ||
-  op_is_bsop env p
+(* Operators that translate to a circuit when applied to arguments. *)
+type paramop =
+  | PBvOp  of EcDecl.crb_bvoperator
+  | PArray of crb_array_operator
+  | PBs    of crb_bitstring_operator
 
-let circuit_of_parametric_baseop (env: env) (p: path) (args: arg list) : circuit = 
-  if op_is_parametric_bvop env p then
-    circuit_of_parametric_bvop env (`Path p) args
-  else if op_is_arrayop env p then
-    circuit_of_arrayop env (`Path p) args
-  else if op_is_bsop env p then
-    circuit_of_bsop env (`Path p) args
-  else
-    assert false (* Should be guarded by call to op_is_parametric_base *)
+(* Classify an operator path against the circuit bindings with a SINGLE
+   registry lookup, returning the bound-op data (so the translators below
+   need not look it up again). [None] means the path is not a circuit
+   base/parametric operator. *)
+let classify_baseop (env : env) (p : path) : baseop option =
+  match EcEnv.Circuit.lookup_bvoperator_path env p with
+  | Some op when not (bvop_is_parametric op) -> Some (BBvOp op)
+  | _ ->
+    match EcEnv.Circuit.reverse_circuit env p with
+    | Some c -> Some (BSpec c)
+    | None   -> None
 
-let circuit_of_op (env: env) (p: path) : circuit = 
-  let op = try
-    EcEnv.Circuit.reverse_operator env p |> List.hd
-  with Failure _ -> 
-    circ_error (MissingOpBinding p) (* Will generally never happen *)
-  in
+let classify_paramop (env : env) (p : path) : paramop option =
+  match EcEnv.Circuit.lookup_bvoperator_path env p with
+  | Some op when bvop_is_parametric op -> Some (PBvOp op)
+  | _ ->
+    match EcEnv.Circuit.reverse_array_operator env p with
+    | Some abnd -> Some (PArray abnd)
+    | None ->
+      match EcEnv.Circuit.reverse_bitstring_operator env p with
+      | Some (_, `OfInt as bsbnd) -> Some (PBs bsbnd)
+      | _ -> None
+
+let circuit_of_op (env: env) (op : baseop) : circuit =
   match op with
-  | `Bitstring (_bs, _op) -> assert false (* Should be guarded by a call to op_is_base *)
-  | `Array _ -> assert false  (* Should be guarded by a call to op_is_parametric_base *)
-  | `BvOperator bvbnd -> circuit_of_bvop  env (`BvBind bvbnd)
-  | `Circuit c -> circuit_from_spec env (`Bind c)
-  
-let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  = 
-  let op = try
-    EcEnv.Circuit.reverse_operator env p |> List.hd
-  with Failure _ -> 
-    circ_error (MissingOpBinding p) (* Will generally never happen *)
-  in
+  | BBvOp bvbnd -> circuit_of_bvop  env (`BvBind bvbnd)
+  | BSpec c     -> circuit_from_spec env (`Bind c)
+
+let circuit_of_op_with_args (env: env) (op : paramop) (args: arg list) : circuit =
   match op with
-  | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
-  | `Array abnd -> circuit_of_arrayop env (`ABinding abnd) args 
-  | `BvOperator bvbnd -> circuit_of_parametric_bvop env (`BvBind bvbnd) args 
-  | `Circuit _c -> assert false (* FIXME PR: Do we want to have parametric operators coming from the spec?  *)
+  | PBvOp bvbnd -> circuit_of_parametric_bvop env (`BvBind bvbnd) args
+  | PArray abnd -> circuit_of_arrayop env (`ABinding abnd) args
+  | PBs   bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
 
 
 let type_has_bindings (env: env) (t: ty) : bool = 
@@ -571,12 +519,13 @@ let circuit_of_form
       match Mp.find_opt pth !op_cache with
       | Some op -> 
         op
-      | None -> 
-      if op_is_base env pth then
-        let circ = circuit_of_op env pth in
+      | None ->
+      match classify_baseop env pth with
+      | Some op ->
+        let circ = circuit_of_op env op in
         op_cache := Mp.add pth circ !op_cache;
-        circ 
-      else
+        circ
+      | None ->
         let circ = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper (Some (OP_Plain f)) -> 
           doit st f
@@ -599,19 +548,24 @@ let circuit_of_form
     begin match EcAlphaInvHashtbl.find_opt cache f_ with
     | Some circ -> circ
     | None -> 
-      let circ = begin match f with
-        | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
-          let args = List.map (arg_of_form st) fs in 
-          circuit_of_op_with_args env pth args
+      let paramop =
+        match f.f_node with
+        | Fop (pth, _) -> classify_paramop env pth
+        | _            -> None
+      in
+      let circ = begin match f, paramop with
+        | _, Some op ->
+          let args = List.map (arg_of_form st) fs in
+          circuit_of_op_with_args env op args
 
         (* For dealing with iter cases: *)
-        | {f_node = Fop _} when form_is_iter f_ -> 
+        | {f_node = Fop _}, _ when form_is_iter f_ ->
           trans_iter st hyps f fs
 
-        | {f_node = Fop (_p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
+        | {f_node = Fop (_p, _)}, _ when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
             doit st (propagate_integer_arguments f fs)
 
-        | {f_node = Fop _} -> 
+        | {f_node = Fop _}, _ ->
         (* Assuming correct types coming from EC *)
         begin match EcFol.op_kind (destr_op f |> fst), fs with
           | Some `Eq, [f1; f2] -> 
