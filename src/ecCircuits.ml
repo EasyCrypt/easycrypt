@@ -66,7 +66,6 @@ type circuit_error =
   | BadFormForArg of form
   | CantConvertToCirc of
       [ `Int
-      | `OpK of EcFol.op_kind
       | `Op of path
       | `Quantif of quantif
       | `Match
@@ -84,37 +83,6 @@ let circ_error (err : circuit_error) = raise (CircError err)
 let propagate_circ_error (call : circuit_conversion_call) (err : circuit_error)
     =
   raise (CircError (PropagateError (call, err)))
-
-(* FIXME: move this to EcPrinting maybe? *)
-let pp_op_kind (fmt : Format.formatter) (opk : EcFol.op_kind) : unit =
-  Format.fprintf fmt "%s"
-    (match opk with
-    | `Map_set -> "Map_set"
-    | `Real_le -> "Real_le"
-    | `Int_le -> "Int_le"
-    | `Iff -> "Iff"
-    | `Int_opp -> "Int_opp"
-    | `Int_lt -> "Int_lt"
-    | `Int_pow -> "Int_pow"
-    | `And `Asym -> "And (&&)"
-    | `And `Sym -> "And (/\\)"
-    | `Map_cst -> "Map_cst"
-    | `False -> "False"
-    | `Eq -> "Eq"
-    | `True -> "True"
-    | `Int_mul -> "Int_mul"
-    | `Real_inv -> "Real_inv"
-    | `Real_add -> "Real_add"
-    | `Int_edivz -> "Int_edivz"
-    | `Or `Asym -> "Or (||)"
-    | `Or `Sym -> "Or (\\/)"
-    | `Not -> "Not"
-    | `Int_add -> "Int_add"
-    | `Map_get -> "Map_get"
-    | `Real_lt -> "Real_lt"
-    | `Real_opp -> "Real_opp"
-    | `Real_mul -> "Real_mul"
-    | `Imp -> "Imp")
 
 let rec pp_circ_error ppe fmt (err : circuit_error) =
   let open EcPrinting in
@@ -163,9 +131,6 @@ let rec pp_circ_error ppe fmt (err : circuit_error) =
       | `Int ->
         Format.fprintf fmt
           "Encountered unexpected integer (maybe you are missing a binding?)"
-      | `OpK opk ->
-        Format.fprintf fmt "Don't know how to translate op kind: %a" pp_op_kind
-          opk
       | `Op pth ->
         Format.fprintf fmt
           "Don't know how to convert operator at path %a to circuit (not \
@@ -562,8 +527,7 @@ let circuit_of_form
                     match EcFol.op_kind (destr_op f_ |> fst) with
                     | Some `True -> (circuit_true :> circuit)
                     | Some `False -> (circuit_false :> circuit)
-                    | Some opk -> circ_error (CantConvertToCirc (`OpK opk))
-                    | None ->
+                    | _ ->
                       circ_error (CantConvertToCirc (`Op (destr_op f_ |> fst)))
                   end
                 in

@@ -34,9 +34,8 @@ type circuit_error =
 | CantReadWriteGlobs
 | BadFormForArg of form
 | CantConvertToCirc of 
-  [ `Int 
-  | `OpK of EcFol.op_kind 
-  | `Op of path 
+  [ `Int
+  | `Op of path
   | `Quantif of quantif
   | `Match
   | `Glob
