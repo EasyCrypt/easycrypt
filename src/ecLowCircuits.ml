@@ -25,8 +25,6 @@ module Hashtbl = Batteries.Hashtbl
 module Set = Batteries.Set
 module Option = Batteries.Option
 
-let debug : bool = false
-
 (* Backend implementing minimal functions needed for the translation *)
 (* Minimal expected functionality is QF_ABV *)
 (* Input are: some identifier + some bit *)

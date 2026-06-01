@@ -16,9 +16,6 @@ module Set = Batteries.Set
 module Option = Batteries.Option
 
 (* -------------------------------------------------------------------- *)
-let debug : bool = EcLowCircuits.debug
-
-(* -------------------------------------------------------------------- *)
 let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
   {base_red with delta_p = (fun pth ->
   if (EcEnv.Circuit.reverse_operator (LDecl.toenv hyps) pth |> List.is_empty) then
