@@ -44,7 +44,7 @@ type circuit_error =
   | `Hoare
   | `Instr
 ] 
-| PropagateError of circuit_conversion_call * circuit_error (* FIXME: make this lazy *)
+| PropagateError of circuit_conversion_call * circuit_error 
 
 exception CircError of circuit_error
 

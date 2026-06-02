@@ -44,7 +44,6 @@ abstract theory BV.
 end BV.
 
 (* ==================================================================== *)
-(* FIXME: Missing of_list axiomatization *)
 abstract theory A.
   op size : int.
 

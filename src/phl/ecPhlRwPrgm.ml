@@ -34,7 +34,11 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
       let x = Option.map EcLocation.unloc (EcLocation.unloc x) in
       let vr = EcAst.{ ov_name = x; ov_type = ty; } in
       let (mem, _) = EcMemory.bind_fresh vr mem in
-      (mem, (EcTypes.pv_loc (oget x), ty)) (* FIXME: oget? *)
+      let x = match x with
+      | Some x -> x
+      | None -> tc_error !!tc "Missing name for variable" 
+      in
+      (mem, (EcTypes.pv_loc x, ty)) 
     ) hs.hs_m bindings in
 
   let env = EcEnv.Memory.push_active_ss mem env in
@@ -43,7 +47,8 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
     let ue = EcProofTyping.unienv_of_hyps (FApi.tc1_hyps tc) in
     let s  = EcTyping.transstmt env ue s in
 
-    assert (EcUnify.UniEnv.closed ue); (* FIXME *)
+    if not (EcUnify.UniEnv.closed ue) 
+    then tc_error !!tc "Failed to infer all types for type variables"; 
 
     let sb = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
     EcCoreSubst.s_subst sb s in

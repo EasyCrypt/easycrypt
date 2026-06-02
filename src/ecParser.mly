@@ -3953,7 +3953,7 @@ user_red_option:
 (* -------------------------------------------------------------------- *)
 (* Circuit & bo bindings                                                *)
 
-(* FIXME:merge-bdep generic option parser *)
+(* FIXME PY: merge-bdep generic option parser *)
 
 spec_binding:
 | op=qoident LARROW circ=loc(STRING)

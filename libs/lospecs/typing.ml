@@ -458,7 +458,7 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       (None, { node; type_; })
 
   | PECond (c, (pe1, pe2)) -> 
-    let c = tt_expr env c in (* FIXME: must be a word *)
+    let c = tt_expr ~check:(`W 1) env c in 
     let e1 = tt_expr env pe1 in
     let e2 = tt_expr env pe2 in
 

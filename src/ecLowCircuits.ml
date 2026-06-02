@@ -1715,7 +1715,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           end
         | _ -> assert false (* Programming error *)
 
-    (* FIXME: review this functiono | FIXME: Not axiomatized in QFABV.ec file *)
       let array_oflist (circs : circuit list) (dfl: circuit) (len: int) : circuit =
         let circs, inps = List.split circs in
         let dif = len - List.length circs in assert (dif >= 0);

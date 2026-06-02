@@ -18,7 +18,7 @@ module Option = Batteries.Option
 (* -------------------------------------------------------------------- *)
 let int_of_form = EcCircuits.int_of_form
 
-(* FIXME: move? V *)
+(* FIXME PY: move? V *)
 let form_list_from_iota (hyps: hyps) (f: form) : form list =
   match f.f_node with
   | Fapp ({f_node = Fop(p, _)}, [n; m]) when p = EcCoreLib.CI_List.p_iota ->
@@ -40,7 +40,7 @@ let rec form_list_of_form (f: form) : form list =
   | _ -> 
     raise (DestrError "list")
 
-(* FIXME: move? A *)
+(* FIXME PY: move? A *)
 
 let rec destr_conj (hyps: hyps) (f: form) : form list = 
   let redmode = {(circ_red hyps) with zeta = false} in
@@ -261,7 +261,7 @@ let t_bdep_simplify (tc: tcenv1) =
   | _ -> assert false 
 
 (* ================ EXTENS TACTIC  ==================== *)
-(* FIXME: Maybe move later? *)
+(* FIXME PY: Maybe move later? *)
 open FApi
 let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
     (* Find goal shape 
@@ -348,10 +348,9 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       | Some (v, _, _) -> v 
       | None -> tc_error (tc1_penv tc) "Failed to find var %s in memory %s" v (EcIdent.name m)
       in
-      (* FIXME: Assumes is not array, fix later *)
       let size = match EcEnv.Circuit.lookup_bitstring_size (tc1_env tc) v.v_type with
       | Some size -> size
-      | None -> tc_error (tc1_penv tc) "Failed to get size for type %a (is it finite and does it have a binding?)" 
+      | None -> tc_error (tc1_penv tc) "Failed to get size for type %a (is it finite and does it have a binding to a bistring type (arrays unsupported)?)" 
         EcPrinting.(pp_type PPEnv.(ofenv (tc1_env tc))) v.v_type
       in
       let tpath = match v.v_type.ty_node with
@@ -361,7 +360,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       let of_int = match EcEnv.Circuit.reverse_type (tc1_env tc) tpath with
       | [] -> tc_error (tc1_penv tc) "No bindings found for type of var"
       | `Bitstring { ofint }::_ -> ofint
-      | _ -> tc_error (tc1_penv tc) "FIXME: Unhandled case"
+      | _ -> tc_error (tc1_penv tc) "Only finite size bitstring supported"
       in
       let ngoals = 1 lsl size in
 (*       let ngoals = min ngoals 5 in *)

@@ -2905,7 +2905,7 @@ type ebinding = [
   | `ModType   of module_sig
 ]
 
-(*  FIXME section :  Global ? *)
+(*  FIXME PY section :  Global ? *)
 let bind1 ((x, eb) : symbol * ebinding) (env : env) =
   match eb with
   | `Variable ty -> Var   .bind_pvglob x ty env

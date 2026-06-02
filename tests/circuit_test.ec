@@ -121,10 +121,8 @@ qed.
 lemma W8_xor_ext_simp (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
 proc.
-extens [a] : by circuit simplify; trivial. (* FIXME: without by does not work *)
+extens [a] : by circuit simplify; trivial. 
 qed.
-
-    
 
 lemma xor_com (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = b_ +^ a_].
 proof.

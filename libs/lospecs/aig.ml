@@ -485,7 +485,6 @@ let abc_check_equiv
   BatIO.write_string abc_in (abc_command ^ "\n");
   BatIO.close_out abc_in;
 (*   let abc_output_c = BatIO.input_channel ~autoclose:true ~cleanup:true abc_output_c in *)
-  (* FIXME: Get the actual output in all cases from abc *)
   let re = Str.regexp {|.*Networks are equivalent.*|} in
   Format.eprintf "Before read@.";
   let abc_output = BatIO.read_all abc_output_c in
@@ -521,7 +520,10 @@ let load (inp : IO.input) : reg * (Set.String.t * string array) option =
     let doit (x : string) =
       if not (Str.string_match re x 0) then
         raise (InvalidAIG ("not a valid uint: " ^ x));
-      int_of_string x           (* FIXME: overflow *)
+      (match int_of_string_opt x with
+      | Some x -> x
+      | None -> raise (InvalidAIG ("error in parsing in from string: " ^ x))
+      )
     in fun x -> doit x in 
 
   let header = String.trim (IO.read_line inp) in

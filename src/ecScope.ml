@@ -2762,7 +2762,6 @@ module Circuit = struct
       evc_empty with evc_lemmas = {
         evc_empty.evc_lemmas with
           ev_global = [
-              (* (Some (loced (Pby None)), Some [`Include, "bydone"]); *) (* FIXME *)
               (None, None);
               (None, None);
             ];
@@ -2792,7 +2791,7 @@ module Circuit = struct
       | EcTheory.Th_type (name, _) ->
         { name; kind = CRBT_Type (pqname root name) }
       | EcTheory.Th_operator (name, op) ->
-        (* FIXME: refresh type parameters? *)
+        (* FIXME PY: refresh type parameters? *)
         let tvars = List.map tvar op.op_tparams in
         let body = e_op (pqname root name) tvars op.op_ty in
         { name; kind = CRBT_Op (op.op_tparams, body) }
@@ -2823,7 +2822,7 @@ module Circuit = struct
     let touint, _ = EcEnv.Op.lookup bs.touint.pl_desc env in
     let tosint, _ = EcEnv.Op.lookup bs.tosint.pl_desc env in
     let ofint, _  = EcEnv.Op.lookup bs.ofint.pl_desc env in
-    let name      = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME: not stable*) in
+    let name      = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME PY: not stable *) in
 
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
@@ -2879,7 +2878,7 @@ module Circuit = struct
           "cannot find named type: `%s'"
           (string_of_qsymbol (unloc ba.type_))
      
-      | Some (path, decl) -> (* FIXME: normalize? *)
+      | Some (path, decl) -> (* FIXME PY: normalize? *)
         if List.length decl.tyd_params <> 1 then
           hierror ~loc:(loc ba.type_)
             "type constructor should take exactly one parameter: `%s'"
@@ -3047,7 +3046,7 @@ module Circuit = struct
             "cannot find named type: `%s'"
             (string_of_qsymbol (unloc ty))
       
-        | Some (path, decl), `BV _ -> (* FIXME: normalize? *)
+        | Some (path, decl), `BV _ -> (* FIXME PY: normalize? *)
           if List.length decl.tyd_params <> 0 then
             hierror ~loc:(loc ty)
               "a bit-string type must be a monomorphic named type";
@@ -3101,7 +3100,7 @@ module Circuit = struct
     let name =
       let suffix = List.map (EcPath.tolist -| proj3_1) types in
       let suffix = List.flatten suffix in
-      String.concat "_" ("BVA" :: unloc op.name :: suffix) (* FIXME: not stable*) in
+      String.concat "_" ("BVA" :: unloc op.name :: suffix) (* FIXME PY: not stable*) in
 
     let _, cltheories =
       let string_of_mode = function `A -> "A" | `BV -> "BV" in
