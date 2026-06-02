@@ -37,10 +37,16 @@ module type SMTInstance = sig
 end
 
 (* ==================================================================== *)
+(* The queries below return the decision together with a lazy model: when
+   forced, it reads back the solver's value for every input bit the query
+   materialized, as an (id, bit, value) triple. It is only meaningful when
+   the query came back satisfiable, and must be forced before the next
+   query reuses the solver; being lazy, the cost is paid only if wanted.
+   Grouping the bits into per-input values is left to the caller. *)
 module type SMTInterface = sig
-  val circ_equiv : ?inps:(int * int) list -> reg -> reg -> node -> bool
-  val circ_sat : ?inps:(int * int) list -> node -> bool
-  val circ_taut : ?inps:(int * int) list -> node -> bool
+  val circ_equiv : reg -> reg -> node -> bool * (int * int * string) list Lazy.t
+  val circ_sat : node -> bool * (int * int * string) list Lazy.t
+  val circ_taut : node -> bool * (int * int * string) list Lazy.t
 end
 
 (* ==================================================================== *)
@@ -55,10 +61,8 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
      instance. AIG ids are globally hash-consed and stable, and the terms
      below live in this instance's solver, so both maps can persist:
      - the node table memoizes node translation, keyed on the positive id;
-     - the variable table holds the size-1 input variables, by name, and
-       is read back for model extraction.
-     Every input variable is built through a single [bvterm_of_name 1]
-     point, so callers never construct names by hand. *)
+     - the variable table maps an input-variable name to its size-1
+       bitvector, so each input bit is built exactly once. *)
   module Cache : sig
     type t
 
@@ -68,20 +72,16 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     val find_node : t -> int -> SMT.bvterm option
     val add_node : t -> int -> SMT.bvterm -> unit
 
-    (* Size-1 input variable named [name], allocated and memoized on the
-       first request. *)
-    val var : t -> string -> SMT.bvterm
+    (* Size-1 variable for bit [bit] of input [id], allocated and memoized
+       on the first request. *)
+    val var : t -> int -> int -> SMT.bvterm
 
-    (* Same, but a name unseen so far yields a fresh (non-memoized)
-       variable — used when reading back a model. *)
-    val var_opt : t -> string -> SMT.bvterm
-
-    (* Names of all the variables allocated so far. *)
-    val var_names : t -> string list
+    (* The input bit variables built so far, as ((id, bit), term) pairs. *)
+    val inputs : t -> ((int * int) * SMT.bvterm) list
   end = struct
     type t = {
       nodes : (int, SMT.bvterm) Hashtbl.t;
-      vars : (string, SMT.bvterm) Hashtbl.t;
+      vars : (int * int, SMT.bvterm) Hashtbl.t;
     }
 
     let create () : t = {nodes = Hashtbl.create 0; vars = Hashtbl.create 0}
@@ -92,41 +92,28 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let add_node (c : t) (id : int) (bv : SMT.bvterm) : unit =
       Hashtbl.add c.nodes id bv
 
-    let var (c : t) (name : string) : SMT.bvterm =
-      match Hashtbl.find_option c.vars name with
+    let var (c : t) (id : int) (bit : int) : SMT.bvterm =
+      match Hashtbl.find_option c.vars (id, bit) with
       | Some bv -> bv
       | None ->
-        let bv = SMT.bvterm_of_name 1 name in
-        Hashtbl.add c.vars name bv;
+        let bv = SMT.bvterm_of_name 1 (name_of_var id bit) in
+        Hashtbl.add c.vars (id, bit) bv;
         bv
 
-    let var_opt (c : t) (name : string) : SMT.bvterm =
-      match Hashtbl.find_option c.vars name with
-      | Some bv -> bv
-      | None -> SMT.bvterm_of_name 1 name
-
-    let var_names (c : t) : string list = List.of_enum (Hashtbl.keys c.vars)
+    let inputs (c : t) : ((int * int) * SMT.bvterm) list =
+      List.of_enum (Hashtbl.enum c.vars)
   end
 
-  (* Dump the current SMT model to stderr (diagnostic only, emitted when a
-     query comes back satisfiable): the allocated input variables, then
-     the solver value of each input in [inps] (a circuit input as an
-     (id, width) pair) as the concatenation of its size-1 bit variables. *)
-  let print_model (cache : Cache.t) (inps : (int * int) list option) : unit =
-    Format.eprintf "Input bvvars: ";
-    List.iter (Format.eprintf "%s ") (Cache.var_names cache);
-    Format.eprintf "@\n";
-    Option.may
-      (fun inps ->
-        List.iteri
-          (fun i (id, sz) ->
-            let bv =
-              List.init sz (fun b -> Cache.var_opt cache (name_of_var id b))
-              |> List.reduce SMT.bvterm_concat
-            in
-            Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv))
-          inps)
-      inps
+  (* Read back the solver's current model: the value of every input bit
+     the query materialized, keyed by its (id, bit). Only meaningful right
+     after a query returned satisfiable, and reads the live solver, so it
+     must run before the solver is reused. The variables are taken from
+     [cache], so no variable naming happens here; grouping the bits into
+     per-input values is left to the caller. *)
+  let model (cache : Cache.t) : (int * int * string) list =
+    Cache.inputs cache
+    |> List.map (fun ((id, bit), bv) ->
+           id, bit, Format.asprintf "%a" SMT.pp_term (SMT.get_value bv))
 
   (* Translate an AIG node to an SMT bitvector term, using [cache] both to
      memoize nodes and to allocate the size-1 input variables. *)
@@ -144,16 +131,13 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     and doit_r (n : Aig.node_r) =
       match n with
       | False -> SMT.bvterm_of_int 1 0
-      | Input v -> Cache.var cache (name_of_var (fst v) (snd v))
+      | Input v -> Cache.var cache (fst v) (snd v)
       | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
     in
     fun (n : Aig.node) -> doit n
 
-  let circ_equiv
-      ?(inps : (int * int) list option)
-      (r1 : Aig.reg)
-      (r2 : Aig.reg)
-      (pcond : Aig.node) : bool =
+  let circ_equiv (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) :
+      bool * (int * int * string) list Lazy.t =
     assert (Array.length r1 = Array.length r2);
     assert (Array.length r1 > 0);
     assert (Array.length r2 > 0);
@@ -171,47 +155,24 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = bvterm_of_node pcond in
 
-    begin
-      SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
-      if SMT.check_sat () = false then true
-      else begin
-        Format.eprintf "bvout1: %a@." SMT.pp_term (SMT.get_value bvinpt1);
-        Format.eprintf "bvout2: %a@." SMT.pp_term (SMT.get_value bvinpt2);
-        print_model cache inps;
-        false
-      end
-    end
+    SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
+    (* equivalent iff the disequality is unsat; the model (a witness to
+       non-equivalence) is meaningful only in the sat case. *)
+    let sat = SMT.check_sat () in
+    not sat, lazy (model cache)
 
   (* TODO: better encoding of smt terms ? *)
-  let circ_sat ?(inps : (int * int) list option) (n : Aig.node) : bool =
+  let circ_sat (n : Aig.node) : bool * (int * int * string) list Lazy.t =
     let cache = Cache.create () in
-    let bvterm_of_node = bvterm_of_node cache in
-
-    begin
-      match inps with
-      | None -> ()
-      | Some inps ->
-        List.iter
-          (fun (id, sz) ->
-            List.iter
-              (fun i -> ignore (Cache.var cache (name_of_var id i)))
-              (List.init sz identity))
-          inps
-    end;
-
-    let form = bvterm_of_node n in
+    let form = bvterm_of_node cache n in
     let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
+    SMT.assert' form;
+    let sat = SMT.check_sat () in
+    sat, lazy (model cache)
 
-    begin
-      SMT.assert' @@ form;
-      if SMT.check_sat () = true then begin
-        print_model cache inps;
-        true
-      end
-      else false
-    end
-
-  let circ_taut ?inps (n : Aig.node) : bool = not (circ_sat ?inps (Aig.neg n))
+  let circ_taut (n : Aig.node) : bool * (int * int * string) list Lazy.t =
+    let sat, m = circ_sat (Aig.neg n) in
+    not sat, m
 end
 
 (* ==================================================================== *)

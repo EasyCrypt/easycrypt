@@ -720,7 +720,8 @@ and process_option (scope : EcScope.scope) (name, value) =
   match value with
   | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr
                   || EcLocation.unloc name = EcGState.pp_showtvi
-                  || EcLocation.unloc name = EcGState.circuit_timing ->
+                  || EcLocation.unloc name = EcGState.circuit_timing
+                  || EcLocation.unloc name = EcGState.circuit_debug_smt ->
     let gs = EcEnv.gstate (EcScope.env scope) in
     EcGState.setflag (unloc name) value gs; scope
 

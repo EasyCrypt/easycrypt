@@ -37,6 +37,12 @@ type circ = {
 type 'a cfun = 'a * (cinp list)
 type circuit = circ cfun
 
+(* A satisfying assignment read back from the SMT solver: the value of
+   each input bit it materialized, as (id, bit, value) triples. The
+   queries below return it lazily; grouping into per-input values is left
+   to the caller. *)
+type model = (int * int * string) list
+
 val pp_flatcirc : Format.formatter -> flatcirc -> unit
 
 (* -------------------------------------------------------------------- *)
@@ -143,9 +149,9 @@ val circuit_uninit            : ctype -> circuit
 val circuit_has_uninitialized : circuit -> int option
 
 (* Logical reasoning over circuits *)
-val circ_equiv : ?pcond:circuit -> circuit -> circuit -> bool
-val circ_sat   : circuit -> bool
-val circ_taut  : circuit -> bool
+val circ_equiv : ?pcond:circuit -> circuit -> circuit -> bool * model Lazy.t
+val circ_sat   : circuit -> bool * model Lazy.t
+val circ_taut  : circuit -> bool * model Lazy.t
 
 (* Composition of circuit functions *)
 val circuit_compose : circuit -> circuit list -> circuit

@@ -34,6 +34,24 @@ let stopwatch (env : env) : string -> unit =
   end
 
 (* -------------------------------------------------------------------- *)
+(* Take the boolean verdict of a backend query [(valid, model)], dumping
+   the counter-model to the user when the query failed (i.e. [not valid],
+   so the lazy model is a genuine witness). The dump is gated by the
+   [Circuit:debug_smt] flag (default off), enabled with
+   [pragma Circuit:debug_smt.]; being lazy, the model is only forced when
+   it is going to be printed. *)
+let check_with_model (env : env) ((valid, model) : bool * model Lazy.t) : bool =
+  if (not valid) && EcGState.get_circuit_debug_smt (EcEnv.gstate env) then begin
+    EcEnv.notify ~immediate:true env `Warning "[debug_smt] counter-model:@.";
+    List.iter
+      (fun (id, bit, value) ->
+        EcEnv.notify ~immediate:true env `Warning
+          "[debug_smt]   input %d bit %d = %s@." id bit value)
+      (Lazy.force model)
+  end;
+  valid
+
+(* -------------------------------------------------------------------- *)
 let circ_red (hyps : hyps) =
   let base_red = EcReduction.full_red in
   {
@@ -889,14 +907,14 @@ let instrs_equiv
         | None, Some _ | Some _, None ->
           false
           (* Variable only defined on one of the blocks (and not in the prelude) *)
-        | Some circ1, Some circ2 -> circ_equiv circ1 circ2)
+        | Some circ1, Some circ2 -> check_with_model env (circ_equiv circ1 circ2))
       vs
   | None ->
     state_get_all_memory st mem
     |> List.for_all (fun (var, _) ->
            let circ1 = state_get_pv st1 mem var in
            let circ2 = state_get_pv st2 mem var in
-           circ_equiv circ1 circ2)
+           check_with_model env (circ_equiv circ1 circ2))
 
 (* FIXME: change memory -> memenv Why?            *)
 let state_of_prog
@@ -925,7 +943,7 @@ let circ_simplify_form_bitstring_equality
   in
   check f
 
-let circ_taut = circ_taut
+let circ_taut (c : circuit) : bool = fst (circ_taut c)
 
 let circuit_state_of_memenv
     ?(st : state = empty_state)

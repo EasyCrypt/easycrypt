@@ -37,6 +37,10 @@ val circuit_timing : string
 val get_circuit_timing : gstate -> bool
 
 (* --------------------------------------------------------------------- *)
+val circuit_debug_smt : string
+val get_circuit_debug_smt : gstate -> bool
+
+(* --------------------------------------------------------------------- *)
 type nid_t
 type loglevel = [`Debug | `Info | `Warning | `Critical]
 
