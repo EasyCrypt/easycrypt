@@ -5,7 +5,9 @@ open EcDecl
 open EcIdent
 open EcMemory
 
-(* -------------------------------------------------------------------- *)
+(* ==================================================================== *)
+(* Backend bindings (lospecs) and library aliases *)
+(* ==================================================================== *)
 module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
@@ -28,6 +30,10 @@ module Option = Batteries.Option
 (* Backend implementing minimal functions needed for the translation *)
 (* Minimal expected functionality is QF_ABV *)
 (* Input are: some identifier + some bit *)
+
+(* ==================================================================== *)
+(* Backend interface (minimal QF_ABV functionality) *)
+(* ==================================================================== *)
 module type CBackend = sig
   type node (* Corresponds to a single output node *)
   type reg
@@ -159,6 +165,9 @@ module type CBackend = sig
   end
 end
 
+(* ==================================================================== *)
+(* Lospecs backend implementation *)
+(* ==================================================================== *)
 module LospecsBack : CBackend = struct
   type node = C.node
   type reg = C.node array
@@ -448,6 +457,9 @@ module LospecsBack : CBackend = struct
   end
 end
 
+(* ==================================================================== *)
+(* Public circuit interface *)
+(* ==================================================================== *)
 module type CircuitInterface = sig
   type flatcirc
   type ctype = 
@@ -598,8 +610,13 @@ module type CircuitInterface = sig
   val circuit_from_spec : ?name:symbol -> (ctype list * ctype) -> Lospecs.Ast.adef -> circuit
 end
 
+(* ==================================================================== *)
+(* Circuit interface, built from a backend *)
+(* ==================================================================== *)
 module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = struct
+  (* -------------------------------------------------------------------- *)
   (* Module Types *)
+  (* -------------------------------------------------------------------- *)
   type flatcirc = Backend.reg
   type ctype = 
     CArray of {width: int; count: int; } 
@@ -617,7 +634,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   type 'a cfun = 'a * (cinp list)
   type circuit = circ cfun 
 
+  (* -------------------------------------------------------------------- *)
   (* Exceptions *)
+  (* -------------------------------------------------------------------- *)
   type circconstructor = 
     | Slice of { slice_size: int; bitstring_size: int; offset: int }
     | ASlice of { slice_size: int; container_size: int; offset: int }
@@ -653,7 +672,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     raise (LowCircError err)
 
  
+  (* -------------------------------------------------------------------- *)
   (* Helper functions *)
+  (* -------------------------------------------------------------------- *)
   let (|->) ((a,b)) ((f,g)) = (f a, g b)
   let idnt = fun x -> x
 
@@ -676,7 +697,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | CTuple tys -> List.sum (List.map size_of_ctype tys)
     | CBool -> 1
 
+  (* -------------------------------------------------------------------- *)
   (* Pretty printers *)
+  (* -------------------------------------------------------------------- *)
   let rec pp_ctype (fmt: Format.formatter) (t: ctype) : unit = 
     match t with
     | CArray {width; count}  -> Format.fprintf fmt "Array(%d@%d)" count width 
@@ -696,6 +719,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       (fun fmt inps -> List.iter (fun inp -> Format.fprintf fmt "%a@\n" pp_cinp inp) inps) inps
     
   (* arg for circuit construction *)
+  (* -------------------------------------------------------------------- *)
+  (* Arguments for circuit construction *)
+  (* -------------------------------------------------------------------- *)
   module CArgs = struct
     type arg = 
     [ `Circuit of circuit
@@ -720,6 +746,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   end
   open CArgs
 
+  (* -------------------------------------------------------------------- *)
+  (* Translation state *)
+  (* -------------------------------------------------------------------- *)
   module TranslationState = struct
     type state = {
       circs    : circuit Mid.t;
@@ -1449,6 +1478,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     { reg = c; type_ = ret_ty}, inps (* TODO: type checking ? *)
 (*     { reg = c; CBitstring c, inps) |> convert_type ret_ty *)
 
+    (* -------------------------------------------------------------------- *)
+    (* Bit-vector operators *)
+    (* -------------------------------------------------------------------- *)
     module BVOps = struct
       let bvget (c: circuit) (i: int) : circuit = 
         match c with 
@@ -1729,6 +1761,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         -> assert false (* Should be guarded by call to op_is_bvop *)
     end
 
+    (* -------------------------------------------------------------------- *)
+    (* Array operators *)
+    (* -------------------------------------------------------------------- *)
     module ArrayOps = struct
       let array_get (c: circuit) (i: int) : circuit = 
         match c with 
@@ -1773,6 +1808,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     end
 end
 
+(* ==================================================================== *)
+(* Assembly: instantiate the interface on the lospecs backend *)
+(* ==================================================================== *)
 include MakeCircuitInterfaceFromCBackend(LospecsBack)
 include CArgs
 include TranslationState
