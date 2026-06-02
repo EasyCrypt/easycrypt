@@ -41,7 +41,8 @@ and run_option = {
 
 and doc_option = {
   doco_input     : string;
-  doco_outdirp   : string option;
+  doco_format    : EcDocFormat.t;
+  doco_outdir    : string option;
 }
 
 and llm_option = {

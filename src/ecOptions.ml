@@ -45,7 +45,8 @@ and run_option = {
 
 and doc_option = {
   doco_input     : string;
-  doco_outdirp   : string option;
+  doco_format    : EcDocFormat.t;
+  doco_outdir    : string option;
 }
 
 and llm_option = {
@@ -212,7 +213,7 @@ and xspec = [
   | `Group of string
 ]
 
-and xkind = [ `Flag | `Int | `String ]
+and xkind = [ `Flag | `Int | `String | `Enum of string list ]
 
 (* -------------------------------------------------------------------- *)
 let print_usage ?progname ?(out = stderr) ?msg specs =
@@ -226,6 +227,7 @@ let print_usage ?progname ?(out = stderr) ?msg specs =
           | `Flag   -> Arg.Unit   (fun _ -> assert false)
           | `Int    -> Arg.Int    (fun _ -> assert false)
           | `String -> Arg.String (fun _ -> assert false)
+          | `Enum _ -> Arg.String (fun _ -> assert false)
         in
           Some ("-" ^ name, kind, " " ^ help)
       | `Group _ -> None
@@ -323,6 +325,7 @@ let parse spec argv =
             | `Flag   -> Arg.Unit   (fun _ -> set (`Bool   true))
             | `Int    -> Arg.Int    (fun i -> set (`Int    i))
             | `String -> Arg.String (fun s -> set (`String s))
+            | `Enum choices -> Arg.Symbol (choices, fun s -> set (`String s))
           in
             ("-" ^ name, setter, help)
         in
@@ -394,7 +397,8 @@ let specs = {
     ("why3config", "Configure why3", []);
 
     ("docgen", "Generate documentation", [
-      `Spec ("outdir", `String, "Output documentation files in <dir>")
+      `Spec ("outdir", `String, "Output documentation files in directory <dir>");
+      `Spec ("format", `Enum EcDocFormat.choices, Format.sprintf "Produce documentation files in format <format>; choose from: %s" (String.concat ", " EcDocFormat.choices));
     ]);
   ];
 
@@ -560,7 +564,18 @@ let runtest_options_of_values ini values (input, scenarios) =
 
 let doc_options_of_values values input =
   { doco_input     = input;
-    doco_outdirp   = get_string "outdir" values; }
+    doco_format    =
+      begin
+        match get_string "format" values with
+        | None -> EcDocFormat.default
+        | Some s ->
+           begin
+             match EcDocFormat.of_string s with
+             | None -> assert false
+             | Some f -> f
+           end
+      end;
+    doco_outdir   = get_string "outdir" values; }
 
 let parse_upto values =
   get_string "upto" values |> Option.map (fun s ->

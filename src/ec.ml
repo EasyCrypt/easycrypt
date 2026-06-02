@@ -414,7 +414,8 @@ let main () =
       (*---*) eco         : bool;
       (*---*) gccompact   : int option;
       (*---*) docgen      : bool;
-      (*---*) outdirp     : string option;
+      (*---*) docformat   : EcDocFormat.t option;
+      (*---*) docoutdir   : string option;
       (*---*) upto        : (int * int option) option;
       mutable trace       : trace1 list option;
     }
@@ -434,7 +435,7 @@ let main () =
       let push_message (trace : trace1 list) msg =
         match trace with
         | [] ->
-          [push1_message trace0 msg] 
+          [push1_message trace0 msg]
         | trace1 :: trace ->
           push1_message trace1 msg :: trace
     end
@@ -493,7 +494,8 @@ let main () =
         ; eco         = false
         ; gccompact   = None
         ; docgen      = false
-        ; outdirp     = None
+        ; docformat   = None
+        ; docoutdir   = None
         ; upto        = None
         ; trace       = None }
 
@@ -529,7 +531,8 @@ let main () =
         ; eco         = cmpopts.cmpo_noeco
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
-        ; outdirp     = None
+        ; docformat   = None
+        ; docoutdir   = None
         ; upto        = None
         ; trace       = trace0 }
 
@@ -558,7 +561,8 @@ let main () =
         ; eco         = true
         ; gccompact   = None
         ; docgen      = false
-        ; outdirp     = None
+        ; docformat   = None
+        ; docoutdir   = None
         ; upto        = llmopts.llmo_upto
         ; trace       = None }
 
@@ -571,12 +575,13 @@ let main () =
     | `DocGen docopts -> begin
         let name = docopts.doco_input in
 
-        begin try
-          let ext = Filename.extension name in
-          ignore (EcLoader.getkind ext : EcLoader.kind)
-        with EcLoader.BadExtension ext ->
-          Format.eprintf "do not know what to do with %s@." ext;
-          exit 1
+        begin
+          try
+            let ext = Filename.extension name in
+            ignore (EcLoader.getkind ext : EcLoader.kind)
+          with EcLoader.BadExtension ext ->
+            Format.eprintf "do not know what to do with %s@." ext;
+            exit 1
         end;
 
         let prvoff =  {
@@ -603,7 +608,8 @@ let main () =
         ; eco         = true
         ; gccompact   = None
         ; docgen      = true
-        ; outdirp     = docopts.doco_outdirp
+        ; docformat   = Some docopts.doco_format
+        ; docoutdir   = docopts.doco_outdir
         ; upto        = None
         ; trace       = None }
       end
@@ -644,7 +650,7 @@ let main () =
                     msg in
                 String.concat "\n" (List.rev_map for1 trace1.messages) in
               (trace1.position, EcEco.{ goals; messages; })
-            in List.rev_map mktrace1 trace in 
+            in List.rev_map mktrace1 trace in
 
           EcEco.{
             eco_root    = EcEco.{
@@ -860,7 +866,18 @@ let main () =
             if not state.eco then
               finalize_input state.input (EcCommands.current ());
             if state.docgen then
-              EcDoc.generate_html ?outdirp:state.outdirp state.input (EcCommands.current ());
+              begin
+                match state.input with
+                | None -> failwith "Missing file name"
+                | Some input ->
+                   begin
+                    match state.docformat with
+                    | None -> assert false
+                    | Some docformat ->
+                       (* EcDoc.generate_html ?outdirp:state.outdirp state.input (EcCommands.current ()); *)
+                       EcDoc.generate_documentation ?outdir:state.docoutdir ~format:docformat input (EcCommands.current ())
+                  end;
+              end;
             exit 0
           end;
       with

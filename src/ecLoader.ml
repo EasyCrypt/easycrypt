@@ -26,7 +26,7 @@ let getkind ext =
   | "eca" -> `EcA
   | _     -> raise (BadExtension ("." ^ ext))
 
-let string_of_namespace ns = 
+let string_of_namespace ns =
   match ns with
   | `System -> "System"
   | `Named s -> s

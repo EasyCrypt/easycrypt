@@ -284,7 +284,7 @@ let emit_page (dp : string) (fn : string) (page : [> Html_types.html ] elt) =
     Format.fprintf fmt "@.";
     close_out file
 
-(* -------------------------------------------------------------------- *)
+(* -----------------------------------------------g--------------------- *)
 let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) =
   let rec c_subpages ?supths ?supthf th docents =
     match docents with
@@ -308,31 +308,66 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
   List.iter (fun fnpg -> emit_page dp (fst fnpg) (snd fnpg)) spgs;
   emit_page dp th (c_page th th tstr gdoc ldocents env)
 
+
+(* -------------------------------------------------------------------- *)
+(* let construct_docmodel () *)
+
+
 (* -------------------------------------------------------------------- *)
 (* input = input name, scope contains all documentation items *)
-let generate_html ?(outdirp : string option) (fname : string option) (scope : EcScope.scope) : unit =
-  match fname with
-  | Some fn ->
-      let kind =
-        try  EcLoader.getkind (Filename.extension fn)
-        with EcLoader.BadExtension _ -> assert false
-      in
-      let dp =
-        match outdirp with
-        | None -> Filename.dirname fn
-        | Some outdirp ->
-          try
-            if Sys.is_directory outdirp
-            then outdirp
-            else raise (Invalid_argument (Format.sprintf "%s is not an existing directory." outdirp))
-          with
-          | _ as ex -> Printf.eprintf "Exception: %s\n." (Printexc.to_string ex); raise ex
-      in
-      let fn = Filename.basename fn in
-      let th = Filename.remove_extension fn in
-      let tstr = thkind_str kind  ^ " " ^ th in
-      begin
-        try emit_pages dp th tstr (get_gdocstrings scope) (get_ldocentities scope) (env scope) with
-        | _ as ex -> Printf.eprintf "Exception: %s\n." (Printexc.to_string ex); raise ex
-      end
-  | None -> ()
+(* let generate_html ?(outdirp : string option) (fname : string option) (scope : EcScope.scope) : unit = *)
+(*   match fname with *)
+(*   | Some fn -> *)
+(*       let kind = *)
+(*         try  EcLoader.getkind (Filename.extension fn) *)
+(*         with EcLoader.BadExtension _ -> assert false *)
+(*       in *)
+(*       let dp = *)
+(*         match outdirp with *)
+(*         | None -> Filename.dirname fn *)
+(*         | Some outdirp -> *)
+(*           try *)
+(*             if Sys.is_directory outdirp *)
+(*             then outdirp *)
+(*             else raise (Invalid_argument (Format.sprintf "%s is not an existing directory." outdirp)) *)
+(*           with *)
+(*           | _ as ex -> Printf.eprintf "Exception: %s\n." (Printexc.to_string ex); raise ex *)
+(*       in *)
+(*       let fn = Filename.basename fn in *)
+(*       let th = Filename.remove_extension fn in *)
+(*       let tstr = thkind_str kind  ^ " " ^ th in *)
+(*       begin *)
+(*         try emit_pages dp th tstr (get_gdocstrings scope) (get_ldocentities scope) (env scope) with *)
+(*         | _ as ex -> Printf.eprintf "Exception: %s\n." (Printexc.to_string ex); raise ex *)
+(*       end *)
+(*   | None -> () *)
+
+let generate_documentation
+      ?(outdir : string option)
+      ~(format : EcDocFormat.t)
+      (filename : string)
+      (scope : EcScope.scope) : unit =
+  let kind =
+    try  EcLoader.getkind (Filename.extension filename)
+    with EcLoader.BadExtension ext as ex ->
+      Printf.eprintf "Unrecognized extension %s (in file %s)\n%!" ext filename; raise ex
+  in
+  let dp =
+    match outdir with
+    | None -> Filename.dirname filename
+    | Some outdir ->
+       try
+         if Sys.is_directory outdir
+         then outdir
+         else raise (Invalid_argument (Format.sprintf "%s is not an existing directory" outdir))
+       with
+       | _ as ex -> Printf.eprintf "Exception: %s\n%!" (Printexc.to_string ex); raise ex
+  in
+  let fn = Filename.basename filename in
+  let th = Filename.remove_extension fn in
+  let tstr = thkind_str kind  ^ " " ^ th in
+  print_endline "End doc reached successfully"
+  (* begin *)
+  (*   try emit_pages dp th tstr (get_gdocstrings scope) (get_ldocentities scope) (env scope) with *)
+  (*   | _ as ex -> Printf.eprintf "Exception: %s\n%!" (Printexc.to_string ex); raise ex *)
+  (* end *)
