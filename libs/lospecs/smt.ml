@@ -6,7 +6,14 @@ open Bitwuzla_cxx
 module type SMTInstance = sig
   type bvterm
 
+  (* A solver instance: holds the assertion stack and, after a satisfiable
+     check, the model. The stateful operations below act on one. *)
+  type solver
+
   exception SMTError
+
+  (* Create a fresh solver (empty assertion stack). *)
+  val create_solver : unit -> solver
 
   (* Expected params: sort, value *)
   val bvterm_of_int : int -> int -> bvterm
@@ -15,11 +22,11 @@ module type SMTInstance = sig
   val bvterm_of_name : int -> string -> bvterm
 
   (* argument must be of size 1, assert it true *)
-  (* Should affect internal state of SMT *)
-  val assert' : bvterm -> unit
+  (* Affects the solver's assertion stack *)
+  val assert' : solver -> bvterm -> unit
 
-  (* Check satisfiability of current asserts *)
-  val check_sat : unit -> bool
+  (* Check satisfiability of the solver's current asserts *)
+  val check_sat : solver -> bool
 
   (* equality over bitvectors, res is a size 1 bitvector *)
   val bvterm_equal : bvterm -> bvterm -> bvterm
@@ -32,98 +39,86 @@ module type SMTInstance = sig
 
   (* bvnot *)
   val bvand : bvterm -> bvterm -> bvterm
-  val get_value : bvterm -> bvterm
+  val get_value : solver -> bvterm -> bvterm
   val pp_term : Format.formatter -> bvterm -> unit
 end
 
 (* ==================================================================== *)
-(* The queries below return the decision together with a lazy model: when
-   forced, it reads back the solver's value for every input bit the query
-   materialized, as an (id, bit, value) triple. It is only meaningful when
-   the query came back satisfiable, and must be forced before the next
-   query reuses the solver; being lazy, the cost is paid only if wanted.
-   Grouping the bits into per-input values is left to the caller. *)
+(* A solving context bundles everything one query needs: the backend
+   solver together with the per-query memoization tables. It is created
+   per query (one solver per query gives assertion isolation) and carried
+   explicitly. The queries return the decision; [model] reads the model
+   back from the same context and is only meaningful after a satisfiable
+   query, before the context's solver is re-used. Grouping the input bits
+   into per-input values is left to the caller. *)
 module type SMTInterface = sig
-  val circ_equiv : reg -> reg -> node -> bool * (int * int * string) list Lazy.t
-  val circ_sat : node -> bool * (int * int * string) list Lazy.t
-  val circ_taut : node -> bool * (int * int * string) list Lazy.t
+  type ctx
+
+  val create : unit -> ctx
+  val equiv : ctx -> reg -> reg -> node -> bool
+  val sat : ctx -> node -> bool
+  val taut : ctx -> node -> bool
+  val model : ctx -> (int * int * string) list
 end
 
 (* ==================================================================== *)
-(* TODO Add model printing for circ_sat and circ_taut *)
 (* Assumes circuit inputs have already been appropriately renamed *)
 module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
   (* SMT variable name for bit [bit] of circuit input [id]. *)
   let name_of_var (id : int) (bit : int) : string =
     Printf.sprintf "BV_%d_%05X" id bit
 
-  (* Per-instance translation state, shared across every query on this
-     instance. AIG ids are globally hash-consed and stable, and the terms
-     below live in this instance's solver, so both maps can persist:
-     - the node table memoizes node translation, keyed on the positive id;
-     - the variable table maps an input-variable name to its size-1
-       bitvector, so each input bit is built exactly once. *)
-  module Cache : sig
-    type t
+  (* The explicit per-query state. AIG ids are globally hash-consed and
+     stable, and the terms below live in [solver], so the two memo tables
+     are valid for the whole life of the context:
+     - [nodes] memoizes node translation, keyed on the positive node id;
+     - [vars] maps an input bit (id, bit) to its size-1 bitvector, so each
+       input bit is built exactly once. *)
+  type ctx = {
+    solver : SMT.solver;
+    nodes : (int, SMT.bvterm) Hashtbl.t;
+    vars : (int * int, SMT.bvterm) Hashtbl.t;
+  }
 
-    val create : unit -> t
-
-    (* Memoized node translation. *)
-    val find_node : t -> int -> SMT.bvterm option
-    val add_node : t -> int -> SMT.bvterm -> unit
-
-    (* Size-1 variable for bit [bit] of input [id], allocated and memoized
-       on the first request. *)
-    val var : t -> int -> int -> SMT.bvterm
-
-    (* The input bit variables built so far, as ((id, bit), term) pairs. *)
-    val inputs : t -> ((int * int) * SMT.bvterm) list
-  end = struct
-    type t = {
-      nodes : (int, SMT.bvterm) Hashtbl.t;
-      vars : (int * int, SMT.bvterm) Hashtbl.t;
+  let create () : ctx =
+    {
+      solver = SMT.create_solver ();
+      nodes = Hashtbl.create 0;
+      vars = Hashtbl.create 0;
     }
 
-    let create () : t = {nodes = Hashtbl.create 0; vars = Hashtbl.create 0}
-
-    let find_node (c : t) (id : int) : SMT.bvterm option =
-      Hashtbl.find_option c.nodes id
-
-    let add_node (c : t) (id : int) (bv : SMT.bvterm) : unit =
-      Hashtbl.add c.nodes id bv
-
-    let var (c : t) (id : int) (bit : int) : SMT.bvterm =
-      match Hashtbl.find_option c.vars (id, bit) with
-      | Some bv -> bv
-      | None ->
-        let bv = SMT.bvterm_of_name 1 (name_of_var id bit) in
-        Hashtbl.add c.vars (id, bit) bv;
-        bv
-
-    let inputs (c : t) : ((int * int) * SMT.bvterm) list =
-      List.of_enum (Hashtbl.enum c.vars)
-  end
+  (* Size-1 variable for bit [bit] of input [id], allocated and memoized
+     on the first request. *)
+  let var (ctx : ctx) (id : int) (bit : int) : SMT.bvterm =
+    match Hashtbl.find_option ctx.vars (id, bit) with
+    | Some bv -> bv
+    | None ->
+      let bv = SMT.bvterm_of_name 1 (name_of_var id bit) in
+      Hashtbl.add ctx.vars (id, bit) bv;
+      bv
 
   (* Read back the solver's current model: the value of every input bit
      the query materialized, keyed by its (id, bit). Only meaningful right
-     after a query returned satisfiable, and reads the live solver, so it
-     must run before the solver is reused. The variables are taken from
-     [cache], so no variable naming happens here; grouping the bits into
-     per-input values is left to the caller. *)
-  let model (cache : Cache.t) : (int * int * string) list =
-    Cache.inputs cache
+     after a satisfiable query, and reads the live solver, so it must run
+     before the context's solver is re-used. The variables are taken from
+     [ctx.vars], so no variable naming happens here; grouping the bits
+     into per-input values is left to the caller. *)
+  let model (ctx : ctx) : (int * int * string) list =
+    Hashtbl.enum ctx.vars |> List.of_enum
     |> List.map (fun ((id, bit), bv) ->
-           id, bit, Format.asprintf "%a" SMT.pp_term (SMT.get_value bv))
+           ( id,
+             bit,
+             Format.asprintf "%a" SMT.pp_term (SMT.get_value ctx.solver bv) ))
 
-  (* Translate an AIG node to an SMT bitvector term, using [cache] both to
-     memoize nodes and to allocate the size-1 input variables. *)
-  let bvterm_of_node (cache : Cache.t) : Aig.node -> SMT.bvterm =
+  (* Translate an AIG node to an SMT bitvector term, memoizing nodes and
+     allocating the size-1 input variables in [ctx]. *)
+  let bvterm_of_node (ctx : ctx) : Aig.node -> SMT.bvterm =
     let rec doit (n : Aig.node) =
       let mn =
-        match Cache.find_node cache (Int.abs n.id) with
+        match Hashtbl.find_option ctx.nodes (Int.abs n.id) with
         | None ->
           let mn = doit_r n.gate in
-          Cache.add_node cache (Int.abs n.id) mn;
+          Hashtbl.add ctx.nodes (Int.abs n.id) mn;
           mn
         | Some mn -> mn
       in
@@ -131,19 +126,18 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     and doit_r (n : Aig.node_r) =
       match n with
       | False -> SMT.bvterm_of_int 1 0
-      | Input v -> Cache.var cache (fst v) (snd v)
+      | Input v -> var ctx (fst v) (snd v)
       | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
     in
     fun (n : Aig.node) -> doit n
 
-  let circ_equiv (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) :
-      bool * (int * int * string) list Lazy.t =
+  let equiv (ctx : ctx) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool
+      =
     assert (Array.length r1 = Array.length r2);
     assert (Array.length r1 > 0);
     assert (Array.length r2 > 0);
 
-    let cache = Cache.create () in
-    let bvterm_of_node = bvterm_of_node cache in
+    let bvterm_of_node = bvterm_of_node ctx in
 
     let bvterm_of_reg (r : Aig.reg) : _ =
       Array.map bvterm_of_node r
@@ -155,66 +149,62 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = bvterm_of_node pcond in
 
-    SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
-    (* equivalent iff the disequality is unsat; the model (a witness to
-       non-equivalence) is meaningful only in the sat case. *)
-    let sat = SMT.check_sat () in
-    not sat, lazy (model cache)
+    SMT.assert' ctx.solver @@ SMT.bvand pcond (SMT.bvnot formula);
+    (* equivalent iff the disequality is unsat; a model is then a witness
+       to non-equivalence. *)
+    not (SMT.check_sat ctx.solver)
 
   (* TODO: better encoding of smt terms ? *)
-  let circ_sat (n : Aig.node) : bool * (int * int * string) list Lazy.t =
-    let cache = Cache.create () in
-    let form = bvterm_of_node cache n in
+  let sat (ctx : ctx) (n : Aig.node) : bool =
+    let form = bvterm_of_node ctx n in
     let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
-    SMT.assert' form;
-    let sat = SMT.check_sat () in
-    sat, lazy (model cache)
+    SMT.assert' ctx.solver form;
+    SMT.check_sat ctx.solver
 
-  let circ_taut (n : Aig.node) : bool * (int * int * string) list Lazy.t =
-    let sat, m = circ_sat (Aig.neg n) in
-    not sat, m
+  let taut (ctx : ctx) (n : Aig.node) : bool = not (sat ctx (Aig.neg n))
 end
 
 (* ==================================================================== *)
-let makeBWZinstance () : (module SMTInstance) =
-  let options = Options.default () in
-  Options.set options Produce_models true;
+(* The Bitwuzla backend. The solver is an explicit value (no longer hidden
+   in a closure), so it can be owned by a solving context. *)
+module BWZInstance : SMTInstance = struct
+  type bvterm = Term.t
+  type solver = Solver.t
 
-  let bitwuzla = Solver.create options in
+  exception SMTError
 
-  (module struct
-    type bvterm = Term.t
+  let create_solver () : solver =
+    let options = Options.default () in
+    Options.set options Produce_models true;
+    Solver.create options
 
-    exception SMTError
+  let bvterm_of_int (sort : int) (v : int) : bvterm =
+    mk_bv_value_int (mk_bv_sort sort) v
 
-    let bvterm_of_int (sort : int) (v : int) : bvterm =
-      mk_bv_value_int (mk_bv_sort sort) v
+  let bvterm_of_name (sort : int) (name : string) : bvterm =
+    mk_const (mk_bv_sort sort) ~symbol:name
 
-    let bvterm_of_name (sort : int) (name : string) : bvterm =
-      mk_const (mk_bv_sort sort) ~symbol:name
+  let assert' (s : solver) (f : bvterm) : unit = Solver.assert_formula s f
 
-    let assert' (f : bvterm) : unit = Solver.assert_formula bitwuzla f
+  let check_sat (s : solver) : bool =
+    match Solver.check_sat s with
+    | Sat -> true
+    | Unsat -> false
+    | Unknown -> raise SMTError
 
-    let check_sat () : bool =
-      match Solver.check_sat bitwuzla with
-      | Sat -> true
-      | Unsat -> false
-      | Unknown -> raise SMTError
+  let bvterm_equal (bv1 : bvterm) (bv2 : bvterm) : bvterm =
+    mk_term2 Kind.Equal bv1 bv2
 
-    let bvterm_equal (bv1 : bvterm) (bv2 : bvterm) : bvterm =
-      mk_term2 Kind.Equal bv1 bv2
+  let bvterm_concat (bv1 : bvterm) (bv2 : bvterm) : bvterm =
+    mk_term2 Kind.Bv_concat bv1 bv2
 
-    let bvterm_concat (bv1 : bvterm) (bv2 : bvterm) : bvterm =
-      mk_term2 Kind.Bv_concat bv1 bv2
+  let bvnot (bv : bvterm) : bvterm = mk_term1 Kind.Bv_not bv
 
-    let bvnot (bv : bvterm) : bvterm = mk_term1 Kind.Bv_not bv
+  let bvand (bv1 : bvterm) (bv2 : bvterm) : bvterm =
+    mk_term2 Kind.Bv_and bv1 bv2
 
-    let bvand (bv1 : bvterm) (bv2 : bvterm) : bvterm =
-      mk_term2 Kind.Bv_and bv1 bv2
+  let get_value (s : solver) (bv : bvterm) : bvterm = Solver.get_value s bv
+  let pp_term (fmt : Format.formatter) (bv : bvterm) : unit = Term.pp fmt bv
+end
 
-    let get_value (bv : bvterm) : bvterm = Solver.get_value bitwuzla bv
-    let pp_term (fmt : Format.formatter) (bv : bvterm) : unit = Term.pp fmt bv
-  end : SMTInstance)
-
-let makeBWZinterface () : (module SMTInterface) =
-  (module MakeSMTInterface ((val makeBWZinstance () : SMTInstance)))
+module BWZ = MakeSMTInterface (BWZInstance)

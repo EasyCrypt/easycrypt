@@ -252,19 +252,16 @@ module LospecsBack : CBackend = struct
   let reg_ite (c: node) = Array.map2 (node_ite c) 
 
   let equiv ~(pcond: node) (r1: reg) (r2: reg) : bool * model Lazy.t =
-    let open CSMT in
-    let module BWZ = (val makeBWZinterface ()) in
-    BWZ.circ_equiv r1 r2 pcond
+    let ctx = CSMT.BWZ.create () in
+    (CSMT.BWZ.equiv ctx r1 r2 pcond, lazy (CSMT.BWZ.model ctx))
 
   let sat (n: node) : bool * model Lazy.t =
-    let open CSMT in
-    let module BWZ = (val makeBWZinterface ()) in
-    BWZ.circ_sat n
+    let ctx = CSMT.BWZ.create () in
+    (CSMT.BWZ.sat ctx n, lazy (CSMT.BWZ.model ctx))
 
   let taut (n: node) : bool * model Lazy.t =
-    let open CSMT in
-    let module BWZ = (val makeBWZinterface ()) in
-    BWZ.circ_taut n
+    let ctx = CSMT.BWZ.create () in
+    (CSMT.BWZ.taut ctx n, lazy (CSMT.BWZ.model ctx))
 
   let slice (r: reg) (idx: int) (len: int) : reg =
     try Array.sub r idx len
