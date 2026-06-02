@@ -4,6 +4,32 @@ open Tyxml.Html
 open EcScope
 
 (* -------------------------------------------------------------------- *)
+type docpage = {
+    path : string list;
+    title : string;
+    intro : docblock list;
+    sections : docsection list;
+    subs : docpage list;
+    super : docpage;
+  }
+
+and docsection = {
+    kind : EcScope.itemkind;
+    items : docitem list;
+  }
+
+and docitem = {
+    mode : EcScope.mode;
+    kind : EcScope.itemkind;
+    name : string;
+    docs : docblock list;
+    source : string list;
+  }
+
+and docblock =
+  | Markdown of string
+
+(* -------------------------------------------------------------------- *)
 let styles_file : string =
   let (module Sites) = EcRelocate.sites in
   Filename.concat Sites.doc "styles.css"
