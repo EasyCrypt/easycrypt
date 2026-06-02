@@ -109,15 +109,11 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
   end
 
   (* Dump the current SMT model to stderr (diagnostic only, emitted when a
-     query comes back satisfiable). [names_header] labels the listing of
-     allocated variables; [inps] are the circuit inputs as (id, width)
-     pairs, each printed as the solver value of the concatenation of its
-     size-1 bit variables. *)
-  let print_model
-      (cache : Cache.t)
-      ~(names_header : string)
-      (inps : (int * int) list option) : unit =
-    Format.eprintf "%s" names_header;
+     query comes back satisfiable): the allocated input variables, then
+     the solver value of each input in [inps] (a circuit input as an
+     (id, width) pair) as the concatenation of its size-1 bit variables. *)
+  let print_model (cache : Cache.t) (inps : (int * int) list option) : unit =
+    Format.eprintf "Input bvvars: ";
     List.iter (Format.eprintf "%s ") (Cache.var_names cache);
     Format.eprintf "@\n";
     Option.may
@@ -151,7 +147,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       | Input v -> Cache.var cache (name_of_var (fst v) (snd v))
       | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
     in
-    doit
+    fun (n : Aig.node) -> doit n
 
   let circ_equiv
       ?(inps : (int * int) list option)
@@ -181,7 +177,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       else begin
         Format.eprintf "bvout1: %a@." SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "bvout2: %a@." SMT.pp_term (SMT.get_value bvinpt2);
-        print_model cache ~names_header:"Terms in formula: " inps;
+        print_model cache inps;
         false
       end
     end
@@ -209,7 +205,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     begin
       SMT.assert' @@ form;
       if SMT.check_sat () = true then begin
-        print_model cache ~names_header:"Input BVVars: " inps;
+        print_model cache inps;
         true
       end
       else false
