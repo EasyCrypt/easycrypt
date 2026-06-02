@@ -15,10 +15,11 @@
 (* the original file; its [pos_cnum] is the absolute body-start offset  *)
 (* referred to as [q0] in the design.                                   *)
 type quotation = {
-  q_name : string;
-  q_body : string;
-  q_bpos : Lexing.position;  (* position of body start in original file *)
-  q_epos : Lexing.position;  (* position just after the closing "%}"    *)
+  q_name  : string;
+  q_body  : string;
+  q_debug : bool;             (* should expansion be printed for user?   *)
+  q_bpos  : Lexing.position;  (* position of body start in original file *)
+  q_epos  : Lexing.position;  (* position just after the closing "%}"    *)
 }
 
 (* -------------------------------------------------------------------- *)

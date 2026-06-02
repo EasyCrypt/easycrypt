@@ -396,17 +396,18 @@ rule main = parse
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 
   (* black-box quotation: {% name <body> %} (see ecQuotation.ml) *)
-  | "{%" blank* (lident as name) {
+  | "{%" ('*'? as debug) blank* (lident as name) {
       (* body starts at the current position (after name and the blanks/
          newline that follow it on this rule's match) *)
       let bpos = Lexing.lexeme_end_p lexbuf in
       let buf  = Buffer.create 256 in
       let epos = quotation buf 0 lexbuf in
       [QUOTATION EcQuotation.{
-         q_name = name;
-         q_body = Buffer.contents buf;
-         q_bpos = bpos;
-         q_epos = epos; }]
+         q_name  = name;
+         q_body  = Buffer.contents buf;
+         q_debug = debug = "*";
+         q_bpos  = bpos;
+         q_epos  = epos; }]
     }
 
   (* string symbols *)

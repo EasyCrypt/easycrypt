@@ -103,6 +103,14 @@ let finalize (ecreader : ecreader) =
   Disposable.dispose ecreader
 
 (* -------------------------------------------------------------------- *)
+let debug (q : EcQuotation.quotation) (expanded : string) : unit =
+  Printf.printf
+  ("---------- quotation ----------\n" ^^
+   "handler: %s\nbody:\n----------\n%s\n----------\n" ^^
+   "expansion:\n----------\n%s\n----------\n")
+  q.q_name (String.trim q.q_body) expanded
+
+(* -------------------------------------------------------------------- *)
 (* Expand a quotation into a list of pre-positioned token triples.       *)
 (* The handler output is lexed in its own buffer; each token's positions  *)
 (* are remapped into the original file via the source map.               *)
@@ -115,6 +123,7 @@ let expand_quotation (q : EcQuotation.quotation)
   : (EcParser.token * L.position * L.position) list
 =
   let (expanded, sm) = EcQuotation.run q in
+  let () = if q.q_debug then debug q expanded in
   let sub = Lexing.from_string expanded in
   Lexing.set_filename sub (EcQuotation.sentinel_fname q);
 
