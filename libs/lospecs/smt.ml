@@ -51,6 +51,40 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
   let name_of_var (id : int) (bit : int) : string =
     Printf.sprintf "BV_%d_%05X" id bit
 
+  (* Translate an AIG node to an SMT bitvector term. Input bits become
+     size-1 variables, allocated on demand and memoized in [bvvars]
+     (shared with the caller for model extraction). Structural sharing
+     is preserved via a per-call cache keyed on the node id. *)
+  let bvterm_of_node (bvvars : SMT.bvterm Map.String.t ref) :
+      Aig.node -> SMT.bvterm =
+    let cache = Hashtbl.create 0 in
+
+    let rec doit (n : Aig.node) =
+      let mn =
+        match Hashtbl.find_option cache (Int.abs n.id) with
+        | None ->
+          let mn = doit_r n.gate in
+          Hashtbl.add cache (Int.abs n.id) mn;
+          mn
+        | Some mn -> mn
+      in
+      if 0 < n.id then mn else SMT.bvnot mn
+    and doit_r (n : Aig.node_r) =
+      match n with
+      | False -> SMT.bvterm_of_int 1 0
+      | Input v ->
+        let name = name_of_var (fst v) (snd v) in
+        begin
+          match Map.String.find_opt name !bvvars with
+          | None ->
+            bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
+            Map.String.find name !bvvars
+          | Some t -> t
+        end
+      | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
+    in
+    doit
+
   let circ_equiv
       ?(inps : (int * int) list option)
       (r1 : Aig.reg)
@@ -61,36 +95,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     assert (Array.length r2 > 0);
 
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
-
-    let rec bvterm_of_node : Aig.node -> SMT.bvterm =
-      let cache = Hashtbl.create 0 in
-
-      let rec doit (n : Aig.node) =
-        let mn =
-          match Hashtbl.find_option cache (Int.abs n.id) with
-          | None ->
-            let mn = doit_r n.gate in
-            Hashtbl.add cache (Int.abs n.id) mn;
-            mn
-          | Some mn -> mn
-        in
-        if 0 < n.id then mn else SMT.bvnot mn
-      and doit_r (n : Aig.node_r) =
-        match n with
-        | False -> SMT.bvterm_of_int 1 0
-        | Input v ->
-          let name = name_of_var (fst v) (snd v) in
-          begin
-            match Map.String.find_opt name !bvvars with
-            | None ->
-              bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
-              Map.String.find name !bvvars
-            | Some t -> t
-          end
-        | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
-      in
-      fun n -> doit n
-    in
+    let bvterm_of_node = bvterm_of_node bvvars in
 
     let bvterm_of_reg (r : Aig.reg) : _ =
       Array.map bvterm_of_node r
@@ -171,35 +176,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
           inps
     end;
 
-    let rec bvterm_of_node : Aig.node -> SMT.bvterm =
-      let cache = Hashtbl.create 0 in
-
-      let rec doit (n : Aig.node) =
-        let mn =
-          match Hashtbl.find_option cache (Int.abs n.id) with
-          | None ->
-            let mn = doit_r n.gate in
-            Hashtbl.add cache (Int.abs n.id) mn;
-            mn
-          | Some mn -> mn
-        in
-        if 0 < n.id then mn else SMT.bvnot mn
-      and doit_r (n : Aig.node_r) =
-        match n with
-        | False -> SMT.bvterm_of_int 1 0
-        | Input v ->
-          let name = name_of_var (fst v) (snd v) in
-          begin
-            match Map.String.find_opt name !bvvars with
-            | None ->
-              bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
-              Map.String.find name !bvvars
-            | Some t -> t
-          end
-        | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
-      in
-      fun n -> doit n
-    in
+    let bvterm_of_node = bvterm_of_node bvvars in
 
     let form = bvterm_of_node n in
     let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
