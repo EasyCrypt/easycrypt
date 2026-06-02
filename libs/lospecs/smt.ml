@@ -51,14 +51,18 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
   let name_of_var (id : int) (bit : int) : string =
     Printf.sprintf "BV_%d_%05X" id bit
 
-  (* Translate an AIG node to an SMT bitvector term. Input bits become
-     size-1 variables, allocated on demand and memoized in [bvvars]
-     (shared with the caller for model extraction). Structural sharing
-     is preserved via a per-call cache keyed on the node id. *)
-  let bvterm_of_node (bvvars : SMT.bvterm Map.String.t ref) :
-      Aig.node -> SMT.bvterm =
-    let cache = Hashtbl.create 0 in
+  (* Per-instance translation state. AIG ids are globally hash-consed and
+     stable, and the terms below live in this instance's solver, so both
+     are shared across every query on this instance:
+     - [cache]  memoizes node translation, keyed on the positive node id;
+     - [bvvars] holds the size-1 input variables, by name, and is read
+       back for model extraction. *)
+  let cache : (int, SMT.bvterm) Hashtbl.t = Hashtbl.create 0
+  let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty
 
+  (* Translate an AIG node to an SMT bitvector term. Input bits become
+     size-1 variables allocated on demand into [bvvars]. *)
+  let bvterm_of_node : Aig.node -> SMT.bvterm =
     let rec doit (n : Aig.node) =
       let mn =
         match Hashtbl.find_option cache (Int.abs n.id) with
@@ -93,9 +97,6 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     assert (Array.length r1 = Array.length r2);
     assert (Array.length r1 > 0);
     assert (Array.length r2 > 0);
-
-    let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
-    let bvterm_of_node = bvterm_of_node bvvars in
 
     let bvterm_of_reg (r : Aig.reg) : _ =
       Array.map bvterm_of_node r
@@ -159,8 +160,6 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
 
   (* TODO: better encoding of smt terms ? *)
   let circ_sat ?(inps : (int * int) list option) (n : Aig.node) : bool =
-    let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
-
     begin
       match inps with
       | None -> ()
@@ -175,8 +174,6 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
               (List.init sz identity))
           inps
     end;
-
-    let bvterm_of_node = bvterm_of_node bvvars in
 
     let form = bvterm_of_node n in
     let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
