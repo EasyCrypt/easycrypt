@@ -1,6 +1,8 @@
+(* ==================================================================== *)
 open Aig
 open Bitwuzla_cxx
 
+(* ==================================================================== *)
 module type SMTInstance = sig
   type bvterm
 
@@ -34,123 +36,121 @@ module type SMTInstance = sig
   val pp_term : Format.formatter -> bvterm -> unit
 end
 
+(* ==================================================================== *)
 module type SMTInterface = sig
   val circ_equiv : ?inps:(int * int) list -> reg -> reg -> node -> bool
   val circ_sat : ?inps:(int * int) list -> node -> bool
   val circ_taut : ?inps:(int * int) list -> node -> bool
 end
 
+(* ==================================================================== *)
 (* TODO Add model printing for circ_sat and circ_taut *)
 (* Assumes circuit inputs have already been appropriately renamed *)
 module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
+  (* SMT variable name for bit [bit] of circuit input [id]. *)
+  let name_of_var (id : int) (bit : int) : string =
+    Printf.sprintf "BV_%d_%05X" id bit
+
   let circ_equiv
       ?(inps : (int * int) list option)
       (r1 : Aig.reg)
       (r2 : Aig.reg)
       (pcond : Aig.node) : bool =
-    if not (Array.length r1 > 0 && Array.length r2 > 0) then (
-      Format.eprintf "Sizes differ in circ_equiv";
-      false)
-    else
-      let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
+    assert (Array.length r1 = Array.length r2);
+    assert (Array.length r1 > 0);
+    assert (Array.length r2 > 0);
 
-      let rec bvterm_of_node : Aig.node -> SMT.bvterm =
-        let cache = Hashtbl.create 0 in
+    let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
 
-        let rec doit (n : Aig.node) =
-          let mn =
-            match Hashtbl.find_option cache (Int.abs n.id) with
-            | None ->
-              let mn = doit_r n.gate in
-              Hashtbl.add cache (Int.abs n.id) mn;
-              mn
-            | Some mn -> mn
-          in
-          if 0 < n.id then mn else SMT.bvnot mn
-        and doit_r (n : Aig.node_r) =
-          match n with
-          | False -> SMT.bvterm_of_int 1 0
-          | Input v ->
-            let name =
-              "BV_"
-              ^ (fst v |> string_of_int)
-              ^ "_"
-              ^ Printf.sprintf "%X" (snd v)
-            in
-            begin
-              match Map.String.find_opt name !bvvars with
-              | None ->
-                bvvars :=
-                  Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
-                Map.String.find name !bvvars
-              | Some t -> t
-            end
-          | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
+    let rec bvterm_of_node : Aig.node -> SMT.bvterm =
+      let cache = Hashtbl.create 0 in
+
+      let rec doit (n : Aig.node) =
+        let mn =
+          match Hashtbl.find_option cache (Int.abs n.id) with
+          | None ->
+            let mn = doit_r n.gate in
+            Hashtbl.add cache (Int.abs n.id) mn;
+            mn
+          | Some mn -> mn
         in
-        fun n -> doit n
+        if 0 < n.id then mn else SMT.bvnot mn
+      and doit_r (n : Aig.node_r) =
+        match n with
+        | False -> SMT.bvterm_of_int 1 0
+        | Input v ->
+          let name = name_of_var (fst v) (snd v) in
+          begin
+            match Map.String.find_opt name !bvvars with
+            | None ->
+              bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
+              Map.String.find name !bvvars
+            | Some t -> t
+          end
+        | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
       in
+      fun n -> doit n
+    in
 
-      let bvterm_of_reg (r : Aig.reg) : _ =
-        Array.map bvterm_of_node r
-        |> Array.reduce (fun acc b -> SMT.bvterm_concat b acc)
-      in
+    let bvterm_of_reg (r : Aig.reg) : _ =
+      Array.map bvterm_of_node r
+      |> Array.reduce (fun acc b -> SMT.bvterm_concat b acc)
+    in
 
-      let bvinpt1 = bvterm_of_reg r1 in
-      let bvinpt2 = bvterm_of_reg r2 in
-      let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
-      let pcond = bvterm_of_node pcond in
-      let inps =
-        Option.bind inps (fun l -> if List.is_empty l then None else Some l)
-      in
+    let bvinpt1 = bvterm_of_reg r1 in
+    let bvinpt2 = bvterm_of_reg r2 in
+    let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
+    let pcond = bvterm_of_node pcond in
+    let inps =
+      Option.bind inps (fun l -> if List.is_empty l then None else Some l)
+    in
 
-      let inps =
-        Option.map
-          (fun inps ->
-            List.map
-              (fun (id, sz) ->
-                List.init sz (fun i ->
-                    "BV_" ^ (id |> string_of_int) ^ "_" ^ Printf.sprintf "%X" i))
-              inps)
-          inps
-      in
-      let inps =
-        Option.map
-          (fun inps ->
-            List.map
-              (List.map (fun name ->
-                   match Map.String.find_opt name !bvvars with
-                   | Some bv -> bv
-                   | None -> SMT.bvterm_of_name 1 name))
-              inps)
-          inps
-      in
-      let bvinp =
-        Option.map
-          (fun inps -> List.map (fun i -> List.reduce SMT.bvterm_concat i) inps)
-          inps
-      in
+    let inps =
+      Option.map
+        (fun inps ->
+          List.map
+            (fun (id, sz) -> List.init sz (fun i -> name_of_var id i))
+            inps)
+        inps
+    in
+    let inps =
+      Option.map
+        (fun inps ->
+          List.map
+            (List.map (fun name ->
+                 match Map.String.find_opt name !bvvars with
+                 | Some bv -> bv
+                 | None -> SMT.bvterm_of_name 1 name))
+            inps)
+        inps
+    in
+    let bvinp =
+      Option.map
+        (fun inps -> List.map (fun i -> List.reduce SMT.bvterm_concat i) inps)
+        inps
+    in
 
-      begin
-        SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
-        if SMT.check_sat () = false then true
-        else begin
-          Format.eprintf "bvout1: %a@." SMT.pp_term (SMT.get_value bvinpt1);
-          Format.eprintf "bvout2: %a@." SMT.pp_term (SMT.get_value bvinpt2);
-          Format.eprintf "Terms in formula: ";
-          List.iter (Format.eprintf "%s ")
-            (List.of_enum @@ Map.String.keys !bvvars);
-          Format.eprintf "@\n";
-          Option.may
-            (fun bvinp ->
-              List.iteri
-                (fun i bv ->
-                  Format.eprintf "input[%d]: %a@." i SMT.pp_term
-                    (SMT.get_value bv))
-                bvinp)
-            bvinp;
-          false
-        end
+    begin
+      SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
+      if SMT.check_sat () = false then true
+      else begin
+        Format.eprintf "bvout1: %a@." SMT.pp_term (SMT.get_value bvinpt1);
+        Format.eprintf "bvout2: %a@." SMT.pp_term (SMT.get_value bvinpt2);
+        Format.eprintf "Terms in formula: ";
+        List.iter (Format.eprintf "%s ")
+          (List.of_enum @@ Map.String.keys !bvvars);
+        Format.eprintf "@\n";
+        Option.may
+          (fun bvinp ->
+            List.iteri
+              (fun i bv ->
+                Format.eprintf "input[%d]: %a@." i SMT.pp_term
+                  (SMT.get_value bv))
+              bvinp)
+          bvinp;
+        false
       end
+    end
 
   (* TODO: better encoding of smt terms ? *)
   let circ_sat ?(inps : (int * int) list option) (n : Aig.node) : bool =
@@ -164,9 +164,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
           (fun (id, sz) ->
             List.iter
               (fun i ->
-                let name =
-                  "BV_" ^ string_of_int id ^ "_" ^ Printf.sprintf "%05X" i
-                in
+                let name = name_of_var id i in
                 bvvars :=
                   Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars)
               (List.init sz identity))
@@ -190,12 +188,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
         match n with
         | False -> SMT.bvterm_of_int 1 0
         | Input v ->
-          let name =
-            "BV_"
-            ^ (fst v |> string_of_int)
-            ^ "_"
-            ^ Printf.sprintf "%05X" (snd v)
-          in
+          let name = name_of_var (fst v) (snd v) in
           begin
             match Map.String.find_opt name !bvvars with
             | None ->
@@ -219,9 +212,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       Option.map
         (fun inps ->
           List.map
-            (fun (id, sz) ->
-              List.init sz (fun i ->
-                  "BV_" ^ (id |> string_of_int) ^ "_" ^ Printf.sprintf "%05X" i))
+            (fun (id, sz) -> List.init sz (fun i -> name_of_var id i))
             inps)
         inps
     in
@@ -261,9 +252,10 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       else false
     end
 
-  let circ_taut ?inps (n : Aig.node) : bool = not @@ circ_sat ?inps (Aig.neg n)
+  let circ_taut ?inps (n : Aig.node) : bool = not (circ_sat ?inps (Aig.neg n))
 end
 
+(* ==================================================================== *)
 let makeBWZinstance () : (module SMTInstance) =
   let options = Options.default () in
   Options.set options Produce_models true;
