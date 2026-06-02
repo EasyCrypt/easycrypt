@@ -51,24 +51,72 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
   let name_of_var (id : int) (bit : int) : string =
     Printf.sprintf "BV_%d_%05X" id bit
 
-  (* Per-instance translation state. AIG ids are globally hash-consed and
-     stable, and the terms below live in this instance's solver, so both
-     are shared across every query on this instance:
-     - [cache]  memoizes node translation, keyed on the positive node id;
-     - [bvvars] holds the size-1 input variables, by name, and is read
-       back for model extraction. *)
-  let cache : (int, SMT.bvterm) Hashtbl.t = Hashtbl.create 0
-  let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty
+  (* Per-instance translation state, shared across every query on this
+     instance. AIG ids are globally hash-consed and stable, and the terms
+     below live in this instance's solver, so both maps can persist:
+     - the node table memoizes node translation, keyed on the positive id;
+     - the variable table holds the size-1 input variables, by name, and
+       is read back for model extraction.
+     Every input variable is built through a single [bvterm_of_name 1]
+     point, so callers never construct names by hand. *)
+  module Cache : sig
+    type t
 
-  (* Translate an AIG node to an SMT bitvector term. Input bits become
-     size-1 variables allocated on demand into [bvvars]. *)
-  let bvterm_of_node : Aig.node -> SMT.bvterm =
+    val create : unit -> t
+
+    (* Memoized node translation. *)
+    val find_node : t -> int -> SMT.bvterm option
+    val add_node : t -> int -> SMT.bvterm -> unit
+
+    (* Size-1 input variable named [name], allocated and memoized on the
+       first request. *)
+    val var : t -> string -> SMT.bvterm
+
+    (* Same, but a name unseen so far yields a fresh (non-memoized)
+       variable — used when reading back a model. *)
+    val var_opt : t -> string -> SMT.bvterm
+
+    (* Names of all the variables allocated so far. *)
+    val var_names : t -> string list
+  end = struct
+    type t = {
+      nodes : (int, SMT.bvterm) Hashtbl.t;
+      mutable vars : SMT.bvterm Map.String.t;
+    }
+
+    let create () : t = {nodes = Hashtbl.create 0; vars = Map.String.empty}
+
+    let find_node (c : t) (id : int) : SMT.bvterm option =
+      Hashtbl.find_option c.nodes id
+
+    let add_node (c : t) (id : int) (bv : SMT.bvterm) : unit =
+      Hashtbl.add c.nodes id bv
+
+    let var (c : t) (name : string) : SMT.bvterm =
+      match Map.String.find_opt name c.vars with
+      | Some bv -> bv
+      | None ->
+        let bv = SMT.bvterm_of_name 1 name in
+        c.vars <- Map.String.add name bv c.vars;
+        bv
+
+    let var_opt (c : t) (name : string) : SMT.bvterm =
+      match Map.String.find_opt name c.vars with
+      | Some bv -> bv
+      | None -> SMT.bvterm_of_name 1 name
+
+    let var_names (c : t) : string list = List.of_enum (Map.String.keys c.vars)
+  end
+
+  (* Translate an AIG node to an SMT bitvector term, using [cache] both to
+     memoize nodes and to allocate the size-1 input variables. *)
+  let bvterm_of_node (cache : Cache.t) : Aig.node -> SMT.bvterm =
     let rec doit (n : Aig.node) =
       let mn =
-        match Hashtbl.find_option cache (Int.abs n.id) with
+        match Cache.find_node cache (Int.abs n.id) with
         | None ->
           let mn = doit_r n.gate in
-          Hashtbl.add cache (Int.abs n.id) mn;
+          Cache.add_node cache (Int.abs n.id) mn;
           mn
         | Some mn -> mn
       in
@@ -76,15 +124,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     and doit_r (n : Aig.node_r) =
       match n with
       | False -> SMT.bvterm_of_int 1 0
-      | Input v ->
-        let name = name_of_var (fst v) (snd v) in
-        begin
-          match Map.String.find_opt name !bvvars with
-          | None ->
-            bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
-            Map.String.find name !bvvars
-          | Some t -> t
-        end
+      | Input v -> Cache.var cache (name_of_var (fst v) (snd v))
       | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
     in
     doit
@@ -97,6 +137,9 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     assert (Array.length r1 = Array.length r2);
     assert (Array.length r1 > 0);
     assert (Array.length r2 > 0);
+
+    let cache = Cache.create () in
+    let bvterm_of_node = bvterm_of_node cache in
 
     let bvterm_of_reg (r : Aig.reg) : _ =
       Array.map bvterm_of_node r
@@ -121,13 +164,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     in
     let inps =
       Option.map
-        (fun inps ->
-          List.map
-            (List.map (fun name ->
-                 match Map.String.find_opt name !bvvars with
-                 | Some bv -> bv
-                 | None -> SMT.bvterm_of_name 1 name))
-            inps)
+        (fun inps -> List.map (List.map (Cache.var_opt cache)) inps)
         inps
     in
     let bvinp =
@@ -143,8 +180,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
         Format.eprintf "bvout1: %a@." SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "bvout2: %a@." SMT.pp_term (SMT.get_value bvinpt2);
         Format.eprintf "Terms in formula: ";
-        List.iter (Format.eprintf "%s ")
-          (List.of_enum @@ Map.String.keys !bvvars);
+        List.iter (Format.eprintf "%s ") (Cache.var_names cache);
         Format.eprintf "@\n";
         Option.may
           (fun bvinp ->
@@ -160,6 +196,9 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
 
   (* TODO: better encoding of smt terms ? *)
   let circ_sat ?(inps : (int * int) list option) (n : Aig.node) : bool =
+    let cache = Cache.create () in
+    let bvterm_of_node = bvterm_of_node cache in
+
     begin
       match inps with
       | None -> ()
@@ -167,10 +206,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
         List.iter
           (fun (id, sz) ->
             List.iter
-              (fun i ->
-                let name = name_of_var id i in
-                bvvars :=
-                  Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars)
+              (fun i -> ignore (Cache.var cache (name_of_var id i)))
               (List.init sz identity))
           inps
     end;
@@ -192,13 +228,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     in
     let inps =
       Option.map
-        (fun inps ->
-          List.map
-            (List.map (fun name ->
-                 match Map.String.find_opt name !bvvars with
-                 | Some bv -> bv
-                 | None -> SMT.bvterm_of_name 1 name))
-            inps)
+        (fun inps -> List.map (List.map (Cache.var_opt cache)) inps)
         inps
     in
     let bvinp =
@@ -211,7 +241,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       SMT.assert' @@ form;
       if SMT.check_sat () = true then begin
         Format.eprintf "Input BVVars: ";
-        let () = Enum.iter (Format.eprintf "%s, ") (Map.String.keys !bvvars) in
+        List.iter (Format.eprintf "%s, ") (Cache.var_names cache);
         Format.eprintf "@.";
         Option.may
           (fun bvinp ->
