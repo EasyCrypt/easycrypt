@@ -108,7 +108,7 @@ let debug (q : EcQuotation.quotation) (expanded : string) : unit =
   ("---------- quotation ----------\n" ^^
    "handler: %s\nbody:\n----------\n%s\n----------\n" ^^
    "expansion:\n----------\n%s\n----------\n")
-  q.q_name (String.trim q.q_body) expanded
+  q.q_name (String.trim q.q_body) (String.trim expanded)
 
 (* -------------------------------------------------------------------- *)
 (* Expand a quotation into a list of pre-positioned token triples.       *)
