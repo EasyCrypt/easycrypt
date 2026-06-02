@@ -81,10 +81,10 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
   end = struct
     type t = {
       nodes : (int, SMT.bvterm) Hashtbl.t;
-      mutable vars : SMT.bvterm Map.String.t;
+      vars : (string, SMT.bvterm) Hashtbl.t;
     }
 
-    let create () : t = {nodes = Hashtbl.create 0; vars = Map.String.empty}
+    let create () : t = {nodes = Hashtbl.create 0; vars = Hashtbl.create 0}
 
     let find_node (c : t) (id : int) : SMT.bvterm option =
       Hashtbl.find_option c.nodes id
@@ -93,19 +93,19 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       Hashtbl.add c.nodes id bv
 
     let var (c : t) (name : string) : SMT.bvterm =
-      match Map.String.find_opt name c.vars with
+      match Hashtbl.find_option c.vars name with
       | Some bv -> bv
       | None ->
         let bv = SMT.bvterm_of_name 1 name in
-        c.vars <- Map.String.add name bv c.vars;
+        Hashtbl.add c.vars name bv;
         bv
 
     let var_opt (c : t) (name : string) : SMT.bvterm =
-      match Map.String.find_opt name c.vars with
+      match Hashtbl.find_option c.vars name with
       | Some bv -> bv
       | None -> SMT.bvterm_of_name 1 name
 
-    let var_names (c : t) : string list = List.of_enum (Map.String.keys c.vars)
+    let var_names (c : t) : string list = List.of_enum (Hashtbl.keys c.vars)
   end
 
   (* Translate an AIG node to an SMT bitvector term, using [cache] both to
