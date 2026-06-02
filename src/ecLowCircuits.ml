@@ -639,8 +639,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   (* -------------------------------------------------------------------- *)
   type circconstructor = 
     | Slice of { slice_size: int; bitstring_size: int; offset: int }
-    | ASlice of { slice_size: int; container_size: int; offset: int }
-    | ASliceTy of ctype
     | SliceSet of { slice_size: int; bitstring_size: int; offset: int }
     | AGet of { container_size: int; index: int }
     | ASet of { container_size: int; index: int }
@@ -675,8 +673,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   (* -------------------------------------------------------------------- *)
   (* Helper functions *)
   (* -------------------------------------------------------------------- *)
-  let (|->) ((a,b)) ((f,g)) = (f a, g b)
-  let idnt = fun x -> x
 
   let pp_flatcirc fmt fc = 
     let r = Backend.node_list_of_reg fc in
@@ -858,9 +854,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let merge_inputs_list (cs: cinp list list) : cinp list =
     List.fold_right (merge_inputs) cs []
 
-  let merge_circuit_inputs (c: circuit) (d: circuit) : cinp list =
-    merge_inputs (snd c) (snd d)
-
   let unify_inputs_renamer (target: cinp list) (inps: cinp list) : Backend.inp -> Backend.node option =
     let map = List.fold_left2 (fun map inp1 inp2 -> match inp1, inp2 with
       | {type_ = CBitstring w ; id=id_tgt},
@@ -888,10 +881,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let map_ = unify_inputs_renamer target inps in
     {c with reg = Backend.applys map_ c.reg}
 
-  let inputs_contained (subi: cinp list) (supi: cinp list) : bool =
-    List.compare_lengths subi supi < 0 &&
-    List.for_all2 (=) (subi) (List.take (List.length subi) supi)
-    
   let circuit_input_compatible ?(strict = false) ((c, _): circuit) (cinp: cinp) : bool =
     match c.type_, cinp with
     | CBitstring n, { type_ = CBitstring n' } when n = n' -> true
@@ -943,14 +932,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     
   let can_convert_input_type (t1: ctype) (t2: ctype) : bool =
     size_of_ctype t1 = size_of_ctype t2     
-
-  let convert_input_types ((c, inps) : circuit) (tys: ctype list) : circuit = 
-    c, List.map2 (fun inp ty ->
-      if can_convert_input_type inp.type_ ty then
-        { inp with type_ = ty }
-      else lowcircerror CircTyConversionFailure
-    ) inps tys
-
 
   let input_of_ctype ?(name : [`Str of string | `Idn of ident | `Bad ] = `Str "input") (ct: ctype) : circuit = 
     let id, c = match name with
@@ -1135,38 +1116,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       })
     
   (* Slice by container index *)
-  let circuit_aslice ~(size:int) ((c, inps): circuit) (offset: int) : circuit =
-    match c.type_ with 
-    | CArray {width=w; count=n} -> 
-      if (n < size + offset) || size < 0 || offset < 0 then
-        lowcircerror @@ CircConstructorInvalidArguments (ASlice {
-          slice_size = size;
-          container_size = n;
-          offset;
-        });
-
-      {reg = Backend.slice c.reg offset size; type_ = CArray {width=w; count=size}}, inps
-
-    | CBitstring w -> lowcircerror @@ CircConstructorInvalidArguments (ASliceTy (CBitstring w))
-    | CTuple tys ->
-        if List.compare_length_with tys (offset + size) < 0 
-        || offset < 0 || size < 0 then
-          lowcircerror @@ CircConstructorInvalidArguments (ASlice {
-            slice_size = size;
-            container_size = List.length tys;
-            offset;
-          });
-
-        let offset, tys = List.takedrop offset tys in
-        let offset = List.sum @@ List.map size_of_ctype offset in
-        let tys = (List.take size tys) in 
-        let sz = List.sum @@ List.map size_of_ctype tys in
-        {reg = (Backend.slice c.reg offset sz); type_ = CTuple tys}, inps
-
-    | CBool -> 
-        lowcircerror @@ CircConstructorInvalidArguments (ASliceTy CBool)
-
-
   (* Does not type check *)
   let circuit_slice_insert ((orig_c, orig_inps): circuit) (idx: int) ((new_c, new_inps): circuit) : circuit = 
     try 
