@@ -44,7 +44,6 @@ module type SMTInterface = sig
   val circ_taut : ?inps:(int * int) list -> node -> bool
 end
 
-(* TODO Add model printing for circ_sat and circ_taut *)
 (* Assumes circuit inputs have already been appropriately renamed *)
 module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
   let circ_equiv ?(inps: (int * int) list option) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
@@ -128,7 +127,6 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     end
 
 
-  (* TODO: better encoding of smt terms ? *)
   let circ_sat ?(inps: (int * int) list option) (n : Aig.node) : bool =
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
 

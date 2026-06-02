@@ -38,7 +38,6 @@ let rec form_list_of_form (f: form) : form list =
     pc = EcCoreLib.CI_List.p_cons ->
     h::(form_list_of_form t)
   | _ -> 
-    (* FIXME: Bad error? *)
     raise (DestrError "list")
 
 (* FIXME: move? A *)
@@ -86,13 +85,7 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 
   (* If f is of the form (a_ = a) (aka prog_var = log_var) 
     then add it to the state, otherwise do nothing *)
-  (* FIXME: are all the simplifications necessary ? *)
   (* Processes explicit equations *)
-  (* FIXME PR: Make sure this works with things of the form
-     a{hr} = b{hr} /\ b{hr} = a{hr}
-     or even
-     a{hr} = b{hr} /\ b{hr} = c{hr} /\ c{hr} = a{hr}
-  *)
   let process_equality (s: state) (f: form) : state = 
     let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
@@ -158,7 +151,6 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
     | _ -> Seq.return (circuit_of_form st hyps post |> state_close_circuit st)
     ) |> List.of_seq |> circuit_check_posts ~env ~pres
 
-(* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve
   (tc : tcenv1) =
   let hyps = (FApi.tc1_hyps tc) in
@@ -222,8 +214,6 @@ let t_bdep_solve
       assert (ctxt.h_tvar = []);
       let st = circuit_state_of_hyps hyps in
       let cgoal = (circuit_of_form st hyps goal |> state_close_circuit st) in
-      (* FIXME: make this lazy *)
-(*       EcEnv.notify env `Debug "goal: %a@." pp_flatcirc (fst cgoal).reg; *)
       if circ_taut cgoal then
       FApi.close (!@ tc) VBdep
       else 
@@ -268,7 +258,7 @@ let t_bdep_simplify (tc: tcenv1) =
     with CircError err ->
       tc_error (FApi.tc1_penv tc) "Circuit simplify failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
     end
-  | _ -> assert false (* FIXME : Do we want to handle other cases before merge? *)
+  | _ -> assert false 
 
 (* ================ EXTENS TACTIC  ==================== *)
 (* FIXME: Maybe move later? *)
@@ -319,7 +309,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
             raise CannotTranslate
         in
         EcCoreModules.i_asgn (lv, e)
-        | _ -> raise (CannotTranslate) (* FIXME: Errors *)
+        | _ -> raise (CannotTranslate) 
 
       ) s.s_node)
     in

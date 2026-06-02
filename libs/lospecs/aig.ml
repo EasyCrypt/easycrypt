@@ -409,9 +409,6 @@ let aiger_serialize_int (id: int) : string =
 let pp_aiger_int fmt (id: int) : unit =
   Format.fprintf fmt "%s" (aiger_serialize_int id)
 
-(* FIXME PR: Look at correction of this and after making sure it is correct   *)
-(*           we can remove or do something else with the asserts              *)
-(*           but they should not be triggered on a normal execution           *)
 let pp_aiger_and fmt ((gid, id1, id2): int * int * int) : unit =
   if not (gid > id1 && id1 > id2) then Format.eprintf "gid : %d | id1: %d | id2: %d@." gid id1 id2;
   assert (gid > id1 && id1 > id2);

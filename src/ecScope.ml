@@ -577,7 +577,7 @@ let for_loading (scope : scope) =
     sc_options    = GenOptions.for_loading scope.sc_options;
     sc_globdoc    = [];
     sc_locdoc     = DocState.empty; 
-    sc_specs      = scope.sc_specs; } (* FIXME: is this correct? *)
+    sc_specs      = scope.sc_specs; }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) lc =

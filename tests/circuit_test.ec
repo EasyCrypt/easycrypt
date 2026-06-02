@@ -87,9 +87,8 @@ qed.
 lemma W8_xor_ext (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
 proc.
-(* extens [a] : (wp; skip; smt()). *)
-(* FIXME : while debugging fhash *) 
-admit. (* *)
+extens [a] : (wp; skip; smt()). 
+admit. 
 qed.
 
 lemma W8_xor_circuit (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].

@@ -12,8 +12,6 @@ let as_seq1 (type t) (xs : t list) : t =
 let as_seq2 (type t) (xs : t list) : t * t =
   match xs with [ x; y ] -> (x, y) | _ -> raise (DestrError "as_seq2") 
 
-(* FIXME: check where used and catch error if needed *)
-
 (* -------------------------------------------------------------------- *)
 module Env : sig
   type env

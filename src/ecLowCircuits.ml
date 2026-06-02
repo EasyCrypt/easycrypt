@@ -42,8 +42,8 @@ module type CBackend = sig
 
   val pp_node : Format.formatter -> node -> unit
 
-  exception NonConstantCircuit (* FIXME: Rename later *)
-  exception GetOutOfRange (* FIXME: Do we even need this? *)
+  exception NonConstantCircuit
+  exception GetOutOfRange 
   exception BadSlice of [`Get | `Set]
 
   val true_ : node
@@ -100,15 +100,13 @@ module type CBackend = sig
   val bnor : node -> node -> node
 
   (* SMTLib Base Operations *)
-  (* FIXME: decide if boolean ops are going to be defined 
-     on registers or on nodes *)
   val add : reg -> reg -> reg
   val sub : reg -> reg -> reg
   val opp : reg -> reg
   val mul : reg -> reg -> reg
   val udiv : reg -> reg -> reg
   val sdiv : reg -> reg -> reg
-  val umod : reg -> reg -> reg (* FIXME: mod or rem here? *)
+  val umod : reg -> reg -> reg
   val smod : reg -> reg -> reg
   val lshl : reg -> reg -> reg
   val lshr : reg -> reg -> reg
@@ -160,7 +158,6 @@ module type CBackend = sig
 
     val forall_inputs : (int -> int -> bool) -> reg -> bool
     val rename_inputs : ((int * int) -> (int * int) option) -> reg -> reg
-    (* TODO: Rename *)
     val excise_bit : ?renamings:(int -> int option) -> node -> node * (int, int * int) Map.t
   end
 end
@@ -176,8 +173,8 @@ module LospecsBack : CBackend = struct
   let pp_node (fmt : Format.formatter) (n: node) = 
     Format.fprintf fmt "%a" (fun fmt -> Lospecs.Aig.pp_node fmt) n
 
-  exception NonConstantCircuit (* FIXME: Rename later *)
-  exception GetOutOfRange (* FIXME: Do we even need this? *)
+  exception NonConstantCircuit 
+  exception GetOutOfRange 
   exception BadSlice of [`Get | `Set]
 
   let true_ = C.true_
@@ -324,7 +321,6 @@ module LospecsBack : CBackend = struct
   let mul (r1: reg) (r2: reg) : reg = C.umull r1 r2 
   let udiv (r1: reg) (r2: reg) : reg = C.udiv r1 r2 
   let sdiv (r1: reg) (r2: reg) : reg = C.sdiv r1 r2 
-  (* FIXME: mod or rem here? *)
   let umod (r1: reg) (r2: reg) : reg  = C.umod r1 r2 
   let smod (r1: reg) (r2: reg) : reg = C.smod r1 r2 
   let lshl (r1: reg) (r2: reg) : reg = C.shift ~side:`L ~sign:`L r1 r2 
@@ -394,8 +390,6 @@ module LospecsBack : CBackend = struct
         idx + w
       ) 0 bd
     
-    (* FIXME: Some of these are unused as of now, but they seem useful 
-       as part of the library, do we keep them? *)
     let dep_var_count (d: deps) : int = 
       Set.cardinal 
         (Array.fold_left (Set.union) Set.empty 
@@ -655,7 +649,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   | CircInputUnificationFailure of (cinp * cinp) 
   | CircTyConversionFailure
   | CircConstructorInvalidArguments of circconstructor
-  | CircComposeInvalidArguments (* FIXME: what is a useful error to print here ? *)
+  | CircComposeInvalidArguments 
   | CircComposeBadNumberOfArguments of { expected: int; received: int}
   | CircEquivNonBoolPCond
   | CircSmtNonBoolCirc
@@ -824,7 +818,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           { st with pv_ids = Map.add (m, s) id st.pv_ids}, (id, t)) st bnds
       in open_circ_lambda st bnds 
 
-    (* FIXME: should we remove id from the mapping? *)
     let close_circ_lambda (st: state) : state = 
       match st.lambdas with
       | [] -> lowcircerror (CloseWithoutLambda)
@@ -845,7 +838,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   end
 
   (* Inputs helper functions *)
-  (* FIXME: maybe do something a bit more principled here ? After merge *)
   let merge_inputs (cs: cinp list) (ds: cinp list) : cinp list =
 (*     if List.for_all2 (fun {id=id1; type_=ct1} {id=id2; type_=ct2} -> id1 = id2 && ct1 = ct2) cs ds then cs  *)
     if cs = ds then cs 
@@ -969,7 +961,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let circuit_is_free (f: circuit) : bool = List.is_empty @@ snd f 
 
   let circuit_ite ~(c: circuit) ~(t: circuit) ~(f: circuit) : circuit =
-    let strict = true in (* FIXME: Decide which behaviour we want, post PR *)
+    let strict = true in
     let inps = match c, t, f with
     | (_, []), (_, []), (_, []) when strict -> []
     | (_, cinps), (_, tinps), (_, finps) when (not strict) && cinps = tinps && cinps = finps -> cinps
@@ -987,7 +979,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | CBool, CBool -> {reg = res_r; type_ = (fst t).type_}, inps
     | _ -> lowcircerror @@ CircConstructorInvalidArguments Ite
 
-  (* TODO: type check? *)
   let circuit_eq (c: circuit) (d: circuit) : circuit =  
     match (fst c).type_, (fst d).type_ with
     | (CArray _), (CArray _) 
@@ -1135,8 +1126,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
      to equivalence between the subcircuits 
 
      Implicitly flattens everything to bitstrings
-
-     TODO: add functionality for user specified lane size
   *)
   let fillet_circuit ((c, inps) : circuit) : circuit list = 
     let r = c.reg |> Backend.node_list_of_reg in
@@ -1188,14 +1177,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let checks = List.stable_sort (fun (_, d1) (_, d2) ->
       let m1 = (Map.keys d1 |> Set.of_enum |> Set.min_elt_opt) in 
       let m2 = (Map.keys d2 |> Set.of_enum |> Set.min_elt_opt) in 
-      (* FIXME: Check this *)
       match m1, m2 with
       | None, None -> 0
       | None, Some _ -> -1
       | Some _, None -> 1
       | Some m1, Some m2 ->
       let c1 = Int.compare m1 m2 in
-      if c1 = 0 then (* FIXME: check default value V V *)
+      if c1 = 0 then
         Int.compare (Map.find m1 d1 |> Set.min_elt_opt |> Option.default (-1)) (Map.find m1 d2 |> Set.min_elt_opt |> Option.default (-1))
       else
         c1
@@ -1210,8 +1198,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       match cs with 
       | [] -> (cur::acc)
       | (c, d')::cs -> 
-(*
-        FIXME: do we keep this? also add log levels *)
         Option.may (fun f -> f @@ 
           Format.asprintf "Comparing deps:@.%a@.To deps:@.%a@."
           Backend.Deps.pp_dep d 
@@ -1261,7 +1247,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     { reg = c; type_ = CBool}, inps
 
 
-  (* FIXME: Review later? *)
   let collapse_lanes ?(logger : (string -> unit) option) (lanes: circuit list) =
     (* Circuit structural equality after renaming *)
     let (===) (c1: circ) (c2: circ) : bool = 
@@ -1278,7 +1263,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         else 
           collapse (cur::acc) c cs
     in
-    (* FIXME: optimize later *)
     let rec doit (cs: circuit list) : circuit list =
       match cs with
       | [] -> []
@@ -1308,7 +1292,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     - SMT check for any remainings ones
    *)
   let fillet_tauts ?(logger: (string -> unit) option) (pres: circuit list) (posts: circuit list) : bool =
-    (* Assumes everything is single bit outputs. FIXME: does it? *)
+    (* Assumes everything is single bit outputs. *)
     let posts = List.filter_map (fun ((postc, _) as post) -> 
       if Backend.nodes_eq (Backend.node_of_reg postc.reg) Backend.true_ then None
       else Some post
@@ -1341,7 +1325,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let compute ~(sign: bool) ((r, inps) as c: circuit) (args: arg list) : zint option = 
     begin match r.type_ with
     | CBitstring _ -> ()
-    | _ -> assert false (* TODO: FIXME Add functionality for other or add exception *)
+    | _ -> assert false 
     end;
 
     if List.compare_lengths args inps <> 0 
@@ -1403,10 +1387,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let inp, renamer = input_aggregate_renamer inps in
     {c with reg = Backend.applys renamer c.reg}, [inp]
 
-  (* FIXME: do implicit conversion to this type before writing or enforce explicit conversion ? *)
   let circuit_to_file ~(name: string) ((c, inps): circuit) : symbol =
     match c, inps with
-    | {reg = r; type_ = CBitstring _}, {type_ = CBitstring w; id}::[] -> (* TODO: rename inputs? *)
+    | {reg = r; type_ = CBitstring _}, {type_ = CBitstring w; id}::[] -> 
       Backend.reg_to_file ~input_count:w ~name (Backend.applys (fun (id_, i) -> if id_ = id then Some (Backend.input_node ~id:0 (i+1)) else None) r)
     | _ -> lowcircerror @@ UnsupportedTypeForFileOutput
 
@@ -1424,7 +1407,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       (Backend.input_of_size ~id size, { type_ = ty; id = id; } )
       ) arg_tys |> List.split in
     let c = c cinps in
-    { reg = c; type_ = ret_ty}, inps (* TODO: type checking ? *)
+    { reg = c; type_ = ret_ty}, inps 
 (*     { reg = c; CBitstring c, inps) |> convert_type ret_ty *)
 
     (* -------------------------------------------------------------------- *)
@@ -1471,7 +1454,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
 
-      (* FIXME: what do we want for out of bounds extract? Decide later *)
       | { kind = `Extract ((_, Some _), (_, Some w_out), aligned) } -> 
         begin match args with
         | [ `Circuit (({type_ = CBitstring _}, _ ) as c) ; `Constant i ] ->
@@ -1497,8 +1479,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           in
           (* Inputs of all components should match after map *)
           if not (List.for_all ((=) (List.hd inps)) inps) then 
-            (* FIXME: Careful with input modelling, if abstraction breaks this breaks
-               post PR work *)
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let inps = List.hd inps in
           let circ = { reg = (Backend.flatten circs); type_ = CArray {width=w_o; count=n}} in  
@@ -1522,8 +1502,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           circs in
           (* Inputs should be uniform across components after mapping *)
           if not (List.for_all ((=) (List.hd cinps)) cinps) then
-            (* FIXME: Careful with input modelling, if abstraction breaks this breaks
-               post PR work *)
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let cinps = List.hd cinps in
           {type_ = CArray {width=w_o; count=n} ; reg = Backend.flatten circs}, cinps 
@@ -1535,7 +1513,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           let circs, cinps = List.split @@ List.init w init_f in
           let circs = List.map 
             (function 
-            (* FIXME: bad abstraction, fix after PR *)
             | {type_ = CBitstring 1; reg = b}
             | {type_ = CBool; reg = b} -> Backend.node_of_reg b 
             (* Return type should be bool (= bit) for components *)
@@ -1543,8 +1520,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
             circs
           in
           if not (List.for_all ((=) (List.hd cinps)) cinps) then
-            (* FIXME: Careful with input modelling, if abstraction breaks this breaks
-               post PR work *)
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let cinps = List.hd cinps in
           {type_ = CBitstring w; reg = (Backend.reg_of_node_list circs)}, cinps
@@ -1589,7 +1564,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
         {type_ = CBitstring size; reg = (Backend.smod c1 c2)}, [inp1; inp2] 
-        (* Should this be mod or rem? TODO FIXME*)
 
       | { kind = `Shl  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 

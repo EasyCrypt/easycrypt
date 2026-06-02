@@ -527,7 +527,7 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
 
     let lv, e = destr_asgn i in
 
-    let pvl = (* FIXME: do we want to do this TCB-wise? *)
+    let pvl = 
       match lv with
       | LvVar _ -> PV.empty
       | LvTuple lvs ->

@@ -8,7 +8,6 @@ let load_from_file ~(filename : string) =
   let specs = Typing.tt_program Typing.Env.empty specs in
   specs
 
-(* FIXME: Duplicated from circuit.ml *)
 let split_at_arr (type t) (n: int) (r: t array) : t array * t array =
   Array.sub r 0 n, Array.right r (Array.length r - n)
 
