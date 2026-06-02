@@ -88,7 +88,6 @@ lemma W8_xor_ext (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ 
 proof.
 proc.
 extens [a] : (wp; skip; smt()). 
-admit. 
 qed.
 
 lemma W8_xor_circuit (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
@@ -148,10 +147,10 @@ end Array8.
 bind array Array8."_.[_]" Array8."_.[_<-_]" Array8.tolist Array8.oflist Array8.t 8.
 realize gt0_size by auto.
 realize tolistP by admit.
+realize oflistP by admit.      
 realize eqP by admit.
 realize get_setP by admit.
 realize get_out by admit.
-
 
 op init_8_8 (f: int -> W8) : W8 Array8.t.
 

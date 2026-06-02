@@ -4,6 +4,7 @@ from Jasmin require import JModel JArray.
 clone import PolyArray as Array2 with op size <- 2.
 
 bind array Array2."_.[_]" Array2."_.[_<-_]" Array2.to_list Array2.of_list Array2.t 2.
+realize oflistP by admit.
 realize tolistP by admit.
 realize eqP by admit.
 realize get_setP by admit.
