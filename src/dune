@@ -31,4 +31,4 @@
 (menhir
  (modules ecParser)
  (explain true)
- (flags --table --unused-token COMMENT))
+ (flags --table --unused-token COMMENT --unused-token QUOTATION))

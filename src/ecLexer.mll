@@ -515,6 +515,17 @@ and quotation buf depth = parse
       Buffer.add_char buf '\n';
       quotation buf depth lexbuf
     }
+  | '.' (eof | blank | newline) {
+      (* ensure the sentence termination will be re-read, when
+         lexing is resumed after the exception is caught;
+         otherwise Proof General will be stuck *)
+      let end_pos = lexbuf.lex_curr_p in
+      let lookahead_len = 2 in
+      lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - lookahead_len;
+      lexbuf.lex_curr_p <-
+        { end_pos with pos_cnum = end_pos.pos_cnum - lookahead_len };
+      lex_error lexbuf "sentence terminated inside quotation";
+    }
   | eof { lex_error lexbuf "unterminated quotation" }
   | _ as c {
       Buffer.add_char buf c;
