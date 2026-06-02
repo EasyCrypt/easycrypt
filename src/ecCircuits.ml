@@ -440,21 +440,19 @@ let form_is_iter (f : form) : bool =
     true
   | _ -> false
 
-(* Expands iter, fold and iteri (for integer arguments) *)
-let circuit_of_form
-    (st : state)
-    (* Program variable values *) (hyps : hyps)
-    (f_ : EcAst.form) : circuit =
-  (* Form level cache, local to each high-level call *)
-  let cache : circuit EcAlphaInvHashtbl.t = EcAlphaInvHashtbl.create hyps 700 in
-  let op_cache : circuit Mp.t ref = ref Mp.empty in
+let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
   let redmode = circ_red hyps in
   let env = toenv hyps in
   let ppe = EcPrinting.PPEnv.ofenv env in
-  let fapply_safe f fs =
-    let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
-    res
+
+  let fapply_safe (f : form) (fs : form list) =
+    EcTypesafeFol.fapply_safe ~redmode hyps f fs
   in
+
+  (* Form level cache, local to each high-level call *)
+  let cache : circuit EcAlphaInvHashtbl.t = EcAlphaInvHashtbl.create hyps 700 in
+  let op_cache : circuit Mp.t ref = ref Mp.empty in
+
   let int_of_form (f : form) : zint = int_of_form hyps f in
 
   (* Supposed to be called on an apply *)
@@ -472,21 +470,25 @@ let circuit_of_form
   let rec arg_of_form (st : state) (f : form) : arg =
     try
       match f.f_ty with
-      | t when EcReduction.EqTest.is_int env t -> arg_of_zint (int_of_form f)
+      | t when EcReduction.EqTest.is_int env t ->
+        arg_of_zint (int_of_form f)
+
       | t when type_has_bindings env t ->
         let f = circuit_of_node st f in
         arg_of_circuit f
-      | {ty_node = Tfun (i_t, c_t)}
-        when i_t.ty_node = EcTypes.tint.ty_node && type_has_bindings env c_t ->
+
+      | { ty_node = Tfun (i_t, c_t) } when
+          ty_equal i_t EcTypes.tint && type_has_bindings env c_t
+        ->
         arg_of_init (fun i ->
             let f = fapply_safe f [f_int (BI.of_int i)] in
             circuit_of_node st f)
-      | {ty_node = Tconstr (p, [t])}
-        when p = EcCoreLib.CI_List.p_list && type_has_bindings env t ->
-        let cs =
-          List.map (fun f -> circuit_of_node st f) (form_list_of_form ~env f)
-        in
-        arg_of_circuits cs
+      | { ty_node = Tconstr (p, [t]) } when
+          EcPath.p_equal p (EcCoreLib.CI_List.p_list) && type_has_bindings env t
+        ->
+          let cs = List.map (circuit_of_node st) (form_list_of_form ~env f) in
+          arg_of_circuits cs
+  
       | _ ->
         EcLowCircuits.log st
         @@ Format.asprintf "Failed to convert form to arg: %a@."
@@ -494,20 +496,21 @@ let circuit_of_form
              f;
         circ_error (BadFormForArg f)
     with CircError e -> propagate_circ_error (`ToArg f) e
+
   (* State does not get backward propagated so it is not returned *)
   and circuit_of_node (st : state) (f_ : form) : circuit =
     try
       begin
         match f_.f_node with
-        | Fint _z -> circ_error (CantConvertToCirc `Int)
-        | Fif (c_f, t_f, f_f) ->
-          let t = circuit_of_node st t_f in
-          let f = circuit_of_node st f_f in
-          let c = circuit_of_node st c_f in
-          circuit_ite ~c ~t ~f
+        | Fint _z ->
+          circ_error (CantConvertToCirc `Int)
+
         | Flocal idn -> state_get st idn
+
         | Fop (pth, _) -> circuit_of_op_form st f_ pth
+  
         | Fapp (f, fs) -> circuit_of_app st f_ f fs
+  
         | Fquant (qnt, binds, f) ->
           (* FIXME Does this type conversion make sense? *)
           let binds =
@@ -518,27 +521,37 @@ let circuit_of_form
             | Lforall | Llambda ->
               circ_lambda_oneshot st binds (fun st -> circuit_of_node st f)
               (* FIXME: look at this interaction *)
-            | Lexists -> circ_error (CantConvertToCirc (`Quantif qnt))
-            (* FIXME: Do we want to handle existentials? *)
+            | Lexists ->
+              circ_error (CantConvertToCirc (`Quantif qnt))
           end
+
+        | Fif (c_f, t_f, f_f) ->
+          let t = circuit_of_node st t_f in
+          let f = circuit_of_node st f_f in
+          let c = circuit_of_node st c_f in
+          circuit_ite ~c ~t ~f
+
         | Fproj (f, i) ->
           let ftp = circuit_of_node st f in
           (circuit_tuple_proj ftp i :> circuit)
-        | Fmatch (_f, _fs, _ty) -> circ_error (CantConvertToCirc `Match)
+  
+        | Fmatch (_f, _fs, _ty) ->
+          circ_error (CantConvertToCirc `Match)
+  
         | Flet (LSymbol (id, _t), v, f) ->
           let vc = circuit_of_node st v in
           let st = update_state st id vc in
           circuit_of_node st f
+
         | Flet (LTuple vs, v, f) ->
           let vc = circuit_of_node st v in
           let comps = circuits_of_circuit_tuple vc in
-          let st =
-            List.fold_left2
-              (fun st (id, _t) vc -> update_state st id vc)
-              st vs comps
-          in
+          let st = List.fold_left2 update_state st (List.fst vs) comps in
           circuit_of_node st f
-        | Flet (LRecord _, _, _) -> circ_error (CantConvertToCirc `Record)
+
+        | Flet (LRecord _, _, _) ->
+          circ_error (CantConvertToCirc `Record)
+
         | Fpvar (pv, mem) ->
           let v =
             match pv with
@@ -560,47 +573,48 @@ let circuit_of_form
                 f_.f_ty (* Allow uninitialized program variables *)
           in
           v
-        | Fglob (_id, _mem) -> circ_error (CantConvertToCirc `ModGlob)
+        | Fglob (_id, _mem) ->
+          circ_error (CantConvertToCirc `ModGlob)
+
         | Ftuple comps ->
-          let comps = List.map (fun comp -> circuit_of_node st comp) comps in
+          let comps = List.map (circuit_of_node st) comps in
           (circuit_tuple_of_circuits comps :> circuit)
+
         | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _ | FeHoareF _
         | FeHoareS _ | FequivF _ | FequivS _ | FeagerF _ | Fpr _ ->
           circ_error (CantConvertToCirc `Hoare)
-        (* FIXME: do we want to allow conversion of hoare statements? 
-        Probably not at this point
-     *)
       end
     with CircError e -> propagate_circ_error (`Convert f_) e
+
   (* Translate a nullary operator [Fop pth] (the whole form is [f_]). *)
   and circuit_of_op_form (st : state) (f_ : form) (pth : path) : circuit =
-    if pth = EcCoreLib.CI_Witness.p_witness then (
+    if EcPath.p_equal pth EcCoreLib.CI_Witness.p_witness then begin
       EcEnv.notify env `Debug "Assigning witness to var of type %a@."
         EcPrinting.(pp_type ppe)
         f_.f_ty;
-      circuit_uninit env f_.f_ty)
-    else
+      circuit_uninit env f_.f_ty
+    end else
       match Mp.find_opt pth !op_cache with
       | Some op -> op
-      | None -> (
-        match classify_baseop env pth with
-        | Some op ->
-          let circ = circuit_of_op env op in
-          op_cache := Mp.add pth circ !op_cache;
-          circ
-        | None ->
-          let circ =
-            match (EcEnv.Op.by_path pth env).op_kind with
-            | OB_oper (Some (OP_Plain f)) -> circuit_of_node st f
-            | _ -> begin
-              match EcFol.op_kind (destr_op f_ |> fst) with
-              | Some `True -> (circuit_true :> circuit)
-              | Some `False -> (circuit_false :> circuit)
-              | _ -> circ_error (CantConvertToCirc (`Op (destr_op f_ |> fst)))
-            end
-          in
-          op_cache := Mp.add pth circ !op_cache;
-          circ)
+      | None ->
+        let circ = circuit_of_op_form_real st f_ pth in
+        op_cache := Mp.add pth circ !op_cache;
+        circ
+
+    and circuit_of_op_form_real (st : state) (f_ : form) (pth : path) : circuit =
+      match classify_baseop env pth with
+      | Some op ->
+        circuit_of_op env op
+      | None ->
+          match (EcEnv.Op.by_path pth env).op_kind with
+          | OB_oper (Some (OP_Plain f)) -> circuit_of_node st f
+          | _ -> begin
+            match EcFol.op_kind (destr_op f_ |> fst) with
+            | Some `True -> (circuit_true :> circuit)
+            | Some `False -> (circuit_false :> circuit)
+            | _ -> circ_error (CantConvertToCirc (`Op (destr_op f_ |> fst)))
+          end
+
   (* Translate an operator application whose head [f] is a (non-parametric,
      non-iter, non-integer-specialized) operator applied to [fs]: the
      logical connectives, otherwise recurse into the definition. *)
@@ -610,38 +624,48 @@ let circuit_of_form
       let c1 = circuit_of_node st f1 in
       let c2 = circuit_of_node st f2 in
       (circuit_eq c1 c2 :> circuit)
+
     | Some `Not, [f] ->
       let c = circuit_of_node st f in
       circuit_not c
-    | Some `True, [] -> (circuit_true :> circuit)
-    | Some `False, [] -> (circuit_false :> circuit)
+
+    | Some `True, [] ->
+      (circuit_true :> circuit)
+
+    | Some `False, [] ->
+      (circuit_false :> circuit)
+
     | Some `Imp, [f1; f2] ->
       let c1 = circuit_of_node st f1 in
       let c2 = circuit_of_node st f2 in
       (circuit_or (circuit_not c1) c2 :> circuit)
+
     | Some (`And _), [f1; f2] ->
       let c1 = circuit_of_node st f1 in
       let c2 = circuit_of_node st f2 in
       (circuit_and c1 c2 :> circuit)
+
     | Some (`Or _), [f1; f2] ->
       let c1 = circuit_of_node st f1 in
       let c2 = circuit_of_node st f2 in
       (circuit_or c1 c2 :> circuit)
+
     | Some `Iff, [f1; f2] ->
       let c1 = circuit_of_node st f1 in
       let c2 = circuit_of_node st f2 in
       (circuit_or (circuit_and c1 c2)
          (circuit_and (circuit_not c1) (circuit_not c2))
         :> circuit)
+
     (* Recurse down into definition *)
     | _ ->
       let f_c = circuit_of_node st f in
       let fcs = List.map (circuit_of_node st) fs in
       circuit_compose f_c fcs
+
   (* Translate an application [Fapp (f, fs)] (the whole form is [f_]),
      memoized in [cache]. *)
-  and circuit_of_app (st : state) (f_ : form) (f : form) (fs : form list) :
-      circuit =
+  and circuit_of_app (st : state) (f_ : form) (f : form) (fs : form list) : circuit =
     match EcAlphaInvHashtbl.find_opt cache f_ with
     | Some circ -> circ
     | None ->
@@ -674,8 +698,8 @@ let circuit_of_form
       in
       EcAlphaInvHashtbl.add cache f_ circ;
       circ
-  and trans_iter (st : state) (hyps : hyps) (f : form) (fs : form list) :
-      circuit =
+
+  and trans_iter (st : state) (hyps : hyps) (f : form) (fs : form list) : circuit =
     try
       (* FIXME: move auxiliary function out of the definitions *)
       let redmode = circ_red hyps in
@@ -709,14 +733,8 @@ let circuit_of_form
           start_val (List.make reps fn)
       | _ -> raise (DestrError "iter")
     with CircError e -> propagate_circ_error (`ExpandIter (f, fs)) e
-  in
-  let res = circuit_of_node st f_ in
-  (* State cleanup *)
-  begin
-    op_cache := Mp.empty;
-    EcAlphaInvHashtbl.clear cache
-  end;
-  res
+
+  in circuit_of_node st f_
 
 let circuit_check_posts
     ~(env : env)
