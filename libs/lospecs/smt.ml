@@ -108,6 +108,30 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let var_names (c : t) : string list = List.of_enum (Hashtbl.keys c.vars)
   end
 
+  (* Dump the current SMT model to stderr (diagnostic only, emitted when a
+     query comes back satisfiable). [names_header] labels the listing of
+     allocated variables; [inps] are the circuit inputs as (id, width)
+     pairs, each printed as the solver value of the concatenation of its
+     size-1 bit variables. *)
+  let print_model
+      (cache : Cache.t)
+      ~(names_header : string)
+      (inps : (int * int) list option) : unit =
+    Format.eprintf "%s" names_header;
+    List.iter (Format.eprintf "%s ") (Cache.var_names cache);
+    Format.eprintf "@\n";
+    Option.may
+      (fun inps ->
+        List.iteri
+          (fun i (id, sz) ->
+            let bv =
+              List.init sz (fun b -> Cache.var_opt cache (name_of_var id b))
+              |> List.reduce SMT.bvterm_concat
+            in
+            Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv))
+          inps)
+      inps
+
   (* Translate an AIG node to an SMT bitvector term, using [cache] both to
      memoize nodes and to allocate the size-1 input variables. *)
   let bvterm_of_node (cache : Cache.t) : Aig.node -> SMT.bvterm =
@@ -150,28 +174,6 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let bvinpt2 = bvterm_of_reg r2 in
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = bvterm_of_node pcond in
-    let inps =
-      Option.bind inps (fun l -> if List.is_empty l then None else Some l)
-    in
-
-    let inps =
-      Option.map
-        (fun inps ->
-          List.map
-            (fun (id, sz) -> List.init sz (fun i -> name_of_var id i))
-            inps)
-        inps
-    in
-    let inps =
-      Option.map
-        (fun inps -> List.map (List.map (Cache.var_opt cache)) inps)
-        inps
-    in
-    let bvinp =
-      Option.map
-        (fun inps -> List.map (fun i -> List.reduce SMT.bvterm_concat i) inps)
-        inps
-    in
 
     begin
       SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
@@ -179,17 +181,7 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       else begin
         Format.eprintf "bvout1: %a@." SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "bvout2: %a@." SMT.pp_term (SMT.get_value bvinpt2);
-        Format.eprintf "Terms in formula: ";
-        List.iter (Format.eprintf "%s ") (Cache.var_names cache);
-        Format.eprintf "@\n";
-        Option.may
-          (fun bvinp ->
-            List.iteri
-              (fun i bv ->
-                Format.eprintf "input[%d]: %a@." i SMT.pp_term
-                  (SMT.get_value bv))
-              bvinp)
-          bvinp;
+        print_model cache ~names_header:"Terms in formula: " inps;
         false
       end
     end
@@ -214,43 +206,10 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let form = bvterm_of_node n in
     let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
 
-    let inps =
-      Option.bind inps (fun l -> if List.is_empty l then None else Some l)
-    in
-
-    let inps =
-      Option.map
-        (fun inps ->
-          List.map
-            (fun (id, sz) -> List.init sz (fun i -> name_of_var id i))
-            inps)
-        inps
-    in
-    let inps =
-      Option.map
-        (fun inps -> List.map (List.map (Cache.var_opt cache)) inps)
-        inps
-    in
-    let bvinp =
-      Option.map
-        (fun inps -> List.map (fun i -> List.reduce SMT.bvterm_concat i) inps)
-        inps
-    in
-
     begin
       SMT.assert' @@ form;
       if SMT.check_sat () = true then begin
-        Format.eprintf "Input BVVars: ";
-        List.iter (Format.eprintf "%s, ") (Cache.var_names cache);
-        Format.eprintf "@.";
-        Option.may
-          (fun bvinp ->
-            List.iteri
-              (fun i bv ->
-                Format.eprintf "input[%d]: %a@." i SMT.pp_term
-                  (SMT.get_value bv))
-              bvinp)
-          bvinp;
+        print_model cache ~names_header:"Input BVVars: " inps;
         true
       end
       else false
