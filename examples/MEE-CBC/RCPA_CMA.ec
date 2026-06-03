@@ -41,7 +41,7 @@ theory MtE.
   proof * by smt.
 
   (** The black-box construction is as follows **)
-  module MacThenEncrypt(E:SKEa.Enc_Scheme, M:MACa.MAC_Scheme): Enc_Scheme = {
+  module MacThenEncrypt (E: SKEa.Enc_Scheme) (M: MACa.MAC_Scheme): Enc_Scheme = {
     proc keygen(): eK * mK = {
       var ek, mk;
 
