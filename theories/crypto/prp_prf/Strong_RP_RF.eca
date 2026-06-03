@@ -12,7 +12,6 @@ op uD: { D distr | is_uniform uD /\ is_lossless uD /\ is_full uD } as uD_uf_fu.
 
 (** and a type K equipped with a lossless distribution **)
 type K.
-op dK: { K distr | is_lossless dK } as dK_ll.
 
 clone import PRP as PRPt with
   type D  <- D.

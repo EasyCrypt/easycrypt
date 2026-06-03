@@ -57,30 +57,23 @@ end RF.
 abstract theory PseudoRF.
 type K.
 
-op dK: { K distr | is_lossless dK } as dK_ll.
-
-op F : K -> D -> R.
-
 module type PseudoRF = {
   proc keygen(): K
-  proc f(_ : K * D): R
+  proc f(_: K * D): R
 }.
 
-module PseudoRF = {
-  proc keygen() = {
-    var k;
-
-    k <$ dK;
-    return k;
-  }
-
-  proc f(k, x) = { return F k x; }
-}.
-
-module PRF = {
+module PRF (P : PseudoRF) = {
   var k : K
 
-  proc init() = { k <$ dK; }
-  proc f(x: D) = { return F k x; }
+  proc init() = {
+    k <@ P.keygen();
+  }
+
+  proc f(x: D) = {
+    var r;
+
+    r <@ P.f(k, x);
+    return r;
+  }
 }.
 end PseudoRF.
