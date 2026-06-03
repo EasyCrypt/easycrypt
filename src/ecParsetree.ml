@@ -1034,7 +1034,6 @@ type apply_info = [
   | `Apply   of ppterm list * [`Apply|`Exact|`Alpha]
   | `Top     of [`Apply|`Exact|`Alpha]
   | `Alpha   of ppterm
-  | `ExactType of pqsymbol
 ]
 
 (* -------------------------------------------------------------------- *)

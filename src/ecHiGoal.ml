@@ -563,25 +563,6 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
     tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
-let process_exacttype qs (tc : tcenv1) =
-  let env, hyps, _ = FApi.tc1_eflat tc in
-  let p =
-    try EcEnv.Ax.lookup_path (EcLocation.unloc qs) env
-    with LookupFailure cause ->
-      tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
-  in
-  let tys =
-    List.map (fun a -> EcTypes.tvar a)
-      (EcEnv.LDecl.tohyps hyps).h_tvar in
-  let pt = ptglobal ~tys p in
-
-  try
-    EcLowGoal.t_apply pt tc
-  with InvalidGoalShape ->
-    let ppe = EcPrinting.PPEnv.ofenv env in
-    tc_error !!tc "cannot apply %a@." (EcPrinting.pp_axname ppe) p
-
-(* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
   let module E = struct exception NoInstance end in
 
@@ -2047,9 +2028,6 @@ let process_apply ~implicits ((infos, orv) : apply_t * prevert option) tc =
 
     | `Alpha pe ->
         process_apply_bwd ~implicits `Alpha pe tc
-
-    | `ExactType qs ->
-        process_exacttype qs tc
 
     | `Top mode ->
         let tc = process_apply_top tc in
