@@ -136,7 +136,7 @@ theory Array8.
 type 'a t.
 
 op tolist : 'a t -> 'a list.
-op oflist : 'a list -> 'a t.
+op oflist : 'a -> 'a list -> 'a t.
 op "_.[_]" : 'a t -> int -> 'a.
 op "_.[_<-_]" : 'a t -> int -> 'a -> 'a t.
 
