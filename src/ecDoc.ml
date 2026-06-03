@@ -4,30 +4,254 @@ open Tyxml.Html
 open EcScope
 
 (* -------------------------------------------------------------------- *)
-type docpage = {
-    path : string list;
-    title : string;
-    intro : docblock list;
-    sections : docsection list;
-    subs : docpage list;
-    super : docpage;
+module DocModel = struct
+  type page_id = string list
+
+  type section_id = {
+    sid_page : page_id;
+    sid_name : string;
   }
 
-and docsection = {
-    kind : EcScope.itemkind;
-    items : docitem list;
+  type item_id = {
+    iid_page : page_id;
+    iid_kind : itemkind;
+    iid_name : string;
+    }
+
+  type item_target =
+    | PageTarget of page_id
+
+  type t = {
+    model_pages : docpage list;
   }
 
-and docitem = {
-    mode : EcScope.mode;
-    kind : EcScope.itemkind;
-    name : string;
-    docs : docblock list;
-    source : string list;
+  and docpage = {
+    page_id : page_id;
+    page_parent : page_id option;
+    page_title : string;
+    page_intro : docblock list;
+    page_sections : docsection list;
+    page_subpages : docpage list;
   }
 
-and docblock =
-  | Markdown of string
+  and docsection = {
+    section_id : section_id;
+    section_title : string;
+    section_items : docitem list;
+  }
+
+  and docitem = {
+    item_id : item_id;
+    item_mode : mode;
+    item_kind : itemkind;
+    item_name : string;
+    item_docs : docblock list;
+    item_source : string list;
+    item_target : item_target option;
+  }
+
+  and docblock =
+    | RawDoc of string
+
+  let empty : t = {
+    model_pages = [];
+  }
+
+  let rawdoc_of_string (s : string) : docblock =
+    RawDoc s
+
+  let rawdocs_of_strings (ss : string list) : docblock list =
+    List.map rawdoc_of_string ss
+
+  let filename_of_pageid ?ext (id : page_id) : string =
+    let base = String.concat "!" id in
+    match ext with
+    | None -> base
+    | Some ext -> base ^ ext
+
+  let pageid_of_name ?pid (name : string) : page_id =
+    match pid with
+    | None -> [name]
+    | Some pid -> pid @ [name]
+
+  let pagetitle_of_mode_and_name (mode : mode) (name : string) : string =
+    match mode with
+    | `Abstract -> "Abstract Theory " ^ name
+    | `Specific -> "Theory " ^ name
+
+  let namesl_of_itemkind (ik : itemkind) : string =
+    match ik with
+    | `Type -> "Type"
+    | `Operator -> "Operator"
+    | `Axiom -> "Axiom"
+    | `Lemma -> "Lemma"
+    | `ModuleType -> "Module Type"
+    | `Module -> "Module"
+    | `Theory -> "Theory"
+
+  let namepl_of_itemkind (ik : itemkind) : string =
+    match ik with
+    | `Type -> "Types"
+    | `Operator -> "Operators"
+    | `Axiom -> "Axioms"
+    | `Lemma -> "Lemmas"
+    | `ModuleType -> "Module Types"
+    | `Module -> "Modules"
+    | `Theory -> "Theories"
+
+  let sectionkey_of_itemkind (ik : itemkind) : string =
+    match ik with
+    | `Type -> "types"
+    | `Operator -> "operators"
+    | `Axiom -> "axioms"
+    | `Lemma -> "lemmas"
+    | `ModuleType -> "module-types"
+    | `Module -> "modules"
+    | `Theory -> "theories"
+
+  (* let path_of_qsymbol (env : EcEnv.env) (ik : itemkind) (qsym : EcSymbols.qsymbol) : EcPath.path = *)
+  (*   match ik with *)
+  (*   | `Type -> EcEnv.Ty.lookup_path qsym env *)
+  (*   | `Operator -> EcEnv.Op.lookup_path qsym env *)
+  (*   | `Axiom -> EcEnv.Ax.lookup_path qsym env *)
+  (*   | `Lemma -> EcEnv.Ax.lookup_path qsym env *)
+  (*   | `ModuleType -> EcEnv.ModTy.lookup_path qsym env *)
+  (*   | `Module -> *)
+  (*      begin *)
+  (*        match (EcEnv.Mod.lookup_path qsym env).m_top with *)
+  (*        | `Concrete (p, None) -> p *)
+  (*        | `Concrete (_, Some _) -> failwith "Linking to sub-modules not supported." *)
+  (*        | `Local _ -> failwith "Linking to local/declared modules not supported." *)
+  (*      end *)
+  (*   | `Theory -> EcEnv.Theory.lookup_path ~mode:`All qsym env *)
+
+ let docitem_of_itemdoc
+      ~(pid : page_id)
+      (docstr, (mode, kind, name, src))
+    : docitem =
+    {
+      item_id = {
+        iid_page = pid;
+        iid_kind = kind;
+        iid_name = name;
+      };
+      item_mode = mode;
+      item_kind = kind;
+      item_name = name;
+      item_docs = rawdocs_of_strings docstr;
+      item_source = src;
+      item_target = None;
+    }
+
+  let docitem_of_subdoc
+      ~(pid : page_id)
+      (docstr, (mode, kind, name, src))
+    : docitem =
+    let child_pid = pageid_of_name ~pid name in
+    {
+      item_id = {
+        iid_page = pid;
+        iid_kind = kind;
+        iid_name = name;
+      };
+      item_mode = mode;
+      item_kind = kind;
+      item_name = name;
+      item_docs = rawdocs_of_strings docstr;
+      item_source = src;
+      item_target = Some (PageTarget child_pid);
+    }
+
+  let docitem_of_docent ~(pid : page_id) (docent : docentity) : docitem =
+    match docent with
+    | ItemDoc (docstr, item) ->
+        docitem_of_itemdoc ~pid (docstr, item)
+
+    | SubDoc ((docstr, item), _) ->
+        docitem_of_subdoc ~pid (docstr, item)
+
+  let docitems_of_docents
+      ~(pid : page_id)
+      (docents : docentity list)
+    : docitem list =
+    List.map (docitem_of_docent ~pid) docents
+
+  let docsection_of_docitems
+        ~(pid : page_id)
+        ~(skey : string)
+        ~(title : string)
+        (docitems : docitem list)
+      : docsection =
+    {
+      section_id = { sid_page = pid; sid_name = skey; };
+      section_title = title;
+      section_items = docitems;
+    }
+
+  let docsection_of_docitems_by_kind
+        ~(pid : page_id)
+        ~(kind : itemkind)
+        (docitems : docitem list)
+      : docsection =
+    let title = namepl_of_itemkind kind in
+    let skey = sectionkey_of_itemkind kind in
+    let items = (List.filter (fun it -> it.item_kind = kind) docitems) in
+    docsection_of_docitems ~pid:pid ~skey:skey ~title:title items
+
+  let docsections_of_docitems_by_kind
+        ~(pid : page_id)
+        (docitems : docitem list)
+      : docsection list =
+    List.map (fun ik -> docsection_of_docitems_by_kind ~pid:pid ~kind:ik docitems) all_itemkinds
+  (* |> List.filter (fun ds ->  ~pid:pid ~kind:ik docitems) *)
+
+  let rec docpage_of_subdoc ?(pid : page_id option) (subdoc : docentity) : docpage =
+    match subdoc with
+    | ItemDoc _ -> assert false
+    | SubDoc ((docstr, (mode, _kind, name, _src)), docents) ->
+       let pageid = pageid_of_name ?pid name in
+       let docitems = docitems_of_docents ~pid:pageid docents in
+       let subpages =
+         List.filter_map
+           (function
+            | ItemDoc _ -> None
+            | SubDoc _ as subdoc ->
+               Some (docpage_of_subdoc ~pid:pageid subdoc))
+           docents
+       in
+       {
+         page_id = pageid;
+         page_parent = pid;
+         page_title = pagetitle_of_mode_and_name mode name;
+         page_intro = rawdocs_of_strings docstr;
+         page_sections =
+           docsections_of_docitems_by_kind ~pid:pageid docitems;
+         page_subpages = subpages;
+       }
+
+  let root_page_of_scope ~(thname : string) ~(thmode : mode) (scope : EcScope.scope) : docpage =
+    let pageid = [thname] in
+    let docents = get_ldocentities scope in
+    let docitems = docitems_of_docents ~pid:pageid docents in
+    let subpages =
+      List.filter_map
+        (function
+          | ItemDoc _ -> None
+          | SubDoc _ as subdoc ->
+              Some (docpage_of_subdoc ~pid:pageid subdoc))
+        docents
+    in
+    {
+      page_id = pageid;
+      page_parent = None;
+      page_title = pagetitle_of_mode_and_name thmode thname;
+      page_intro = rawdocs_of_strings (get_gdocstrings scope);
+      page_sections =
+        docsections_of_docitems_by_kind ~pid:pageid docitems;
+      page_subpages = subpages;
+    }
+end
+
 
 (* -------------------------------------------------------------------- *)
 let styles_file : string =
@@ -310,7 +534,7 @@ let emit_page (dp : string) (fn : string) (page : [> Html_types.html ] elt) =
     Format.fprintf fmt "@.";
     close_out file
 
-(* -----------------------------------------------g--------------------- *)
+(* -------------------------------------------------------------------- *)
 let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) =
   let rec c_subpages ?supths ?supthf th docents =
     match docents with
@@ -336,7 +560,16 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
 
 
 (* -------------------------------------------------------------------- *)
-(* let construct_docmodel () *)
+let construct_docitem = ()
+
+let construct_docblock = ()
+
+let construct_docsection = ()
+
+let construct_docpage = ()
+
+let construct_docmodel = ()
+
 
 
 (* -------------------------------------------------------------------- *)
@@ -373,7 +606,7 @@ let generate_documentation
       ~(format : EcDocFormat.t)
       (filename : string)
       (scope : EcScope.scope) : unit =
-  let kind =
+  let filekind =
     try  EcLoader.getkind (Filename.extension filename)
     with EcLoader.BadExtension ext as ex ->
       Printf.eprintf "Unrecognized extension %s (in file %s)\n%!" ext filename; raise ex
@@ -391,7 +624,7 @@ let generate_documentation
   in
   let fn = Filename.basename filename in
   let th = Filename.remove_extension fn in
-  let tstr = thkind_str kind  ^ " " ^ th in
+  let tstr = thkind_str filekind  ^ " " ^ th in
   print_endline "End doc reached successfully"
   (* begin *)
   (*   try emit_pages dp th tstr (get_gdocstrings scope) (get_ldocentities scope) (env scope) with *)

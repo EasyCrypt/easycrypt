@@ -65,6 +65,8 @@ and itemkind = [`Type | `Operator | `Axiom | `Lemma | `ModuleType | `Module | `T
 
 and mode = [`Abstract | `Specific]
 
+val all_itemkinds : itemkind list
+
 (* -------------------------------------------------------------------- *)
 val notify : scope -> EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
 

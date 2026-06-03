@@ -363,6 +363,17 @@ and itemkind = [`Type | `Operator | `Axiom | `Lemma | `ModuleType | `Module | `T
 
 and mode = [`Abstract | `Specific]
 
+let all_itemkinds =
+  [
+    `Type;
+    `Operator;
+    `Axiom;
+    `Lemma;
+    `ModuleType;
+    `Module;
+    `Theory;
+  ]
+
 (* -------------------------------------------------------------------- *)
 let get_gdocstrings (sc : scope) : string list =
   sc.sc_globdoc
