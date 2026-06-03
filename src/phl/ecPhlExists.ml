@@ -450,6 +450,166 @@ let t_ecall_hoare_bwd ((cttpt, _) : proofterm * form) (tc : tcenv1) =
   ] tc
 
 (* -------------------------------------------------------------------- *)
+(* Backward ecall on bdHoare/phoare goals (ecall without ->>).
+ *
+ * Mirrors t_ecall_hoare_bwd but for a bdHoare goal and a bdHoare/phoare
+ * contract.  We abstract program-variable arguments of the contract pterm
+ * into fresh local idents, dispatch to [t_call None ctt] (which routes
+ * via [t_call]'s (FbdHoareF, FbdHoareS) arm to [t_bdhoare_call]), then
+ * re-generalize over the abstracted idents in the residual goals.
+ *
+ * The prefix is split from the call with [t_bdhoare_seq] under a fixed
+ * trivial probability split (f1=f2=1%r, g1=g2=0%r, pR=true).  That split
+ * only discharges the resulting bound side-conditions when the goal — and
+ * the contract — are lossless [= 1%r]; both are checked up-front so that
+ * out-of-scope goals are rejected cleanly rather than failing deep inside
+ * [t_call].  The residual goal handed back to the user is the prefix, lifted
+ * to a lossless bdHoare goal so that further ecalls keep dispatching here.
+ *)
+let t_ecall_bdhoare_bwd ((cttpt, _) : proofterm * form) (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
+  let env = EcEnv.LDecl.toenv hyps in
+  let concl = destr_bdHoareS (FApi.tc1_goal tc) in
+  let m = fst (concl.bhs_m) in
+  let call, _ = pf_last_call !!tc concl.bhs_s in
+
+  (* The trivial probability split below (f1=f2=1, g1=g2=0) only discharges
+   * the bound side-conditions when the goal is [= 1%r] (lossless). For any
+   * other comparison or bound the construction would fail opaquely deep in
+   * [t_call]/[apply]; reject up-front with an explanatory message instead. *)
+  if concl.bhs_cmp <> FHeq || not (f_equal (bhs_bd concl).inv f_r1) then
+    tc_error !!tc
+      "backward ecall on phoare goals is only supported for lossless `= 1%%r' goals";
+
+  let pvs = PT.collect_pvars_from_pt cttpt in
+  let ids, _, pvs_as_inv, subst = abstract_pvs hyps [m] pvs in
+
+  let cttpt =
+    let pt_head, pt_args =
+      match cttpt with
+      | PTApply { pt_head; pt_args } -> (pt_head, pt_args)
+      | _ -> assert false in
+    let pt_args = List.map (PT.subst_pv_pt_arg env subst) pt_args in
+    PTApply { pt_head; pt_args } in
+
+  let cttpt, ctt = EcLowGoal.LowApply.check `Elim cttpt (`Hyps (hyps, !!tc)) in
+
+  let ctt =
+    EcReduction.h_red_opt EcReduction.full_red hyps ctt
+    |> odfl ctt in
+
+  let ids_subst =
+    List.fold_left2
+      (fun s (id, _) pv -> EcSubst.add_flocal s id (inv_of_inv pv))
+      EcSubst.empty ids pvs_as_inv in
+
+  let hf = destr_bdHoareF ctt in
+
+  (* The suffix call subgoal is synthesized with bound [= 1%r]; only a
+   * lossless [= 1%r] contract applies to it. *)
+  if hf.bhf_cmp <> FHeq || not (f_equal (bhf_bd hf).inv f_r1) then
+    tc_error !!tc
+      "backward ecall on phoare goals requires a lossless `= 1%%r' contract";
+
+  let fpre, fpost =
+    (ss_inv_rebind (bhf_pr hf) m).inv, (ss_inv_rebind (bhf_po hf) m).inv
+  in
+
+  let post =
+    EcPhlCall.compute_hoare_call_post
+      hyps m (fpre, POE.empty fpost) call
+      (POE.empty (bhs_po concl).inv) in
+  let post = EcSubst.subst_form ids_subst post in
+
+  (* Trivial probability split for FHeq with bound 1%r (lossless body):
+       pR = true, f1=f2=1%r, g1=g2=0%r.  Yields:
+        - cond_phi : f_hoareS pre s1 post  (user-level prefix, as hoare)
+        - condf1   : pre  s1 true 1%r      (lossless prefix, trivial for det. code)
+        - condf2   : phi  s2 bhs_po 1%r    (suffix bdhoare, target of t_call)
+        - condg1   : pre  s1 false 0%r     (trivial)
+        - condbd   : 1*1+0*0 = bd          (trivial when bd=1%r)
+        - condnm   : forall r1 r2 ...      (trivial) *)
+  let seq_info =
+    let phi = { m; inv = post } in
+    let pR  = { m; inv = f_true } in
+    let f1  = { m; inv = f_r1 } in
+    let f2  = { m; inv = f_r1 } in
+    let g1  = { m; inv = f_r0 } in
+    let g2  = { m; inv = f_r0 } in
+    (phi, pR, f1, f2, g1, g2)
+  in
+
+  let tc = EcPhlSeq.t_bdhoare_seq (GapBefore cpos1_last) seq_info tc in
+  (* Subgoal order from t_bdhoare_seq (with f1≠0, f2≠0, g1=0):
+       [cond_phi; condf1; condf2; condg1; condbd; condnm]
+     We apply the exists+intros+t_call pipeline to condf2 (the suffix).
+     The intros chain leaves a single bdhoare goal on which t_call produces
+     two subgoals (contract obligation + conseq); we then dispatch via
+     t_seqsub.  *)
+  let condf2_tactic =
+    FApi.t_seqs [
+      t_hr_exists_intro_r pvs_as_inv;
+      t_hr_exists_elim_r ~bound:(List.length ids);
+      t_intros_i (List.fst ids);
+      FApi.t_seqsub
+        (EcPhlCall.t_call None ctt)
+        [ EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true cttpt;
+          EcPhlAuto.t_auto ?conv:None; ];
+    ]
+  in
+
+  (* t_bdhoare_seq_r auto-closes condnm via t_try, so the count is 5 (or 6 if
+     that auto fails).  Use t_onalli with an index-based dispatcher to be
+     robust to either count.  Order (0-indexed):
+       0 -> cond_phi (HOARE prefix): lift to BDHOARE [pre ==> phi] FHeq 1%r
+            via t_hoareS_conseq_bdhoare.  This is sound under losslessness of
+            the prefix — which the user proves as part of the residual goal.
+            Subsequent ecalls then dispatch through our bdhoare arm and accept
+            phoare contracts.
+       2 -> condf2 (suffix call dance)
+       others -> auto (trivial bound conditions). *)
+  let tc =
+    FApi.t_onalli
+      (fun i ->
+        if i = 0 then EcPhlConseq.t_hoareS_conseq_bdhoare
+        else if i = 2 then condf2_tactic
+        else EcPhlAuto.t_auto ?conv:None)
+      tc
+  in
+
+  tc
+
+(* -------------------------------------------------------------------- *)
+let process_ecall_bdhoare
+  (dir   : APT.pdirection)
+  (pterm : APT.pecall)
+  (tc    : tcenv1)
+=
+  if dir <> `Backward then
+    tc_error !!tc "forward ecall on bdHoare/phoare goals is not supported";
+
+  let (ctt_path, ctt_tvi, ctt_args) = pterm in
+  let hyps = FApi.tc1_hyps tc in
+  let concl = destr_bdHoareS (FApi.tc1_goal tc) in
+
+  (* Type-check contract (lemma) - apply it fully to find the bdHoare contract *)
+  let ptenv = PT.ptenv_of_penv (LDecl.push_active_ss concl.bhs_m hyps) !!tc in
+  let contract = PT.process_pterm ptenv (APT.FPNamed (ctt_path, ctt_tvi)) in
+  let contract, _ = PT.process_pterm_args_app contract ctt_args in
+  let contract = PT.apply_pterm_to_max_holes hyps contract in
+
+  assert (PT.can_concretize contract.PT.ptev_env);
+  let contract = PT.concretize contract in
+
+  let call, _ = pf_last_call !!tc concl.bhs_s in
+
+  check_contract_type
+    ~phoare:true ~noexn:false ~loc:(L.loc ctt_path) ~name:(L.unloc ctt_path)
+    !!tc hyps (`Single call) (snd contract);
+
+  t_ecall_bdhoare_bwd contract tc
+
+(* -------------------------------------------------------------------- *)
 let process_ecall_hoare
   (dir   : APT.pdirection)
   (pterm : APT.pecall)
@@ -626,7 +786,12 @@ let process_ecall
         tc_error !!tc "cannot provide a side for Hoare goals";
       process_ecall_hoare dir pterm tc
 
+  | FbdHoareS _ ->
+      if Option.is_some oside then
+        tc_error !!tc "cannot provide a side for bdHoare/phoare goals";
+      process_ecall_bdhoare dir pterm tc
+
   | FequivS _ ->
       process_ecall_equiv dir oside pterm tc
 
-  | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `Equiv `Stmt] !!tc
+  | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt; `Equiv `Stmt] !!tc
