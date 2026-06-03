@@ -345,7 +345,21 @@ let t_change_stmt
   let goal2 =
    EcLowPhlGoal.hl_set_stmt
      side (FApi.tc1_goal tc)
-     stmt in
+     stmt 
+  in
+
+  let goal2 = 
+    let rebind inv = EcSubst.ss_inv_rebind inv (fst me) in
+    let rebind_left inv = EcSubst.ts_inv_rebind_left inv (fst me) in
+    let rebind_right inv = EcSubst.ts_inv_rebind_right inv (fst me) in
+    match side, goal2.f_node with
+    | None       , FhoareS   hs -> f_hoareS (snd me) (rebind (hs_pr hs)) hs.hs_s {(hs_po hs) with hsi_m=(fst me)}
+    | None       , FeHoareS  hs -> f_eHoareS (snd me) {(ehs_pr hs) with m=(fst me)} hs.ehs_s {(ehs_po hs) with m=(fst me)}
+    | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (rebind (bhs_pr hs)) hs.bhs_s (rebind (bhs_po hs)) hs.bhs_cmp (bhs_bd hs)
+    | Some `Left , FequivS   es -> f_equivS (snd me) (snd es.es_mr) (rebind_left (es_pr es)) es.es_sl es.es_sr (rebind_left (es_po es))
+    | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (snd me) (rebind_right (es_pr es)) es.es_sl es.es_sr (rebind_right (es_po es))
+    | _ -> assert false
+  in
 
   FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]
 

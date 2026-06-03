@@ -71,6 +71,12 @@ let get_pp_showtvi (g : gstate) : bool =
   getflag ~default:false pp_showtvi g
 
 (* -------------------------------------------------------------------- *)
+let circuit_timing = "Circuit:timing"
+
+let get_circuit_timing (g : gstate) : bool =
+  getflag ~default:false circuit_timing g
+
+(* -------------------------------------------------------------------- *)
 let add_notifier (notifier : loglevel -> string Lazy.t -> unit) (gs : gstate) =
   let notifier = { nt_id = EcUid.unique (); nt_cb = notifier; } in
   gs.gs_notifiers <- notifier :: gs.gs_notifiers; notifier.nt_id
