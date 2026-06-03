@@ -2878,7 +2878,7 @@ module Circuit = struct
           "cannot find named type: `%s'"
           (string_of_qsymbol (unloc ba.type_))
      
-      | Some (path, decl) -> (* FIXME PY: normalize? *)
+      | Some (path, decl) -> 
         if List.length decl.tyd_params <> 1 then
           hierror ~loc:(loc ba.type_)
             "type constructor should take exactly one parameter: `%s'"
@@ -3046,7 +3046,7 @@ module Circuit = struct
             "cannot find named type: `%s'"
             (string_of_qsymbol (unloc ty))
       
-        | Some (path, decl), `BV _ -> (* FIXME PY: normalize? *)
+        | Some (path, decl), `BV _ -> 
           if List.length decl.tyd_params <> 0 then
             hierror ~loc:(loc ty)
               "a bit-string type must be a monomorphic named type";

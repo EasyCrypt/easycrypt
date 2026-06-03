@@ -1029,7 +1029,6 @@ let subst_tc (s : subst) tc =
 
 (* -------------------------------------------------------------------- *)
 let subst_binding_size ?(red: (form -> int option) option) (s: subst) (bsize: binding_size) = 
-  (* FIXME PY: add reduction? *)
   let fsize = subst_form s (fst bsize) in
   let csize = match red with
   | Some red when Option.is_none (snd bsize) -> red fsize
@@ -1103,7 +1102,6 @@ let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbin
     assert (not (Mp.mem bs.touint s.sb_def));
     assert (not (Mp.mem bs.tosint s.sb_def));
     assert (not (Mp.mem bs.ofint s.sb_def));
-    (* FIXME PY: maybe add an assert here? *)
     CRB_Bitstring {
       type_  = subst_path s bs.type_;
       from_  = subst_path s bs.from_;

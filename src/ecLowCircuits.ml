@@ -1237,7 +1237,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     assert (c.type_ = CBool);
     let node_c = Backend.node_of_reg c.reg in
     let node_c, shifts = Backend.Deps.excise_bit node_c in
-    (* FIXME: do this in a more principled way (the types) after merge *)
     let inps = List.filter_map (fun {id; _} ->
       match Map.find_opt id shifts with
       | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1)}

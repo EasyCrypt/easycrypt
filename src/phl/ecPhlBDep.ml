@@ -261,7 +261,6 @@ let t_bdep_simplify (tc: tcenv1) =
   | _ -> assert false 
 
 (* ================ EXTENS TACTIC  ==================== *)
-(* FIXME PY: Maybe move later? *)
 open FApi
 let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
     (* Find goal shape 

@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 type symbol = Ptree.symbol [@@deriving yojson]
 
-(* FIXME PY: Maybe get a decl file to declare errors and other common things? *)
 exception DestrError of string
 
 (* -------------------------------------------------------------------- *)
