@@ -238,13 +238,11 @@ module KnownFlags = struct
   let implicits = "implicits"
   let oldip     = "oldip"
   let redlogic  = "redlogic"
-  let und_delta = "und_delta"
 
   let flags = [
     (implicits, false);
     (oldip    , false);
     (redlogic , true );
-    (und_delta, false);
   ]
 end
 
@@ -546,12 +544,6 @@ module Options = struct
 
   let set_redlogic scope value =
     set scope KnownFlags.redlogic value
-
-  let get_und_delta scope =
-    get scope KnownFlags.und_delta
-
-  let set_und_delta scope value =
-    set scope KnownFlags.und_delta value
 end
 
 (* -------------------------------------------------------------------- *)
@@ -857,8 +849,7 @@ module Tactics = struct
           EcHiGoal.tt_smtmode    = htmode;
           EcHiGoal.tt_implicits  = Options.get_implicits scope;
           EcHiGoal.tt_oldip      = Options.get_oldip scope;
-          EcHiGoal.tt_redlogic   = Options.get_redlogic scope;
-          EcHiGoal.tt_und_delta  = Options.get_und_delta scope; } in
+          EcHiGoal.tt_redlogic   = Options.get_redlogic scope; } in
 
         let bullets =
           try omap (EcBullets.open_phrase ~bullet juc) pac.puc_bullets
