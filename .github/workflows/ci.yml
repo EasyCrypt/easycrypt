@@ -246,8 +246,7 @@ jobs:
 
   publish:
     name: Publish Docker images
-    if: |
-      github.event_name == 'push'
+    if: github.event_name == 'push'
     needs: [compile-opam, compile-nix, check, external, external-status, docker]
     runs-on: ubuntu-24.04
     permissions:
@@ -258,6 +257,8 @@ jobs:
       with:
         name: docker-images
     - run: gunzip -c base-image.tar.gz | docker load
+    - run: gunzip -c base-build-image.tar.gz | docker load
+      if: github.ref_name == 'main'
     - run: gunzip -c build-image.tar.gz | docker load
     - uses: docker/login-action@v3
       with:
