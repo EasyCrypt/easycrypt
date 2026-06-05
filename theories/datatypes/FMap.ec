@@ -547,7 +547,7 @@ qed.
 
 lemma offset_get s (e: 'a): (offset s).[e] = if e \in s then Some () else None.
 proof.
-rewrite getE /ofset ofmapK.
+rewrite getE ofmapK.
 - move: (FSet.finite_mem s).
   apply/eq_ind/fun_ext => y.
   rewrite offunE /#.
