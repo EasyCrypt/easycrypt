@@ -1353,7 +1353,7 @@ module Op = struct
     } in
     let unfold =
       match op.po_args with
-      | (a, Some _) -> Some (List.length a)
+      | (a, Some _) -> Some (List.fold (fun acc (b, _) -> acc + List.length b) 0 a)
       | (_, None) -> None in
 
     let tyop   = EcDecl.mk_op ~opaque ?unfold tparams ty body lc in

@@ -270,7 +270,7 @@ section.
     by move=> _ _; islossless.
     (* Psample.prg preserves bad *)
     move=> *; proc; auto=> />; rewrite dseed_ll dout_ll /=.
-    move=> &hr + v1 _ _ v2 _ _; case=> [h|r r_in_log r_in_m].
+    move=> &hr + v1 _ v2 _; case=> [h|r r_in_log r_in_m].
     + by apply/Cycle; rewrite /= h.
     by apply/(@Collision _ _ r)=> /=; [rewrite r_in_log|rewrite r_in_m].
     (* [F.f ~ F.f: I] when Bad does not hold *)
@@ -290,7 +290,7 @@ section.
     case (x \in F.m).
     + by rcondf 3; auto=> />; rewrite dseed_ll dout_ll.
     rcondt 3; first by do !rnd; wp.
-    auto=> />; rewrite dseed_ll dout_ll //= => &hr bad_init x_notin_m v _ _ v0 _ _.
+    auto=> />; rewrite dseed_ll dout_ll //= => &hr bad_init x_notin_m v _ v0 _.
     case: bad_init=> [/(Cycle<:seed,seed * output>) -> //|r r_in_log r_in_m].
     by apply/(@Collision _ _ r)=> //=; rewrite mem_set r_in_m.
   (* Returning to main *)

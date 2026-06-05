@@ -438,7 +438,7 @@ apply: (eq_trans _ _ _ (BCA.eq_big_perm _ _ _ (range 0 (k+1)) _)).
   * move=> x; split => [/mapP[y []]|]; 1: by rewrite !mem_range /#.
     rewrite !mem_range => *; apply/mapP; exists (F x).
     by rewrite !mem_range /F /#.
-+ by apply: BCA.eq_bigr => /= i _ @/F; rewrite mulrC /#.
++ by apply: BCA.eq_bigr => /= i @/F; rewrite mulrC /#.
 qed.
 
 lemma polyMEwr M p q k : (k <= M)%Int => (p * q).[k] =
@@ -468,9 +468,9 @@ have ->: (p * (q * r)).[k] =
   ) 0 (k+1).
 + rewrite polyME !BCA.big_seq &(BCA.eq_bigr) => /= i.
   case/mem_range => g0_i lt_i_Sk; rewrite (@polyMEwr k) 1:/#.
-  by rewrite BCA.mulr_sumr &(BCA.eq_bigr) => /= j _; rewrite mulrA.
-rewrite BCA.exchange_big &(BCA.eq_bigr) => /= i _.
-by rewrite &(BCA.eq_bigr) => /= j _ /#.
+  by rewrite BCA.mulr_sumr &(BCA.eq_bigr) => /= j; rewrite mulrA.
+rewrite BCA.exchange_big &(BCA.eq_bigr) => /= i.
+by rewrite &(BCA.eq_bigr) => /= j /#.
 qed.
 
 lemma mul1p : left_id poly1 polyM.
@@ -485,13 +485,13 @@ qed.
 lemma mul0p : left_zero poly0 polyM.
 proof.
 move=> p; apply/poly_eqP=> c _; rewrite poly0E polyME.
-by rewrite BCA.big1 //= => i _; rewrite poly0E mul0r.
+by rewrite BCA.big1 //= => i; rewrite poly0E mul0r.
 qed.
 
 lemma mulpDl: left_distributive polyM polyD.
 proof.
 move=> p q r; apply: poly_eqP => c ge0_c; rewrite !(polyME, polyDE).
-by rewrite -BCA.big_split &(BCA.eq_bigr) => /= i _; rewrite polyDE mulrDl.
+by rewrite -BCA.big_split &(BCA.eq_bigr) => /= i; rewrite polyDE mulrDl.
 qed.
 
 lemma onep_neq0 : poly1 <> poly0.

@@ -133,7 +133,7 @@ hint exact : ge0_mu.
 lemma summable_mu1 ['a] (d : 'a distr) : summable (mu1 d).
 proof.
 exists 1%r=> s eq_s; rewrite (@eq_bigr _ _ (mu1 d)) => /=.
-  by move=> i _; rewrite ger0_norm //.
+  by move=> i; rewrite ger0_norm //.
 by apply/le1_mu1_fin.
 qed.
 
@@ -154,7 +154,7 @@ lemma le1_mu (d : 'a distr) p : mu d p <= 1%r.
 proof.
 rewrite muE &(lerfin_sum) 1:&(summable_mu1_cond) => J uqJ.
 apply: (@ler_trans (big predT (mu1 d) J)).
-+ by apply: ler_sum => /= a _; case: (p a).
++ by apply: ler_sum => /= a; case: (p a).
 + by apply: le1_mu1_fin.
 qed.
 
@@ -707,7 +707,7 @@ rewrite BIA.big_cat IntID.addrC BIA.big_seq BIA.big1 /=.
   by rewrite -count_eq0 has_pred1.
 have /BIA.eq_big_perm <- := perm_filterC (mem J) (undup s).
 rewrite BIA.big_cat ler_paddr ?sumr_ge0 /=.
-+ by move=> x _; rewrite count_ge0.
++ by move=> x; rewrite count_ge0.
 rewrite lerr_eq &(BIA.eq_big_perm) uniq_perm_eq //.
 + by rewrite filter_uniq.
 + by rewrite filter_uniq undup_uniq.
@@ -1457,7 +1457,7 @@ rewrite -ler_pdivl_mull // mulr1 => le; move: (le_k_Vm).
 have gt0_Vm := ltr_le_trans _ _ _ lt0_k le_k_Vm.
 rewrite -ler_pinv 1?gtr_eqF // invrK => h; apply/(ler_trans _ _ h).
 apply/(ler_trans _ _ le) => {h le}; apply/lerr_eq.
-by rewrite undup_id //; apply/eq_bigr=> /= x _; rewrite muK.
+by rewrite undup_id //; apply/eq_bigr=> /= x; rewrite muK.
 qed.
 
 op dscalar (k : real) (d : 'a distr) = mk (mscalar k (mu1 d)).
@@ -1487,7 +1487,7 @@ apply/eq_distr=> a; rewrite muK; last by rewrite /mscalar !dnull1E.
 split => /=.
 - by move=> {a}a @/mscalar; rewrite dnull1E.
 - move=> s _; rewrite (@BRA.eq_bigr _ _ (fun _ => 0%r)).
-  - by move=> a' /= _ @/mscalar; rewrite dnull1E.
+  - by move=> a' /= @/mscalar; rewrite dnull1E.
   - by rewrite Bigreal.sumr_const.
 qed.
 
@@ -1630,7 +1630,7 @@ lemma isdistr_mrestrict ['a] d p : isdistr (mrestrict<:'a> d p).
 proof. split.
 + by move=> a; rewrite /mrestrict; case: (p a).
 + move=> J uqJ @/mrestrict; have h := le1_mu1_fin d _ uqJ.
-  by apply/(ler_trans _ _ h)/ler_sum=> /= a _; case: (p a).
+  by apply/(ler_trans _ _ h)/ler_sum=> /= a; case: (p a).
 qed.
 
 lemma drestrict1E ['a] d p x :
@@ -1776,7 +1776,7 @@ rewrite (@partition_big ofst _ predT _ _ (undup (unzip1 s))).
 + by case=> a b ab_in_s _; rewrite mem_undup map_f.
 pose P := fun x ab => ofst<:'a, 'b> ab = x.
 pose F := fun (ab : 'a * 'b) => mb ab.`2.
-rewrite -(@eq_bigr _ (fun x => ma x * big (P x) F s)) => /= [x _|].
+rewrite -(@eq_bigr _ (fun x => ma x * big (P x) F s)) => /= [x|].
 + by rewrite mulr_sumr; apply/eq_bigr=> -[a b] /= @/P <-.
 pose s' := undup _; apply/(@ler_trans (big predT (fun x => ma x) s')).
 + apply/ler_sum=> a _ /=; apply/ler_pimulr; first by apply/ge0_isdistr.
@@ -2215,7 +2215,7 @@ lemma djoin_fu (ds : 'a distr list) (xs : 'a list):
 proof.
 move=> eq_sz hfu; rewrite supportP djoin1E eq_sz /=.
 rewrite RealOrder.gtr_eqF // Bigreal.prodr_gt0_seq.
-case=> d x /= /mem_zip [d_ds x_xs] _.
+case=> d x /= /mem_zip [d_ds x_xs].
 by rewrite -/(_ \in _) supportP -supportPn /=; apply: hfu.
 qed.
 
@@ -2605,7 +2605,7 @@ lemma dfun_prod1E ['u 'v] (df : t -> 'u distr) (dg : t -> 'v distr) f g :
 proof.
 pose F x := mu1 (df x) (f x) * mu1 (dg x) (g x).
 rewrite dfun1E /= -(@BRM.eq_bigr _ F) //= /F => {F}.
-- by move=> x _; rewrite dprod1E.
+- by move=> x; rewrite dprod1E.
 - by rewrite BRM.big_split -!dfun1E.
 qed.
 
@@ -2668,10 +2668,10 @@ pose p (x : t) :=
      mu1 (dX x) true  * mu1 (dt x) (f x)
    + mu1 (dX x) false * mu1 (df x) (f x).
 rewrite dfun1E /= -(@BRM.eq_bigr _ p) //=.
-- by move=> x _; rewrite dletE_bool.
+- by move=> x; rewrite dletE_bool.
 rewrite dlet1E prodrDl2; first by apply: FinT.is_finite_for.
 apply: eq_sum => X /=; rewrite !dfun1E -BRM.big_split /=.
-by apply: BRM.eq_bigr => /= x _; case: (X x).
+by apply: BRM.eq_bigr => /= x; case: (X x).
 qed.
 
 lemma dfun_dcondE ['u] (dX : t -> bool distr) (dt df : t -> 'u distr) :
@@ -2928,7 +2928,7 @@ qed.
 lemma hasEC (d : 'a distr) (c : real) : hasE d (fun _ => c).
 proof.
 exists `|c| => J uqJ; pose f := fun i => `|c| * mu1 d i.
-rewrite -(@eq_bigr _ f) /= => [i _|].
+rewrite -(@eq_bigr _ f) /= => [i|].
 + by rewrite normrM (@ger0_norm (mu1 _ _)).
 rewrite /f -mulr_sumr ler_pimulr 1:normr_ge0.
 by apply/(@le1_mu1_fin d).
@@ -3133,7 +3133,7 @@ rewrite (@sum_swap (fun ab : _ * _ => s ab.`1 ab.`2)).
   - apply: uniq_perm_eq; 1,2: by apply/undup_uniq.
     by move=> x @/K; rewrite !mem_undup -map_comp -(@eq_map snd).
   move/BRA.eq_big_perm=> ->; apply: Bigreal.ler_sum => /=.
-  move=> b _ @/s => {s}; pose s a := `|f b| * (mu1 (df a) b * mu1 d a).
+  move=> b @/s => {s}; pose s a := `|f b| * (mu1 (df a) b * mu1 d a).
   rewrite BRA.big_filter -(@BRA.eq_bigr _ (fun ba : _ * _ => s ba.`2)) /=.
   - case=> b' a' /= ->> @/pswap /= @/s.
     by rewrite -!mulrA !normrM; congr; rewrite !ger0_norm.
@@ -3160,7 +3160,7 @@ rewrite (@sum_swap (fun ab : _ * _ => s ab.`1 ab.`2)).
   rewrite -psum_sum; 1: by apply: eq_summable sm_s => /= a; rewrite /s mulrC.
   apply: (ler_trans _ _ (ler_big_psum _ uqJ)) => //=; last first.
   - by apply: eq_summable sm_s => /= a @/s; rewrite mulrC.
-  apply/lerr_eq/BRA.eq_bigr=> /= a _ @/s.
+  apply/lerr_eq/BRA.eq_bigr=> /= a @/s.
   by rewrite normrM !ger0_norm // mulrC.
 apply: eq_sum=> /= b @/s; rewrite dlet1E -sumZ /=.
 by apply: eq_sum=> /= a; rewrite mulrAC mulrA.

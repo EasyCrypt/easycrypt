@@ -122,7 +122,7 @@ lemma sum_pair_dep ['a 'b] u v J : uniq J =>
          (filter (fun ij : _ * _ => ij.`1 = i) J))
       (undup (unzip1 J)).
 proof.
-move=> uqJ; rewrite big_pair // &(eq_bigr) => /= a _.
+move=> uqJ; rewrite big_pair // &(eq_bigr) => /= a.
 by rewrite mulr_sumr !big_filter &(eq_bigr) => -[a' b] /= ->>.
 qed.
 
@@ -133,7 +133,7 @@ lemma sum_pair ['a 'b] u v J : uniq J =>
       (undup (unzip1 J)).
 proof.
 move=> uqJ; rewrite (@sum_pair_dep u (fun _ => v)) // &(eq_bigr) /=.
-by move=> a _ /=; congr; rewrite big_map predT_comp /(\o).
+by move=> a /=; congr; rewrite big_map predT_comp /(\o).
 qed.
 end BAdd.
 
@@ -357,7 +357,7 @@ case: (x = zeror) => [->>|nz_x].
 rewrite -subr_ge0 subrXX 1:ltzW // pmulr_lge0 ?subr_ge0 //=.
 rewrite {2}(_ : n = n - 1 + 1) 1:#ring BAdd.big_int_recr /= 1:/#.
 rewrite expr0 /= ltr_spaddr ?mul1r; 1: by rewrite expr_gt0 ltr_neqAle /#.
-by rewrite sumr_ge0 => /= i _; rewrite mulr_ge0 ?expr_ge0.
+by rewrite sumr_ge0 => /= i; rewrite mulr_ge0 ?expr_ge0.
 qed.
 
 lemma big_normr ['a] P F s :
