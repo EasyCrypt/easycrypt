@@ -185,7 +185,7 @@ module EqMod_base(Fe : sig
   val for_expr : env -> norm:bool -> (ident * ty) Mid.t -> expr -> expr -> bool
 end) = struct
   open EqTest_base
-  open Fe
+  include Fe
 
   (* ------------------------------------------------------------------ *)
   let rec for_stmt env alpha ~norm s1 s2 =
@@ -1866,8 +1866,9 @@ module EqTest = struct
 
   include EqMod_base(struct
     let for_expr env ~norm:_ alpha e1 e2 =
+      let dummy_mem = EcIdent.create "&dummy" in
       let convert e =
-        let f = (ss_inv_of_expr (EcIdent.create "&dummy") e).inv in
+        let f = (ss_inv_of_expr dummy_mem e).inv in
 
         if Mid.is_empty alpha then f else
 
