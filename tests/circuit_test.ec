@@ -51,8 +51,6 @@ realize ofintP by admit.
 realize touintP by admit.
 realize tosintP by done. 
 realize gt0_size by done.
-    
-
 
 type W8.
 

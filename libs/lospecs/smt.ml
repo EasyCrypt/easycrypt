@@ -31,6 +31,13 @@ module type SMTInstance = sig
   (* bvnot *)
   val bvand : bvterm -> bvterm -> bvterm
 
+  (* Boolean negation; argument and result are of Boolean sort
+     (as produced by [bvterm_equal]). *)
+  val bool_not : bvterm -> bvterm
+
+  (* Boolean conjunction; both arguments and the result are of Boolean sort. *)
+  val bool_and : bvterm -> bvterm -> bvterm
+
   val get_value : bvterm -> bvterm
 
   val pp_term : Format.formatter -> bvterm -> unit
@@ -109,9 +116,14 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       List.map (fun i -> List.reduce (SMT.bvterm_concat) i) inps) inps 
     in
 
+    (* [pcond] is a 1-bit BV; lift to Boolean by comparing with #b1.
+       [formula] is already Boolean (built via [bvterm_equal]).
+       We search for a counterexample: a model under which [pcond] holds
+       and [r1 <> r2], i.e. [pcond_bool /\ not formula]. *)
+    let pcond_bool = SMT.bvterm_equal pcond (SMT.bvterm_of_int 1 1) in
     begin
-      SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
-      if SMT.check_sat () = false then true 
+      SMT.assert' @@ SMT.bool_and pcond_bool (SMT.bool_not formula);
+      if SMT.check_sat () = false then true
       else begin
         Format.eprintf "bvout1: %a@."  SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "bvout2: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
@@ -252,6 +264,12 @@ let makeBWZinstance () : (module SMTInstance) =
 
   let bvand (bv1: bvterm) (bv2: bvterm) : bvterm =
     mk_term2 Kind.Bv_and bv1 bv2
+
+  let bool_not (bv: bvterm) : bvterm =
+    mk_term1 Kind.Not bv
+
+  let bool_and (bv1: bvterm) (bv2: bvterm) : bvterm =
+    mk_term2 Kind.And bv1 bv2
 
   let get_value (bv: bvterm) : bvterm =
     Solver.get_value bitwuzla bv
