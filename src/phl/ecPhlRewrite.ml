@@ -230,29 +230,27 @@ let process_rewrite_at
   |> FApi.t_sub [t_pre; t_post; EcLowGoal.t_id]
 
 (* -------------------------------------------------------------------- *)
-(* [t_change_stmt side pos ?me s] replaces a code range with [s] by
+(* [t_change_stmt side pos ?mt s] replaces a code range with [s] by
    generating:
    - a local equivalence goal showing that the original fragment and [s]
      agree under the framed precondition on the variables they both read,
      and produce the same values for everything observable afterwards;
    - the original program-logic goal with the selected range rewritten.
 
-   If [me] is provided, it is used as the memory environment (e.g. when
-   fresh local variables have been bound); otherwise, the memory
-   environment is taken from the goal. *)
+   If [mt] is provided, it is used as the memtype of the selected side (e.g.
+   when fresh local variables have been bound); otherwise, the memtype is
+   taken from the goal. *)
 let t_change_stmt
    (side : side option)
    (pos  : EcMatching.Position.codegap_range)
-  ?(me   : memenv option)
+  ?(mt   : memtype option)
    (s    : stmt)
    (tc   : tcenv1)
 =
   let env = FApi.tc1_env tc in
 
-  let me, stmt =
-    let metc, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
-    (odfl metc me, stmt)
-  in
+  let (mid, metc), stmt = EcLowPhlGoal.tc1_get_stmt side tc in
+  let mt = odfl metc mt in
 
   let zpr, (_,stmt, epilog), _nmr =
     EcMatching.Zipper.zipper_and_split_of_cgap_range env pos stmt in
@@ -269,8 +267,8 @@ let t_change_stmt
   let frame =
     let filter (f : form) =
       let pvs = EcPV.form_read env EcPV.PMVS.empty f in
-      let pvs_me = EcIdent.Mid.find_def EcPV.PV.empty (fst me) pvs in
-      let pvs = EcIdent.Mid.remove (fst me) pvs in
+      let pvs_me = EcIdent.Mid.find_def EcPV.PV.empty mid pvs in
+      let pvs = EcIdent.Mid.remove mid pvs in
 
          EcIdent.Mid.is_empty pvs
       && (EcPV.PV.indep env modi pvs_me) in
@@ -293,7 +291,7 @@ let t_change_stmt
         EcLowPhlGoal.logicS_post_read env
           (EcLowPhlGoal.get_logicS (FApi.tc1_goal tc))
       in
-      EcIdent.Mid.find_def EcPV.PV.empty (fst me) pvs
+      EcIdent.Mid.find_def EcPV.PV.empty mid pvs
     in
 
     EcPV.PV.union obs goal
@@ -314,7 +312,7 @@ let t_change_stmt
   let mr = EcIdent.create "&2" in
 
   let frame = omap (fun frame ->
-    let subst = EcSubst.add_memory EcSubst.empty (fst me) ml in
+    let subst = EcSubst.add_memory EcSubst.empty mid ml in
     EcSubst.subst_form subst frame) frame in
 
   let mk_pv_eq ((pv, ty) : prog_var * ty) =
@@ -329,10 +327,13 @@ let t_change_stmt
   let po_eq = List.map mk_pv_eq wr_pvs @ List.map mk_glob_eq wr_globs in
 
   (* First subgoal: prove that the replacement fragment preserves the
-     observable behavior required by the outer proof. *)
+     observable behavior required by the outer proof. The left program is the
+     original fragment, which only mentions the pre-existing locals
+     ([metc]); the right program is the replacement, which may use the
+     freshly bound locals ([mt]). *)
   let goal1 =
     f_equivS
-      (snd me) (snd me)
+      metc mt
       { ml; mr; inv = ofold f_and (f_ands pr_eq) frame; }
       (EcAst.stmt stmt) s
       { ml; mr; inv = f_ands po_eq; }
@@ -341,10 +342,11 @@ let t_change_stmt
   let stmt = EcMatching.Zipper.zip { zpr with z_tail = s.s_node @ epilog } in
 
   (* Second subgoal: continue with the original goal after rewriting the
-     selected statement range. *)
+     selected statement range. The rewritten side also takes [mt], as the new
+     statement may mention the fresh locals. *)
   let goal2 =
    EcLowPhlGoal.hl_set_stmt
-     side (FApi.tc1_goal tc)
+     ~mt side (FApi.tc1_goal tc)
      stmt in
 
   FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]
@@ -401,4 +403,4 @@ let process_change_stmt
   let hyps = EcEnv.LDecl.push_active_ss me hyps in
   let s = EcProofTyping.process_stmt hyps s in
 
-  t_change_stmt side pos ~me s tc
+  t_change_stmt side pos ~mt:(snd me) s tc

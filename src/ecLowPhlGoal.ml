@@ -235,13 +235,18 @@ let tc1_process_codepos1 tc (side, cpos) =
   EcTyping.trans_codepos1 env cpos
 
 (* -------------------------------------------------------------------- *)
-let hl_set_stmt (side : side option) (f : form) (s : stmt) =
+(* [mt] overrides the memtype of the active side (the one whose statement is
+   being replaced), e.g. when the new statement [s] mentions fresh locals.
+   The memory identifier is untouched, so the pre/post-conditions keep
+   referring to it. *)
+let hl_set_stmt ?(mt : memtype option) (side : side option) (f : form) (s : stmt) =
+  let mtof (dfl : memenv) = odfl (snd dfl) mt in
   match side, f.f_node with
-  | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs)
-  | None       , FeHoareS  hs -> f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
-  | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
-  | Some `Left , FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
-  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) es.es_sl s (es_po es)
+  | None       , FhoareS   hs -> f_hoareS (mtof hs.hs_m) (hs_pr hs) s (hs_po hs)
+  | None       , FeHoareS  hs -> f_eHoareS (mtof hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
+  | None       , FbdHoareS hs -> f_bdHoareS (mtof hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
+  | Some `Left , FequivS   es -> f_equivS (mtof es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
+  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (mtof es.es_mr) (es_pr es) es.es_sl s (es_po es)
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
