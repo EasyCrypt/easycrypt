@@ -1340,7 +1340,8 @@ module Op = struct
     let tags   = Sstr.of_list (List.map unloc op.po_tags) in
     let opaque = {
       smt       = Sstr.mem "smt_opaque" tags;
-      reduction = Sstr.mem "opaque" tags
+      reduction = Sstr.mem "opaque" tags;
+      inline    = Sstr.mem "smt_inline" tags;
     } in
     let unfold =
       match op.po_args with
@@ -1374,7 +1375,7 @@ module Op = struct
               let axop  =
                 let nargs = List.sum (List.map (List.length -| fst) args) in
                   EcDecl.axiomatized_op ~nargs path (tyop.op_tparams, bd) lc in
-              let tyop  = { tyop with op_opaque = { reduction = true; smt = false; }} in
+              let tyop  = { tyop with op_opaque = { reduction = true; smt = false; inline = false; }} in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope (unloc ax, axop)
 
