@@ -508,6 +508,7 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
+  pp_tags   : psymbol list;
   pp_locality  : locality;
 }
 

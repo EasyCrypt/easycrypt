@@ -128,7 +128,7 @@ type operator = {
   op_unfold   : int option;
 }
 
-and opopaque = { smt: bool; reduction: bool; }
+and opopaque = { smt: bool; reduction: bool; inline: bool; }
 
 val op_ty        : operator -> ty
 val is_pred      : operator -> bool

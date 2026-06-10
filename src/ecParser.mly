@@ -1867,22 +1867,25 @@ exception_:
 (* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
 predicate:
-| locality=locality PRED x=oident
+| locality=locality PRED tags=bracket(ident*)? x=oident
    { { pp_name     = x;
        pp_tyvars   = None;
        pp_def      = PPabstr [];
+       pp_tags     = odfl [] tags;
        pp_locality = locality; } }
 
-| locality=locality PRED x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
+| locality=locality PRED tags=bracket(ident*)? x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
    { { pp_name     = x;
        pp_tyvars   = tyvars;
        pp_def      = PPabstr sty;
+       pp_tags     = odfl [] tags;
        pp_locality = locality; } }
 
-| locality=locality PRED x=oident tyvars=tyvars_decl? p=ptybindings? EQ f=form
+| locality=locality PRED tags=bracket(ident*)? x=oident tyvars=tyvars_decl? p=ptybindings? EQ f=form
    { { pp_name     = x;
        pp_tyvars   = tyvars;
        pp_def      = PPconcr (odfl [] p, f);
+       pp_tags     = odfl [] tags;
        pp_locality = locality; } }
 
 | locality=locality INDUCTIVE x=oident tyvars=tyvars_decl? p=ptybindings?
@@ -1891,6 +1894,7 @@ predicate:
    { { pp_name     = x;
        pp_tyvars   = tyvars;
        pp_def      = PPind (odfl [] p, b);
+       pp_tags     = [];
        pp_locality = locality; } }
 
 indpred_def:
