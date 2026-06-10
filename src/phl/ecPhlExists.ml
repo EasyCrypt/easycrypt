@@ -235,15 +235,17 @@ let abstract_pvs
     | [ml; mr] -> fun inv -> Inv_ts { ml; mr; inv; }
     | _        -> assert false in
 
-  let for_memory (subst : EcPV.PVM.subst) (m : memory) =
+  let for_memory ((subst, hyps) : EcPV.PVM.subst * LDecl.hyps) (m : memory) =
     let pvs = EcIdent.Mid.find_def [] m pvs in
 
     let ids = List.map (fun (pv, ty) ->
       (Format.sprintf "%s_" (EcTypes.symbol_of_pv pv)), ty) pvs in
-    let ids =
-      List.combine
-        (LDecl.fresh_ids hyps (List.fst ids))
-        (List.snd ids) in
+    let fresh = LDecl.fresh_ids hyps (List.fst ids) in
+    let hyps =
+      List.fold_left2 (fun hyps id (_, ty) ->
+        LDecl.add_local id (LD_var (ty, None)) hyps)
+        hyps fresh ids in
+    let ids = List.combine fresh (List.snd ids) in
 
     let pvs_as_inv = List.map (fun (pv, ty) ->
       mkinv (f_pvar pv ty m).inv
@@ -252,11 +254,11 @@ let abstract_pvs
       EcPV.PVM.add env pv m (f_local x ty) subst
     ) subst (List.combine pvs (List.fst ids)) in
 
-    (subst, (ids, pvs, pvs_as_inv))
+    ((subst, hyps), (ids, pvs, pvs_as_inv))
   in
 
-  let subst, ids =
-    List.fold_left_map for_memory EcPV.PVM.empty ms in
+  let (subst, _), ids =
+    List.fold_left_map for_memory (EcPV.PVM.empty, hyps) ms in
 
   let ids = List.map proj3_1 ids 
   and pvs = List.map proj3_2 ids
