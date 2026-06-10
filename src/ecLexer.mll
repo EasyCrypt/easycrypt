@@ -410,6 +410,20 @@ rule main = parse
 
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 
+  (* black-box quotation: {% name <body> %} (see ecQuotation.ml) *)
+  | "{%" blank* (lident as name) {
+      (* body starts at the current position (after name and the blanks/
+         newline that follow it on this rule's match) *)
+      let bpos = Lexing.lexeme_end_p lexbuf in
+      let buf  = Buffer.create 256 in
+      let epos = quotation buf 0 lexbuf in
+      [QUOTATION EcQuotation.{
+         q_name = name;
+         q_body = Buffer.contents buf;
+         q_bpos = bpos;
+         q_epos = epos; }]
+    }
+
   (* string symbols *)
   | ".."    { [DOTDOT   ] }
   | ".["    { [DLBRACKET] }
@@ -497,6 +511,30 @@ and doccomment kind buf = parse
       Buffer.add_char buf c;
       doccomment kind buf lexbuf
   }
+
+and quotation buf depth = parse
+  | "%}" {
+      if depth = 0 then
+        Lexing.lexeme_end_p lexbuf
+      else begin
+        Buffer.add_string buf "%}";
+        quotation buf (depth - 1) lexbuf
+      end
+    }
+  | "{%" {
+      Buffer.add_string buf "{%";
+      quotation buf (depth + 1) lexbuf
+    }
+  | newline {
+      Lexing.new_line lexbuf;
+      Buffer.add_char buf '\n';
+      quotation buf depth lexbuf
+    }
+  | eof { lex_error lexbuf "unterminated quotation" }
+  | _ as c {
+      Buffer.add_char buf c;
+      quotation buf depth lexbuf
+    }
 
 and string buf = parse
   | "\""          { buf }

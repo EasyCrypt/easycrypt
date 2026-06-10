@@ -38,6 +38,11 @@ type ecreader_r = {
   mutable ecr_atstart : bool;
   mutable ecr_trim    : int;
   mutable ecr_tokens  : EcParser.token list;
+  (* Pre-positioned triples produced by expanding a quotation.  These are
+     emitted (front-first) before any token is read from [ecr_lexbuf], so a
+     single quotation can expand to several EC sentences across successive
+     [parse] calls.  Positions are already remapped into the original file. *)
+  mutable ecr_expand  : (EcParser.token * L.position * L.position) list;
 }
 
 type ecreader = ecreader_r Disposable.t
@@ -48,7 +53,8 @@ let ecreader_of_lexbuf (buffer : Buffer.t) (lexbuf : L.lexbuf) : ecreader_r =
     ecr_source  = buffer;
     ecr_atstart = true;
     ecr_trim    = 0;
-    ecr_tokens  = []; }
+    ecr_tokens  = [];
+    ecr_expand  = []; }
 
 (* -------------------------------------------------------------------- *)
 let lexbuf (reader : ecreader) =
@@ -97,12 +103,70 @@ let finalize (ecreader : ecreader) =
   Disposable.dispose ecreader
 
 (* -------------------------------------------------------------------- *)
-let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
+(* Expand a quotation into a list of pre-positioned token triples.       *)
+(* The handler output is lexed in its own buffer; each token's positions  *)
+(* are remapped into the original file via the source map.               *)
+(*                                                                        *)
+(* A quotation expands to a FRAGMENT that is spliced into the surrounding *)
+(* sentence: it may stand for only part of a sentence, and the sentence   *)
+(* terminator ('.') is always written by the user, never produced by the *)
+(* expansion.  Hence the fragment must contain no FINAL.                  *)
+let expand_quotation (q : EcQuotation.quotation)
+  : (EcParser.token * L.position * L.position) list
+=
+  let (expanded, sm) = EcQuotation.run q in
+  let sub = Lexing.from_string expanded in
+  Lexing.set_filename sub (EcQuotation.sentinel_fname q);
+
+  let remap o = EcQuotation.remap_position sm q o in
+
+  let rec collect acc =
+    let toks =
+      try EcLexer.main sub
+      with EcLexer.LexicalError (_, msg) ->
+        EcQuotation.error q
+          (Printf.sprintf "lexical error in expansion: %s" msg)
+    in
+    (* positions of the lexeme just consumed by EcLexer.main *)
+    let sp = remap (Lexing.lexeme_start sub) in
+    let ep = remap (Lexing.lexeme_end   sub) in
+    let acc =
+      List.fold_left (fun acc tk -> (tk, sp, ep) :: acc) acc toks in
+    match toks with
+    | [EcParser.EOF] -> List.rev acc
+    | _              -> collect acc
+  in
+  let triples = collect [] in
+
+  (* drop the lexed EOF; the surrounding stream supplies sentence flow *)
+  let body = List.filter (fun (t, _, _) -> t <> EcParser.EOF) triples in
+  (* a fragment must not terminate the sentence: the '.' is the user's *)
+  let isfinal = function EcParser.FINAL _ -> true | _ -> false in
+  if List.exists (fun (t, _, _) -> isfinal t) body then
+    EcQuotation.error q
+      "quotation expansion must be a sentence fragment (it must not contain '.')";
+  body
+
+(* -------------------------------------------------------------------- *)
+let rec lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
   let lexbuf = ecreader.ecr_lexbuf in
 
   let isfinal = function
     | EcParser.FINAL _ -> true
     | _ -> false in
+
+  (* Emit the next pre-positioned expansion triple, if any. *)
+  let emit_expand () =
+    match ecreader.ecr_expand with
+    | [] -> None
+    | triple :: rest ->
+        ecreader.ecr_expand <- rest;
+        Some triple
+  in
+
+  match emit_expand () with
+  | Some triple -> triple
+  | None ->
 
   if ecreader.ecr_atstart then
     ecreader.ecr_trim <- ecreader.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum;
@@ -118,6 +182,17 @@ let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
     | tokens ->
         ecreader.ecr_tokens <- tokens
   done;
+
+  (* Intercept a quotation token: expand it into a fragment and splice it.
+     A quotation always sits at the head of [ecr_tokens] (its lexer rule
+     returns a singleton list).  An empty fragment is allowed -- recurse to
+     produce the next real token. *)
+  match ecreader.ecr_tokens with
+  | EcParser.QUOTATION q :: queue ->
+      ecreader.ecr_tokens <- queue;
+      ecreader.ecr_expand <- expand_quotation q;
+      lexer ?checkpoint ecreader
+  | _ ->
 
   let token, queue = List.destruct ecreader.ecr_tokens in
 
