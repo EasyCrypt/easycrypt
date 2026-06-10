@@ -146,6 +146,11 @@ type pregoal = {
   g_concl : form;
 }
 
+(* An open (extensible) type of recheckable proof-rule nodes. Each TCB tactic
+   extends [rule] with a constructor carrying the parameters needed to
+   recompute its subgoals, and registers a checker (see below). *)
+type rule = ..
+
 type validation =
 | VSmt                               (* SMT call *)
 | VAdmit                             (* admit *)
@@ -158,6 +163,9 @@ type validation =
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
+
+  (* recheckable external proof-node *)
+| VRule    of rule * handle list
 
 (* -------------------------------------------------------------------- *)
 type location = {
@@ -185,6 +193,22 @@ val tcenv1_of_proof   : proof  -> tcenv1
 val tcenv_of_proof    : proof  -> tcenv
 val proof_of_tcenv    : tcenv  -> proof
 val proofenv_of_proof : proof  -> proofenv
+
+(* -------------------------------------------------------------------- *)
+(* Rechecking of [VRule] proof-nodes. A [rule_checker] receives the proof
+ * environment, the node's (closed) goal and the pregoals of the subgoals the
+ * rule produced; it must re-derive the expected subgoals and confirm they
+ * match, raising [RecheckFailure] otherwise. Checkers are registered as
+ * partial handlers over the open [rule] type. *)
+exception RecheckFailure of string
+
+type rule_checker = proofenv -> pregoal -> pregoal list -> unit
+
+val register_rule_checker : (rule -> rule_checker option) -> unit
+
+(* Recheck every [VRule] node reachable in this proof environment. Unregistered
+ * rules and non-[VRule] validations are skipped. *)
+val recheck_proofenv : proofenv -> unit
 
 (* Start a new interactive proof in a given local context
  * [LDecl.hyps] for given [form]. Mainly, a [proof] records the set
@@ -288,6 +312,15 @@ module FApi : sig
 
   val xmutate_hyps  : tcenv  -> 'a -> (LDecl.hyps * form) list -> tcenv
   val xmutate1_hyps : tcenv1 -> 'a -> (LDecl.hyps * form) list -> tcenv
+
+  (* Same as [xmutate], but emit a recheckable [VRule] node. The [rule] must
+   * carry the parameters its registered checker needs to recompute the
+   * subgoals. *)
+  val xrule  : tcenv  -> rule -> form list -> tcenv
+  val xrule1 : tcenv1 -> rule -> form list -> tcenv
+
+  val xrule_hyps  : tcenv  -> rule -> (LDecl.hyps * form) list -> tcenv
+  val xrule1_hyps : tcenv1 -> rule -> (LDecl.hyps * form) list -> tcenv
 
   (* Apply a forward tactic to a backward environment, using the
    * proof-environment of the latter *)

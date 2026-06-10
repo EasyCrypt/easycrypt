@@ -1076,7 +1076,9 @@ module Ax = struct
           | PSCheck _ when mode <> `Save -> ()
           | PSCheck pf -> begin
               if not (EcCoreGoal.closed pf) then
-                hierror "cannot save an incomplete proof"
+                hierror "cannot save an incomplete proof";
+              if EcUtils.is_some (Sys.getenv_opt "EC_RECHECK") then
+                EcCoreGoal.recheck_proofenv (EcCoreGoal.proofenv_of_proof pf)
           end
       end; (pac, pct)
     in

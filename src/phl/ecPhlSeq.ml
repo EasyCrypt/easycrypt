@@ -14,19 +14,11 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-(* [t_hoare_seq_r gap phi]: splits the statement at [gap]; the first
-   subgoal covers instructions before the gap, the second after. *)
-let t_hoare_seq_r i phi tc =
-  let env = FApi.tc1_env tc in
-  let hs = tc1_as_hoareS tc in
-  let phi = ss_inv_rebind phi (fst hs.hs_m) in
-  let s1, s2 = s_split env i hs.hs_s in
-  let post = update_hs_ss phi (hs_po hs) in
-  let a = f_hoareS (snd hs.hs_m) (hs_pr hs) (stmt s1) post in
-  let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs)  in
-  FApi.xmutate1 tc `HlApp [a; b]
-
-let t_hoare_seq = FApi.t_low2 "hoare-seq" t_hoare_seq_r
+(* The hoare [seq] rule (split + intermediate assertion) now lives in
+   [EcHoareSeq], which owns its pure subgoal-builder, the recheckable
+   proof-node and the matching checker. Re-exported here so existing callers
+   and the public interface are unchanged. *)
+let t_hoare_seq = EcHoareSeq.t_hoare_seq
 
 (* -------------------------------------------------------------------- *)
 let t_ehoare_seq_r i phi tc =
@@ -229,10 +221,7 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
 
   match k, bd_info with
   | Single i, PSeqNone when is_hoareS concl ->
-    check_side side;
-    let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-    let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
-    t_hoare_seq i phi tc
+    EcHoareSeq.process_hoare_seq side i (get_single phi) tc
 
   | Single i, PSeqNone when is_eHoareS concl ->
     check_side side;
