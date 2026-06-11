@@ -88,5 +88,6 @@ src/phl/
 
 - **hoare `seq`** — [`rules/hoare/ecHoareSeq.ml`](rules/hoare/ecHoareSeq.ml).
   The reference example of the full spine + checker. `EcPhlSeq.process_seq`
-  dispatches its `hoareS` arm here; `EcPhlSeq.t_hoare_seq` re-exports the rule
-  so existing callers and the public interface are unchanged.
+  dispatches its `hoareS` arm here. The canonical rule `EcHoareSeq.t_hoare_seq`
+  takes a `hoare_seq_rule` record; the legacy `EcPhlSeq.t_hoare_seq` keeps its
+  positional `.mli` and adapts onto it, so existing callers are unchanged.

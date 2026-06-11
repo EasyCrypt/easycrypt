@@ -176,23 +176,58 @@ in the node + add the checker, register it. **Proofs must not change.**
 - `dune build` clean; test suite green; always run `ec.exe` with `-no-eco`.
 - A full `EC_RECHECK=1` pass over the stdlib raises **zero** `RecheckFailure`.
 
+## 7b. Parameters travel as records, not tuples
+
+Two records make each tactic self-documenting (fields show up in the `.mli`):
+
+- **Parse input** — *lives in the parsetree*, not in `src/phl`. The tactic's
+  `EcParsetree` info type is a record with named, prefixed fields (e.g.
+  `seq_info = { seqi_side; seqi_at; seqi_mid; seqi_bd }`), built in the grammar.
+  We do **not** mirror it with a phl-side copy — the parse info *is* the
+  parsetree node. The dispatcher `process_<tactic>` routes purely on the goal
+  kind and forwards the **whole record** to the per-logic
+  `process_<logic>_<tac>`, which takes that same record and owns its
+  surface-syntax validation (single vs double, side allowed, bound allowed, …).
+  So `process_*` are never positional.
+- **Typed rule parameters** — a record defined in the migrated `rules/*` module
+  (e.g. `hoare_seq_rule = { hsr_at; hsr_mid }`), carried by the proof-node
+  constructor (`RHoareSeq of hoare_seq_rule`) and consumed by the shared
+  subgoal-builder. The **canonical rule in `rules/*` takes this record**
+  (`EcHoareSeq.t_hoare_seq : hoare_seq_rule -> backward`). The **legacy positional
+  entry in `phl/*` keeps its `.mli` unchanged** and is a thin adapter onto it
+  (`let t_hoare_seq i phi = EcHoareSeq.(t_hoare_seq { hsr_at = i; hsr_mid = phi })`),
+  so not-yet-migrated callers are untouched.
+
+Field names use a short per-record **prefix** (`seqi_`, `hsr_`), matching the
+existing EC record style (`hs_m`, `es_pr`, `bhs_bd`) and avoiding label clashes
+within a module.
+
 ## 8. Per-tactic migration recipe
 
 1. Create `src/phl/<family>/<logic>/ecPhl…` (or `Ec<Logic><Tactic>`) keeping a
    globally-unique module name.
-2. Extract the pure core `<logic>_<tac>_subgoals : LDecl.hyps -> … -> form list`
-   from the existing `t_*_r` (everything up to the `xmutate1` call, returning the
-   `form list`; take `hyps` and derive `env = LDecl.toenv hyps` inside).
-3. Add `type EcCoreGoal.rule += R<Logic><Tac> of <params>`.
-4. Rewrite the rule to
-   `FApi.xrule1 tc (R… params) (… _subgoals (FApi.tc1_hyps tc) …)`.
+2. Define the typed parameter record `<logic>_<tac>_rule = { <pfx>_… }` (prefixed
+   fields, §7b) and extract the pure core
+   `<logic>_<tac>_subgoals : LDecl.hyps -> <judgement> -> <logic>_<tac>_rule -> form list`
+   from the existing `t_*_r` (everything up to the `xmutate1` call; take `hyps`
+   and derive `env = LDecl.toenv hyps` inside).
+3. Add `type EcCoreGoal.rule += R<Logic><Tac> of <logic>_<tac>_rule`.
+4. Write the canonical rule in `rules/*` taking the record:
+   `t_<logic>_<tac> : <logic>_<tac>_rule -> backward`, body
+   `FApi.xrule1 tc (R… r) (<…>_subgoals (FApi.tc1_hyps tc) j r)`. Turn the legacy
+   `phl/*` `t_*` (positional `.mli` unchanged) into a thin adapter that builds the
+   record and calls it. If the tactic's `EcParsetree` info is still a tuple,
+   convert it to a record (§7b) at the same time.
 5. Register the checker with `EcPhlRecheck.checker_of "<logic>-<tac>" pf_as_<logic>
-   (fun hyps j -> <logic>_<tac>_subgoals hyps j params)` — no per-rule comparison
-   code.
-6. Write/move `process_<logic>_<tac>` (the typing), and have the tactic's
-   `process_<tactic>` dispatcher route the relevant logic arm to it.
-7. Re-export the moved `t_*`/`process_*` from the old module if its `.mli` or
-   external callers still reference them (avoids touching unrelated files).
+   (fun hyps j -> <logic>_<tac>_subgoals hyps j r)` — no per-rule comparison code.
+6. Write `process_<logic>_<tac> : <tactic>_info -> backward` (taking the parsetree
+   record): validate the surface syntax for that logic, type the arguments, build
+   the rule record and call `t_<logic>_<tac>`. In the `phl/*` dispatcher
+   `process_<tactic>`, route by **pattern-matching the goal's `f_node`** —
+   `| F<logic>S _ -> EcPhl…process_<logic>_<tac> info tc` — and drop the
+   corresponding legacy arm. Do not use `is_*` predicates for dispatch.
+7. Keep the legacy `phl/*` `t_*` (positional adapter) so external callers and the
+   module's `.mli` are untouched.
 8. Build; run the tactic's tests with `EC_RECHECK=1`; add a negative test once
    (temporarily break the checker) to confirm it actually fires.
 
