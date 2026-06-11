@@ -63,6 +63,8 @@ Variant: List enumeration over ``iota_``
    op to_sint : W8 -> int.
 
    bind bitstring to_bits from_bits to_uint to_sint of_int W8 8.
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
@@ -123,6 +125,8 @@ Variant: Hoare-triple enumeration over a bitstring variable
    op to_sint : W8 -> int.
 
    bind bitstring to_bits from_bits to_uint to_sint of_int W8 8.
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
@@ -176,6 +180,8 @@ whole-program circuit translation would not. The same example with
    op to_sint : W8 -> int.
 
    bind bitstring to_bits from_bits to_uint to_sint of_int W8 8.
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.

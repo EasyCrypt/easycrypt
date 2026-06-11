@@ -17,12 +17,21 @@ the goal: instead, it rewrites the postcondition using bit-level
 equalities derived from the circuit, leaving a simpler residual goal
 to be discharged by other tactics.
 
-The translation uses the type and operator bindings declared by the
-``bind`` family of commands (see :doc:`bindings`). Every type
-appearing in the goal must be ``bind bitstring`` or ``bind array``;
-every operator must be ``bind op`` or ``bind circuit``, or definable
-in terms of bound operators; and every program statement must be an
-assignment whose right-hand side translates to a circuit.
+.. important::
+
+   The ``circuit`` family of tactics relies entirely on the
+   ``bind`` family of commands to know how EasyCrypt types and
+   operators correspond to their bit-level counterparts. Every type
+   appearing in the goal must be ``bind bitstring``- or ``bind
+   array``-bound; every operator must be ``bind op``- or ``bind
+   circuit``-bound, or definable in terms of bound operators; and
+   every program statement must be an assignment whose right-hand
+   side translates to a circuit.
+
+   See :doc:`bindings` for the syntax and semantics of the ``bind``
+   commands and the catalog of supported operator names — the
+   examples below all begin with ``bind`` declarations, whose side
+   conditions (the ``realize`` lines) come from that catalog.
 
 .. contents::
    :local:
@@ -57,6 +66,8 @@ into a boolean circuit and checks that it is a tautology.
      W8
      8.
 
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
@@ -115,6 +126,8 @@ on every initial state.
      W8
      8.
 
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
@@ -197,6 +210,8 @@ sides holds on every joint initial state satisfying the precondition.
      W8
      8.
 
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
@@ -262,6 +277,8 @@ by ordinary tactics.
      W8
      8.
 
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
@@ -389,6 +406,8 @@ the replacement block but never read again may freely differ.
    op to_sint : W8 -> int.
 
    bind bitstring to_bits from_bits to_uint to_sint of_int W8 8.
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
@@ -436,6 +455,8 @@ read downstream.
    op to_sint : W8 -> int.
 
    bind bitstring to_bits from_bits to_uint to_sint of_int W8 8.
+   (* The realizes below discharge the side conditions left by
+      [bind bitstring]; refer to the [bind] command documentation. *)
    realize gt0_size by admit.
    realize tolistP by admit.
    realize oflistP by admit.
