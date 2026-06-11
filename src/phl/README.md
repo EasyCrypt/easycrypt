@@ -29,9 +29,24 @@ CHECKER       check_<logic>_<tac>     read the params back from the node, recomp
 ```
 
 Key rule: the rule and its checker share one **pure subgoal-builder**
-(`<logic>_<tac>_subgoals : env -> <judgement> -> params -> form list`). The
-checker is then "rerun the builder and compare", which is why recording the
-params in the node is all that recheckability costs.
+(`<logic>_<tac>_subgoals : LDecl.hyps -> <judgement> -> params -> form list`).
+The checker is then "rerun the builder and compare", which is why recording the
+params in the node is all that recheckability costs. The builder is handed the
+goal's `hyps` (the authoritative context; its environment is `LDecl.toenv` of
+them), so the rule and checker reason in exactly the same context.
+
+The comparison boilerplate is shared in [`ecPhlRecheck.ml`](ecPhlRecheck.ml):
+`EcPhlRecheck.checker_of name destr build` turns a judgement reader (`pf_as_*`)
+and a builder into a `rule_checker`, and wraps any exception raised while
+rebuilding into a `RecheckFailure`. A checker is then just its registration:
+
+```ocaml
+let () = register_rule_checker (function
+  | R<Logic><Tac> params ->
+      Some (EcPhlRecheck.checker_of "<logic>-<tac>" pf_as_<logic>
+              (fun hyps j -> <logic>_<tac>_subgoals hyps j params))
+  | _ -> None)
+```
 
 Derived (non-TCB) tactics that only orchestrate other tactics emit **no** node
 and need **no** checker — rechecking recurses into the rules they expand to.

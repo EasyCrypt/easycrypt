@@ -71,11 +71,22 @@ CHECKER       check_<logic>_<tac>     read params from the node, rerun the SAME 
 ```
 
 The rule and its checker **share one pure subgoal-builder**
-`<logic>_<tac>_subgoals : env -> <judgement> -> params -> form list`. The checker
-is then just "rerun the builder and compare", so recording the params in the node
-is the entire cost of recheckability. Derived (orchestration-only) tactics emit
-**no** node and need **no** checker — rechecking recurses into the rules they
-expand to.
+`<logic>_<tac>_subgoals : LDecl.hyps -> <judgement> -> params -> form list`. The
+checker is then just "rerun the builder and compare", so recording the params in
+the node is the entire cost of recheckability. The builder takes the goal's
+`hyps` (the authoritative context — `env` is just `LDecl.toenv` of it, and the
+conversion check needs `hyps` anyway), so the rule and checker share one context.
+Derived (orchestration-only) tactics emit **no** node and need **no** checker —
+rechecking recurses into the rules they expand to.
+
+The destruct/rebuild/compare boilerplate common to every checker is factored into
+its own module, [`ecPhlRecheck.ml`](ecPhlRecheck.ml): `recheck_forms` (arity +
+per-subgoal `is_conv` under each subgoal's hyps) and `checker_of name destr
+build` (assemble a `rule_checker` from a `pf_as_*` reader and a builder, wrapping
+any rebuild exception into a `RecheckFailure`). A per-rule checker is then only
+its registration. A hyps-changing rule (one emitted via `xrule*_hyps`, e.g.
+`while`) will need a hyps-aware variant that also validates the recorded
+hypotheses — to be added when the first such rule is migrated.
 
 ## 4. Recheckable proof-nodes (kernel)
 
@@ -169,12 +180,15 @@ in the node + add the checker, register it. **Proofs must not change.**
 
 1. Create `src/phl/<family>/<logic>/ecPhl…` (or `Ec<Logic><Tactic>`) keeping a
    globally-unique module name.
-2. Extract the pure core `<logic>_<tac>_subgoals` from the existing `t_*_r`
-   (everything up to the `xmutate1` call, returning the `form list`).
+2. Extract the pure core `<logic>_<tac>_subgoals : LDecl.hyps -> … -> form list`
+   from the existing `t_*_r` (everything up to the `xmutate1` call, returning the
+   `form list`; take `hyps` and derive `env = LDecl.toenv hyps` inside).
 3. Add `type EcCoreGoal.rule += R<Logic><Tac> of <params>`.
-4. Rewrite the rule to `FApi.xrule1 tc (R… params) (… _subgoals …)`.
-5. Write `check_<logic>_<tac>` = rerun `_subgoals` from the recorded params and
-   `is_conv`-compare to the stored subgoals; `register_rule_checker` it.
+4. Rewrite the rule to
+   `FApi.xrule1 tc (R… params) (… _subgoals (FApi.tc1_hyps tc) …)`.
+5. Register the checker with `EcPhlRecheck.checker_of "<logic>-<tac>" pf_as_<logic>
+   (fun hyps j -> <logic>_<tac>_subgoals hyps j params)` — no per-rule comparison
+   code.
 6. Write/move `process_<logic>_<tac>` (the typing), and have the tactic's
    `process_<tactic>` dispatcher route the relevant logic arm to it.
 7. Re-export the moved `t_*`/`process_*` from the old module if its `.mli` or
