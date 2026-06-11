@@ -692,7 +692,7 @@ proof. by move => [y fy] @/pinv; rewrite ifT; smt(choicebP). qed.
 
 lemma pcancel_pinv (f : 'a->'b): 
   injective f => pcancel f (pinv f).
-proof. by move => inj_f @/pcansel x; smt(pinv_inv). qed.
+proof. by move => inj_f x; smt(pinv_inv). qed.
 
 
 (* -------------------------------------------------------------------- *)

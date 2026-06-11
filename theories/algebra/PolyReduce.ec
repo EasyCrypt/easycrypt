@@ -67,7 +67,7 @@ proof.
 move=> p un_p; rewrite ideal_eq1P 1:&(idI) //; apply/negP.
 move/fun_ext => /(_ poly1); rewrite mem_idT /I mem_idgen1.
 case/eqT=> q /(congr1 deg); rewrite deg1 => /eq_sym.
-case: (q = poly0) => [->|nz_q]; first by rewrite /( * ) mul0r deg0.
+case: (q = poly0) => [->|nz_q]; first by rewrite mul0r deg0.
 rewrite degM_proper; 1: by rewrite lc_polyXnDC // mulr1 lc_eq0.
 rewrite deg_polyXnDC // -!addrA /= gtr_eqF //.
 by rewrite (_ : 1 = 1 + 0) 1:// ler_lt_add // deg_ge1.
@@ -126,7 +126,7 @@ proof. by rewrite /( ** ) !scalepE -2!mulE reprK. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eqv_Xn : eqv (exp X n) (-poly1).
-proof.  rewrite eqv_sym /eqv /[-] opprK /I mem_idgen1_gen. qed.
+proof.  rewrite eqv_sym /eqv opprK /I mem_idgen1_gen. qed.
 
 (* -------------------------------------------------------------------- *)
 op reduce (p : poly) : poly =
@@ -165,7 +165,7 @@ rewrite {1}(polyE p) /reduce !PCA.big_seq &(eqv_sum) /=.
 move=> i /mem_range [rg_i _]; rewrite mulrC -scalepA.
 pose q := exp X (i %/ n * n) * exp X (i %% n).
 rewrite !scalepE &(eqvMl) &(eqv_trans q).
-- rewrite (_ : q = exp X i) // /q /( * ) -exprD_nneg // -?divz_eq //.
+- rewrite (_ : q = exp X i) // /q -exprD_nneg // -?divz_eq //.
   - by rewrite mulr_ge0 // divz_ge0.
   - by rewrite modz_ge0 gtr_eqF.
 apply/eqvMr; rewrite -polyCX ?divz_ge0 // (IntID.mulrC _ n).
@@ -192,7 +192,7 @@ split=> [eq_rd|eqv_pq].
 have @/eqv @/I: eqv (reduce p) (reduce q).
 - by rewrite !(eqv_reducel, eqv_reducer).
 case/mem_idgen1=> r /(congr1 deg); case: (r = poly0) => [->>|nz_r].
-- by rewrite /( * ) mul0r deg0 deg_eq0 subr_eq0 => ->.
+- by rewrite mul0r deg0 deg_eq0 subr_eq0 => ->.
 have: deg (reduce q - reduce p) <= n.
 - by rewrite &(ler_trans _ _ _ (degB _ _)) ler_maxrP !deg_reduce.
 rewrite degM_proper.
@@ -411,8 +411,8 @@ rewrite polyDE; pose c := (bigi _ _ _ _); have ->: c.[k] = Coeff.zeror.
   move=> i [/mem_range [ge0_i lt_in] @/predC1 ne_ik].
   by rewrite polyZE polyXnE // (eq_sym k i) ne_ik /= mulr0.
 rewrite addr0 polyZE polyXnE //= mulr1 (reducewE (2 * n)).
-- case: (p = poly0) => [->|nz_p]; first by rewrite /( * ) mul0r deg0 /#.
-  case: (q = poly0) => [->|nz_q]; first by rewrite /( * ) mulr0 deg0 /#.
+- case: (p = poly0) => [->|nz_p]; first by rewrite mul0r deg0 /#.
+  case: (q = poly0) => [->|nz_q]; first by rewrite mulr0 deg0 /#.
   apply: (ler_trans (deg p + deg q)); last first.
   - by rewrite (_ : 2 * n = n + n) 1:#ring ler_add &(deg_reduced).
   by rewrite &(ler_trans (deg (p * q) + 1)) ?ler_addl // &(degM_le).

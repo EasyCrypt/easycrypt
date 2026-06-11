@@ -1335,7 +1335,7 @@ qed.
 
 lemma mul_colmxc (v:vector) c: (colmx v) *^ vectc 1 c = c ** v.
 proof.
-rewrite eq_vectorP size_scalarv size_mulmxv /= /max 1:// => i bound.
+rewrite eq_vectorP size_scalarv size_mulmxv /= 1:// => i bound.
 rewrite get_scalarv get_mulmxv dotpE /= /max /=.
 by rewrite Big.BAdd.big_int1 /= get_vectc // mulrC.
 qed.
@@ -1826,7 +1826,7 @@ lemma dmatrix1E d m : mu1 (dmatrix d (rows m) (cols m)) m =
     BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 (cols m)) 0 (rows m).
 proof.
 pose g (m: matrix) := mkseq (fun i => col m i) (cols m).
-rewrite (in_dmap1E_can _ _ g) /ofcols.
+rewrite (in_dmap1E_can _ _ g) 1,2:/ofcols.
 - rewrite /g eq_matrixP /= => i j bound.
   by rewrite get_offunm /= 1:/# nth_mkseq 1:/# get_col.
 - rewrite /g => y y_in <- /=.
@@ -1902,7 +1902,7 @@ proof.
 move => k_ge0; rewrite /dmatrix /ofcols ler_maxr // dlist1 dmap_comp /(\o).
 apply eq_dmap_in => v /size_dvector; rewrite ler_maxr //= => s_v.
 rewrite /colmx s_v; apply/eq_matrixP => /= i j [i_bound j_bound]. 
-by rewrite /ofcols !get_offunm /#.
+by rewrite !get_offunm /#.
 qed.
 
 lemma supp_dmatrix d m r c : 
