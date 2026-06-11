@@ -28,12 +28,13 @@ CHECKER       check_<logic>_<tac>     read the params back from the node, recomp
                                       confirm they match (is_conv) what was stored.
 ```
 
-Key rule: the rule and its checker share one **pure subgoal-builder**
-(`<logic>_<tac>_subgoals : LDecl.hyps -> <judgement> -> params -> form list`).
-The checker is then "rerun the builder and compare", which is why recording the
-params in the node is all that recheckability costs. The builder is handed the
-goal's `hyps` (the authoritative context; its environment is `LDecl.toenv` of
-them), so the rule and checker reason in exactly the same context.
+Key rule: the rule and its checker share one **pure low-level subgoal-builder**
+(`<logic>_<tac>_subgoals : <judgement> -> <node> -> form list`), operating on the
+node's *resolved* parameters (e.g. an integer split index, not a symbolic code
+gap). The checker is then "rerun the builder and compare", which is why recording
+the resolved params in the node is all that recheckability costs. Resolution
+(code positions, typing, …) happens once in the rule, **before** the core, so it
+stays out of the checker's trust boundary — see REFACTORING §7c.
 
 The comparison boilerplate is shared in [`ecPhlRecheck.ml`](ecPhlRecheck.ml):
 `EcPhlRecheck.checker_of name destr build` turns a judgement reader (`pf_as_*`)
@@ -42,9 +43,9 @@ rebuilding into a `RecheckFailure`. A checker is then just its registration:
 
 ```ocaml
 let () = register_rule_checker (function
-  | R<Logic><Tac> params ->
+  | R<Logic><Tac> node ->
       Some (EcPhlRecheck.checker_of "<logic>-<tac>" pf_as_<logic>
-              (fun hyps j -> <logic>_<tac>_subgoals hyps j params))
+              (fun _hyps j -> <logic>_<tac>_subgoals j node))
   | _ -> None)
 ```
 

@@ -189,37 +189,69 @@ Two records make each tactic self-documenting (fields show up in the `.mli`):
   `process_<logic>_<tac>`, which takes that same record and owns its
   surface-syntax validation (single vs double, side allowed, bound allowed, …).
   So `process_*` are never positional.
-- **Typed rule parameters** — a record defined in the migrated `rules/*` module
-  (e.g. `hoare_seq_rule = { hsr_at; hsr_mid }`), carried by the proof-node
-  constructor (`RHoareSeq of hoare_seq_rule`) and consumed by the shared
-  subgoal-builder. The **canonical rule in `rules/*` takes this record**
+- **Rule arguments** — a record defined in the migrated `rules/*` module (e.g.
+  `hoare_seq_rule = { hsr_at; hsr_mid }`, high level: the position is still a
+  symbolic `codegap1`). The **canonical rule in `rules/*` takes this record**
   (`EcHoareSeq.t_hoare_seq : hoare_seq_rule -> backward`). The **legacy positional
   entry in `phl/*` keeps its `.mli` unchanged** and is a thin adapter onto it
   (`let t_hoare_seq i phi = EcHoareSeq.(t_hoare_seq { hsr_at = i; hsr_mid = phi })`),
   so not-yet-migrated callers are untouched.
+- **Node payload** — a *separate* record (e.g. `hoare_seq_node = { hsn_at; hsn_mid }`)
+  carried by the proof-node constructor (`RHoareSeq of hoare_seq_node`) and
+  consumed by the shared subgoal-builder. It holds the **resolved, low-level**
+  parameters (see §7c): `hsn_at` is the normalized integer split index, not the
+  symbolic gap.
 
-Field names use a short per-record **prefix** (`seqi_`, `hsr_`), matching the
-existing EC record style (`hs_m`, `es_pr`, `bhs_bd`) and avoiding label clashes
-within a module.
+Field names use a short per-record **prefix** (`seqi_`, `hsr_`, `hsn_`), matching
+the existing EC record style (`hs_m`, `es_pr`, `bhs_bd`) and avoiding label
+clashes within a module.
+
+## 7c. The checker is post-resolution; the node records resolved data
+
+A checker is *trusted* re-validation, so its TCB must be minimal. It must **not**
+redo elaboration/resolution work the rule already did — code-position
+resolution, name lookup, unification, etc. Concretely, the rule splits at a
+symbolic `codegap1`, which `normalize_cgap1 env` resolves to an integer index
+(`nm_codegap1`). If the node stored the `codegap1` and the checker re-resolved
+it, all of code-position normalization would sit inside the checker's TCB.
+
+Instead: the rule does the env-dependent resolution **once**
+(`EcLowPhlGoal.s_split_index`), records the **resolved** value in the node, and
+both the rule and the checker build subgoals through the same pure low-level
+core (`hoare_seq_subgoals : sHoareS -> hoare_seq_node -> form list`), which splits
+at the integer with `split_at_nmcgap1` (no env). The rule builds its subgoals via
+that core too, so faithfulness is by construction: the checker reruns the exact
+same function on the exact same recorded data.
+
+Rule of thumb when migrating: **record the lowest-level value that still
+determines the subgoals** (a resolved index, a typed formula, an instantiated
+witness) — never the surface syntax that produced it. The high-level
+`*_rule` record is the rule's *input*; the `*_node` record is what survives into
+the proof and the checker.
 
 ## 8. Per-tactic migration recipe
 
 1. Create `src/phl/<family>/<logic>/ecPhl…` (or `Ec<Logic><Tactic>`) keeping a
    globally-unique module name.
-2. Define the typed parameter record `<logic>_<tac>_rule = { <pfx>_… }` (prefixed
-   fields, §7b) and extract the pure core
-   `<logic>_<tac>_subgoals : LDecl.hyps -> <judgement> -> <logic>_<tac>_rule -> form list`
-   from the existing `t_*_r` (everything up to the `xmutate1` call; take `hyps`
-   and derive `env = LDecl.toenv hyps` inside).
-3. Add `type EcCoreGoal.rule += R<Logic><Tac> of <logic>_<tac>_rule`.
-4. Write the canonical rule in `rules/*` taking the record:
-   `t_<logic>_<tac> : <logic>_<tac>_rule -> backward`, body
-   `FApi.xrule1 tc (R… r) (<…>_subgoals (FApi.tc1_hyps tc) j r)`. Turn the legacy
-   `phl/*` `t_*` (positional `.mli` unchanged) into a thin adapter that builds the
-   record and calls it. If the tactic's `EcParsetree` info is still a tuple,
-   convert it to a record (§7b) at the same time.
+2. Define two records (prefixed fields, §7b/§7c): the high-level **rule
+   arguments** `<logic>_<tac>_rule` (symbolic positions, untyped-derived data as
+   supplied by callers) and the low-level **node payload** `<logic>_<tac>_node`
+   (resolved indices, typed data). Extract the pure low-level core
+   `<logic>_<tac>_subgoals : <judgement> -> <logic>_<tac>_node -> form list` from
+   the existing `t_*_r` — everything from *after* resolution up to the `xmutate1`
+   call. It should need no env (resolution already happened); if it genuinely
+   needs more, pass it explicitly.
+3. Add `type EcCoreGoal.rule += R<Logic><Tac> of <logic>_<tac>_node`.
+4. Write the canonical rule in `rules/*` taking the rule-arguments record:
+   `t_<logic>_<tac> : <logic>_<tac>_rule -> backward`. Body: do the env-dependent
+   resolution (e.g. `EcLowPhlGoal.s_split_index`), build the `<…>_node`, then
+   `FApi.xrule1 tc (R… n) (<…>_subgoals j n)`. Turn the legacy `phl/*` `t_*`
+   (positional `.mli` unchanged) into a thin adapter that builds the rule record
+   and calls it. If the tactic's `EcParsetree` info is still a tuple, convert it
+   to a record (§7b) at the same time.
 5. Register the checker with `EcPhlRecheck.checker_of "<logic>-<tac>" pf_as_<logic>
-   (fun hyps j -> <logic>_<tac>_subgoals hyps j r)` — no per-rule comparison code.
+   (fun _hyps j -> <logic>_<tac>_subgoals j n)` — runs only the post-resolution
+   core, no comparison code.
 6. Write `process_<logic>_<tac> : <tactic>_info -> backward` (taking the parsetree
    record): validate the surface syntax for that logic, type the arguments, build
    the rule record and call `t_<logic>_<tac>`. In the `phl/*` dispatcher
