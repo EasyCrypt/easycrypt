@@ -1028,7 +1028,7 @@ wp; call (_:
   + by move => *; inline *;auto => /#.
   (* Backdoor F2Auth *)
   move=> m2 p; inline *; auto => /> &1 &2.
-  rewrite /staterel /leak oget_some /unblock /kstp /rcv.
+  rewrite /staterel /leak oget_some /rcv.
   by case (FKE.st{2}.`kst) => /> /#.
 
 (* WRAP-UP CALL *)
@@ -1712,11 +1712,11 @@ call (_: invotp OTP.Initiator.p{1}
     sp 1 0; if{1}.
     (* STEP INITIATOR *)
     + sp 0 1; match{2}.
-      + by rcondf {1} 1; auto => /> &1;rewrite /invotp /kstp; smt().
-      + rcondt {1} 1; first by auto => /> &1;rewrite /invotp /kstp; smt().
-        by sp 1 0; match{1}; by move => *;rcondf {1} 5; auto => /> &1;rewrite /invotp /kstp;smt().
-      + rcondt {1} 1; first by auto => /> &1;rewrite /invotp /kstp;smt().
-        by sp 1 0; match{1};  by move => *;rcondf {1} 5; auto => /> &1;rewrite /invotp /kstp;smt().
+      + by rcondf {1} 1; auto => /> &1;rewrite /invotp; smt().
+      + rcondt {1} 1; first by auto => /> &1;rewrite /invotp; smt().
+        by sp 1 0; match{1}; by move => *;rcondf {1} 5; auto => /> &1;rewrite /invotp;smt().
+      + rcondt {1} 1; first by auto => /> &1;rewrite /invotp;smt().
+        by sp 1 0; match{1};  by move => *;rcondf {1} 5; auto => /> &1;rewrite /invotp;smt().
       + rcondt {2} 1; first by move => *; wp;skip;smt().
         if{1}.
         + seq 0 3 : (#pre /\  (oget (getl (oget lfa{2}))) = Ch_Init);
@@ -1769,7 +1769,7 @@ call (_: invotp OTP.Initiator.p{1}
         seq 0 3 : (#pre /\ (oget (getl (oget lfa{2}))) <> Ch_Init);
           first by wp;skip;smt().
         by match {2}; 1: (by exfalso => /#); auto => /#.
-      by rcondf{1} 1; [ by auto => /> &1;rewrite /invotp /kstp;smt()| by auto=> />].
+      by rcondf{1} 1; [ by auto => /> &1;rewrite /invotp;smt()| by auto=> />].
     (* STEP RESPONDER *)
     sp 0 1; match{2}; first 3 by auto;rewrite /invotp /#.
     + by rcondf{2} 1; auto; rewrite /invotp /#.
