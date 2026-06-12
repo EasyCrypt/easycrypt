@@ -447,8 +447,30 @@ let select_form_op env mode ~forcepv opsc name ue tvi psig =
 (* -------------------------------------------------------------------- *)
 let select_proj env opsc name ue tvi recty =
   let filter = (fun _ op -> EcDecl.is_proj op) in
-  let ops = EcUnify.select_op ~filter tvi env name ue ([recty], None) in
-  let ops = List.map (fun (p, ty, ue, _) -> (p, ty, ue)) ops in
+  let do_select name =
+    let ops = EcUnify.select_op ~filter tvi env name ue ([recty], None) in
+    List.map (fun (p, ty, ue, _) -> (p, ty, ue)) ops in
+
+  (* When the record type is known, resolve the projector from the type so it
+     need not be in scope by name; fall back to a name-based search otherwise. *)
+  let ty = ty_subst (Tuni.subst (UE.assubst ue)) recty in
+  let ops =
+    match (EcEnv.ty_hnorm ty env).ty_node with
+    | Tconstr (tp, _) -> begin
+        let projp = EcPath.pqoname (EcPath.prefix tp) (snd name) in
+        match EcEnv.Op.by_path_opt projp env with
+        | Some op when EcDecl.is_proj op
+                    && EcPath.p_equal tp (proj3_1 (EcDecl.operator_as_proj op)) ->
+            let subue = EcUnify.UniEnv.copy ue in
+            let top, tvs =
+              EcUnify.UniEnv.openty subue op.op_tparams tvi op.op_ty in
+            (try  EcUnify.unify env subue top (EcUnify.tfun_expected subue [recty])
+             with EcUnify.UnificationFailure _ -> assert false);
+            [((projp, tvs), top, subue)]
+        | _ -> do_select name
+      end
+    | _ -> do_select name
+  in
 
   match ops, opsc with
   | _ :: _ :: _, Some opsc ->
