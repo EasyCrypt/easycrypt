@@ -399,6 +399,14 @@ let s_split env i s =
   try  Pos.split_at_cgap1 env i s
   with Pos.InvalidCPos -> raise (InvalidSplit (`Gap i))
 
+(* Resolve a (symbolic) code gap to its normalized integer index. This is the
+   env-dependent "code resolution" step; splitting a statement at the resulting
+   index ([EcMatching.Position.split_at_nmcgap1]) needs no environment. *)
+let s_split_index env i s =
+  let module Pos = EcMatching.Position in
+  try  Pos.normalize_cgap1 env i s
+  with Pos.InvalidCPos -> raise (InvalidSplit (`Gap i))
+
 (* -------------------------------------------------------------------- *)
 let s_split_i env i s =
   let module Pos = EcMatching.Position in

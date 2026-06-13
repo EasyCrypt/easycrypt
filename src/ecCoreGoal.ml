@@ -126,6 +126,14 @@ type rwproofterm = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* An open (extensible) type of recheckable proof-rule nodes. Each tactic
+   that produces a trusted (TCB) judgement extends [rule] with a constructor
+   carrying exactly the parameters needed to recompute its subgoals, and
+   registers a checker (see [register_rule_checker]). The kernel never needs
+   to know the payload types: dispatch is by a registry of partial handlers. *)
+type rule = ..
+
+(* -------------------------------------------------------------------- *)
 type proof = {
   pr_env    : proofenv;
   pr_opened : handle list;
@@ -160,6 +168,10 @@ and validation =
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
+
+  (* recheckable external proof-node: the [rule] carries enough information
+     to recompute (and thus re-validate) the listed subgoals. *)
+| VRule    of rule * handle list
 
 and tcenv1 = {
   tce_penv : proofenv;               (* top-level proof environment *)
@@ -527,6 +539,30 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let xmutate1_hyps (tc : tcenv1) (vx : 'a) subgoals =
     xmutate_hyps (tcenv_of_tcenv1 tc) vx subgoals
+
+  (* ------------------------------------------------------------------ *)
+  (* Same as [xmutate], but emit a recheckable [VRule] node. [r] must carry
+     the parameters its registered checker needs to recompute [fp]. *)
+  let xrule (tc : tcenv) (r : rule) (fp : form list) =
+    let (tc, hds) = List.map_fold (fun tc fp -> newgoal tc fp) tc fp in
+    close tc (VRule (r, hds))
+
+  (* ------------------------------------------------------------------ *)
+  let xrule1 (tc : tcenv1) (r : rule) (fp : form list) =
+    xrule (tcenv_of_tcenv1 tc) r fp
+
+  (* ------------------------------------------------------------------ *)
+  let xrule_hyps (tc : tcenv) (r : rule) subgoals =
+    let (tc, hds) =
+      List.map_fold
+        (fun tc (hyps, fp) -> newgoal tc ~hyps fp)
+        tc subgoals
+    in
+      close tc (VRule (r, hds))
+
+  (* ------------------------------------------------------------------ *)
+  let xrule1_hyps (tc : tcenv1) (r : rule) subgoals =
+    xrule_hyps (tcenv_of_tcenv1 tc) r subgoals
 
   (* ------------------------------------------------------------------ *)
   let newfact (pe : proofenv) vx hyps concl =
@@ -983,6 +1019,46 @@ let proof_of_tcenv (tc : tcenv) =
 (* -------------------------------------------------------------------- *)
 let proofenv_of_proof (pf : proof) =
   pf.pr_env
+
+(* -------------------------------------------------------------------- *)
+(* Rechecking of [VRule] proof-nodes.
+
+   A checker is given the proof environment, the node's (closed) goal and the
+   pregoals of the subgoals the rule produced. It must re-derive what subgoals
+   the rule should yield for that goal and confirm they match what was
+   recorded, raising [RecheckFailure] otherwise. Checkers are registered as
+   partial handlers over the open [rule] type. *)
+exception RecheckFailure of string
+
+type rule_checker = proofenv -> pregoal -> pregoal list -> unit
+
+let rule_checkers : (rule -> rule_checker option) list ref = ref []
+
+let register_rule_checker (f : rule -> rule_checker option) =
+  rule_checkers := f :: !rule_checkers
+
+let find_rule_checker (r : rule) : rule_checker option =
+  let rec aux = function
+    | []      -> None
+    | f :: fs -> (match f r with Some _ as x -> x | None -> aux fs)
+  in aux !rule_checkers
+
+(* Recheck every [VRule] node of [pe]. Nodes whose rule has no registered
+   checker are left untouched (not yet migrated); all other validation kinds
+   are trusted by construction. *)
+let recheck_proofenv (pe : proofenv) =
+  ID.Map.iter (fun _ (g : goal) ->
+    match g.g_validation with
+    | Some (VRule (r, hds)) -> begin
+        match find_rule_checker r with
+        | None     -> ()
+        | Some chk ->
+            let subs =
+              List.map
+                (fun hd -> (FApi.get_goal_by_id hd pe).g_goal) hds in
+            chk pe g.g_goal subs
+      end
+    | _ -> ()) pe.pr_goals
 
 (* -------------------------------------------------------------------- *)
 let start (hyps : LDecl.hyps) (goal : form) =
