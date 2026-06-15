@@ -13,6 +13,9 @@ type tdeps = (int, int Set.t) Map.t
 val dep  : Aig.node -> tdeps
 val deps : Aig.reg -> tdeps array
 
+(* [merge_deps d1 d2] is the pointwise union of [d1] and [d2]: each input
+   variable maps to the union of its bit-sets in the two. Use it to pool
+   the dependencies of several output bits (e.g. into one block). *)
 val merge_deps : tdeps -> tdeps -> tdeps
 
 (* [realign_inputs ?renamings n] rewrites [n] so each input's used bits
