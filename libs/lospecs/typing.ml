@@ -21,7 +21,6 @@ module Env : sig
   val empty : env
   val lookup : env -> symbol -> (ident * sig_) option
   val push : env -> symbol -> sig_ -> env * ident
-  val export : env -> (symbol, ident * sig_) Map.t
 end = struct
   type sig_ = aword list option * atype
 
@@ -35,8 +34,6 @@ end = struct
     let idx = Ident.create x in
     let env = { vars = Map.add x (idx, sig_) env.vars } in
     (env, idx)
-
-  let export (env : env) : (symbol, ident * sig_) Map.t = env.vars
 end
 
 (* -------------------------------------------------------------------- *)
@@ -65,10 +62,6 @@ let mk_tyerror (range : range) msg =
 (* -------------------------------------------------------------------- *)
 let tyerror (range : range) msg =
   mk_tyerror_r range (fun e -> raise e) msg
-
-(* -------------------------------------------------------------------- *)
-let tt_type (_ : env) (t : ptype) : atype =
-  (t.data :> atype)
 
 (* -------------------------------------------------------------------- *)
 let tt_type_parameters
@@ -105,12 +98,6 @@ let check_plain_arg (_ : env) (arg : pexpr option loced) =
     end
   | Some arg ->
     arg
-
-(* -------------------------------------------------------------------- *)
-let as_int_constant (e : pexpr) : int64 =
-  match e.data with
-  | PEInt (i, None) -> i
-  | _ -> tyerror e.range "integer constant expected"
 
 (* -------------------------------------------------------------------- *)
 let as_nativeint_constant (e : pexpr) : int =
