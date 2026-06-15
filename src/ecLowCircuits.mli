@@ -116,8 +116,8 @@ val circ_of_zint    : size:int -> zint -> circ
 val circuit_of_zint : size:int -> zint -> circuit
 
 (* Construct an input *)
-val new_input_circuit : ?name:[`Str of string | `Idn of ident | `Bad] -> ctype -> circ * cinp
-val input_of_ctype    : ?name:[`Str of string | `Idn of ident | `Bad] -> ctype -> circuit
+val new_input_circuit : ?name:[`Str of string | `Idn of ident] -> ctype -> circ * cinp
+val input_of_ctype    : ?name:[`Str of string | `Idn of ident] -> ctype -> circuit
 
 (* Aggregation functions *)
 val circuit_aggregate        : circuit list -> circuit
@@ -143,9 +143,8 @@ val circuit_tuple_proj        : circuit -> int -> circuit
 val circuit_tuple_of_circuits : circuit list -> circuit
 val circuits_of_circuit_tuple : circuit -> circuit list
 
-(* Avoid nodes for uninitialized inputs *)
+(* Fresh arbitrary value (used for [witness] and unknown values) *)
 val circuit_uninit            : ctype -> circuit
-val circuit_has_uninitialized : circuit -> int option
 
 (* Logical reasoning over circuits *)
 val circ_equiv : ?pcond:circuit -> circuit -> circuit -> bool * model Lazy.t

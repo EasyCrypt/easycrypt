@@ -51,10 +51,6 @@ module type CBackend = sig
 
   val nodes_eq : node -> node -> bool
 
-  val bad : node
-  val bad_reg : int -> reg 
-  val has_bad : node -> bool
-  val have_bad : reg -> int option
 
   val node_array_of_reg : reg -> node array
   val node_list_of_reg : reg -> node list
@@ -189,27 +185,6 @@ module LospecsBack : CBackend = struct
   let false_ = C.false_
   let nodes_eq ({id=id1; _}: node) ({id=id2; _}: node) = id1 = id2
   let size_of_reg = Array.length
-  let bad = C.input (-1, -1)
-  let bad_reg = fun i -> Array.make i bad
-  let has_bad : node -> bool = 
-    let cache : (int, bool) Hashtbl.t = Hashtbl.create 0 in
-    let rec doit (n: node) : bool =
-      match Hashtbl.find_option cache (Int.abs n.id) with
-      | Some b -> b
-      | None -> let b = doit_r n.gate in
-        Hashtbl.add cache (Int.abs n.id) b;
-        b
-    and doit_r (n: C.node_r) : bool =
-      match n with
-      | C.Input (-1, -1) -> true
-      | C.Input _
-      | C.False -> false
-      | C.And (n1, n2) -> (doit n1) || (doit n2)
-    in
-    fun b -> doit b
-
-  let have_bad (r: reg) : int option =
-    Array.find_opt (fun (_, r) -> has_bad r) (Array.mapi (fun i r -> (i,r)) r) |> Option.map fst
 
   let node_array_of_reg : reg -> node array = fun x -> x
 
@@ -558,8 +533,8 @@ module type CircuitInterface = sig
 
   
   (* Construct an input *)
-  val new_input_circuit : ?name:[`Str of string | `Idn of ident | `Bad] -> ctype -> circ * cinp
-  val input_of_ctype : ?name:[`Str of string | `Idn of ident | `Bad] -> ctype -> circuit
+  val new_input_circuit : ?name:[`Str of string | `Idn of ident] -> ctype -> circ * cinp
+  val input_of_ctype : ?name:[`Str of string | `Idn of ident] -> ctype -> circuit
 
   (* Aggregation functions *)
   val circuit_aggregate : circuit list -> circuit
@@ -586,9 +561,8 @@ module type CircuitInterface = sig
   val circuit_tuple_of_circuits : circuit list -> circuit
   val circuits_of_circuit_tuple : circuit -> circuit list
  
-  (* Avoid nodes for uninitialized inputs *)
+  (* Fresh arbitrary value (used for [witness] and unknown values) *)
   val circuit_uninit : ctype -> circuit
-  val circuit_has_uninitialized : circuit -> int option
 
   (* Logical reasoning over circuits. Each query returns the decision and
      a lazy counter-model (see [Backend.model]); forcing it is only
@@ -938,14 +912,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let can_convert_input_type (t1: ctype) (t2: ctype) : bool =
     size_of_ctype t1 = size_of_ctype t2     
 
-  let input_of_ctype ?(name : [`Str of string | `Idn of ident | `Bad ] = `Str "input") (ct: ctype) : circuit = 
+  let input_of_ctype ?(name : [`Str of string | `Idn of ident] = `Str "input") (ct: ctype) : circuit =
     let id, c = match name with
     | `Str name -> let id = EcIdent.create name |> tag in
-      id, Backend.input_of_size ~id (size_of_ctype ct)    
+      id, Backend.input_of_size ~id (size_of_ctype ct)
     | `Idn idn -> let id = idn.id_tag in
-      id, Backend.input_of_size ~id (size_of_ctype ct)    
-    | `Bad ->
-      -1, Backend.bad_reg (size_of_ctype ct)
+      id, Backend.input_of_size ~id (size_of_ctype ct)
     in
     { reg = c; type_ = ct; }, [{ id; type_ = ct; }]
 
@@ -1050,13 +1022,10 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let inps = merge_inputs_list (List.snd args) in
     (circ, inps)
 
-  (* Functions for dealing with uninitialized inputs *)
+  (* Fresh arbitrary value (used for [witness] and unknown values) *)
   let circuit_uninit (t: ctype) : circuit =
     let c, _ = input_of_ctype ~name:(`Str "uninit") t in
     c, []
-    
-  let circuit_has_uninitialized (c: circuit) : int option =
-    Backend.have_bad (fst c).reg
 
   let circ_equiv ?(pcond:circuit option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool * Backend.model Lazy.t =
     let pcond = Option.map (convert_type CBool) pcond in (* Try to convert to bool *)

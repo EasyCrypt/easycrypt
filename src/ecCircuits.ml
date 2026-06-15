@@ -778,8 +778,6 @@ let circuits_of_equality ~(st : state) ~(hyps : hyps) (f1 : form) (f2 : form) :
   let c2 = circuit_of_form st hyps f2 |> state_close_circuit st in
   lap "Right side circuit generation done";
 
-  assert (Option.is_none @@ circuit_has_uninitialized c1);
-  assert (Option.is_none @@ circuit_has_uninitialized c2);
   let posts = circuit_eqs c1 c2 in
   lap "Done with postcondition circuit generation";
   posts
