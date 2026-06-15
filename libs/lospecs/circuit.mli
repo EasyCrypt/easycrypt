@@ -142,11 +142,19 @@ val ugt : reg -> reg -> node
 
 val uge : reg -> reg -> node
 
+val ult : reg -> reg -> node
+
+val ule : reg -> reg -> node
+
 val sgte : node -> reg -> reg -> node
 
 val sgt : reg -> reg -> node
 
 val sge : reg -> reg -> node
+
+val slt : reg -> reg -> node
+
+val sle : reg -> reg -> node
 
 val bvueq : reg -> reg -> node
 

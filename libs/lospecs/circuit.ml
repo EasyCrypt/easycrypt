@@ -32,25 +32,6 @@ let uint_of_bools (bs : bool array) : int =
     (fun v i b -> if b then (1 lsl i) lor v else v)
     0 bs
 
-(* -------------------------------------------------------------------- *)
-let int32_of_bools (bs : bool array) : int32 =
-  Array.fold_lefti
-    (fun v i b ->
-       if b then
-         Int32.logor (Int32.shift_left 1l i) v
-       else
-         v)
-    0l bs
-
-let int64_of_bools (bs : bool array) : int64 =
-  Array.fold_lefti
-    (fun v i b ->
-      if b then
-        Int64.(logor (shift_left 1L i) v)
-      else
-        v)
-    0L bs
-
 let ubigint_of_bools (bs: bool array) : Z.t =
   Array.fold_right 
     (fun b acc -> 
@@ -90,26 +71,6 @@ let bools_of_reg (r: reg) : bool array =
   ) r
 
 let bool_list_of_reg : reg -> bool list = fun r -> bools_of_reg r |> Array.to_list
-
-(* -------------------------------------------------------------------- *)
-let pp_reg_ ~(size : int) (fmt : Format.formatter) (r : bool array) =
-  assert (Array.length r mod (size * 4) = 0);
-
-  let r = explode ~size:(size * 4) r in
-(*   let r = explode ~size:(size * 4) r in *)
-  let r = Array.map int32_of_bools r in
-
-  Format.fprintf fmt "%a"
-  (fun fmt arr -> Array.iteri (fun i x ->
-    Format.fprintf fmt "%0.8lx" x;
-    if i < Array.length arr - 1 then 
-    Format.fprintf fmt "_"
-   ) arr)
-  r
-
-let pp_reg ~(size: int) (fmt: Format.formatter) (r: reg) = 
-  assert (size mod 4 = 0);
-  pp_reg_ ~size:(size / 4) fmt (bools_of_reg r)
 
 (* ==================================================================== *)
 let bit ~(position : int) (v : int) : bool =
@@ -152,13 +113,6 @@ let of_bigint_all ~(size : int) (v : Z.t) : reg =
   let v = Z.rem v mod_ in
   let v = if Z.sign v < 0 then Z.add mod_ v else v in
   of_bigint ~size v
-
-let of_bigint_repr_size (v : Z.t) : reg =
-  let size = Z.numbits v + (if Z.sign v <= 0 then 1 else 0) in
-  of_bigint_all ~size v
-
-let of_int_repr_size (v: int) : reg =
-  of_bigint_repr_size (Z.of_int v)
 
 (* -------------------------------------------------------------------- *)
 let of_string ~(size : int) (s : string) : reg =
@@ -247,10 +201,6 @@ let sextend ~(size : int) (r : reg) : reg =
       Array.append r (Array.make (size - lr) (r.(lr - 1)))
   else
     r
-
-(* -------------------------------------------------------------------- *)
-let trunc ~(size: int) (r: reg) : reg =
-  Array.sub r 0 size 
 
 (* -------------------------------------------------------------------- *)
 let mux2 (n1 : node) (n2 : node) (c : node) =
