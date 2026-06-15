@@ -22,17 +22,7 @@ let f_app_safe (env: env) (f: EcPath.path) (args: form list) =
   let tvars,(newt, _f_kind) = open_oper_ue o_f ue in
   let rty = UE.fresh ue in
   let fty = toarrow (List.map (fun f -> f.f_ty) args) rty in
-  let () = begin
-  try
-  (EcUnify.unify env ue fty newt)
-  with 
-  | UnificationFailure (`TyUni (ty1, ty2)) -> 
-    let pp_type = (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) in
-    Format.eprintf "Failed to unify types (%a, %a) in call to %s@." pp_type ty1 pp_type ty2 
-    (let h,t = EcPath.toqsymbol f in List.fold_right (fun a b -> a ^ "." ^ b) h t); 
-    raise (UnificationFailure (`TyUni (ty1, ty2)))
-  end 
-  in
+  (try EcUnify.unify env ue fty newt with UnificationFailure _ -> assert false);
   let uidmap = UE.assubst ue in
   let subst = EcCoreSubst.Tuni.subst uidmap in
   let rty = EcCoreSubst.ty_subst subst rty in
