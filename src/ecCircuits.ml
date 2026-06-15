@@ -576,15 +576,7 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
           let v =
             match state_get_pv_opt st mem v with
             | Some v -> v
-            | None ->
-              EcEnv.notify env `Debug
-                "Assigning unassigned program variable %a of type %a@."
-                EcPrinting.(pp_pv ppe)
-                pv
-                EcPrinting.(pp_type ppe)
-                f_.f_ty;
-              circuit_uninit env
-                f_.f_ty (* Allow uninitialized program variables *)
+            | None -> assert false (* opened up front: internal error *)
           in
           v
         | Fglob (_id, _mem) ->
