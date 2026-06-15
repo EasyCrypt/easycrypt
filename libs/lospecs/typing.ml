@@ -652,5 +652,5 @@ let tt_def (env : env) (p : pdef) : symbol * adef =
   (p.name, { name = p.name; arguments = args; body = bod; rettype = rty; })
 
 (* -------------------------------------------------------------------- *)
-let tt_program (env : env) (p : pprogram) : (symbol * adef) list =
-  List.map (tt_def env) p
+let tt_program (p : pprogram) : (symbol * adef) list =
+  List.map (tt_def Env.empty) p

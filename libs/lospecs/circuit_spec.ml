@@ -5,7 +5,7 @@ open Aig
 (* ==================================================================== *)
 let load_from_file ~(filename : string) =
   let specs = File.with_file_in filename (Io.parse filename) in
-  let specs = Typing.tt_program Typing.Env.empty specs in
+  let specs = Typing.tt_program specs in
   specs
 
 let split_at_arr (type t) (n: int) (r: t array) : t array * t array =
