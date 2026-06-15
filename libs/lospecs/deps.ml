@@ -6,12 +6,8 @@ module Hashtbl = Batteries.Hashtbl
            i |->  {j | output depends on bit j of var i }*)
 type tdeps = (int, int Set.t) Map.t
 
-let cache : (int, tdeps) Hashtbl.t = Hashtbl.create 5003 
-
-let reset_state : unit -> unit = fun () -> Hashtbl.reset cache
-
 (* ==================================================================== *)
-let rec dep : _ -> tdeps = 
+let rec dep : _ -> tdeps =
   let cache : (int, tdeps) Hashtbl.t = Hashtbl.create 0 in
 
   let rec doit (n: Aig.node) : tdeps = 

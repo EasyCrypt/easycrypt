@@ -1687,6 +1687,5 @@ include TranslationState
 include BVOps
 include ArrayOps
 
-let reset_backend_state () = 
-  C.HCons.clear ();
-  CDeps.reset_state ()
+let reset_backend_state () =
+  C.HCons.clear ()

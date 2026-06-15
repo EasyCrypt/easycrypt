@@ -8,9 +8,6 @@
 type tdeps = (int, int Set.t) Map.t
 
 (* -------------------------------------------------------------------- *)
-(* Clears the memoization cache. *)
-val reset_state : unit -> unit
-
 (* [dep n] / [deps r] are the dependencies of a node / of each output bit
    of a register. *)
 val dep  : Aig.node -> tdeps
