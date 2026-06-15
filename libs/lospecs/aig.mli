@@ -45,6 +45,13 @@ val map  : (var -> node option) -> node -> node
 val maps : (var -> node option) -> reg -> reg
 
 (* -------------------------------------------------------------------- *)
+(* [get_bit b i] is bit [i] (little-endian) of the byte buffer [b]. *)
+val get_bit : bytes -> int -> bool
+
+(* [eval env n] evaluates the AIG [n] under the input assignment [env]. *)
+val eval : (var -> bool) -> node -> bool
+
+(* -------------------------------------------------------------------- *)
 val pp_node :
   ?input_namer:(int -> string) -> Format.formatter -> node -> unit
 

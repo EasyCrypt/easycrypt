@@ -166,3 +166,31 @@ let map (env : var -> node option) : node -> node =
 (* -------------------------------------------------------------------- *)
 let maps (env : var -> node option) : reg -> reg =
   fun r -> Array.map (map env) r
+
+(* -------------------------------------------------------------------- *)
+let get_bit (b : bytes) (i : int) =
+  Char.code (Bytes.get b (i / 8)) lsr (i mod 8) land 0b1 <> 0
+
+(* -------------------------------------------------------------------- *)
+let eval (env : var -> bool) =
+  let cache : (int, bool) Hashtbl.t = Hashtbl.create 0 in
+
+  let rec for_node (n : node) =
+    let value =
+      match Hashtbl.find_option cache (abs n.id) with
+      | None ->
+         let value = for_node_r n.gate in
+         Hashtbl.add cache (abs n.id) value;
+         value
+      | Some value ->
+         value
+
+    in if 0 < n.id then value else not value
+
+  and for_node_r (n : node_r) =
+    match n with
+    | False -> false
+    | Input x -> env x
+    | And (n1, n2) -> for_node n1 && for_node n2
+
+  in fun (n : node) -> for_node n
