@@ -25,6 +25,7 @@ type ctype =
 type cinp = {
   type_ : ctype;
   id    : int;
+  name  : string;  (* source-level name, for counter-model display *)
 }
 
 (* A circuit: a register together with its type. *)

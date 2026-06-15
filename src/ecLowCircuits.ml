@@ -443,9 +443,10 @@ module type CircuitInterface = sig
   | CBool
   type cinp = {
     type_ : ctype;
-    id: int
+    id   : int;
+    name : string;  (* source-level name, for counter-model display *)
   }
-  type circ = { 
+  type circ = {
     reg: flatcirc ;
     type_: ctype ;
   }
@@ -609,7 +610,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 }
   type cinp = {
     type_ : ctype;
-    id : int;
+    id   : int;
+    name : string;  (* source-level name, for counter-model display *)
   }
   type 'a cfun = 'a * (cinp list)
   type circuit = circ cfun
@@ -784,7 +786,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | `Idn id -> id
       | `Str s -> EcIdent.create s
       in
-      { id = name.id_tag; type_ = t},
+      { id = name.id_tag; type_ = t; name = EcIdent.name name},
       ({ reg = Backend.input_of_size ~id:name.id_tag (size_of_ctype t); type_ = t}, [])
         
     (* Circuit lambdas, for managing inputs *)
@@ -913,13 +915,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     size_of_ctype t1 = size_of_ctype t2     
 
   let input_of_ctype ?(name : [`Str of string | `Idn of ident] = `Str "input") (ct: ctype) : circuit =
-    let id, c = match name with
+    let id, nm, c = match name with
     | `Str name -> let id = EcIdent.create name |> tag in
-      id, Backend.input_of_size ~id (size_of_ctype ct)
+      id, name, Backend.input_of_size ~id (size_of_ctype ct)
     | `Idn idn -> let id = idn.id_tag in
-      id, Backend.input_of_size ~id (size_of_ctype ct)
+      id, EcIdent.name idn, Backend.input_of_size ~id (size_of_ctype ct)
     in
-    { reg = c; type_ = ct; }, [{ id; type_ = ct; }]
+    { reg = c; type_ = ct; }, [{ id; type_ = ct; name = nm }]
 
   let new_input_circuit ?(name = `Str "input") (ty: ctype) : circ * cinp = 
     let c, inps = input_of_ctype ~name ty in
@@ -1091,8 +1093,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let fillet_circuit ((c, inps) : circuit) : circuit list = 
     let r = c.reg |> Backend.node_list_of_reg in
     List.map (fun n ->
-      let new_inps = List.map (fun {id=_;type_} ->
-        {id=EcIdent.create "_" |> tag; type_}) inps 
+      let new_inps = List.map (fun {id=_;type_;name} ->
+        {id=EcIdent.create "_" |> tag; type_; name}) inps
       in
       let renamings = List.combine 
         (List.map (fun {id} -> id) inps)
@@ -1102,9 +1104,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let renamings = fun v -> Map.find_opt v renamings in
       let n', shifts = Backend.Deps.excise_bit ~renamings n in
 
-      let new_inps = List.filter_map (fun {id;_} ->
+      let new_inps = List.filter_map (fun {id;name;_} ->
         match Map.find_opt id shifts with
-        | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1)}
+        | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1); name}
         | None -> None
       ) new_inps in
       { reg = Backend.reg_of_node n';
@@ -1198,11 +1200,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     assert (c.type_ = CBool);
     let node_c = Backend.node_of_reg c.reg in
     let node_c, shifts = Backend.Deps.excise_bit node_c in
-    let inps = List.filter_map (fun {id; _} ->
+    let inps = List.filter_map (fun {id; name; _} ->
       match Map.find_opt id shifts with
-      | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1)}
-      | None -> None 
-    ) cinps in 
+      | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1); name}
+      | None -> None
+    ) cinps in
     let c = Backend.reg_of_node node_c in
     { reg = c; type_ = CBool}, inps
 
@@ -1333,8 +1335,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         (size + 1, Map.add id (size, 1) map)
       ) (0, Map.empty) inps
     in
-    {type_ = CBitstring size; id=new_id},
-    fun (id, bit) -> 
+    {type_ = CBitstring size; id=new_id; name = "aggregated"},
+    fun (id, bit) ->
       let base_sz = Map.find_opt id map in
       Option.bind base_sz (fun (base, sz) ->
         let idx = bit + base in
@@ -1361,10 +1363,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | None -> "spec_input"
     in
 
-    let cinps, inps = List.mapi (fun i ty -> 
-      let id = EcIdent.create (name ^ "_" ^ (string_of_int i)) |> tag in
+    let cinps, inps = List.mapi (fun i ty ->
+      let nm = name ^ "_" ^ (string_of_int i) in
+      let id = EcIdent.create nm |> tag in
       let size : int = size_of_ctype ty in
-      (Backend.input_of_size ~id size, { type_ = ty; id = id; } )
+      (Backend.input_of_size ~id size, { type_ = ty; id = id; name = nm } )
       ) arg_tys |> List.split in
     let c = c cinps in
     { reg = c; type_ = ret_ty}, inps 
