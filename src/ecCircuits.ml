@@ -862,17 +862,18 @@ let instrs_equiv
   if not (List.for_all (EcTypes.is_loc -| fst) (rd @ wr)) then
     circ_error CantReadWriteGlobs;
 
+  (* Open the read/written program variables as the circuit inputs, keyed
+     by their (memory, name) so that [Fpvar] reads in [process_instr]
+     resolve to them. Opening them with the ident-based [open_circ_lambda]
+     (under fresh idents) would leave every read unbound, collapsing all
+     variables to a single uninitialized input. A variable that is both
+     read and written must be opened only once. *)
   let inputs =
-    List.map
-      (fun (pv, ty) -> {v_name = EcTypes.get_loc pv; v_type = ty})
-      (rd @ wr)
+    List.map (fun (pv, ty) -> (EcTypes.get_loc pv, ty)) (rd @ wr)
+    |> List.sort_uniq (fun (a, _) (b, _) -> String.compare a b)
+    |> List.map (fun (s, ty) -> ((mem, s), ctype_of_ty env ty))
   in
-  let inputs =
-    List.map
-      (fun {v_name; v_type} -> create v_name, ctype_of_ty env v_type)
-      inputs
-  in
-  let st = open_circ_lambda st inputs in
+  let st = open_circ_lambda_pv st inputs in
 
   let st1 = List.fold_left (fun st -> process_instr hyps mem ~st) st s1 in
   let st2 = List.fold_left (fun st -> process_instr hyps mem ~st) st s2 in

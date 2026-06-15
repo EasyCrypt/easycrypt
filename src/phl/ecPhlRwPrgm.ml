@@ -75,13 +75,13 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
     let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) (POE.lower (EcAst.hs_po hs)).inv) in
     let st = EcLowCircuits.(set_logger empty_state EcEnv.(notify env `Debug "%s")) in
 
-    begin
-      try
-        if not (EcCircuits.instrs_equiv (FApi.tc1_hyps tc) ~keep mem st target s.s_node) then
-          tc_error !!tc "statements are not circuit-equivalent"
-        with e ->
-          tc_error !!tc "circuit-equivalence checker error: %s" (Printexc.to_string e)
-    end;
+    let equiv =
+      try EcCircuits.instrs_equiv (FApi.tc1_hyps tc) ~keep mem st target s.s_node
+      with e ->
+        tc_error !!tc "circuit-equivalence checker error: %s" (Printexc.to_string e)
+    in
+    if not equiv then
+      tc_error !!tc "statements are not circuit-equivalent";
     { zp with z_tail = s.s_node @ tl } in
 
   let hs = { hs with hs_s = Zpr.zip zp; hs_m = mem; } in
