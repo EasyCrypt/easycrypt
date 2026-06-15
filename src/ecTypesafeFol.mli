@@ -4,12 +4,21 @@ open EcAst
 (* -------------------------------------------------------------------- *)
 (* Type-aware construction of operator/function applications as forms,
    with on-the-fly normalisation. Used by the circuit translation to bring
-   applications into a reduced, translatable shape. The type-inference and
-   reduction helpers are internal. *)
+   applications into a reduced, translatable shape. *)
 
-(* [f_app_safe env p args] builds the application of the operator at path
-   [p] to [args], inferring and instantiating its type variables. *)
-val f_app_safe : EcEnv.env -> EcPath.path -> form list -> form
+(* [f_app_safe env ?typarams ?rty op args] builds the application of the
+   operator at path [op] to [args], instantiating its type variables.
+   [?typarams] seeds the type parameters of the unification environment and
+   [?rty] fixes the expected result type. It is an internal error (assert)
+   if the application does not type — unification fails, or type variables
+   remain unresolved. *)
+val f_app_safe :
+     EcEnv.env
+  -> ?typarams:EcDecl.ty_params
+  -> ?rty:EcTypes.ty
+  -> EcPath.path
+  -> form list
+  -> form
 
 (* [fapply_safe ~redmode hyps f fs] applies the function-form [f] to the
    argument-forms [fs], normalising the result by call-by-value under

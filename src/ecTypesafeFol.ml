@@ -1,29 +1,46 @@
+(* -------------------------------------------------------------------- *)
 open EcUtils
 open EcAst
+open EcDecl
 open EcTypes
-open EcCoreFol
+open EcFol
 open EcUnify
 open EcEnv
 
 module UE = EcUnify.UniEnv
 
-type form = EcAst.form
+(* -------------------------------------------------------------------- *)
+let f_app_safe
+   (env      : env)
+  ?(typarams : ty_params option)
+  ?(rty      : ty option)
+   (op       : EcPath.path)
+   (args     : form list)
+=
+  let ue = UE.create typarams in
+  let opdecl = EcEnv.Op.by_path op env in
+  let opty, tvars = UE.openty ue opdecl.op_tparams None opdecl.op_ty in
 
-let f_app_safe (env: env) (f: EcPath.path) (args: form list) =
-  let ue = UE.create None in
-  let o_f = EcEnv.Op.by_path f env in
-  let newt, tvars = UE.openty ue o_f.EcDecl.op_tparams None o_f.EcDecl.op_ty in
-  let rty = UE.fresh ue in
+  let rty = ofdfl (fun () -> UE.fresh ue) rty in
   let fty = toarrow (List.map (fun f -> f.f_ty) args) rty in
-  (try EcUnify.unify env ue fty newt with UnificationFailure _ -> assert false);
-  let uidmap = UE.assubst ue in
-  let subst = EcCoreSubst.Tuni.subst uidmap in
-  let rty = EcCoreSubst.ty_subst subst rty in
-  let newt = EcCoreSubst.ty_subst subst newt in
+
+  begin
+    try
+      EcUnify.unify env ue fty opty
+    with UnificationFailure _ -> assert false
+  end;
+
+  if not (UE.closed ue) then
+    assert false;
+
+  let subst = EcCoreSubst.Tuni.subst (UE.assubst ue) in
+  let rty   = EcCoreSubst.ty_subst subst rty in
+  let opty  = EcCoreSubst.ty_subst subst opty in
   let tvars = List.map (EcCoreSubst.ty_subst subst) tvars in
-  let op = f_op f tvars newt in
-  f_app op args rty
+
+  f_app (f_op op tvars opty) args rty
   
+(* -------------------------------------------------------------------- *)
 let fapply_safe
     ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps)
     (f: form) (fs: form list) : form =
