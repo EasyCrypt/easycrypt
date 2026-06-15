@@ -6,9 +6,9 @@ type range = {
   rg_fname : string;
   rg_begin : int * int;
   rg_end   : int * int;  
-} [@@deriving yojson]
+}
 
-type 'a loced = { range : range; data : 'a; } [@@deriving yojson]
+type 'a loced = { range : range; data : 'a; }
 
 (* -------------------------------------------------------------------- *)
 module Lc = struct
@@ -71,17 +71,17 @@ end
 exception ParseError of range
 
 (* -------------------------------------------------------------------- *)
-type symbol = string [@@deriving yojson]
-type word = [ `W of int ] [@@deriving yojson]
-type type_ = [ `Unsigned | `Signed | word ] [@@deriving yojson]
+type symbol = string
+type word = [ `W of int ]
+type type_ = [ `Unsigned | `Signed | word ]
 
 (* -------------------------------------------------------------------- *)
-type psymbol = symbol loced [@@deriving yojson]
-type pword = word loced [@@deriving yojson]
-type ptype = type_ loced [@@deriving yojson]
-type parg = psymbol * pword [@@deriving yojson]
-type pargs = parg list [@@deriving yojson]
-type pfname = (psymbol * pword list option) loced [@@deriving yojson]
+type psymbol = symbol loced
+type pword = word loced
+type ptype = type_ loced
+type parg = psymbol * pword
+type pargs = parg list
+type pfname = (psymbol * pword list option) loced
 
 (* -------------------------------------------------------------------- *)
 type pexpr_ =
@@ -94,13 +94,11 @@ type pexpr_ =
   | PESlice of pexpr * pslice
   | PEAssign of pexpr * pslice * pexpr
   | PEApp of pfname * pexpr option loced list
-[@@deriving yojson]
 
-and pexpr = pexpr_ loced [@@deriving yojson]
+and pexpr = pexpr_ loced
 
-and pslice = (pexpr * pexpr option * pexpr option) [@@deriving yojson]
+and pslice = (pexpr * pexpr option * pexpr option)
 
 type pdef = { name : symbol; args : pargs; rty : pword; body : pexpr }
-[@@deriving yojson]
 
-type pprogram = pdef list [@@deriving yojson]
+type pprogram = pdef list

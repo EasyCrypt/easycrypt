@@ -265,13 +265,8 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
     begin
       match e.type_ with
       | `W n ->
-        if Array.length r <> n then begin
-          Format.eprintf "%d %d@." (Array.length r) n;
-          Format.eprintf "%a@."
-            (Yojson.Safe.pretty_print ~std:true)
-            (Ast.aexpr_to_yojson e);
+        if Array.length r <> n then
           raise (CircuitSpecError (Format.asprintf "Bitstring length mismatch (expected %d, got %d)" n (Array.length r)))
-        end
       | _ -> ()
     end; r
   in

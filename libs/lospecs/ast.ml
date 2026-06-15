@@ -1,17 +1,17 @@
 (* -------------------------------------------------------------------- *)
-type symbol = Ptree.symbol [@@deriving yojson]
+type symbol = Ptree.symbol
 
 exception DestrError of string
 
 (* -------------------------------------------------------------------- *)
 module Ident : sig
-  type ident [@@deriving yojson]
+  type ident
 
   val create : string -> ident
   val name : ident -> string
   val id : ident -> int
 end = struct
-  type ident = symbol * int [@@deriving yojson]
+  type ident = symbol * int
 
   let create (x : string) : ident = (x, Oo.id (object end))
   let name ((x, _) : ident) : string = x
@@ -24,27 +24,27 @@ module IdentMap = Map.Make(struct
 end) 
 
 (* -------------------------------------------------------------------- *)
-type ident = Ident.ident [@@deriving yojson]
+type ident = Ident.ident
 
 (* -------------------------------------------------------------------- *)
-type aword = [ `W of int ] [@@deriving yojson]
+type aword = [ `W of int ]
 
 (* -------------------------------------------------------------------- *)
-type atype = [ aword | `Signed | `Unsigned ] [@@deriving yojson]
+type atype = [ aword | `Signed | `Unsigned ]
 
 (* -------------------------------------------------------------------- *)
-type aarg = ident * aword [@@deriving yojson]
+type aarg = ident * aword
 
 (* -------------------------------------------------------------------- *)
-type aargs = aarg list [@@deriving yojson]
+type aargs = aarg list
 
 (* -------------------------------------------------------------------- *)
-type lr = [`L | `R] [@@deriving yojson]
-type la = [`L | `A] [@@deriving yojson]
-type us = [`U | `S] [@@deriving yojson]
-type hl = [`H | `L] [@@deriving yojson]
-type hld = [hl | `D] [@@deriving yojson]
-type mulk = [`U of hld | `S of hld | `US] [@@deriving yojson]
+type lr = [`L | `R]
+type la = [`L | `A]
+type us = [`U | `S]
+type hl = [`H | `L]
+type hld = [hl | `D]
+type mulk = [`U of hld | `S of hld | `US]
 
 (* -------------------------------------------------------------------- *)
 type aexpr_ =
@@ -72,9 +72,8 @@ type aexpr_ =
   | EEq of aword * (aexpr * aexpr)
   | ECmp of aword * us * [`Gt | `Ge] * (aexpr * aexpr)
   | EPopCount of aword * aexpr
-[@@deriving yojson]
 
-and aexpr = { node : aexpr_; type_ : atype } [@@deriving yojson]
+and aexpr = { node : aexpr_; type_ : atype }
 
 (* -------------------------------------------------------------------- *)
 type adef = {
@@ -82,7 +81,7 @@ type adef = {
   arguments : aargs;
   body : aexpr;
   rettype : aword;
-} [@@deriving yojson]
+}
 
 (* -------------------------------------------------------------------- *)
 let atype_as_aword (ty : atype) =

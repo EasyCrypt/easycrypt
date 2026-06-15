@@ -3,8 +3,6 @@
   (public_name easycrypt.lospecs)
   (flags
     (:standard -open Batteries))
-  (preprocess
-    (pps ppx_deriving_yojson))
   (libraries batteries bitwuzla-cxx menhirLib zarith))
 
 (ocamllex lexer)
