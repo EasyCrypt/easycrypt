@@ -18,7 +18,7 @@ let open_oper_ue op ue =
 
 let f_app_safe (env: env) (f: EcPath.path) (args: form list) =
   let ue = UE.create None in
-  let p_f, o_f = EcEnv.Op.lookup (EcPath.toqsymbol f) env in
+  let o_f = EcEnv.Op.by_path f env in
   let tvars,(newt, _f_kind) = open_oper_ue o_f ue in
   let rty = UE.fresh ue in
   let fty = toarrow (List.map (fun f -> f.f_ty) args) rty in
@@ -28,7 +28,7 @@ let f_app_safe (env: env) (f: EcPath.path) (args: form list) =
   let rty = EcCoreSubst.ty_subst subst rty in
   let newt = EcCoreSubst.ty_subst subst newt in
   let tvars = List.map (EcCoreSubst.ty_subst subst) tvars in
-  let op = f_op p_f tvars newt in
+  let op = f_op f tvars newt in
   f_app op args rty
   
 let fapply_safe
