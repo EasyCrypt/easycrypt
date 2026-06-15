@@ -43,11 +43,6 @@ let unroll_ftype (ty:ty) : ty list * ty =
 
   doit [] ty
 
-let ty_var_from_ty (ty:ty) : ty list =
-  match ty.ty_node with
-  | Tconstr (_, args) -> args
-  | _ -> assert false (* FIXME: how to handle this case ? *)
-
 (* Returned list is (tyvar, ty) *)
 let rec match_ty_tyargs (ty: ty) (tyargs: ty) : (ty * ty) list = 
   match (ty.ty_node, tyargs.ty_node) with

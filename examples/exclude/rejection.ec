@@ -62,7 +62,7 @@ module M = {
 
     var counter : w64 <- W64.zero;
 
-    permq <- W8.of_int 148; (* FIXME: hex/bin notations *)
+    permq <- W8.of_int 148; (* FIXME: PY hex/bin notations *)
     shfb  <- W32u8.pack32 (List.map W8.of_int [
        0;  1;  1;  2;  3;  4;  4;  5;
        6;  7;  7;  8;  9; 10; 10; 11;

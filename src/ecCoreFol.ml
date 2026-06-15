@@ -183,8 +183,6 @@ let f_false  = f_op EcCoreLib.CI_Bool.p_false [] tbool
 let f_bool   = fun b -> if b then f_true else f_false
 
 (* -------------------------------------------------------------------- *)
-(* TODO: check types here *)
-(* FIXME CIRCUIT PR: do we want to keep this? *)
 let ty_ftlist1 ty = toarrow (List.make 1 ty) (tlist ty)
 let ty_ftlist2 ty = toarrow ([ty; (tlist ty)]) (tlist ty)
 let ty_flist1 ty = toarrow (List.make 1 (tlist ty)) (tlist ty)

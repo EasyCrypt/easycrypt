@@ -1121,7 +1121,7 @@ let generalize_auto to_gen auto_rl =
       to_gen, Some (Th_auto {auto_rl with axioms})
 
 let generalize_crbinding (to_gen : to_gen) ((bd, lc) : crbinding * is_local) =
-  (* FIXME: not complete? *)
+  (* FIXME PY: not complete? *)
   let bd = EcSubst.subst_crbinding to_gen.tg_subst bd in
   let item =
     if lc = `Local then None else Some (Th_crbinding (bd, lc))
@@ -1226,7 +1226,7 @@ let can_depend (cd : can_depend) (who : cbarg) =
   | `ModuleType _ -> cd.d_modty
   | `Typeclass  _ -> cd.d_tc
   | `Instance   _ -> assert false
-  | `Crbind     _ -> assert false (* FIXME *)
+  | `Crbind     _ -> assert false (* FIXME PY *)
 
 let cb scenv from cd who =
   let env = scenv.sc_env in
@@ -1612,7 +1612,7 @@ let check_item scenv item =
   | Th_auto { locality } ->
     if (locality = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
-  | Th_reduction _ -> () (* FIXME *)
+  | Th_reduction _ -> () (* FIXME PY *)
   | Th_crbinding (crb, lc) -> check_crbinding scenv (crb, lc)
   | Th_theory  _   -> assert false
   | Th_alias _     -> () (* FIXME:ALIAS *)

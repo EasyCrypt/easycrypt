@@ -3,7 +3,6 @@ open Aig
 module Hashtbl = Batteries.Hashtbl
 
 (* ------------------------------------------------------------------------------- *)
-(* FIXME: CHECK THIS *)
 let rec inputs_of_node : _ -> Aig.var Set.t =
   let cache : (int, Aig.var Set.t) Hashtbl.t = Hashtbl.create 0 in
   
@@ -156,7 +155,7 @@ let collapse_blocks (d: tdblock list) : tdblock option =
 (* -------------------------------------------------------------------- *)
 (* Uses dependency analysis to realign inputs to start at 0             *)
 (* Corresponds to taking the relevant subcircuit to this output         *)
-(* Assumes that inputs are contiguous FIXME                             *)
+(* Assumes that inputs are contiguous                                   *)
 let realign_inputs ?(renamings: (int -> int option) option) (n: node) : node * (int, int * int) Map.t = 
   let d = dep n in
   let shifts = Map.map (fun s -> 

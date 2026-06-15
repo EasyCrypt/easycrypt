@@ -39,6 +39,13 @@ module type SMTInstance = sig
 
   (* bvand *)
   val bvand : bvterm -> bvterm -> bvterm
+
+  (* Boolean negation; argument and result are of Boolean sort
+     (as produced by [bvterm_equal]). *)
+  val bool_not : bvterm -> bvterm
+
+  (* Boolean conjunction; both arguments and the result are of Boolean sort. *)
+  val bool_and : bvterm -> bvterm -> bvterm
   val get_value : solver -> bvterm -> bvterm
   val pp_term : Format.formatter -> bvterm -> unit
 end
@@ -154,7 +161,12 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = bvterm_of_node pcond in
 
-    SMT.assert' ctx.solver (SMT.bvand pcond (SMT.bvnot formula));
+    (* [pcond] is a 1-bit BV; lift it to Boolean by comparing with #b1.
+       [formula] is already Boolean (built via [bvterm_equal]). We look for
+       a counter-model: an assignment under which [pcond] holds and the
+       registers differ, i.e. [pcond_bool /\ not formula]. *)
+    let pcond_bool = SMT.bvterm_equal pcond (SMT.bvterm_of_int 1 1) in
+    SMT.assert' ctx.solver (SMT.bool_and pcond_bool (SMT.bool_not formula));
     not (SMT.check_sat ctx.solver)
 
   let sat (ctx : ctx) (n : Aig.node) : bool =
@@ -204,6 +216,11 @@ module BWZInstance : SMTInstance = struct
 
   let bvand (bv1 : bvterm) (bv2 : bvterm) : bvterm =
     mk_term2 Kind.Bv_and bv1 bv2
+
+  let bool_not (bv : bvterm) : bvterm = mk_term1 Kind.Not bv
+
+  let bool_and (bv1 : bvterm) (bv2 : bvterm) : bvterm =
+    mk_term2 Kind.And bv1 bv2
 
   let get_value (s : solver) (bv : bvterm) : bvterm = Solver.get_value s bv
   let pp_term (fmt : Format.formatter) (bv : bvterm) : unit = Term.pp fmt bv

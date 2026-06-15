@@ -177,7 +177,6 @@ type crb_tyrev_binding = [
   | `Array     of crb_array
 ]
 
-(* FIXME: rename `To ? *)
 type crb_bitstring_operator = crb_bitstring * [`From | `To | `OfInt | `ToUInt | `ToSInt ]
 
 type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]
@@ -2906,7 +2905,7 @@ type ebinding = [
   | `ModType   of module_sig
 ]
 
-(*  FIXME section :  Global ? *)
+(*  FIXME PY section :  Global ? *)
 let bind1 ((x, eb) : symbol * ebinding) (env : env) =
   match eb with
   | `Variable ty -> Var   .bind_pvglob x ty env
@@ -2976,7 +2975,7 @@ module LDecl = struct
     | LD_hyp f ->
         LD_hyp (Fsubst.f_subst s f)
 
-    | LD_abs_st _ ->                    (* FIXME *)
+    | LD_abs_st _ ->               
         assert false
 
   (* ------------------------------------------------------------------ *)

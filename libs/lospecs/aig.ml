@@ -409,9 +409,6 @@ let aiger_serialize_int (id: int) : string =
 let pp_aiger_int fmt (id: int) : unit =
   Format.fprintf fmt "%s" (aiger_serialize_int id)
 
-(* FIXME PR: Look at correction of this and after making sure it is correct   *)
-(*           we can remove or do something else with the asserts              *)
-(*           but they should not be triggered on a normal execution           *)
 let pp_aiger_and fmt ((gid, id1, id2): int * int * int) : unit =
   if not (gid > id1 && id1 > id2) then Format.eprintf "gid : %d | id1: %d | id2: %d@." gid id1 id2;
   assert (gid > id1 && id1 > id2);
@@ -488,7 +485,6 @@ let abc_check_equiv
   BatIO.write_string abc_in (abc_command ^ "\n");
   BatIO.close_out abc_in;
 (*   let abc_output_c = BatIO.input_channel ~autoclose:true ~cleanup:true abc_output_c in *)
-  (* FIXME: Get the actual output in all cases from abc *)
   let re = Str.regexp {|.*Networks are equivalent.*|} in
   Format.eprintf "Before read@.";
   let abc_output = BatIO.read_all abc_output_c in
@@ -524,7 +520,10 @@ let load (inp : IO.input) : reg * (Set.String.t * string array) option =
     let doit (x : string) =
       if not (Str.string_match re x 0) then
         raise (InvalidAIG ("not a valid uint: " ^ x));
-      int_of_string x           (* FIXME: overflow *)
+      (match int_of_string_opt x with
+      | Some x -> x
+      | None -> raise (InvalidAIG ("error in parsing in from string: " ^ x))
+      )
     in fun x -> doit x in 
 
   let header = String.trim (IO.read_line inp) in

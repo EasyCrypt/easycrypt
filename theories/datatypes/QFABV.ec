@@ -44,7 +44,6 @@ abstract theory BV.
 end BV.
 
 (* ==================================================================== *)
-(* FIXME: Missing of_list axiomatization *)
 abstract theory A.
   op size : int.
 
@@ -58,9 +57,16 @@ abstract theory A.
 
   op to_list ['a] : 'a t -> 'a list.
 
+  op of_list ['a] : 'a -> 'a list -> 'a t.
+  
   axiom tolistP ['a] (a : 'a t) :
     to_list a = mkseq (fun i => get a i) size.
 
+  axiom oflistP ['a] (a : 'a list) :
+    (forall (i: int) (dfl: 'a), 
+     0 <= i /\ i < size => 
+     List.nth dfl a i = get (of_list dfl a) i).
+  
   axiom eqP ['a] (a1 a2 : 'a t) :
         (forall i, 0 <= i < size => get a1 i = get a2 i)
     <=> (a1 = a2).
@@ -108,7 +114,8 @@ theory BVOperators.
 
   (* ------------------------------------------------------------------ *)
   abstract theory BVMul.
-    clone import BV.
+
+  clone import BV.
   
     op bvmul : bv -> bv -> bv.
   
@@ -137,8 +144,20 @@ theory BVOperators.
   end BVURem.
 
   (* ------------------------------------------------------------------ *)
-  (*  abstract theory BVSRem. FIXME: TODO *)
-  (* end BVSRem. *)
+  abstract theory BVSRem.
+    clone import BV.
+   
+    op bvsrem : bv -> bv -> bv.
+
+    (* FIXME: PY check this please *)
+    op srem (i1 i2 : int) = 
+      let s = if i1 < 0 then -1 else if i1 = 0 then 0 else 1 in
+      let r = s * (`|i1| %% `|i2|) in
+      if 2 ^ (size - 1) <= r then r - 2^(size) else r.
+
+    axiom bvsremP (bv1 bv2 : bv) :
+      tosint (bvsrem bv1 bv2) = srem (tosint bv1) (tosint bv2).
+  end BVSRem.
   
   (* ------------------------------------------------------------------ *)
   abstract theory BVSHL.

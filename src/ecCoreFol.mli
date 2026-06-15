@@ -147,8 +147,6 @@ val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form
 val f_pr_r : pr -> form
 val f_pr   : memory -> xpath -> form -> ss_inv -> form
 
-(* FIXME: Check this V *)
-(* FIXME CIRCUIT PR: do we want to keep this? *)
 val ty_ftlist1 : ty -> ty
 val ty_ftlist2 : ty -> ty
 val ty_flist1  : ty -> ty
@@ -157,7 +155,6 @@ val ty_lmap    : ty -> ty -> ty
 val ty_chunk   : ty -> ty
 val ty_all     : ty -> ty
 
-(* FIXME CIRCUIT PR: if keeping, maybe change names *)
 val fop_empty   : ty -> form
 val fop_cons    : ty -> form
 val fop_append  : ty -> form

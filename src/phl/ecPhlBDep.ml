@@ -18,7 +18,7 @@ module Option = Batteries.Option
 (* -------------------------------------------------------------------- *)
 let int_of_form = EcCircuits.int_of_form
 
-(* FIXME: move? V *)
+(* FIXME PY: move? V *)
 let form_list_from_iota (hyps: hyps) (f: form) : form list =
   match f.f_node with
   | Fapp ({f_node = Fop(p, _)}, [n; m]) when p = EcCoreLib.CI_List.p_iota ->
@@ -38,10 +38,9 @@ let rec form_list_of_form (f: form) : form list =
     pc = EcCoreLib.CI_List.p_cons ->
     h::(form_list_of_form t)
   | _ -> 
-    (* FIXME: Bad error? *)
     raise (DestrError "list")
 
-(* FIXME: move? A *)
+(* FIXME PY: move? A *)
 
 let rec destr_conj (hyps: hyps) (f: form) : form list = 
   let redmode = {(circ_red hyps) with zeta = false} in
@@ -86,13 +85,7 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 
   (* If f is of the form (a_ = a) (aka prog_var = log_var) 
     then add it to the state, otherwise do nothing *)
-  (* FIXME: are all the simplifications necessary ? *)
   (* Processes explicit equations *)
-  (* FIXME PR: Make sure this works with things of the form
-     a{hr} = b{hr} /\ b{hr} = a{hr}
-     or even
-     a{hr} = b{hr} /\ b{hr} = c{hr} /\ c{hr} = a{hr}
-  *)
   let process_equality (s: state) (f: form) : state = 
     let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
@@ -158,7 +151,6 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
     | _ -> Seq.return (circuit_of_form st hyps post |> state_close_circuit st)
     ) |> List.of_seq |> circuit_check_posts ~env ~pres
 
-(* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve
   (tc : tcenv1) =
   let hyps = (FApi.tc1_hyps tc) in
@@ -268,10 +260,9 @@ let t_bdep_simplify (tc: tcenv1) =
     with CircError err ->
       tc_error (FApi.tc1_penv tc) "Circuit simplify failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
     end
-  | _ -> assert false (* FIXME : Do we want to handle other cases before merge? *)
+  | _ -> assert false 
 
 (* ================ EXTENS TACTIC  ==================== *)
-(* FIXME: Maybe move later? *)
 open FApi
 let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
     (* Find goal shape 
@@ -319,7 +310,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
             raise CannotTranslate
         in
         EcCoreModules.i_asgn (lv, e)
-        | _ -> raise (CannotTranslate) (* FIXME: Errors *)
+        | _ -> raise (CannotTranslate) 
 
       ) s.s_node)
     in
@@ -358,10 +349,9 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       | Some (v, _, _) -> v 
       | None -> tc_error (tc1_penv tc) "Failed to find var %s in memory %s" v (EcIdent.name m)
       in
-      (* FIXME: Assumes is not array, fix later *)
       let size = match EcEnv.Circuit.lookup_bitstring_size (tc1_env tc) v.v_type with
       | Some size -> size
-      | None -> tc_error (tc1_penv tc) "Failed to get size for type %a (is it finite and does it have a binding?)" 
+      | None -> tc_error (tc1_penv tc) "Failed to get size for type %a (is it finite and does it have a binding to a bistring type (arrays unsupported)?)" 
         EcPrinting.(pp_type PPEnv.(ofenv (tc1_env tc))) v.v_type
       in
       let tpath = match v.v_type.ty_node with
@@ -371,7 +361,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       let of_int = match EcEnv.Circuit.reverse_type (tc1_env tc) tpath with
       | [] -> tc_error (tc1_penv tc) "No bindings found for type of var"
       | `Bitstring { ofint }::_ -> ofint
-      | _ -> tc_error (tc1_penv tc) "FIXME: Unhandled case"
+      | _ -> tc_error (tc1_penv tc) "Only finite size bitstring supported"
       in
       let ngoals = 1 lsl size in
 (*       let ngoals = min ngoals 5 in *)

@@ -4,6 +4,7 @@ from Jasmin require import JModel JArray.
 clone import PolyArray as Array2 with op size <- 2.
 
 bind array Array2."_.[_]" Array2."_.[_<-_]" Array2.to_list Array2.of_list Array2.t 2.
+realize oflistP by admit.
 realize tolistP by admit.
 realize eqP by admit.
 realize get_setP by admit.
@@ -52,9 +53,6 @@ realize bvorP by admit.
 
 bind op bool [!] "not".
 realize bvnotP by admit.
-
-(* TODO: Add shifts once we have truncate/extend *)
-
 
 (* ----------- BEGIN W8 BINDINGS ---------- *)
 bind bitstring W8.w2bits W8.bits2w W8.to_uint W8.to_sint W8.of_int W8.t 8.
@@ -196,9 +194,6 @@ lemma shl_shift w sa :
 bind op W16.t shl16 "shl".
 realize bvshlP by admit.
 
-(* TODO: Add shifts once we have truncate/extend *)
-
-
 (* ----------- BEGIN W32 BINDINGS ---------- *)
 bind bitstring W32.w2bits W32.bits2w W32.to_uint W32.to_sint W32.of_int W32.t 32.
 realize size_tolist by auto.
@@ -241,9 +236,6 @@ realize bvnotP by admit.
 bind op [W32.t & bool] W32."_.[_]" "get".
 realize bvgetP by admit.
 
-(* TODO: Add shifts once we have truncate/extend *)
-
-
 (* ----------- BEGIN W64 BINDINGS ---------- *)
 
 bind bitstring W64.w2bits W64.bits2w W64.to_uint W64.to_sint W64.of_int W64.t 64.
@@ -283,9 +275,6 @@ realize bvxorP by admit.
 
 bind op W64.t W64.invw "not".
 realize bvnotP by admit.
-
-(* TODO: Add shifts once we have truncate/extend *)
-
 
 (* ----------- BEGIN W128 BINDINGS ---------- *)
 
@@ -327,8 +316,6 @@ realize bvxorP by admit.
 bind op W128.t W128.invw "not".
 realize bvnotP by admit.
 
-(* TODO: Add shifts once we have truncate/extend *)
-
 (* ----------- BEGIN W256 BINDINGS ---------- *)
 
 bind bitstring W256.w2bits W256.bits2w W256.to_uint W256.to_sint W256.of_int W256.t 256.
@@ -369,8 +356,6 @@ realize bvxorP by admit.
 bind op W256.t W256.invw "not".
 realize bvnotP by admit.
 
-(* TODO: Add shifts once we have truncate/extend *)
-
 (* ----------- BEGIN SPEC FILE BINDINDS ---------- *)
 
 
@@ -392,10 +377,7 @@ bind circuit VPACKUS_16u16 "VPACKUS_16u16".
 bind circuit VPMADDUBSW_256 "VPMADDUBSW_256".
 bind circuit VPERMD "VPERMD".
 
-
-(* FIXME: Check new types *)
 bind circuit VPSRA_16u16 "VPSRA_16u16_new".
-
 
 bind op [bool & W16.t] W16.init "init".
 realize bvinitP by admit.

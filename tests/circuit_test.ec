@@ -51,8 +51,6 @@ realize ofintP by admit.
 realize touintP by admit.
 realize tosintP by done. 
 realize gt0_size by done.
-    
-
 
 type W8.
 
@@ -87,9 +85,7 @@ qed.
 lemma W8_xor_ext (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
 proc.
-(* extens [a] : (wp; skip; smt()). *)
-(* FIXME : while debugging fhash *) 
-admit. (* *)
+extens [a] : (wp; skip; smt()). 
 qed.
 
 lemma W8_xor_circuit (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
@@ -123,10 +119,8 @@ qed.
 lemma W8_xor_ext_simp (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
 proc.
-extens [a] : by circuit simplify; trivial. (* FIXME: without by does not work *)
+extens [a] : by circuit simplify; trivial. 
 qed.
-
-    
 
 lemma xor_com (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = b_ +^ a_].
 proof.
@@ -140,7 +134,7 @@ theory Array8.
 type 'a t.
 
 op tolist : 'a t -> 'a list.
-op oflist : 'a list -> 'a t.
+op oflist : 'a -> 'a list -> 'a t.
 op "_.[_]" : 'a t -> int -> 'a.
 op "_.[_<-_]" : 'a t -> int -> 'a -> 'a t.
 
@@ -149,10 +143,10 @@ end Array8.
 bind array Array8."_.[_]" Array8."_.[_<-_]" Array8.tolist Array8.oflist Array8.t 8.
 realize gt0_size by auto.
 realize tolistP by admit.
+realize oflistP by admit.      
 realize eqP by admit.
 realize get_setP by admit.
 realize get_out by admit.
-
 
 op init_8_8 (f: int -> W8) : W8 Array8.t.
 

@@ -125,7 +125,6 @@ let rec pp_circ_error ppe fmt (err : circuit_error) =
     Format.fprintf fmt "Missing op spec binding for operator at path %a" pp_path
       pth
   | IntConversionFailure ->
-    (* FIXME: check that this actually prints the form, otherwise add it *)
     Format.fprintf fmt "Failed to convert form to concrete integer"
   | MissingOpBody pth ->
     Format.fprintf fmt "No body for operator at path %a" pp_path pth
@@ -530,7 +529,6 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
         | Fapp (f, fs) -> circuit_of_app st f_ f fs
   
         | Fquant (qnt, binds, f) ->
-          (* FIXME Does this type conversion make sense? *)
           let binds =
             List.map (fun (idn, t) -> idn, gty_as_ty t |> ctype_of_ty env) binds
           in
@@ -538,7 +536,6 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
             match qnt with
             | Lforall | Llambda ->
               circ_lambda_oneshot st binds (fun st -> circuit_of_node st f)
-              (* FIXME: look at this interaction *)
             | Lexists ->
               circ_error (CantConvertToCirc (`Quantif qnt))
           end
@@ -574,7 +571,6 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
           let v =
             match pv with
             | PVloc v -> v
-            (* FIXME: Should globals be supported? *)
             | _ -> circ_error (CantConvertToCirc `Glob)
           in
           let v =
@@ -719,7 +715,6 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
 
   and trans_iter (st : state) (hyps : hyps) (f : form) (fs : form list) : circuit =
     try
-      (* FIXME: move auxiliary function out of the definitions *)
       let redmode = circ_red hyps in
       let fapply_safe f fs =
         let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
@@ -801,8 +796,6 @@ let circuit_simplify_equality
   let posts = circuits_of_equality ~st ~hyps f1 f2 in
   circuit_check_posts ~env:(toenv hyps) ~pres posts
 
-(* FIXME: add support for spec bindings for abstract/opaque operators 
-    = convert from Fop rather than from op body *)
 let process_instr (hyps : hyps) (mem : memory) ~(st : state) (inst : instr) :
     state =
   EcEnv.notify (toenv hyps) `Debug "[W] Processing : %a@."
@@ -851,7 +844,6 @@ let process_instr (hyps : hyps) (mem : memory) ~(st : state) (inst : instr) :
     | _ -> circ_error (CantConvertToCirc `Instr)
   with CircError e -> propagate_circ_error (`Instr inst) e
 
-(* FIXME: check if memory is the right one in calls to state *)
 let instrs_equiv
     (hyps : hyps)
     ((mem, _mt) : memenv)
@@ -887,7 +879,6 @@ let instrs_equiv
 
   let st1 = close_circ_lambda st1 in
   let st2 = close_circ_lambda st2 in
-  (* FIXME: what was the intended behaviour for keep? *)
   match keep with
   | Some pv ->
     let vs = EcPV.PV.elements pv |> fst in
@@ -916,7 +907,6 @@ let instrs_equiv
            let circ2 = state_get_pv st2 mem var in
            check_with_model env (circ_equiv circ1 circ2))
 
-(* FIXME: change memory -> memenv Why?            *)
 let state_of_prog
     ?(close = false)
     (hyps : hyps)
@@ -979,8 +969,8 @@ let circuit_state_of_hyps
         (* If there is a memory, add all the variables from that memory into the translation state *)
         | EcBaseLogic.LD_mem mt -> circuit_state_of_memenv ~st env (id, mt)
         (* Initialized variable. 
-       Check if body is convertible to circuit, if not just process it as uninitialized.
-       TODO: Maybe do a first pass on this, check convertibility and remove duplicates? *)
+           Check if body is convertible to circuit, if not just process it as uninitialized.
+         *)
         | EcBaseLogic.LD_var (t, Some f) ->
           EcEnv.notify env `Debug "Assigning %a to %a@."
             EcPrinting.(pp_form ppe)
@@ -988,7 +978,6 @@ let circuit_state_of_hyps
           begin
             try
               update_state st id (circuit_of_form st hyps f)
-              (* FIXME PR: Should only catch circuit translation errors, hack *)
             with CircError e -> (
               EcEnv.notify env `Debug
                 "Failed to translate hypothesis for var %s with error %a, \
@@ -996,7 +985,6 @@ let circuit_state_of_hyps
                 (tostring_internal id) (pp_circ_error ppe) e;
               try
                 open_circ_lambda st [id, ctype_of_ty env t]
-                (* FIXME PR: Should only catch circuit translation errors, hack *)
               with
               | ( CircError (AbstractTyBinding _)
                 | CircError (MissingTyBinding _) ) as e
@@ -1031,7 +1019,6 @@ let circuit_state_of_hyps
             when EcFol.op_kind p = Some `Eq -> begin
             try
               update_state_pv st m pv (circuit_of_form st hyps fv)
-              (* FIXME PR: Should only catch circuit translation errors, hack *)
             with CircError e ->
               EcEnv.notify env `Debug
                 "Failed to translate hypothesis %s => %a@\n\
