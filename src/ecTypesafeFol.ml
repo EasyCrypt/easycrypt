@@ -8,9 +8,7 @@ open EcEnv
 
 module UE = EcUnify.UniEnv
 
-type form     = EcAst.form
-
-exception InsufficientArguments
+type form = EcAst.form
 
 let open_oper_ue op ue =
   (* Maybe list map works fine because ue is imperative? *)
@@ -18,7 +16,7 @@ let open_oper_ue op ue =
   let _ue, tys = List.fold_left_map (fun ue _ -> (ue, EcUnify.UniEnv.fresh ue)) ue op.op_tparams in
   (tys, open_oper op tys)
 
-let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
+let f_app_safe (env: env) (f: EcPath.path) (args: form list) =
   let ue = UE.create None in
   let p_f, o_f = EcEnv.Op.lookup (EcPath.toqsymbol f) env in
   let tvars,(newt, _f_kind) = open_oper_ue o_f ue in
@@ -41,13 +39,6 @@ let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   let newt = EcCoreSubst.ty_subst subst newt in
   let tvars = List.map (EcCoreSubst.ty_subst subst) tvars in
   let op = f_op p_f tvars newt in
-  if full then
-  match rty.ty_node with
-  | Tfun _ -> Format.eprintf "op: %a@.args: " (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) op; 
-    List.iter (fun a -> Format.eprintf "%a, " (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) a) args; Format.eprintf "@.";
-    raise InsufficientArguments
-  | _ -> f_app op args rty
-  else
   f_app op args rty
   
 let fapply_safe
