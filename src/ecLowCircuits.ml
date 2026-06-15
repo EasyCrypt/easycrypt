@@ -131,8 +131,6 @@ module type CBackend = sig
 
   val flatten : reg list -> reg
 
-  val reg_to_file : input_count:int -> ?inp_name_map:(int -> string) -> name:string -> reg -> symbol 
-
   module Deps : sig
     type dep = (int, int Set.t) Map.t
     type deps = dep array
@@ -322,10 +320,7 @@ module LospecsBack : CBackend = struct
   let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
   let flatten (rs: reg list) : reg = Array.concat rs
 
-  let reg_to_file ~(input_count: int) ?(inp_name_map: (int -> string) option) ~(name: string) (r: reg) : symbol =
-    C.write_aiger_bin_temp ~input_count ?inp_name_map ~name r 
-
-  module Deps = struct 
+  module Deps = struct
     type dep = (int, int Set.t) Map.t
     type deps = dep array
     type block_deps = (int * dep) array
@@ -585,9 +580,6 @@ module type CircuitInterface = sig
   val fillet_tauts : ?logger:(string -> unit) -> circuit list -> circuit list -> bool
   val batch_checks : ?logger:(string -> unit) -> ?sort:bool -> ?mode:[`ByEq | `BySub ] -> circuit list -> circuit list
 
-  (* Wraps the backend call to deal with args/inputs *) 
-  val circuit_to_file : name:string -> circuit -> symbol
-
   val circuit_from_spec : ?name:symbol -> (ctype list * ctype) -> Lospecs.Ast.adef -> circuit
 end
 
@@ -644,7 +636,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   | CircSmtNonBoolCirc
   | CircComputeBadNumberOfArguments of { expected: int; received: int}
   | CircComputeInvalidArguments of int
-  | UnsupportedTypeForFileOutput 
   | CloseWithoutLambda
 
   exception LowCircError of lowcircerror
@@ -1348,12 +1339,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let circuit_aggregate_inputs ((c, inps): circuit) : circuit =
     let inp, renamer = input_aggregate_renamer inps in
     {c with reg = Backend.applys renamer c.reg}, [inp]
-
-  let circuit_to_file ~(name: string) ((c, inps): circuit) : symbol =
-    match c, inps with
-    | {reg = r; type_ = CBitstring _}, {type_ = CBitstring w; id}::[] -> 
-      Backend.reg_to_file ~input_count:w ~name (Backend.applys (fun (id_, i) -> if id_ = id then Some (Backend.input_node ~id:0 (i+1)) else None) r)
-    | _ -> lowcircerror @@ UnsupportedTypeForFileOutput
 
   let circuit_from_spec ?(name: symbol option) ((arg_tys, ret_ty) : (ctype list * ctype)) (spec: Lospecs.Ast.adef) : circuit = 
     let c = Backend.circuit_from_spec spec in

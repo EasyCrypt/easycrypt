@@ -50,12 +50,3 @@ val pp_node :
 module HCons : sig
   val clear : unit -> unit
 end
-
-(* -------------------------------------------------------------------- *)
-(* Serialize [r] to a fresh temporary ".aig" file; returns its path. *)
-val write_aiger_bin_temp :
-     input_count:int
-  -> ?inp_name_map:(int -> string)
-  -> ?name:string
-  -> reg
-  -> string

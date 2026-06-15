@@ -170,7 +170,6 @@ val batch_checks         :
   -> circuit list
   -> circuit list
 
-val circuit_to_file   : name:symbol -> circuit -> symbol
 val circuit_from_spec : ?name:symbol -> (ctype list * ctype) -> Lospecs.Ast.adef -> circuit
 
 (* -------------------------------------------------------------------- *)
