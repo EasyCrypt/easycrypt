@@ -598,7 +598,12 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
       EcEnv.notify env `Debug "Assigning witness to var of type %a@."
         EcPrinting.(pp_type ppe)
         f_.f_ty;
-      circuit_uninit env f_.f_ty
+      match EcAlphaInvHashtbl.find_opt cache f_ with
+      | Some circ -> circ
+      | None ->
+        let circ = circuit_uninit env f_.f_ty in
+        EcAlphaInvHashtbl.add cache f_ circ;
+        circ
     end else
       match Mp.find_opt pth !op_cache with
       | Some op -> op

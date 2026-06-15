@@ -1051,8 +1051,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     (circ, inps)
 
   (* Functions for dealing with uninitialized inputs *)
-  let circuit_uninit (t: ctype) : circuit = 
-    let c, _ = input_of_ctype ~name:`Bad t in
+  let circuit_uninit (t: ctype) : circuit =
+    let c, _ = input_of_ctype ~name:(`Str "uninit") t in
     c, []
     
   let circuit_has_uninitialized (c: circuit) : int option =
