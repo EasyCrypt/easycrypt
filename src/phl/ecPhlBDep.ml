@@ -332,7 +332,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
           in
 
           let goals = List.init len (fun i -> 
-            EcTypesafeFol.fapply_safe (tc1_hyps tc) fpred [f_int EcBigInt.(of_int (i + start))]
+            EcTypesafeFol.f_app (tc1_hyps tc) fpred [f_int EcBigInt.(of_int (i + start))]
           ) in
 
           EcEnv.notify (tc1_env tc) `Debug "Got iota => [%d, %d)@.Goals: %a@." start len 
@@ -368,7 +368,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
 (*       let ngoals = min ngoals 5 in *)
       List.init ngoals (fun i ->
         let subst = EcPV.PVM.(add (tc1_env tc) (PVloc v.v_name) (fst hs.hs_m) 
-        (EcTypesafeFol.f_app_safe (tc1_env tc) of_int [f_int BI.(of_int i)]) empty)
+        (EcTypesafeFol.f_op_app (tc1_env tc) of_int [f_int BI.(of_int i)]) empty)
         in
         let s = subst_pv_stmt (tc1_hyps tc) m subst hs.hs_s in
         let subst = EcPV.PVM.subst (tc1_env tc) subst in

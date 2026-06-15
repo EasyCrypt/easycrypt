@@ -463,7 +463,7 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
   let ppe = EcPrinting.PPEnv.ofenv env in
 
   let fapply_safe (f : form) (fs : form list) =
-    EcTypesafeFol.fapply_safe ~redmode hyps f fs
+    EcTypesafeFol.f_app ~redmode hyps f fs
   in
 
   (* Form level cache, local to each high-level call *)
@@ -714,7 +714,7 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
     try
       let redmode = circ_red hyps in
       let fapply_safe f fs =
-        let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
+        let res = EcTypesafeFol.f_app ~redmode hyps f fs in
         res
       in
       match f, fs with

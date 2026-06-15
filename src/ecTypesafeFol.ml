@@ -10,7 +10,7 @@ open EcEnv
 module UE = EcUnify.UniEnv
 
 (* -------------------------------------------------------------------- *)
-let f_app_safe
+let f_op_app
    (env      : env)
   ?(typarams : ty_params option)
   ?(rty      : ty option)
@@ -41,7 +41,7 @@ let f_app_safe
   f_app (f_op op tvars opty) args rty
   
 (* -------------------------------------------------------------------- *)
-let fapply_safe
+let f_app
   ?(redmode : EcReduction.reduction_info = EcReduction.full_red)
    (hyps    : LDecl.hyps)
    (f        : form)
