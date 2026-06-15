@@ -1,0 +1,61 @@
+(* -------------------------------------------------------------------- *)
+(* And-Inverter Graphs: hash-consed boolean circuits. A [node] is a
+   shared, structurally-unique gate; [neg] points to its complement and
+   the sign of [id] gives the polarity (so negation is free). *)
+type name = int
+
+type var = name * int
+
+type node_r =
+  | False
+  | Input of var
+  | And   of node * node
+
+and node = {
+  gate : node_r;
+  id   : int;
+  neg  : node;
+}
+
+type reg = node array
+
+(* -------------------------------------------------------------------- *)
+(* Leaves and constants. *)
+val false_   : node
+val true_    : node
+val constant : bool -> node
+val input    : var -> node
+
+(* -------------------------------------------------------------------- *)
+(* Boolean combinators (structure-sharing, with constant folding). *)
+val neg  : node -> node
+val and_ : node -> node -> node
+val nand : node -> node -> node
+val or_  : node -> node -> node
+val xor  : node -> node -> node
+val xnor : node -> node -> node
+
+(* -------------------------------------------------------------------- *)
+(* [map env] / [maps env] rewrite the inputs of a node / register, [env]
+   giving the replacement node for an input (or [None] to keep it). *)
+val map  : (var -> node option) -> node -> node
+val maps : (var -> node option) -> reg -> reg
+
+(* -------------------------------------------------------------------- *)
+val pp_node :
+  ?input_namer:(int -> string) -> Format.formatter -> node -> unit
+
+(* -------------------------------------------------------------------- *)
+(* Clears the global hash-consing table. *)
+module HCons : sig
+  val clear : unit -> unit
+end
+
+(* -------------------------------------------------------------------- *)
+(* Serialize [r] to a fresh temporary ".aig" file; returns its path. *)
+val write_aiger_bin_temp :
+     input_count:int
+  -> ?inp_name_map:(int -> string)
+  -> ?name:string
+  -> reg
+  -> string
