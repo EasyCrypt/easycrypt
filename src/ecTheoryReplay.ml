@@ -476,36 +476,39 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             rename ove subst (`Type, x)
 
         | `Inline _ ->
-          let subst =
-            EcSubst.add_tydef
-              subst (xpath ove x) (newtyd.tyd_params, body) in
+            let subst =
+              EcSubst.add_tydef
+                subst (xpath ove x) (newtyd.tyd_params, body) in
+            (subst, x) in
 
-          let subst =
-            (* FIXME: HACK *)
-            match otyd.tyd_type, body.ty_node with
-            | Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
-                match (EcEnv.Ty.by_path np env).tyd_type with
-                | Datatype { tydt_ctors = _ } ->
-                  let newtparams = newtyd.tyd_params in
-                  let newtparams_ty = List.map tvar newtparams in
-                  let newdtype = tconstr np newtparams_ty in
-                  let tysubst = CS.Tvar.init otyd.tyd_params newtparams_ty in
+      let subst =
+        (* FIXME: HACK -- when a datatype is overridden by another datatype,
+           the source constructors are not re-created, so redirect them to the
+           target's constructors. This is needed for every override mode (alias
+           or inline); skipping it leaves references to the source constructors
+           (e.g. in operator bodies) pointing at non-existent paths. *)
+        match otyd.tyd_type, body.ty_node with
+        | Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
+            match (EcEnv.Ty.by_path np env).tyd_type with
+            | Datatype { tydt_ctors = _ } ->
+              let newtparams = newtyd.tyd_params in
+              let newtparams_ty = List.map tvar newtparams in
+              let newdtype = tconstr np newtparams_ty in
+              let tysubst = CS.Tvar.init otyd.tyd_params newtparams_ty in
 
-                  List.fold_left (fun subst (name, tyargs) ->
-                    let np = EcPath.pqoname (EcPath.prefix np) name in
-                    let newtyargs =
-                      List.map
-                        (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
-                        tyargs in
-                    EcSubst.add_opdef subst
-                      (xpath ove name)
-                      (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
-                    ) subst octors
-                | _ -> subst
-              end
-            | _, _ -> subst
-
-          in (subst, x) in
+              List.fold_left (fun subst (name, tyargs) ->
+                let np = EcPath.pqoname (EcPath.prefix np) name in
+                let newtyargs =
+                  List.map
+                    (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
+                    tyargs in
+                EcSubst.add_opdef subst
+                  (xpath ove name)
+                  (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
+                ) subst octors
+            | _ -> subst
+          end
+        | _, _ -> subst in
 
       let refotyd = EcSubst.subst_tydecl subst otyd in
 
