@@ -42,15 +42,18 @@ let f_app_safe
   
 (* -------------------------------------------------------------------- *)
 let fapply_safe
-    ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps)
-    (f: form) (fs: form list) : form =
+  ?(redmode : EcReduction.reduction_info = EcReduction.full_red)
+   (hyps    : LDecl.hyps)
+   (f        : form)
+   (args     : form list)
+: form =
   let env = LDecl.toenv hyps in
   (* type of [f] applied to its first [n] arguments *)
   let rec result_ty (n : int) (ty : ty) : ty =
     if n <= 0 then ty
     else match (ty_hnorm ty env).ty_node with
       | Tfun (_, codom) -> result_ty (n - 1) codom
-      | _ -> ty
+      | _ -> assert false
   in
-  let rty = result_ty (List.length fs) f.f_ty in
-  f_app f fs rty |> EcReduction.h_red_until redmode hyps
+  let rty = result_ty (List.length args) f.f_ty in
+  f_app f args rty |> EcReduction.h_red_until redmode hyps
