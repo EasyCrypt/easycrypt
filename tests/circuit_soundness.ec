@@ -79,3 +79,44 @@ proof. circuit. qed.
 
 lemma witness_xor_self : witness<:W8> +^ witness<:W8> = zero.
 proof. circuit. qed.
+
+(* -------------------------------------------------------------------- *)
+(* Completeness: a circuit-typed term with no structural translation     *)
+(* (a free variable, or an application of an opaque head) is an opaque   *)
+(* leaf modelled as a fresh, form-cached input -- not a [Not_found]      *)
+(* anomaly. Alpha-equal occurrences share their input.                   *)
+theory A.
+  type 'a t.
+  op tolist : 'a t -> 'a list.
+  op oflist : 'a -> 'a list -> 'a t.
+  op "_.[_]"    : 'a t -> int -> 'a.
+  op "_.[_<-_]" : 'a t -> int -> 'a -> 'a t.
+end A.
+bind array A."_.[_]" A."_.[_<-_]" A.tolist A.oflist A.t 8.
+realize gt0_size by admit.  realize tolistP by admit.  realize oflistP by admit.
+realize eqP by admit.  realize get_setP by admit.  realize get_out by admit.
+export A.
+
+op init (f : int -> W8) : W8 A.t.
+bind op [W8 & A.t] init "ainit".
+realize bvainitP by admit.
+
+(* [(init f).[4]] applies the opaque [f] at index 4; both that occurrence *)
+(* and the right-hand [f 4] resolve to the same cached input.            *)
+lemma opaque_app_shared (f : int -> W8) : (init f).[4] = f 4.
+proof. circuit. qed.
+
+lemma opaque_app_xor_self (f : int -> W8) : f 4 +^ f 4 = zero.
+proof. circuit. qed.
+
+(* A free variable of circuit type is itself an opaque leaf. *)
+lemma free_var_refl (x : W8) : x = x.
+proof. circuit. qed.
+
+(* Soundness of the sharing: DISTINCT opaque leaves get DISTINCT inputs,  *)
+(* so non-alpha-equal terms must NOT be equated.                         *)
+lemma opaque_app_distinct (f : int -> W8) : f 4 = f 5.
+proof. fail circuit. abort.
+
+lemma free_var_distinct (x y : W8) : x = y.
+proof. fail circuit. abort.

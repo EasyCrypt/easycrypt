@@ -472,6 +472,20 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
 
   let int_of_form (f : form) : zint = int_of_form hyps f in
 
+  (* A circuit-typed form with no structural translation (an opaque leaf:
+     a free variable, [witness], or an application of an opaque head) is an
+     arbitrary value of its type, modelled as a fresh input and cached so
+     that alpha-equal occurrences share it. [circuit_uninit] raises a clean
+     [CircError] when the type is not circuit-translatable. *)
+  let circuit_of_uninterpreted (f_ : form) : circuit =
+    match EcAlphaInvHashtbl.find_opt cache f_ with
+    | Some circ -> circ
+    | None ->
+      let circ = circuit_uninit env f_.f_ty in
+      EcAlphaInvHashtbl.add cache f_ circ;
+      circ
+  in
+
   (* Supposed to be called on an apply *)
   let propagate_integer_arguments (op : form) (args : form list) : form =
     let op =
@@ -522,7 +536,11 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
         | Fint _z ->
           circ_error (CantConvertToCirc `Int)
 
-        | Flocal idn -> state_get st idn
+        | Flocal idn ->
+          begin match state_get_opt st idn with
+          | Some c -> c
+          | None   -> circuit_of_uninterpreted f_
+          end
 
         | Fop (pth, _) -> circuit_of_op_form st f_ pth
   
@@ -598,12 +616,7 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
       EcEnv.notify env `Debug "Assigning witness to var of type %a@."
         EcPrinting.(pp_type ppe)
         f_.f_ty;
-      match EcAlphaInvHashtbl.find_opt cache f_ with
-      | Some circ -> circ
-      | None ->
-        let circ = circuit_uninit env f_.f_ty in
-        EcAlphaInvHashtbl.add cache f_ circ;
-        circ
+      circuit_of_uninterpreted f_
     end else
       match Mp.find_opt pth !op_cache with
       | Some op -> op
@@ -701,6 +714,11 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
         | {f_node = Fop _}, _ ->
           (* Assuming correct types coming from EC *)
           circuit_of_logic_app st f fs
+        (* An application of an opaque (unbound) local is itself an opaque
+           leaf: model the whole application as a fresh input (cached below
+           by [f_]). *)
+        | {f_node = Flocal idn}, _ when Option.is_none (state_get_opt st idn) ->
+          circuit_uninit env f_.f_ty
         (* Recurse down into definition *)
         | _ ->
           let f_c = circuit_of_node st f in
