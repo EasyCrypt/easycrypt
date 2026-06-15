@@ -11,7 +11,7 @@ open EcMemory
 module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
-  include Lospecs.Circuit_spec
+  include Lospecs.Specifications
 end
 
 module CDeps = struct

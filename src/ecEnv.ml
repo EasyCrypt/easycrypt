@@ -3430,7 +3430,7 @@ module Circuit = struct
       ~filter:(function `Circuit x -> Some x | _ -> None)        
 
   let get_specification_by_name ~(filename : string) (name : symbol) : Lospecs.Ast.adef option =
-    let specs = Lospecs.Circuit_spec.load_from_file ~filename in
+    let specs = Lospecs.Specifications.load_from_file ~filename in
     List.Exceptionless.assoc name specs
 end
 
