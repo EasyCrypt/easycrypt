@@ -224,7 +224,7 @@ let t_bdep_solve
       let cgoal = (circuit_of_form st hyps goal |> state_close_circuit st) in
       (* FIXME: make this lazy *)
 (*       EcEnv.notify env `Debug "goal: %a@." pp_flatcirc (fst cgoal).reg; *)
-      if circ_taut cgoal then
+      if circ_valid cgoal then
       FApi.close (!@ tc) VBdep
       else 
       tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  

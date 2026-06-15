@@ -34,10 +34,10 @@ module type SMTInstance = sig
   (* bvterm concat, res sort is sum of sorts *)
   val bvterm_concat : bvterm -> bvterm -> bvterm
 
-  (* bvand *)
+  (* bvnot *)
   val bvnot : bvterm -> bvterm
 
-  (* bvnot *)
+  (* bvand *)
   val bvand : bvterm -> bvterm -> bvterm
   val get_value : solver -> bvterm -> bvterm
   val pp_term : Format.formatter -> bvterm -> unit
@@ -48,17 +48,16 @@ end
    solver together with the per-query memoization tables. It is created
    per query (one solver per query gives assertion isolation) and carried
    explicitly. The queries return the decision; [model] reads the model
-   back from the same context and is only meaningful after a satisfiable
-   query, before the context's solver is re-used. Grouping the input bits
-   into per-input values is left to the caller. *)
+   back from the same context, one value per input, and is only meaningful
+   after a satisfiable query, before the context's solver is re-used. *)
 module type SMTInterface = sig
   type ctx
 
   val create : unit -> ctx
   val equiv : ctx -> reg -> reg -> node -> bool
   val sat : ctx -> node -> bool
-  val taut : ctx -> node -> bool
-  val model : ctx -> (int * int * string) list
+  val valid : ctx -> node -> bool
+  val model : ctx -> (int * int) list -> (int * string) list
 end
 
 (* ==================================================================== *)
@@ -97,18 +96,24 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       Hashtbl.add ctx.vars (id, bit) bv;
       bv
 
-  (* Read back the solver's current model: the value of every input bit
-     the query materialized, keyed by its (id, bit). Only meaningful right
-     after a satisfiable query, and reads the live solver, so it must run
-     before the context's solver is re-used. The variables are taken from
-     [ctx.vars], so no variable naming happens here; grouping the bits
-     into per-input values is left to the caller. *)
-  let model (ctx : ctx) : (int * int * string) list =
-    Hashtbl.enum ctx.vars |> List.of_enum
-    |> List.map (fun ((id, bit), bv) ->
-           ( id,
-             bit,
-             Format.asprintf "%a" SMT.pp_term (SMT.get_value ctx.solver bv) ))
+  (* Read back the solver's current model, one value per input. [inps]
+     gives the inputs as (id, width) pairs; for each, the [width] size-1
+     bit variables are concatenated into a single bitvector (bit 0 most
+     significant, as in the register encoding) and its value rendered as a
+     string. Bits the formula never referenced are allocated here so they
+     still appear (the solver assigns them a default), keeping the value at
+     the full declared width rather than compacting over gaps. Only
+     meaningful right after a satisfiable query, and reads the live solver,
+     so it must run before the context's solver is re-used. *)
+  let model (ctx : ctx) (inps : (int * int) list) : (int * string) list =
+    List.map
+      (fun (id, width) ->
+        let bv =
+          List.init width (fun bit -> var ctx id bit)
+          |> List.reduce SMT.bvterm_concat
+        in
+        id, Format.asprintf "%a" SMT.pp_term (SMT.get_value ctx.solver bv))
+      inps
 
   (* Translate an AIG node to an SMT bitvector term, memoizing nodes and
      allocating the size-1 input variables in [ctx]. *)
@@ -149,19 +154,16 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = bvterm_of_node pcond in
 
-    SMT.assert' ctx.solver @@ SMT.bvand pcond (SMT.bvnot formula);
-    (* equivalent iff the disequality is unsat; a model is then a witness
-       to non-equivalence. *)
+    SMT.assert' ctx.solver (SMT.bvand pcond (SMT.bvnot formula));
     not (SMT.check_sat ctx.solver)
 
-  (* TODO: better encoding of smt terms ? *)
   let sat (ctx : ctx) (n : Aig.node) : bool =
     let form = bvterm_of_node ctx n in
-    let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
+    let form = SMT.(bvterm_equal form (bvterm_of_int 1 1)) in
     SMT.assert' ctx.solver form;
     SMT.check_sat ctx.solver
 
-  let taut (ctx : ctx) (n : Aig.node) : bool = not (sat ctx (Aig.neg n))
+  let valid (ctx : ctx) (n : Aig.node) : bool = not (sat ctx (Aig.neg n))
 end
 
 (* ==================================================================== *)

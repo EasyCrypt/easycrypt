@@ -44,9 +44,9 @@ let check_with_model (env : env) ((valid, model) : bool * model Lazy.t) : bool =
   if (not valid) && EcGState.get_circuit_debug_smt (EcEnv.gstate env) then begin
     EcEnv.notify ~immediate:true env `Warning "[debug_smt] counter-model:@.";
     List.iter
-      (fun (id, bit, value) ->
-        EcEnv.notify ~immediate:true env `Warning
-          "[debug_smt]   input %d bit %d = %s@." id bit value)
+      (fun (id, value) ->
+        EcEnv.notify ~immediate:true env `Warning "[debug_smt]   input %d = %s@."
+          id value)
       (Lazy.force model)
   end;
   valid
@@ -943,7 +943,7 @@ let circ_simplify_form_bitstring_equality
   in
   check f
 
-let circ_taut (c : circuit) : bool = fst (circ_taut c)
+let circ_valid (c : circuit) : bool = fst (circ_valid c)
 
 let circuit_state_of_memenv
     ?(st : state = empty_state)

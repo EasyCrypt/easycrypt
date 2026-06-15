@@ -56,7 +56,7 @@ val circ_red : hyps -> EcReduction.reduction_info
 val int_of_form : ?redmode:EcReduction.reduction_info -> hyps -> form -> BI.zint
 
 (* Use circuits *)
-val circ_taut  : circuit -> bool
+val circ_valid  : circuit -> bool
 
 (* Generate circuits *)
 (* Form processors *)

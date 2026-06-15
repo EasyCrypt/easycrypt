@@ -78,14 +78,15 @@ module type CBackend = sig
   val circuit_from_spec : Lospecs.Ast.adef -> reg list -> reg
 
   (* The queries return the decision and a lazy model: when forced, the
-     solver's value for each input bit it materialized, as (id, bit,
-     value) triples. Only meaningful (and only to be forced) when the
-     decision witnesses a counter-model. *)
-  type model = (int * int * string) list
+     solver's value for each input, as (id, value) pairs. [inps] gives the
+     inputs as (id, width) pairs, needed to render each at its full width.
+     The model is only meaningful (and only to be forced) when the decision
+     witnesses a counter-model. *)
+  type model = (int * string) list
 
-  val equiv : pcond:node -> reg -> reg -> bool * model Lazy.t
-  val sat : node -> bool * model Lazy.t
-  val taut : node -> bool * model Lazy.t
+  val equiv : inps:inp list -> pcond:node -> reg -> reg -> bool * model Lazy.t
+  val sat : inps:inp list -> node -> bool * model Lazy.t
+  val valid : inps:inp list -> node -> bool * model Lazy.t
 
   val slice : reg -> int -> int -> reg
   val subcirc : reg -> (int list) -> reg
@@ -179,7 +180,7 @@ module LospecsBack : CBackend = struct
   type node = C.node
   type reg = C.node array
   type inp = int * int
-  type model = (int * int * string) list
+  type model = (int * string) list
 
   let pp_node (fmt : Format.formatter) (n: node) = 
     Format.fprintf fmt "%a" (fun fmt -> Lospecs.Aig.pp_node fmt) n
@@ -251,17 +252,17 @@ module LospecsBack : CBackend = struct
   let node_ite (c: node) (t: node) (f: node) = C.mux2 f t c 
   let reg_ite (c: node) = Array.map2 (node_ite c) 
 
-  let equiv ~(pcond: node) (r1: reg) (r2: reg) : bool * model Lazy.t =
+  let equiv ~(inps: inp list) ~(pcond: node) (r1: reg) (r2: reg) : bool * model Lazy.t =
     let ctx = CSMT.BWZ.create () in
-    (CSMT.BWZ.equiv ctx r1 r2 pcond, lazy (CSMT.BWZ.model ctx))
+    (CSMT.BWZ.equiv ctx r1 r2 pcond, lazy (CSMT.BWZ.model ctx inps))
 
-  let sat (n: node) : bool * model Lazy.t =
+  let sat ~(inps: inp list) (n: node) : bool * model Lazy.t =
     let ctx = CSMT.BWZ.create () in
-    (CSMT.BWZ.sat ctx n, lazy (CSMT.BWZ.model ctx))
+    (CSMT.BWZ.sat ctx n, lazy (CSMT.BWZ.model ctx inps))
 
-  let taut (n: node) : bool * model Lazy.t =
+  let valid ~(inps: inp list) (n: node) : bool * model Lazy.t =
     let ctx = CSMT.BWZ.create () in
-    (CSMT.BWZ.taut ctx n, lazy (CSMT.BWZ.model ctx))
+    (CSMT.BWZ.valid ctx n, lazy (CSMT.BWZ.model ctx inps))
 
   let slice (r: reg) (idx: int) (len: int) : reg =
     try Array.sub r idx len
@@ -483,11 +484,10 @@ module type CircuitInterface = sig
   type 'a cfun = 'a * (cinp list)
   type circuit = circ cfun
 
-  (* A satisfying assignment, read back from the SMT solver: the value of
-     each input bit it materialized, as (id, bit, value) triples. The
-     queries below return it lazily, grouping into per-input values is
-     left to the caller. *)
-  type model = (int * int * string) list
+  (* A satisfying assignment, read back from the SMT solver: one value per
+     input it materialized, as (id, value) pairs. The queries below return
+     it lazily. *)
+  type model = (int * string) list
 
   val pp_flatcirc : Format.formatter -> flatcirc -> unit
 
@@ -602,7 +602,7 @@ module type CircuitInterface = sig
      meaningful when the decision is a counter-model witness. *)
   val circ_equiv : ?pcond:circuit -> circuit -> circuit -> bool * model Lazy.t
   val circ_sat   : circuit -> bool * model Lazy.t
-  val circ_taut  : circuit -> bool * model Lazy.t
+  val circ_valid : circuit -> bool * model Lazy.t
 
   (* Composition of circuit functions, should deal with inputs and call some backend *)
   val circuit_compose : circuit -> circuit list -> circuit
@@ -1068,6 +1068,10 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let circuit_has_uninitialized (c: circuit) : int option =
     Backend.have_bad (fst c).reg
 
+  (* The (id, width) of each input, for rendering a counter-model. *)
+  let inps_of_cinps (inps: cinp list) : Backend.inp list =
+    List.map (fun (i: cinp) -> (i.id, size_of_ctype i.type_)) inps
+
   let circ_equiv ?(pcond:circuit option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool * Backend.model Lazy.t =
     let pcond = Option.map (convert_type CBool) pcond in (* Try to convert to bool *)
     let pcc = match pcond with
@@ -1079,22 +1083,22 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     (* This throws, but we let it propagate upwards *)
     let c2 = unify_inputs inps1 (c2, inps2) in
     if (c1.type_ = c2.type_) then
-      Backend.equiv ~pcond:pcc c1.reg c2.reg
+      Backend.equiv ~inps:(inps_of_cinps inps1) ~pcond:pcc c1.reg c2.reg
     else (false, lazy [])
 
-  let circ_sat ((c, _): circuit) : bool * Backend.model Lazy.t =
+  let circ_sat ((c, inps): circuit) : bool * Backend.model Lazy.t =
     let c = match c with
     | {type_ = CBool; reg} -> Backend.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
-    Backend.sat c
+    Backend.sat ~inps:(inps_of_cinps inps) c
 
-  let circ_taut ((c, _): circuit) : bool * Backend.model Lazy.t =
+  let circ_valid ((c, inps): circuit) : bool * Backend.model Lazy.t =
     let c = match c with
     | {type_ = CBool; reg} -> Backend.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
-    Backend.taut c
+    Backend.valid ~inps:(inps_of_cinps inps) c
 
   (* Inputs mean different things depending on circuit type *)
   (* Allow unaligned slices *)
@@ -1325,7 +1329,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
 (*         let res = fillet_taut pres post in  *)
         let post = sublimate_inputs post in
-        let res = fst (circ_taut post) in
+        let res = fst (circ_valid post) in
         if not res then
           Option.may (fun f -> f @@ Format.asprintf "Failed for bit %d@." i) logger;
         res) posts |>
