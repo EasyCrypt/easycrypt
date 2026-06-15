@@ -1335,7 +1335,7 @@ qed.
 
 lemma mul_colmxc (v:vector) c: (colmx v) *^ vectc 1 c = c ** v.
 proof.
-rewrite eq_vectorP size_scalarv size_mulmxv /= /max 1:// => i bound.
+rewrite eq_vectorP size_scalarv size_mulmxv /= 1:// => i bound.
 rewrite get_scalarv get_mulmxv dotpE /= /max /=.
 by rewrite Big.BAdd.big_int1 /= get_vectc // mulrC.
 qed.
@@ -1663,18 +1663,17 @@ lemma catmr_subm m n: 0 <= n < cols m =>
   (subm m 0 (rows m) 0 n || subm m 0 (rows m) n (cols m)) = m.
 proof.
 move => n_bound; rewrite eq_matrixP /=.
-split => [| i j bound]. 
-- smt(rows_catmr cols_catmr size_subm).
+rewrite rows_catmr cols_catmr 2!cols_subm 2!rows_subm /= maxzz /=.
+split => [/#| i j bound]. 
 rewrite get_catmr // cols_subm /=.
 case (j < n) => j_bound.
-- rewrite get_subm /=; first 2 smt(size_catmr size_subm).
-  rewrite (getm0E (subm _ _ _ _ _)).
+- rewrite get_subm /= 1,2:/# (getm0E (subm _ _ _ _ _)).
   + smt(size_catmr size_subm).
   by rewrite addr0.
 - rewrite getm0E; 1: smt(size_catmr size_subm).
   rewrite add0r get_subm; [3:smt()].
-  + smt(rows_catmr rows_subm).
-  + smt(cols_catmr cols_subm).
+  + by elim bound.
+  + smt().
 qed.
 
 lemma subm_colmx (m: matrix) l : 
@@ -1827,7 +1826,7 @@ lemma dmatrix1E d m : mu1 (dmatrix d (rows m) (cols m)) m =
     BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 (cols m)) 0 (rows m).
 proof.
 pose g (m: matrix) := mkseq (fun i => col m i) (cols m).
-rewrite (in_dmap1E_can _ _ g) /ofcols.
+rewrite (in_dmap1E_can _ _ g) 1,2:/ofcols.
 - rewrite /g eq_matrixP /= => i j bound.
   by rewrite get_offunm /= 1:/# nth_mkseq 1:/# get_col.
 - rewrite /g => y y_in <- /=.
@@ -1903,7 +1902,7 @@ proof.
 move => k_ge0; rewrite /dmatrix /ofcols ler_maxr // dlist1 dmap_comp /(\o).
 apply eq_dmap_in => v /size_dvector; rewrite ler_maxr //= => s_v.
 rewrite /colmx s_v; apply/eq_matrixP => /= i j [i_bound j_bound]. 
-by rewrite /ofcols !get_offunm /#.
+by rewrite !get_offunm /#.
 qed.
 
 lemma supp_dmatrix d m r c : 

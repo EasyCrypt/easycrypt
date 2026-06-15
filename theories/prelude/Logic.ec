@@ -181,28 +181,28 @@ pred right_commutative (o:'a -> 'b -> 'a) =
 pred left_distributive (o1:'a -> 'b -> 'a) (o2:'a -> 'a -> 'a) =
   forall x y z, o1 (o2 x y) z = o2 (o1 x z) (o1 y z).
 
-pred right_loop (inv : 'b -> 'b) (o:'a -> 'b -> 'a) =
+pred [smt_inline] right_loop (inv : 'b -> 'b) (o:'a -> 'b -> 'a) =
   forall y, cancel (fun x, o x y) (fun x, o x (inv y)).
 
-pred rev_right_loop inv (o:'a -> 'b -> 'a) =
+pred [smt_inline] rev_right_loop inv (o:'a -> 'b -> 'a) =
   forall y, cancel (fun x, o x (inv y)) (fun x, o x y).
 
-pred left_loop inv (o:'a -> 'b -> 'b) =
+pred [smt_inline] left_loop inv (o:'a -> 'b -> 'b) =
   forall x, cancel (o x) (o (inv x)).
 
-pred rev_left_loop inv (o:'a -> 'b -> 'b) =
+pred [smt_inline] rev_left_loop inv (o:'a -> 'b -> 'b) =
   forall x, cancel (o (inv x)) (o x).
 
-pred right_loop_in p (inv : 'b -> 'b) (o:'a -> 'b -> 'a) =
+pred [smt_inline] right_loop_in p (inv : 'b -> 'b) (o:'a -> 'b -> 'a) =
   forall y, p y => cancel (fun x, o x y) (fun x, o x (inv y)).
 
-pred rev_right_loop_in p inv (o:'a -> 'b -> 'a) =
+pred [smt_inline] rev_right_loop_in p inv (o:'a -> 'b -> 'a) =
   forall y, p y => cancel (fun x, o x (inv y)) (fun x, o x y).
 
-pred left_loop_in p inv (o:'a -> 'b -> 'b) =
+pred [smt_inline] left_loop_in p inv (o:'a -> 'b -> 'b) =
   forall x, p x => cancel (o x) (o (inv x)).
 
-pred rev_left_loop_in p inv (o:'a -> 'b -> 'b) =
+pred [smt_inline] rev_left_loop_in p inv (o:'a -> 'b -> 'b) =
   forall x, p x => cancel (o (inv x)) (o x).
 
 pred left_id e (o:'a -> 'b -> 'b) =
@@ -692,7 +692,7 @@ proof. by move => [y fy] @/pinv; rewrite ifT; smt(choicebP). qed.
 
 lemma pcancel_pinv (f : 'a->'b): 
   injective f => pcancel f (pinv f).
-proof. by move => inj_f @/pcansel x; smt(pinv_inv). qed.
+proof. by move => inj_f x; smt(pinv_inv). qed.
 
 
 (* -------------------------------------------------------------------- *)

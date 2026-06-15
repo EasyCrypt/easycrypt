@@ -144,7 +144,7 @@ type operator = {
   op_unfold   : int option;
 }
 
-and opopaque = { smt: bool; reduction: bool; }
+and opopaque = { smt: bool; reduction: bool; inline: bool; }
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
@@ -229,7 +229,7 @@ let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
 let optransparent : opopaque =
-  { smt = false; reduction = false; }
+  { smt = false; reduction = false; inline = false; }
 
 let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in

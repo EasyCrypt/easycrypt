@@ -238,13 +238,11 @@ module KnownFlags = struct
   let implicits = "implicits"
   let oldip     = "oldip"
   let redlogic  = "redlogic"
-  let und_delta = "und_delta"
 
   let flags = [
     (implicits, false);
     (oldip    , false);
     (redlogic , true );
-    (und_delta, false);
   ]
 end
 
@@ -548,12 +546,6 @@ module Options = struct
 
   let set_redlogic scope value =
     set scope KnownFlags.redlogic value
-
-  let get_und_delta scope =
-    get scope KnownFlags.und_delta
-
-  let set_und_delta scope value =
-    set scope KnownFlags.und_delta value
 end
 
 (* -------------------------------------------------------------------- *)
@@ -861,8 +853,7 @@ module Tactics = struct
           EcHiGoal.tt_smtmode    = htmode;
           EcHiGoal.tt_implicits  = Options.get_implicits scope;
           EcHiGoal.tt_oldip      = Options.get_oldip scope;
-          EcHiGoal.tt_redlogic   = Options.get_redlogic scope;
-          EcHiGoal.tt_und_delta  = Options.get_und_delta scope; } in
+          EcHiGoal.tt_redlogic   = Options.get_redlogic scope; } in
 
         let bullets =
           try omap (EcBullets.open_phrase ~bullet juc) pac.puc_bullets
@@ -1353,7 +1344,8 @@ module Op = struct
     let tags   = Sstr.of_list (List.map unloc op.po_tags) in
     let opaque = {
       smt       = Sstr.mem "smt_opaque" tags;
-      reduction = Sstr.mem "opaque" tags
+      reduction = Sstr.mem "opaque" tags;
+      inline    = Sstr.mem "smt_inline" tags;
     } in
     let unfold =
       match op.po_args with
@@ -1387,7 +1379,7 @@ module Op = struct
               let axop  =
                 let nargs = List.sum (List.map (List.length -| fst) args) in
                   EcDecl.axiomatized_op ~nargs path (tyop.op_tparams, bd) lc in
-              let tyop  = { tyop with op_opaque = { reduction = true; smt = false; }} in
+              let tyop  = { tyop with op_opaque = { reduction = true; smt = false; inline = false; }} in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope (unloc ax, axop)
 
@@ -2750,7 +2742,9 @@ module Circuit = struct
       (((nm, name), proof, mode) : qsymbol * path * clmode)
     =
       in_evclone (fun evc ->
-        let tactic = Papply (`ExactType (loced (EcPath.toqsymbol proof)), None) in
+        let tactic = FPNamed (loced (EcPath.toqsymbol proof), None) in
+        let tactic = { fp_mode = `Explicit; fp_head = tactic; fp_args = []; } in
+        let tactic = Papply (`Apply ([tactic], `Exact), None) in
         let tactic = loced (Plogic tactic) in
         let ovrd = (Some tactic, mode, false) in
         let evc_lemmas = { evc.evc_lemmas with

@@ -1208,7 +1208,7 @@ rewrite -(@eq_sum (G (x :: r) (x :: r))) => /= [sg @/G|].
 rewrite -(@eq_sum (fun sg => F x u * G (x :: r) r sg)).
 - by move=> sg /= @/G; case _: (_ /\ _).
 rewrite sumZ; congr => @/G @/M => {S P M G}.
-rewrite -(@sum_reindex (swap_codom x witness u)) /(\o) /=.
+rewrite -(@sum_reindex (swap_codom x witness u)) 3:/(\o) /=.
 - by apply: bij_swap_codom.
 - by apply/summable_cond_fin/finiteIr/finite_fixfinfun; apply/finite_mem.
 apply: eq_sum=> /= sg; congr; last first.

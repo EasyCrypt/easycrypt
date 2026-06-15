@@ -884,9 +884,14 @@ async def _main():
         with open(options.report, 'wb') as output:
             _dump_report(mainconfig, log, output)
 
-    haserrors = any(not x.success for x in log)
+    failing = [x for x in log if not x.success]
+    if failing:
+        print(f"Failed files ({len(failing)}):")
+        for f in failing:
+            print(f"  - {f.config.filename}")
+        exit(2)
 
-    exit(2 if haserrors else 0)
+    exit(0)
 
 # --------------------------------------------------------------------
 if __name__ == '__main__':

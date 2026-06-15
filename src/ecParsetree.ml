@@ -508,6 +508,7 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
+  pp_tags   : psymbol list;
   pp_locality  : locality;
 }
 
@@ -1077,7 +1078,6 @@ type apply_info = [
   | `Apply   of ppterm list * [`Apply|`Exact|`Alpha]
   | `Top     of [`Apply|`Exact|`Alpha]
   | `Alpha   of ppterm
-  | `ExactType of pqsymbol
 ]
 
 (* -------------------------------------------------------------------- *)

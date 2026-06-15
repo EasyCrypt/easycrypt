@@ -654,8 +654,35 @@ and trans_kpatterns env (ks : (kpattern * w3_known_op) list) (f : form) =
        ks)
 
 (* -------------------------------------------------------------------- *)
+(* Operators tagged `[smt_inline]` are δ/β-reduced at their use sites instead
+   of being emitted as a symbol plus a defining axiom. This keeps lambdas
+   occurring in their bodies monomorphic at the call's instantiation, which
+   avoids the polymorphic higher-order encoding (uni/t2tb bridges) that
+   weaker SMT solvers fail to navigate. *)
+and try_inline ((genv, _) : tenv * lenv) (fp : form) =
+  let hd, args =
+    match fp.f_node with
+    | Fapp (hd, args) -> (hd, args)
+    | _               -> (fp, []) in
+  match hd.f_node with
+  | Fop (p, tys) -> begin
+      match Op.by_path_opt p genv.te_env with
+      | Some op when op.op_opaque.inline -> begin
+          match op.op_kind with
+          | OB_oper (Some (OP_Plain _)) | OB_pred (Some (PR_Plain _)) ->
+              Some (f_app_simpl (Op.reduce ~mode:`Force genv.te_env p tys) args fp.f_ty)
+          | _ -> None
+        end
+      | _ -> None
+    end
+  | _ -> None
+
 and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   try trans_kpatterns env genv.tk_known_w3 fp with CanNotTranslate ->
+
+  match try_inline env fp with
+  | Some fp -> trans_form env fp
+  | None ->
 
   match fp.f_node with
   | Fquant (qt, bds, body) ->

@@ -33,7 +33,6 @@ type ttenv = {
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;
-  tt_und_delta : bool;
 }
 
 type engine = ptactic_core -> FApi.backward
@@ -563,25 +562,6 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
     tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
-let process_exacttype qs (tc : tcenv1) =
-  let env, hyps, _ = FApi.tc1_eflat tc in
-  let p =
-    try EcEnv.Ax.lookup_path (EcLocation.unloc qs) env
-    with LookupFailure cause ->
-      tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
-  in
-  let tys =
-    List.map (fun a -> EcTypes.tvar a)
-      (EcEnv.LDecl.tohyps hyps).h_tvar in
-  let pt = ptglobal ~tys p in
-
-  try
-    EcLowGoal.t_apply pt tc
-  with InvalidGoalShape ->
-    let ppe = EcPrinting.PPEnv.ofenv env in
-    tc_error !!tc "cannot apply %a@." (EcPrinting.pp_axname ppe) p
-
-(* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
   let module E = struct exception NoInstance end in
 
@@ -690,7 +670,7 @@ let process_rewrite1_core
           tc_error !!tc "context variable does not appear in the r-pattern"
 
 (* -------------------------------------------------------------------- *)
-let process_delta ~und_delta ?target ((s :rwside), o, p) tc =
+let process_delta ?target ((s :rwside), o, p) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let o = norm_rwocc o in
 
@@ -712,10 +692,8 @@ let process_delta ~und_delta ?target ((s :rwside), o, p) tc =
           EcReduction.delta_h = check_id; } in
     let redform = EcReduction.simplify ri hyps target in
 
-    if und_delta then begin
-      if EcFol.f_equal target redform then
-        EcEnv.notify env `Warning "unused unfold: /%s" x
-    end;
+    if EcFol.f_equal target redform then
+      EcEnv.notify env `Warning "unused unfold: /%s" x;
 
     t_change ~ri:{ ri with eta = true; beta = true; } ?target:idtg redform tc
 
@@ -842,7 +820,6 @@ let process_delta ~und_delta ?target ((s :rwside), o, p) tc =
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_r ttenv ?target ri tc =
   let implicits = ttenv.tt_implicits in
-  let und_delta = ttenv.tt_und_delta in
 
   match unloc ri with
   | RWDone simpl ->
@@ -865,7 +842,7 @@ let process_rewrite1_r ttenv ?target ri tc =
         tc_error !!tc "cannot use pattern selection in delta-rewrite rules";
 
       let do1 tc =
-        process_delta ~und_delta ?target (rwopt.side, rwopt.occurrence, p) tc in
+        process_delta ?target (rwopt.side, rwopt.occurrence, p) tc in
 
       match rwopt.repeat with
       | None -> do1 tc
@@ -1628,7 +1605,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     in t_seqs [t_intros_i [h]; rwt; t_clear h] tc
 
   and intro1_unfold (_ : ST.state) (s, o) p tc =
-    process_delta ~und_delta:ttenv.tt_und_delta (s, o, p) tc
+    process_delta (s, o, p) tc
 
   and intro1_view (_ : ST.state) pe tc =
     process_view1 pe tc
@@ -2047,9 +2024,6 @@ let process_apply ~implicits ((infos, orv) : apply_t * prevert option) tc =
 
     | `Alpha pe ->
         process_apply_bwd ~implicits `Alpha pe tc
-
-    | `ExactType qs ->
-        process_exacttype qs tc
 
     | `Top mode ->
         let tc = process_apply_top tc in

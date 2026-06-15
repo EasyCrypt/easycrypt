@@ -55,8 +55,8 @@
   ,
 
   { "name"       : "sphincsplus"
-  , "repository" : "https://github.com/MM45/FV-SPHINCSPLUS-EC"
-  , "branch"     : "master"
+  , "repository" : "https://github.com/formosa-crypto/formosa-slhdsa"
+  , "branch"     : "main"
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "sphincsplus"

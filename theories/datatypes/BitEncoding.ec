@@ -815,7 +815,7 @@ move=> s1 s2; rewrite mulzDl /= [_ + n]addrC => szE1 szE2.
 have := size_eqD _ _ _ _ _ szE1; ~-1: move=> //#.
 have := size_eqD _ _ _ _ _ szE2; ~-1: move=> //#.
 case=> [s1a s1b] [# sz1a sz1b ->] [s2a s2b] [# sz2a sz2b ->].
-rewrite !mkseqSr /(\o) //= !drop0 !take_catl ?(sz1a, sz2a) //.
+rewrite !mkseqSr //= /(\o) !drop0 !take_catl ?(sz1a, sz2a) //.
 rewrite !take_oversize ?(sz1a, sz2a) // => -[<-].
 move=> eq_tl; congr; apply: ih => //.
 apply: (eq_trans _ _ (eq_trans _ eq_tl _)).

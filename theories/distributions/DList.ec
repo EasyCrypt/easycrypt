@@ -326,7 +326,7 @@ rewrite -(dlet_dmap _ C (fun ds => dmap d (F ds))) -dlist_add ~-1:/#.
 rewrite -(dmap_dprodE _ _ (fun (xy : _ * _) => F xy.`1 xy.`2)) /F /=.
 rewrite dlistSr ~-1:/# /= !dmap_dprodE_swap /= &(in_eq_dlet) /=.
 move=> x _; rewrite -(dmap_comp h (fun xs => rcons xs x)); congr.
-apply: ih => @/k2; 2,3: by smt().
+apply: ih; 2,3: by smt().
 have ->: k1 + (n - (k1 + 1)) = n - 1 by ring.
 by have := inrgf 0 _; smt().
 qed.
