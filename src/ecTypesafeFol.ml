@@ -3,23 +3,16 @@ open EcAst
 open EcTypes
 open EcCoreFol
 open EcUnify
-open EcSubst
 open EcEnv
 
 module UE = EcUnify.UniEnv
 
 type form = EcAst.form
 
-let open_oper_ue op ue =
-  (* Maybe list map works fine because ue is imperative? *)
-  let open EcDecl in
-  let _ue, tys = List.fold_left_map (fun ue _ -> (ue, EcUnify.UniEnv.fresh ue)) ue op.op_tparams in
-  (tys, open_oper op tys)
-
 let f_app_safe (env: env) (f: EcPath.path) (args: form list) =
   let ue = UE.create None in
   let o_f = EcEnv.Op.by_path f env in
-  let tvars,(newt, _f_kind) = open_oper_ue o_f ue in
+  let newt, tvars = UE.openty ue o_f.EcDecl.op_tparams None o_f.EcDecl.op_ty in
   let rty = UE.fresh ue in
   let fty = toarrow (List.map (fun f -> f.f_ty) args) rty in
   (try EcUnify.unify env ue fty newt with UnificationFailure _ -> assert false);
