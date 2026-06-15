@@ -16,7 +16,6 @@ module Sx = EcPath.Sx
 module UE = EcUnify.UniEnv
 
 type form     = EcAst.form
-type f_node   = EcAst.f_node
 type ty       = EcTypes.ty
 
 let (%) f g = fun x -> f (g x)
