@@ -64,7 +64,7 @@ module type SMTInterface = sig
   val equiv : ctx -> reg -> reg -> node -> bool
   val sat : ctx -> node -> bool
   val valid : ctx -> node -> bool
-  val model : ctx -> (int * int) list -> (int * string) list
+  val model : ctx -> (int * string) list
 end
 
 (* ==================================================================== *)
@@ -103,24 +103,28 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
       Hashtbl.add ctx.vars (id, bit) bv;
       bv
 
-  (* Read back the solver's current model, one value per input. [inps]
-     gives the inputs as (id, width) pairs; for each, the [width] size-1
-     bit variables are concatenated into a single bitvector (bit 0 most
-     significant, as in the register encoding) and its value rendered as a
-     string. Bits the formula never referenced are allocated here so they
-     still appear (the solver assigns them a default), keeping the value at
-     the full declared width rather than compacting over gaps. Only
+  (* Read back the solver's current model, one value per input. We report
+     exactly the input bits the query materialized — the contents of
+     [ctx.vars] — so the values are always those of variables the solver
+     actually constrained (reading externally-supplied ids could name
+     variables absent from the formula, whose model value is an arbitrary
+     default). Bits are grouped by input id and concatenated, lowest bit
+     last (bit 0 most significant, as in the register encoding). Only
      meaningful right after a satisfiable query, and reads the live solver,
      so it must run before the context's solver is re-used. *)
-  let model (ctx : ctx) (inps : (int * int) list) : (int * string) list =
-    List.map
-      (fun (id, width) ->
-        let bv =
-          List.init width (fun bit -> var ctx id bit)
-          |> List.reduce SMT.bvterm_concat
-        in
-        id, Format.asprintf "%a" SMT.pp_term (SMT.get_value ctx.solver bv))
-      inps
+  let model (ctx : ctx) : (int * string) list =
+    Hashtbl.enum ctx.vars |> List.of_enum
+    (* group the (id, bit) -> term entries by input id *)
+    |> List.group (fun ((id1, _), _) ((id2, _), _) -> Int.compare id1 id2)
+    |> List.map (fun bits ->
+           let id = fst (fst (List.hd bits)) in
+           let bv =
+             bits
+             |> List.sort (fun ((_, b1), _) ((_, b2), _) -> Int.compare b1 b2)
+             |> List.map snd
+             |> List.reduce SMT.bvterm_concat
+           in
+           id, Format.asprintf "%a" SMT.pp_term (SMT.get_value ctx.solver bv))
 
   (* Translate an AIG node to an SMT bitvector term, memoizing nodes and
      allocating the size-1 input variables in [ctx]. *)
