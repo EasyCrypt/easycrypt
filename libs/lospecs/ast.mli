@@ -1,40 +1,27 @@
 (* -------------------------------------------------------------------- *)
 type symbol = Ptree.symbol
 
-exception DestrError of string
-
 (* -------------------------------------------------------------------- *)
 module Ident : sig
   type ident
 
   val create : string -> ident
-end = struct
-  type ident = symbol * int
-
-  let create (x : string) : ident = (x, Oo.id (object end))
 end
 
-(* -------------------------------------------------------------------- *)
 type ident = Ident.ident
 
 (* -------------------------------------------------------------------- *)
 type aword = [ `W of int ]
-
-(* -------------------------------------------------------------------- *)
 type atype = [ aword | `Signed | `Unsigned ]
 
-(* -------------------------------------------------------------------- *)
-type aarg = ident * aword
-
-(* -------------------------------------------------------------------- *)
+type aarg  = ident * aword
 type aargs = aarg list
 
-(* -------------------------------------------------------------------- *)
-type lr = [`L | `R]
-type la = [`L | `A]
-type us = [`U | `S]
-type hl = [`H | `L]
-type hld = [hl | `D]
+type lr   = [`L | `R]
+type la   = [`L | `A]
+type us   = [`U | `S]
+type hl   = [`H | `L]
+type hld  = [hl | `D]
 type mulk = [`U of hld | `S of hld | `US]
 
 (* -------------------------------------------------------------------- *)
@@ -68,27 +55,13 @@ and aexpr = { node : aexpr_; type_ : atype }
 
 (* -------------------------------------------------------------------- *)
 type adef = {
-  name: string;
+  name : string;
   arguments : aargs;
   body : aexpr;
   rettype : aword;
 }
 
 (* -------------------------------------------------------------------- *)
-let atype_as_aword (ty : atype) =
-  match ty with `W n -> n | _ -> raise (DestrError "atype_as_aword") 
-
-(* -------------------------------------------------------------------- *)
-let get_size (`W w : aword) : int =
-  w
-
-(* -------------------------------------------------------------------- *)
-let pp_aword (fmt : Format.formatter) (`W n : aword) =
-  Format.fprintf fmt "@%d" n
-
-(* -------------------------------------------------------------------- *)
-let pp_atype (fmt : Format.formatter) (t : atype) =
-  match t with
-  | `W _ as w -> Format.fprintf fmt "%a" pp_aword w
-  | `Unsigned -> Format.fprintf fmt "%s" "unsigned"
-  | `Signed -> Format.fprintf fmt "%s" "signed"
+val atype_as_aword : atype -> int
+val get_size : aword -> int
+val pp_atype : Format.formatter -> atype -> unit
