@@ -50,40 +50,16 @@ let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   else
   f_app op args rty
   
-let rec fapply_safe ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps) (f: form) (fs: form list) : form =
-(*
-  Format.eprintf "Applying forms:@.%a@.To form: %a@."
-  (fun fmt fs -> List.iter (fun f -> Format.fprintf fmt "%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f) fs) fs 
-  (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f;
-*)
-  match f.f_node with
-  | Fop (pth, _) -> 
-    f_app_safe ~full:false (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv redmode hyps
-  | Fapp (fop, args) -> 
-    (* let new_args = args @ fs in *)
-    (* let pp_form = EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) in *)
-    (* let pp_forms fmt = List.iter (Format.fprintf fmt "%a, " pp_form) in *)
-    (* Format.eprintf "new_args: %a@." pp_forms new_args; *)
-    fapply_safe ~redmode hyps fop (args @ fs)
-  | Fquant (Llambda, binds, f) ->
-    assert (List.compare_lengths binds fs >= 0);
-    let subst_bnds, rem_bnds = List.takedrop (List.length fs) binds in
-    let subst = 
-      List.fold_left2  
-      (fun subst b f -> EcSubst.add_flocal subst (fst b) f) EcSubst.empty subst_bnds fs
-    in
-    let f = f_quant Llambda rem_bnds (EcSubst.subst_form subst f) in
-    EcCallbyValue.norm_cbv redmode hyps f
-(* FIXME PR
-  | Fquant  (qtf, _, _) -> assert false
-  | Fif     (f, ft, ff) -> assert false
-  | Fmatch  (f, fs, t) -> assert false
-  | Flet    (lpat, f, fb) -> assert false
-  | Fint    (i) -> assert false
-  | Flocal  (id) -> assert false
-  | Fpvar   (pv, m) -> assert false
-  | Fglob   (id, m) -> assert false
-  | Ftuple  (fs) -> assert false
-  | Fproj   (f, i) -> assert false
-*)
-  | _ -> assert false
+let fapply_safe
+    ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps)
+    (f: form) (fs: form list) : form =
+  let env = LDecl.toenv hyps in
+  (* type of [f] applied to its first [n] arguments *)
+  let rec result_ty (n : int) (ty : ty) : ty =
+    if n <= 0 then ty
+    else match (ty_hnorm ty env).ty_node with
+      | Tfun (_, codom) -> result_ty (n - 1) codom
+      | _ -> ty
+  in
+  let rty = result_ty (List.length fs) f.f_ty in
+  f_app f fs rty |> EcCallbyValue.norm_cbv redmode hyps
