@@ -6,12 +6,15 @@ type name = int
 
 type var = name * int
 
+(* [node] is private: nodes are hash-consed, so the only way to build one
+   is through the smart constructors below (which preserve the [id]/[neg]
+   sharing invariant). Fields stay readable and the type matchable. *)
 type node_r =
   | False
   | Input of var
   | And   of node * node
 
-and node = {
+and node = private {
   gate : node_r;
   id   : int;
   neg  : node;
