@@ -53,4 +53,4 @@ let fapply_safe
       | _ -> ty
   in
   let rty = result_ty (List.length fs) f.f_ty in
-  f_app f fs rty |> EcCallbyValue.norm_cbv redmode hyps
+  f_app f fs rty |> EcReduction.h_red_until redmode hyps

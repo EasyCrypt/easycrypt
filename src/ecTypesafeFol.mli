@@ -21,8 +21,8 @@ val f_app_safe :
   -> form
 
 (* [fapply_safe ~redmode hyps f fs] applies the function-form [f] to the
-   argument-forms [fs], normalising the result by call-by-value under
-   [redmode] (default [EcReduction.full_red]). *)
+   argument-forms [fs], head-reducing the result under [redmode] (default
+   [EcReduction.full_red]). *)
 val fapply_safe :
      ?redmode:EcReduction.reduction_info
   -> EcEnv.LDecl.hyps
