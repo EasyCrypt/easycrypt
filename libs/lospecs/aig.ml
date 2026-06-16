@@ -103,6 +103,12 @@ let constant (b : bool) : node =
   if b then true_ else false_
 
 (* -------------------------------------------------------------------- *)
+(* Structural equality: nodes are hash-consed, so equal [id]s mean the
+   same structure and polarity. *)
+let equal (n1 : node) (n2 : node) : bool =
+  n1.id = n2.id
+
+(* -------------------------------------------------------------------- *)
 let neg (n : node) : node =
   n.neg
 

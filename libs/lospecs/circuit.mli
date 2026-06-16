@@ -10,13 +10,17 @@ type reg
 module Reg : sig
   val length    : reg -> int
   val get       : reg -> int -> node
+  val node_of_reg : reg -> node                     (* asserts [length r = 1] *)
   val extract   : reg -> int -> int -> reg          (* [extract r off len] *)
+  val truncate  : reg -> int -> reg                 (* [truncate r size] = first [size] bits *)
   val split_at  : int -> reg -> reg * reg
   val singleton : node -> reg
   val make      : int -> node -> reg
   val init      : int -> (int -> node) -> reg
+  val input_of_size : ?offset:int -> id:int -> int -> reg
   val append    : reg -> reg -> reg
   val concat    : reg list -> reg
+  val insert    : reg -> int -> reg -> reg          (* [insert r idx r_in] *)
   val map2      : (node -> node -> node) -> reg -> reg -> reg
   val fold_left : ('a -> node -> 'a) -> 'a -> reg -> 'a
   val to_list   : reg -> node list
@@ -183,6 +187,10 @@ val sge : reg -> reg -> node
 val slt : reg -> reg -> node
 
 val sle : reg -> reg -> node
+
+val node_eq : node -> node -> node
+
+val reg_eq : reg -> reg -> node
 
 val bvueq : reg -> reg -> node
 

@@ -27,6 +27,10 @@ val true_    : node
 val constant : bool -> node
 val input    : var -> node
 
+(* [equal n1 n2] is structural equality (same hash-consed node, same
+   polarity). *)
+val equal : node -> node -> bool
+
 (* -------------------------------------------------------------------- *)
 (* Boolean combinators (structure-sharing, with constant folding). *)
 val neg  : node -> node

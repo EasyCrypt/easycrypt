@@ -66,6 +66,9 @@ module Reg = struct
   let make (n : int) (x : node) : reg =
     Array.make n x
 
+  let input_of_size ?(offset = 0) ~(id : int) (n : int) : reg =
+    Array.init n (fun i -> input (id, offset + i))
+
   let length (r : reg) : int =
     Array.length r
 
@@ -75,8 +78,15 @@ module Reg = struct
   let get (r : reg) (i : int) : node =
     r.(i)
 
+  let node_of_reg (r : reg) : node =
+    assert (Array.length r = 1);
+    r.(0)
+
   let extract (r : reg) (off : int) (len : int) : reg =
     Array.sub r off len
+
+  let truncate (r : reg) (size : int) : reg =
+    extract r 0 size
 
   let split_at (n : int) (r : reg) : reg * reg =
     Array.sub r 0 n, Array.right r (Array.length r - n)
@@ -86,6 +96,11 @@ module Reg = struct
 
   let concat (rs : reg list) : reg =
     Array.concat rs
+
+  (* [insert r idx r_in] overwrites [length r_in] bits of [r] at [idx]. *)
+  let insert (r : reg) (idx : int) (r_in : reg) : reg =
+    let len = Array.length r_in in
+    concat [extract r 0 idx; r_in; extract r (idx + len) (Array.length r - idx - len)]
 
   let map2 (f : node -> node -> node) (r1 : reg) (r2 : reg) : reg =
     Array.map2 f r1 r2
@@ -582,7 +597,15 @@ let sgte (eq : node) (r1 : reg) (r2 : reg) : node =
     ~k11:(ugte eq r1 r2)
 
 (* -------------------------------------------------------------------- *)
-let bvueq (r1 : reg) (r2 : reg) : node = 
+let node_eq (n1 : node) (n2 : node) : node =
+  xnor n1 n2
+
+(* -------------------------------------------------------------------- *)
+let reg_eq (r1 : reg) (r2 : reg) : node =
+  Array.fold_left and_ true_ (Array.map2 node_eq r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let bvueq (r1 : reg) (r2 : reg) : node =
   let n1 = Array.length r1 in
   let n2 = Array.length r2 in
   let n = max n1 n2 in

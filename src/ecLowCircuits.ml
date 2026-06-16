@@ -24,24 +24,6 @@ module C = struct
   type inp = int * int
   type model = (int * string) list
 
-  let pp_node (fmt : Format.formatter) (n: node) =
-    Format.fprintf fmt "%a" (fun fmt -> Lospecs.Aig.pp_node fmt) n
-
-  exception GetOutOfRange
-  exception BadSlice of [`Get | `Set]
-
-  let nodes_eq ({id=id1; _}: node) ({id=id2; _}: node) = id1 = id2
-  let size_of_reg = Reg.length
-
-  let node_array_of_reg : reg -> node array = Reg.to_array
-  let node_list_of_reg  : reg -> node list  = Reg.to_list
-  let reg_of_node_list  : node list -> reg  = Reg.of_list
-  let reg_of_node_array : node array -> reg = Reg.of_array
-  let reg_of_node       : node -> reg       = Reg.singleton
-
-  (* If this throws it is a programming error *)
-  let node_of_reg : reg -> node = fun r -> Reg.get r 0
-
   let reg_of_zint ~(size: int) (v: zint) : reg =
     of_bigint_all ~size (to_zt v)
 
@@ -50,11 +32,6 @@ module C = struct
 
   let uzint_of_reg (r: reg) : zint =
     bools_of_reg r |> ubigint_of_bools |> of_zt
-
-  let node_eq (n1: node) (n2: node) = xnor n1 n2
-  let reg_eq (r1: reg) (r2: reg) = Reg.fold_left and_ true_ (Reg.map2 node_eq r1 r2)
-  let reg_ite (c: node) (r1: reg) (r2: reg) : reg =
-    Reg.map2 (fun t f -> mux2 f t c) r1 r2
 
   let equiv ~(pcond: node) (r1: reg) (r2: reg) : bool * model Lazy.t =
     let ctx = CSMT.BWZ.create () in
@@ -67,45 +44,6 @@ module C = struct
   let valid (n: node) : bool * model Lazy.t =
     let ctx = CSMT.BWZ.create () in
     (CSMT.BWZ.valid ctx n, lazy (CSMT.BWZ.model ctx))
-
-  let slice (r: reg) (idx: int) (len: int) : reg =
-    try Reg.extract r idx len
-    with Invalid_argument _ ->
-      raise (BadSlice `Get)
-
-  let subcirc (r: reg) (outs: int list) : reg =
-    try Reg.of_list (List.map (Reg.get r) outs)
-    with Invalid_argument _ ->
-      raise (BadSlice `Get)
-
-  let insert (r: reg) (idx: int) (r_in: reg) : reg =
-    try
-      let len = Reg.length r_in in
-      Reg.concat [Reg.extract r 0 idx; r_in; Reg.extract r (idx + len) (Reg.length r - idx - len)]
-    with Invalid_argument _ ->
-      raise (BadSlice `Set)
-
-  let get (r: reg) (idx: int) =
-    try Reg.get r idx
-    with Invalid_argument _ ->
-      raise GetOutOfRange
-
-  let permute (w: int) (perm: int -> int) (r: reg) : reg =
-    List.init (size_of_reg r) (fun i ->
-      let block_idx, bit_idx = perm (i / w), (i mod w) in
-      if block_idx < 0 then None
-      else Some (get r (block_idx * w + bit_idx)))
-    |> List.filter_map (fun x -> x)
-    |> Reg.of_list
-
-  let input_of_size ?(offset = 0) ~id (i: int) =
-    Reg.init i (fun i -> input (id, offset + i))
-
-  let applys (map_: inp -> node option) : reg -> reg = Reg.maps map_
-
-  let trunc (r1: reg) (size: int) : reg = Reg.extract r1 0 size
-  let concat (r1: reg) (r2: reg) : reg = Reg.append r1 r2
-  let flatten (rs: reg list) : reg = Reg.concat rs
 end
 
 module CDeps = struct
@@ -278,9 +216,9 @@ end
   (* -------------------------------------------------------------------- *)
 
   let pp_flatcirc fmt fc = 
-    let r = C.node_list_of_reg fc in
+    let r = C.Reg.to_list fc in
     List.iter (fun n ->
-      Format.fprintf fmt "%a@." C.pp_node n
+      Format.fprintf fmt "%a@." (fun fmt -> C.pp_node fmt) n
     ) r
 
   let circ_of_zint ~(size: int) (i: zint) : circ = 
@@ -413,7 +351,7 @@ end
       | `Str s -> EcIdent.create s
       in
       { id = name.id_tag; type_ = t; name = EcIdent.name name},
-      ({ reg = C.input_of_size ~id:name.id_tag (size_of_ctype t); type_ = t}, [])
+      ({ reg = C.Reg.input_of_size ~id:name.id_tag (size_of_ctype t); type_ = t}, [])
         
     (* Circuit lambdas, for managing inputs *)
     let open_circ_lambda (st: state) (bnds: (ident  * ctype) list) : state = 
@@ -478,7 +416,7 @@ end
   (* Renames circuit2 inputs to match circuit 1 *)
   let unify_inputs (target: cinp list) ((c, inps): circuit) : circ = 
     let map_ = unify_inputs_renamer target inps in
-    {c with reg = C.applys map_ c.reg}
+    {c with reg = C.Reg.maps map_ c.reg}
 
   let circuit_input_compatible ((c, _): circuit) (cinp: cinp) : bool =
     match c.type_, cinp with
@@ -496,11 +434,11 @@ end
     let idx, ty = List.takedrop i tys in
     let ty = List.hd ty in
     let idx = List.fold_left (+) 0 (List.map size_of_ctype idx) in
-    {reg = (C.slice r idx (size_of_ctype ty)); type_ = ty}, inps
+    {reg = (C.Reg.extract r idx (size_of_ctype ty)); type_ = ty}, inps
 
   let circuit_tuple_of_circuits (cs: circuit list) : circuit = 
     let tys = (List.map (fun (c : circuit) -> (fst c).type_) cs) in 
-    let circ = C.flatten (List.map (fun (c : circuit) -> (fst c).reg) cs) in 
+    let circ = C.Reg.concat (List.map (fun (c : circuit) -> (fst c).reg) cs) in 
     let inps = List.snd cs in
     {reg = circ; type_= CTuple tys}, merge_inputs_list inps
 
@@ -513,7 +451,7 @@ end
       (fun idx ty -> 
         let sz = (size_of_ctype ty) in
         (idx + sz, 
-        ({reg = (C.slice tp idx sz); type_ = ty}, tpinps)))
+        ({reg = (C.Reg.extract tp idx sz); type_ = ty}, tpinps)))
       0 szs 
 
   (* Convert a circuit's output to a given circuit type *)
@@ -532,9 +470,9 @@ end
   let input_of_ctype ?(name : [`Str of string | `Idn of ident] = `Str "input") (ct: ctype) : circuit =
     let id, nm, c = match name with
     | `Str name -> let id = EcIdent.create name |> tag in
-      id, name, C.input_of_size ~id (size_of_ctype ct)
+      id, name, C.Reg.input_of_size ~id (size_of_ctype ct)
     | `Idn idn -> let id = idn.id_tag in
-      id, EcIdent.name idn, C.input_of_size ~id (size_of_ctype ct)
+      id, EcIdent.name idn, C.Reg.input_of_size ~id (size_of_ctype ct)
     in
     { reg = c; type_ = ct; }, [{ id; type_ = ct; name = nm }]
 
@@ -542,8 +480,8 @@ end
     let c, inps = input_of_ctype ~name ty in
     c, List.hd inps
 
-  let circuit_true  = {reg = C.reg_of_node C.true_; type_ = cbool}, []
-  let circuit_false  = {reg = C.reg_of_node C.false_; type_ = cbool}, []
+  let circuit_true  = {reg = C.Reg.singleton C.true_; type_ = cbool}, []
+  let circuit_false  = {reg = C.Reg.singleton C.false_; type_ = cbool}, []
 
   let circuit_and ((c, cinps): circuit) ((d, dinps): circuit) =  
     if c.type_ = d.type_ then
@@ -568,10 +506,10 @@ end
     | _ -> assert false
     in
     let c = match (fst c).type_ with
-    | CBitstring 1 -> C.node_of_reg (fst c).reg
+    | CBitstring 1 -> C.Reg.node_of_reg (fst c).reg
     | _ -> assert false
     in
-    let res_r = C.reg_ite c (fst t).reg (fst f).reg in
+    let res_r = C.ite c (fst t).reg (fst f).reg in
     match ((fst t).type_, (fst f).type_) with
     | CBitstring nt, CBitstring nf when nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps
     | CArray {width=wt; count=nt}, CArray {width=wf; count=nf} when wt = wf && nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps
@@ -583,7 +521,7 @@ end
     | (CArray _), (CArray _)
     | (CTuple _), (CTuple _)
     | (CBitstring _), (CBitstring _) ->
-      {reg = (C.reg_eq (fst c).reg (fst d).reg |> C.reg_of_node); type_ = cbool}, merge_inputs (snd c) (snd d)
+      {reg = (C.reg_eq (fst c).reg (fst d).reg |> C.Reg.singleton); type_ = cbool}, merge_inputs (snd c) (snd d)
     | _ -> lowcircerror @@ CircConstructorInvalidArguments Eq
 
   (* Ignore types, do extensionally over bits, return the circuits evaluating to the condition *)
@@ -593,10 +531,10 @@ end
     if (size_of_ctype c.type_ <> size_of_ctype d.type_) then 
       lowcircerror @@ CircConstructorInvalidArguments Eqs;
 
-    let cs = C.node_list_of_reg c.reg in
-    let ds = C.node_list_of_reg d.reg in
+    let cs = C.Reg.to_list c.reg in
+    let ds = C.Reg.to_list d.reg in
     List.map2 (fun c d ->
-      let r = C.node_eq c d |> C.reg_of_node in
+      let r = C.node_eq c d |> C.Reg.singleton in
       {reg = r; type_ = cbool}, inps) cs ds
 
     
@@ -618,13 +556,13 @@ end
         match c.type_ with
         | CArray _ | CTuple _ | CBitstring _ ->
           begin try
-            Some (C.get c.reg idx)
+            Some (C.Reg.get c.reg idx)
           with Invalid_argument _ -> None
           end
       )
     in
     
-    let circ = {(fst c) with reg = C.applys map_ (fst c).reg} in
+    let circ = {(fst c) with reg = C.Reg.maps map_ (fst c).reg} in
     let inps = merge_inputs_list (List.snd args) in
     (circ, inps)
 
@@ -637,7 +575,7 @@ end
     let pcond = Option.map (convert_type cbool) pcond in (* Try to convert to bool *)
     let pcc = match pcond with
     | Some ({reg = b; type_ = CBitstring 1}, pcinps) ->
-        C.map (unify_inputs_renamer inps1 pcinps) (C.node_of_reg b)
+        C.map (unify_inputs_renamer inps1 pcinps) (C.Reg.node_of_reg b)
     | None -> C.true_
     | _ -> lowcircerror CircEquivNonBoolPCond
     in
@@ -649,14 +587,14 @@ end
 
   let circ_sat ((c, _): circuit) : bool * C.model Lazy.t =
     let c = match c with
-    | {type_ = CBitstring 1; reg} -> C.node_of_reg reg
+    | {type_ = CBitstring 1; reg} -> C.Reg.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
     C.sat c
 
   let circ_valid ((c, _): circuit) : bool * C.model Lazy.t =
     let c = match c with
-    | {type_ = CBitstring 1; reg} -> C.node_of_reg reg
+    | {type_ = CBitstring 1; reg} -> C.Reg.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
     C.valid c
@@ -665,11 +603,11 @@ end
   (* Allow unaligned slices *)
   let circuit_slice ~(size:int) ((c, inps): circuit) (offset: int) : circuit =
     try 
-      {reg = C.slice c.reg offset size; type_ = CBitstring size}, inps
-    with C.BadSlice `Get ->
+      {reg = C.Reg.extract c.reg offset size; type_ = CBitstring size}, inps
+    with Invalid_argument _ ->
       lowcircerror @@ CircConstructorInvalidArguments (Slice {
         slice_size = size;
-        bitstring_size = C.size_of_reg c.reg;
+        bitstring_size = C.Reg.length c.reg;
         offset;
       })
     
@@ -677,11 +615,11 @@ end
   (* Does not type check *)
   let circuit_slice_insert ((orig_c, orig_inps): circuit) (idx: int) ((new_c, new_inps): circuit) : circuit = 
     try 
-      { orig_c with reg = (C.insert orig_c.reg idx new_c.reg)}, merge_inputs orig_inps new_inps
-    with C.BadSlice `Set ->
+      { orig_c with reg = (C.Reg.insert orig_c.reg idx new_c.reg)}, merge_inputs orig_inps new_inps
+    with Invalid_argument _ ->
       lowcircerror @@ CircConstructorInvalidArguments (SliceSet {
-        slice_size = C.size_of_reg new_c.reg;
-        bitstring_size = C.size_of_reg orig_c.reg;
+        slice_size = C.Reg.length new_c.reg;
+        bitstring_size = C.Reg.length orig_c.reg;
         offset = idx;
       })
 
@@ -695,7 +633,7 @@ end
      Implicitly flattens everything to bitstrings
   *)
   let fillet_circuit ((c, inps) : circuit) : circuit list = 
-    let r = c.reg |> C.node_list_of_reg in
+    let r = c.reg |> C.Reg.to_list in
     List.map (fun n ->
       let new_inps = List.map (fun {id=_;type_;name} ->
         {id=EcIdent.create "_" |> tag; type_; name}) inps
@@ -713,7 +651,7 @@ end
         | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1); name}
         | None -> None
       ) new_inps in
-      { reg = C.reg_of_node n';
+      { reg = C.Reg.singleton n';
         type_ = cbool },
       new_inps
     ) r
@@ -739,7 +677,7 @@ end
     let checks = if sort then begin 
 
     let checks = List.map (fun (c, inps) ->
-      (c, inps), C.(CDeps.dep_of_node (node_of_reg c.reg))) checks in
+      (c, inps), C.(CDeps.dep_of_node (Reg.node_of_reg c.reg))) checks in
     let checks = List.stable_sort (fun (_, d1) (_, d2) ->
       let m1 = (Map.keys d1 |> Set.of_enum |> Set.min_elt_opt) in 
       let m2 = (Map.keys d2 |> Set.of_enum |> Set.min_elt_opt) in 
@@ -757,7 +695,7 @@ end
     checks 
     end else
       List.map (fun c ->
-        c, C.(CDeps.dep_of_node (node_of_reg (fst c).reg))) checks
+        c, C.(CDeps.dep_of_node (Reg.node_of_reg (fst c).reg))) checks
     in
 
     let rec doit (acc: circuit list) (cur, d: circuit * CDeps.dep) (cs: (circuit * CDeps.dep) list) : circuit list =
@@ -782,7 +720,7 @@ end
 
    
   let attach_compatible_pres ?(mode: [`Cont | `Eq | `Int] = `Cont) (pres: (circuit * CDeps.dep) list) ((post_circ, _) as post: circuit) : circuit =
-    let d = C.(CDeps.dep_of_node (node_of_reg post_circ.reg)) in
+    let d = C.(CDeps.dep_of_node (Reg.node_of_reg post_circ.reg)) in
     let compat_pres = List.filteri (fun _i (_c, pre_dep) ->
       match mode with
       | `Cont -> CDeps.dep_contained pre_dep d
@@ -795,23 +733,23 @@ end
 
     let sublimate_inputs ((c, cinps): circuit) : circuit = 
     assert (c.type_ = cbool);
-    let node_c = C.node_of_reg c.reg in
+    let node_c = C.Reg.node_of_reg c.reg in
     let node_c, shifts = CDeps.excise_bit node_c in
     let inps = List.filter_map (fun {id; name; _} ->
       match Map.find_opt id shifts with
       | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1); name}
       | None -> None
     ) cinps in
-    let c = C.reg_of_node node_c in
+    let c = C.Reg.singleton node_c in
     { reg = c; type_ = cbool}, inps
 
 
   let collapse_lanes (lanes: circuit list) =
     (* Circuit structural equality after renaming *)
     let (===) (c1: circ) (c2: circ) : bool = 
-      let n', _ = C.node_of_reg c1.reg |> CDeps.excise_bit in
-      let n, _ = C.node_of_reg c2.reg |> CDeps.excise_bit in
-      C.nodes_eq n n'
+      let n', _ = C.Reg.node_of_reg c1.reg |> CDeps.excise_bit in
+      let n, _ = C.Reg.node_of_reg c2.reg |> CDeps.excise_bit in
+      C.equal n n'
     in
     let rec collapse (acc: circuit list) (cur: circuit) (cs: circuit list) : circuit list = 
       match cs with
@@ -852,7 +790,7 @@ end
   let fillet_tauts (pres: circuit list) (posts: circuit list) : bool =
     (* Assumes everything is single bit outputs. *)
     let posts = List.filter_map (fun ((postc, _) as post) -> 
-      if C.nodes_eq (C.node_of_reg postc.reg) C.true_ then None
+      if C.equal (C.Reg.node_of_reg postc.reg) C.true_ then None
       else Some post
     ) posts in
   
@@ -863,7 +801,7 @@ end
       || (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = cbool) posts)) then
         lowcircerror CircSmtNonBoolCirc;
       let pres = List.map (fun ((c, _) as circ) -> circ,
-        CDeps.dep_of_node (C.node_of_reg c.reg)) pres in
+        CDeps.dep_of_node (C.Reg.node_of_reg c.reg)) pres in
       let posts = List.map (attach_compatible_pres ~mode:`Int pres) posts in
       let posts = collapse_lanes posts in
 
@@ -901,9 +839,9 @@ end
   let circuit_aggregate (cs: circuit list) : circuit =
     let inps = List.snd cs in
     let cs = List.map (fun c -> (fst c).reg) cs in
-    let c = C.flatten cs in
+    let c = C.Reg.concat cs in
     let inps = merge_inputs_list inps in
-    {reg = c; type_ = CBitstring (C.size_of_reg c)}, inps
+    {reg = c; type_ = CBitstring (C.Reg.length c)}, inps
 
   let input_aggregate_renamer (inps: cinp list) : cinp * (C.inp -> C.node option) =
     let new_id = create "aggregated" |> tag in
@@ -930,7 +868,7 @@ end
 
   let circuit_aggregate_inputs ((c, inps): circuit) : circuit =
     let inp, renamer = input_aggregate_renamer inps in
-    {c with reg = C.applys renamer c.reg}, [inp]
+    {c with reg = C.Reg.maps renamer c.reg}, [inp]
 
   let circuit_from_spec ?(name: symbol option) ((arg_tys, ret_ty) : (ctype list * ctype)) (spec: Lospecs.Ast.adef) : circuit = 
     let c args = C.circuit_of_specification args spec in
@@ -944,7 +882,7 @@ end
       let nm = name ^ "_" ^ (string_of_int i) in
       let id = EcIdent.create nm |> tag in
       let size : int = size_of_ctype ty in
-      (C.input_of_size ~id size, { type_ = ty; id = id; name = nm } )
+      (C.Reg.input_of_size ~id size, { type_ = ty; id = id; name = nm } )
       ) arg_tys |> List.split in
     let c = c cinps in
     { reg = c; type_ = ret_ty}, inps 
@@ -958,8 +896,8 @@ end
         match c with 
         | {reg; type_ = CBitstring n}, inps when 0 <= i && i < n -> 
           begin try
-            {reg = C.reg_of_node (C.get reg i); type_ = cbool}, inps
-          with C.GetOutOfRange ->
+            {reg = C.Reg.singleton (C.Reg.get reg i); type_ = cbool}, inps
+          with Invalid_argument _ ->
             lowcircerror (CircConstructorInvalidArguments (Get {
               bitstring_size = n;
               index = i;
@@ -1015,13 +953,13 @@ end
             | { type_ = CBitstring _; reg}, inps -> reg, inps 
             | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
             ) 
-          (List.init n (fun i -> {reg = (C.slice arr (i*w_i) w_i); type_ = CBitstring w_i}, []))
+          (List.init n (fun i -> {reg = (C.Reg.extract arr (i*w_i) w_i); type_ = CBitstring w_i}, []))
           in
           (* Inputs of all components should match after map *)
           if not (List.for_all ((=) (List.hd inps)) inps) then 
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let inps = List.hd inps in
-          let circ = { reg = (C.flatten circs); type_ = CArray {width=w_o; count=n}} in  
+          let circ = { reg = (C.Reg.concat circs); type_ = CArray {width=w_o; count=n}} in  
           (circ, inps) 
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
@@ -1036,7 +974,7 @@ end
           let circs, cinps = List.split @@ List.init n init_f in
           let circs = List.map 
             (function 
-              | {type_ = CBitstring _; reg = r} when C.size_of_reg r = w_o -> r 
+              | {type_ = CBitstring _; reg = r} when C.Reg.length r = w_o -> r 
             (* Invalid type for init component *)
             | _ -> assert false) (* Should be caught by EC typechecking + binding correctness *) 
           circs in
@@ -1044,7 +982,7 @@ end
           if not (List.for_all ((=) (List.hd cinps)) cinps) then
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let cinps = List.hd cinps in
-          {type_ = CArray {width=w_o; count=n} ; reg = C.flatten circs}, cinps 
+          {type_ = CArray {width=w_o; count=n} ; reg = C.Reg.concat circs}, cinps 
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
       | { kind = `Init (_, Some w) } -> 
@@ -1053,7 +991,7 @@ end
           let circs, cinps = List.split @@ List.init w init_f in
           let circs = List.map 
             (function 
-            | {type_ = CBitstring 1; reg = b} -> C.node_of_reg b
+            | {type_ = CBitstring 1; reg = b} -> C.Reg.node_of_reg b
             (* Return type should be bool (= bit) for components *)
             | _ -> assert false) (* Should be caught by EC typechecking + binding correctness *)
             circs
@@ -1061,7 +999,7 @@ end
           if not (List.for_all ((=) (List.hd cinps)) cinps) then
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let cinps = List.hd cinps in
-          {type_ = CBitstring w; reg = (C.reg_of_node_list circs)}, cinps
+          {type_ = CBitstring w; reg = (C.Reg.of_list circs)}, cinps
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
       | _ -> assert false (* Should not happen because calls should be guarded by call to op_is_parametric_bvop *)
@@ -1170,22 +1108,22 @@ end
       | { kind = `Lt ((_, Some size), false) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = C.reg_of_node (C.ult c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.Reg.singleton (C.ult c1 c2)}, [inp1; inp2] 
       
       | { kind = `Lt ((_, Some size), true) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = C.reg_of_node (C.slt c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.Reg.singleton (C.slt c1 c2)}, [inp1; inp2] 
 
       | { kind = `Le ((_, Some size), false) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = C.reg_of_node (C.ule c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.Reg.singleton (C.ule c1 c2)}, [inp1; inp2] 
 
       | { kind = `Le ((_, Some size), true) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = C.reg_of_node (C.sle c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.Reg.singleton (C.sle c1 c2)}, [inp1; inp2] 
 
       | { kind = `Extend ((_, Some size), (_, Some out_size), false) } ->
         (* assert (size <= out_size); *)
@@ -1200,13 +1138,13 @@ end
       | { kind = `Truncate ((_, Some size), (_, Some out_sz)) } ->
         (* assert (size >= out_sz); *)
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring out_sz; reg = (C.trunc c1 out_sz)}, [inp1] 
+        {type_ = CBitstring out_sz; reg = (C.Reg.truncate c1 out_sz)}, [inp1] 
 
       | { kind = `Concat ((_, Some sz1), (_, Some sz2), (_, Some szo)) } ->
         (* assert (sz1 + sz2 = szo); *)
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring sz1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring sz2) in
-        {type_ = CBitstring szo; reg = (C.concat c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring szo; reg = (C.Reg.append c1 c2)}, [inp1; inp2] 
 
       | { kind = `A2B (((_, Some w), (_, Some n)), (_, Some m))} ->
         (* assert (n * w = m); *)
@@ -1231,8 +1169,8 @@ end
         match c with 
         | ({reg = c; type_ = CArray {width=w; count=n}}, inps) -> 
           begin try
-            { type_ = CBitstring w; reg = (C.slice c (i*w) w)}, inps  
-          with C.BadSlice `Get ->
+            { type_ = CBitstring w; reg = (C.Reg.extract c (i*w) w)}, inps  
+          with Invalid_argument _ ->
             lowcircerror @@ CircConstructorInvalidArguments (AGet {
               container_size = n;
               index = i;
@@ -1244,9 +1182,9 @@ end
         | (({reg = arr; type_ =  CArray {width=w; count=n}}, inps) : circuit), (({reg = bs; type_ = CBitstring w'}, cinps): circuit) -> 
           begin try
             assert (w = w');
-            { type_ = CArray {width=w; count=n}; reg = (C.insert arr (pos * w) bs)},
+            { type_ = CArray {width=w; count=n}; reg = (C.Reg.insert arr (pos * w) bs)},
             merge_inputs inps cinps
-          with C.BadSlice `Set -> 
+          with Invalid_argument _ -> 
             lowcircerror @@ CircConstructorInvalidArguments (ASet {
               container_size = n;
               index = pos;
@@ -1265,7 +1203,7 @@ end
             | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
           ) circs
         in
-        { type_ = CArray {width=C.size_of_reg (List.hd circs); count=len}; reg = (C.flatten circs)}, merge_inputs_list inps 
+        { type_ = CArray {width=C.Reg.length (List.hd circs); count=len}; reg = (C.Reg.concat circs)}, merge_inputs_list inps 
     end
 include CArgs
 include TranslationState
