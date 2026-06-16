@@ -162,10 +162,9 @@ val compute : sign:bool -> circuit -> arg list -> zint option
 val circuit_slice        : size:int -> circuit -> int -> circuit
 val circuit_slice_insert : circuit -> int -> circuit -> circuit
 val fillet_circuit       : circuit -> circuit list
-val fillet_tauts         : ?logger:(string -> unit) -> circuit list -> circuit list -> bool
+val fillet_tauts         : circuit list -> circuit list -> bool
 val batch_checks         :
-     ?logger:(string -> unit)
-  -> ?sort:bool
+     ?sort:bool
   -> ?mode:[`ByEq | `BySub]
   -> circuit list
   -> circuit list

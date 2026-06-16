@@ -577,8 +577,8 @@ module type CircuitInterface = sig
   val circuit_slice : size:int -> circuit -> int -> circuit
   val circuit_slice_insert : circuit -> int -> circuit -> circuit 
   val fillet_circuit : circuit -> circuit list
-  val fillet_tauts : ?logger:(string -> unit) -> circuit list -> circuit list -> bool
-  val batch_checks : ?logger:(string -> unit) -> ?sort:bool -> ?mode:[`ByEq | `BySub ] -> circuit list -> circuit list
+  val fillet_tauts : circuit list -> circuit list -> bool
+  val batch_checks : ?sort:bool -> ?mode:[`ByEq | `BySub ] -> circuit list -> circuit list
 
   val circuit_from_spec : ?name:symbol -> (ctype list * ctype) -> Lospecs.Ast.adef -> circuit
 end
@@ -1116,10 +1116,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
 *)
   (* Batches circuit checks by dependencies. Assumes equivalent checks are contiguous *)
-  let batch_checks 
-    ?(logger : (string -> unit) option) 
-    ?(sort = true) 
-    ?(mode : [`ByEq | `BySub] = `ByEq) 
+  let batch_checks
+    ?(sort = true)
+    ?(mode : [`ByEq | `BySub] = `ByEq)
      (checks: circuit list) 
     : circuit list 
   =
@@ -1151,12 +1150,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let rec doit (acc: circuit list) (cur, d: circuit * Backend.Deps.dep) (cs: (circuit * Backend.Deps.dep) list) : circuit list =
       match cs with 
       | [] -> (cur::acc)
-      | (c, d')::cs -> 
-        Option.may (fun f -> f @@ 
-          Format.asprintf "Comparing deps:@.%a@.To deps:@.%a@."
-          Backend.Deps.pp_dep d 
-          Backend.Deps.pp_dep d') 
-        logger;
+      | (c, d')::cs ->
         begin match mode with
           | `ByEq when Backend.Deps.deps_equal d d' -> 
             doit acc ((circuit_and cur c), d) cs
@@ -1165,7 +1159,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           | `BySub when Backend.Deps.(dep_contained d' d) ->
             doit acc ((circuit_and cur c), d) cs
           | _ ->
-            Option.may (fun f -> f @@ Format.asprintf "Consolidated lane deps: %a@." Backend.Deps.pp_dep d) logger;
             doit (cur::acc) (c, d') cs
         end
     in
@@ -1200,7 +1193,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     { reg = c; type_ = CBool}, inps
 
 
-  let collapse_lanes ?(logger : (string -> unit) option) (lanes: circuit list) =
+  let collapse_lanes (lanes: circuit list) =
     (* Circuit structural equality after renaming *)
     let (===) (c1: circ) (c2: circ) : bool = 
       let n', _ = Backend.node_of_reg c1.reg |> Backend.Deps.excise_bit in
@@ -1227,8 +1220,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           doit (collapse [] c cs)
         else
           if (List.length (cs) + 1) mod idx != 0 then
-            (Option.may (fun f -> f "Cannot correctly infer lanes, defaulting to bruteforce checking@.") logger;
-            (c::cs))
+            (c::cs)
           else
             let cs = List.chunkify idx (c::cs) |> List.map (List.reduce circuit_and) in
             doit cs
@@ -1244,7 +1236,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     - Checks for structural equality of circuits
     - SMT check for any remainings ones
    *)
-  let fillet_tauts ?(logger: (string -> unit) option) (pres: circuit list) (posts: circuit list) : bool =
+  let fillet_tauts (pres: circuit list) (posts: circuit list) : bool =
     (* Assumes everything is single bit outputs. *)
     let posts = List.filter_map (fun ((postc, _) as post) -> 
       if Backend.nodes_eq (Backend.node_of_reg postc.reg) Backend.true_ then None
@@ -1260,19 +1252,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let pres = List.map (fun ((c, _) as circ) -> circ,
         Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
       let posts = List.map (attach_compatible_pres ~mode:`Int pres) posts in
-      let posts = collapse_lanes ?logger posts in
+      let posts = collapse_lanes posts in
 
-      Option.may (fun f -> f @@ Format.asprintf "%d conditions to check after structural equality collapse@." (List.length posts)) logger;
-
-      List.mapi (fun i post -> 
-        Option.may (fun f -> f @@ Format.asprintf "Checking equivalence for bit %d@." i) logger;
-
-(*         let res = fillet_taut pres post in  *)
+      List.map (fun post ->
         let post = sublimate_inputs post in
-        let res = fst (circ_valid post) in
-        if not res then
-          Option.may (fun f -> f @@ Format.asprintf "Failed for bit %d@." i) logger;
-        res) posts |>
+        fst (circ_valid post)) posts |>
       List.for_all identity
    
   let compute ~(sign: bool) ((r, inps) as c: circuit) (args: arg list) : zint option = 
