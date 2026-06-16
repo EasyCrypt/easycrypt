@@ -131,3 +131,14 @@ let notify (lvl : loglevel) (msg : string Lazy.t) (gs : gstate) =
 
   if accept_log ~level:gs.gs_loglevel ~wanted:lvl then
     List.iter do1 gs.gs_notifiers
+
+(* printf-style front-end to [notify]: format [msg] into a buffer lazily
+   and forward it to the registered notifiers. *)
+let notify_fmt (lvl : loglevel) (gs : gstate) msg =
+  let buf  = Buffer.create 0 in
+  let fbuf = Format.formatter_of_buffer buf in
+  Format.kfprintf
+    (fun _ ->
+      Format.pp_print_flush fbuf ();
+      notify lvl (lazy (Buffer.contents buf)) gs)
+    fbuf msg

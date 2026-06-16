@@ -944,11 +944,12 @@ let state_of_prog
   if close then close_circ_lambda st else st
 
 let circ_simplify_form_bitstring_equality
-    ?(st : state = empty_state)
+    ?st
     ?(pres : circuit list = [])
     (hyps : hyps)
     (f : form) : form =
   let env = toenv hyps in
+  let st = Option.default (create_state (EcEnv.gstate env)) st in
 
   let rec check (f : form) =
     match EcFol.sform_of_form f with
@@ -963,9 +964,10 @@ let circ_simplify_form_bitstring_equality
 let circ_valid (c : circuit) : bool = fst (circ_valid c)
 
 let circuit_state_of_memenv
-    ?(st : state = empty_state)
+    ?st
     (env : env)
     ((m, mt) as me : memenv) : state =
+  let st = Option.default (create_state (EcEnv.gstate env)) st in
   match mt with
   | Lmt_concrete (Some {lmt_decl = decls}) ->
     let bnds =
@@ -988,10 +990,11 @@ let circuit_state_of_memenv
   | Lmt_concrete None -> st
 
 let circuit_state_of_hyps
-    ?(st : state = empty_state)
+    ?st
     ?(strict = false)
     (hyps : hyps) : state =
   let env = toenv hyps in
+  let st = Option.default (create_state (EcEnv.gstate env)) st in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let st =
     List.fold_left

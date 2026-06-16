@@ -291,13 +291,8 @@ let gstate (env : env) =
 
 (* -------------------------------------------------------------------- *)
 let notify ?(immediate = true) (env : preenv) (lvl : EcGState.loglevel) msg =
-  let buf  = Buffer.create 0 in
-  let fbuf = Format.formatter_of_buffer buf in
-  ignore immediate; Format.kfprintf
-    (fun _ ->
-      Format.pp_print_flush fbuf ();
-      EcGState.notify lvl (lazy (Buffer.contents buf)) (gstate env))
-    fbuf msg
+  ignore immediate;
+  EcGState.notify_fmt lvl (gstate env) msg
 
 (* -------------------------------------------------------------------- *)
 let empty_mc params = {

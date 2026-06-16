@@ -473,7 +473,7 @@ module type CircuitInterface = sig
   module TranslationState : sig
     type state
 
-    val empty_state : state
+    val create_state : EcGState.gstate -> state
 
     val update_state_pv : state -> memory -> symbol -> circuit -> state
     val state_get_pv_opt : state -> memory -> symbol -> circuit option
@@ -496,7 +496,6 @@ module type CircuitInterface = sig
     val close_circ_lambda : state -> state 
     val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> circuit) -> circuit
 
-    val set_logger : state -> (string -> unit) -> state
     val log : state -> string -> unit
   end
 
@@ -724,15 +723,19 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       circs    : circuit Mid.t;
       lambdas  : cinp list list; (* actually a stack *)
       pv_ids   : (ident * symbol, ident) Map.t; (* can be changed to int Msym.t if needed *)
-      logger   : string -> unit;
+      gstate   : EcGState.gstate;
     }
 
-    let empty_state : state = {
+    let create_state (gstate : EcGState.gstate) : state = {
       circs = Mid.empty;
       lambdas = [];
       pv_ids = Map.empty; (* can be changed to int Msym.t if needed *)
-      logger = fun _ -> ();
+      gstate;
     }
+
+    (* Debug log through the gstate's registered notifiers. *)
+    let log (st: state) (s: string) : unit =
+      EcGState.notify `Debug (lazy s) st.gstate
 
     let update_state_pv (st: state) (m: memory) (s: symbol) (c: circuit) : state = 
       match Map.find_opt (m, s) st.pv_ids with
@@ -783,7 +786,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     (* Circuit lambdas, for managing inputs *)
     let open_circ_lambda (st: state) (bnds: (ident  * ctype) list) : state = 
       let inps, cs = List.map (fun (id, t) -> 
-        st.logger @@ Format.asprintf "Opening circuit lambda for ident: (%s, %d)@." (name id) (tag id);
+        log st @@ Format.asprintf "Opening circuit lambda for ident: (%s, %d)@." (name id) (tag id);
         let inp, c = cinput_of_type (`Idn id) t
         in inp, (id, c)) bnds |> List.split in
       {st with
@@ -810,11 +813,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let (c, inps) = c st' in
       (c, (List.hd st'.lambdas) @ inps)
 
-    let set_logger (st: state) (logger: string -> unit) : state = 
-      { st with logger; } 
-
-    let log (st: state) (s: string) : unit = 
-      st.logger s
   end
 
   (* Inputs helper functions *)

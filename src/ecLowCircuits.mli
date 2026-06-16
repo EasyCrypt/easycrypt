@@ -64,7 +64,7 @@ val pp_arg          : Format.formatter -> arg -> unit
    circuits computing them, plus the circuit lambdas (open inputs). *)
 type state
 
-val empty_state : state
+val create_state : EcGState.gstate -> state
 
 val update_state_pv     : state -> memory -> symbol -> circuit -> state
 val state_get_pv_opt    : state -> memory -> symbol -> circuit option
@@ -87,7 +87,6 @@ val open_circ_lambda_pv : state -> ((memory * symbol) * ctype) list -> state
 val close_circ_lambda   : state -> state
 val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> circuit) -> circuit
 
-val set_logger : state -> (string -> unit) -> state
 val log        : state -> string -> unit
 
 (* -------------------------------------------------------------------- *)

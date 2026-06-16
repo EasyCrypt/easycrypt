@@ -159,7 +159,7 @@ let t_bdep_solve
   match goal.f_node with
   | FhoareS hs -> begin try
     let lap = EcCircuits.stopwatch env in
-    let st = set_logger empty_state (EcEnv.notify env `Debug "%s") in
+    let st = create_state (EcEnv.gstate env) in
     let st = circuit_state_of_hyps ~st hyps in
     let st = circuit_state_of_memenv ~st env hs.hs_m in
     let st, cpres = process_pre ~st tc (hs_pr hs).inv in
@@ -185,7 +185,7 @@ let t_bdep_solve
   | FequivS es -> begin try
       let lap = EcCircuits.stopwatch env in
 
-      let st = set_logger empty_state (EcEnv.notify env `Debug "%s") in
+      let st = create_state (EcEnv.gstate env) in
 
       let st = circuit_state_of_hyps ~st hyps in
       let st = circuit_state_of_memenv ~st (FApi.tc1_env tc) es.es_ml in
