@@ -1395,7 +1395,7 @@ type pbind_bitstring =
   ; touint : pqsymbol
   ; tosint : pqsymbol
   ; ofint  : pqsymbol
-  ; type_  : pty
+  ; type_  : pqsymbol
   ; size   : pformula }
   
 (* -------------------------------------------------------------------- *)

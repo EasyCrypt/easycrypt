@@ -3961,7 +3961,7 @@ spec_binding:
   { (op, circ) }
 
 cr_binding_r:
-| BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=loc(simpl_type_exp) size=sform
+| BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=qoident size=sform
   { CRB_Bitstring { from_; to_; touint; tosint; ofint; type_; size; } }
 
 | BIND ARRAY get=qoident set=qoident tolist=qoident oflist=qoident type_=qoident size=sform

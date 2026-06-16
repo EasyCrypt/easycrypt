@@ -2798,18 +2798,17 @@ module Circuit = struct
   let add_bitstring (scope : scope) (local : is_local) (bs : pbind_bitstring) : scope = 
     let env = env scope in
 
-    let type_ =
-      let ue = EcUnify.UniEnv.create None in
-      let ty = EcTyping.transty tp_tydecl env ue bs.type_ in
-      assert (EcUnify.UniEnv.closed ue);
-      ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty in
-
     let bspath =
-      match (EcEnv.ty_hnorm type_ env).ty_node with
-      | Tconstr (p, []) -> p
-      | _ ->
-          hierror ~loc:(bs.type_.pl_loc)
-            "bit-string type must be a monomorphic named type" in
+      match EcEnv.Ty.lookup_opt (unloc bs.type_) env with
+      | None ->
+          hierror ~loc:(loc bs.type_)
+            "cannot find named type: `%s'" (string_of_qsymbol (unloc bs.type_))
+      | Some (path, decl) ->
+          if not (List.is_empty decl.tyd_params) then
+            hierror ~loc:(loc bs.type_)
+              "bit-string type must be a monomorphic named type: `%s'"
+              (string_of_qsymbol (unloc bs.type_));
+          path in
 
     let from_, _  = EcEnv.Op.lookup bs.to_.pl_desc env in
     let to_  , _  = EcEnv.Op.lookup bs.from_.pl_desc env in
