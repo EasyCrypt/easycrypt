@@ -32,141 +32,9 @@ module Option = Batteries.Option
 (* Input are: some identifier + some bit *)
 
 (* ==================================================================== *)
-(* Backend interface (minimal QF_ABV functionality) *)
+(* Register-level helpers over the lospecs backend. *)
 (* ==================================================================== *)
-module type CBackend = sig
-  type node (* Corresponds to a single output node *)
-  type reg
-  (* Id + offset, both assumed starting at 0 *)
-  type inp = int * int
-
-  val pp_node : Format.formatter -> node -> unit
-
-  exception NonConstantCircuit
-  exception GetOutOfRange 
-  exception BadSlice of [`Get | `Set]
-
-  val true_ : node
-  val false_ : node
-
-  val nodes_eq : node -> node -> bool
-
-
-  val node_array_of_reg : reg -> node array
-  val node_list_of_reg : reg -> node list
-  val reg_of_node_list : node list -> reg
-  val reg_of_node_array : node array -> reg
-  val reg_of_node : node -> reg
-  val node_of_reg : reg -> node 
-
-  val input_node : id:int -> int -> node
-  val input_of_size : ?offset:int -> id:int -> int -> reg
-
-  val reg_of_zint : size:int -> zint -> reg
-  val bool_array_of_reg : reg -> bool array
-  val bool_list_of_reg : reg -> bool list
-  val szint_of_reg : reg -> zint
-  val uzint_of_reg : reg -> zint
-  val size_of_reg : reg -> int
-
-  val apply : (inp -> node option) -> node -> node
-  val applys : (inp -> node option) -> reg -> reg
-  val circuit_from_spec : Lospecs.Ast.adef -> reg list -> reg
-
-  (* The queries return the decision and a lazy model: when forced, the
-     solver's value for each input the query materialized, as (id, value)
-     pairs read back from the solved circuit. Only meaningful (and only to
-     be forced) when the decision witnesses a counter-model. *)
-  type model = (int * string) list
-
-  val equiv : pcond:node -> reg -> reg -> bool * model Lazy.t
-  val sat : node -> bool * model Lazy.t
-  val valid : node -> bool * model Lazy.t
-
-  val slice : reg -> int -> int -> reg
-  val subcirc : reg -> (int list) -> reg
-  val insert : reg -> int -> reg -> reg
-  val get : reg -> int -> node
-  val permute : int -> (int -> int) -> reg -> reg
-
-  val node_eq : node -> node -> node
-  val reg_eq : reg -> reg -> node
-  val node_ite : node -> node -> node -> node
-  val reg_ite : node -> reg -> reg -> reg
-
-  val band : node -> node -> node
-  val bor : node -> node -> node
-  val bxor : node -> node -> node
-  val bnot : node -> node
-  val bxnor : node -> node -> node
-  val bnand : node -> node -> node
-  val bnor : node -> node -> node
-
-  (* SMTLib Base Operations *)
-  val add : reg -> reg -> reg
-  val sub : reg -> reg -> reg
-  val opp : reg -> reg
-  val mul : reg -> reg -> reg
-  val udiv : reg -> reg -> reg
-  val sdiv : reg -> reg -> reg
-  val umod : reg -> reg -> reg
-  val smod : reg -> reg -> reg
-  val lshl : reg -> reg -> reg
-  val lshr : reg -> reg -> reg
-  val ashr : reg -> reg -> reg
-  val rol : reg -> reg -> reg
-  val ror : reg -> reg -> reg
-  val land_ : reg -> reg -> reg
-  val lor_ : reg -> reg -> reg
-  val lxor_ : reg -> reg -> reg
-  val lnot_ : reg -> reg 
-  val ult: reg -> reg -> node
-  val slt : reg -> reg -> node
-  val ule : reg -> reg -> node
-  val sle : reg -> reg -> node
-  val uext : reg -> int -> reg
-  val sext : reg -> int -> reg
-  val trunc : reg -> int -> reg
-  val concat : reg -> reg -> reg
-
-  val flatten : reg list -> reg
-
-  module Deps : sig
-    type dep = (int, int Set.t) Map.t
-    type deps = dep array
-    type block_deps
-
-    val dep_of_node : node -> dep
-    val deps_of_reg : reg -> deps
-    val block_deps_of_deps : int -> deps -> block_deps 
-    val block_deps_of_reg : int -> reg -> block_deps
-
-    val pp_dep : Format.formatter -> dep -> unit
-    val pp_deps : Format.formatter -> deps -> unit
-    val pp_block_deps : Format.formatter -> block_deps -> unit
-
-    val dep_var_count : deps -> int
-    (* Assumes single_dep *)
-    val dep_ranges : deps -> (int, int * int) Map.t
-    (* Checks if first dep is a subset of second dep *) 
-    val dep_contained : dep -> dep -> bool
-    (* Checks if two dep sets are equal *)
-    val deps_equal : dep -> dep -> bool
-    (* Checks if two dep sets intersect *)
-    val deps_intersect : dep -> dep -> bool
-    (* Checks if all the deps are in a given list of inputs *)
-    val check_inputs : reg -> (int * int) list -> bool
-
-    val forall_inputs : (int -> int -> bool) -> reg -> bool
-    val rename_inputs : ((int * int) -> (int * int) option) -> reg -> reg
-    val excise_bit : ?renamings:(int -> int option) -> node -> node * (int, int * int) Map.t
-  end
-end
-
-(* ==================================================================== *)
-(* Lospecs backend implementation *)
-(* ==================================================================== *)
-module LospecsBack : CBackend = struct
+module Backend = struct
   type node = C.node
   type reg = C.node array
   type inp = int * int
@@ -175,8 +43,7 @@ module LospecsBack : CBackend = struct
   let pp_node (fmt : Format.formatter) (n: node) = 
     Format.fprintf fmt "%a" (fun fmt -> Lospecs.Aig.pp_node fmt) n
 
-  exception NonConstantCircuit 
-  exception GetOutOfRange 
+  exception GetOutOfRange
   exception BadSlice of [`Get | `Set]
 
   let true_ = C.true_
@@ -429,7 +296,6 @@ end
 (* ==================================================================== *)
 (* Circuit interface, built directly on the lospecs backend.            *)
 (* ==================================================================== *)
-module Backend = LospecsBack
   (* -------------------------------------------------------------------- *)
   (* Module Types *)
   (* -------------------------------------------------------------------- *)
@@ -1104,13 +970,10 @@ module Backend = LospecsBack
     ) args inps 
     in
     match circuit_compose c args with
-    | {reg = r; type_ = CBitstring _}, [] -> 
-      begin try 
-        Some (if sign 
+    | {reg = r; type_ = CBitstring _}, [] ->
+      Some (if sign
         then Backend.szint_of_reg r
         else Backend.uzint_of_reg r)
-      with Backend.NonConstantCircuit -> None
-      end
     | _, _::_ -> assert false (* Should not happen *)
     | _ -> assert false (* Should not happen *)
 
