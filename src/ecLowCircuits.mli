@@ -11,9 +11,6 @@ open EcMemory
    plumbing are intentionally hidden. *)
 
 (* -------------------------------------------------------------------- *)
-(* The backend's flattened circuit register (opaque). *)
-type flatcirc
-
 (* The type of a circuit value. *)
 type ctype =
   | CArray of {width: int; count: int}
@@ -24,28 +21,30 @@ type ctype =
 val cbool : ctype
 
 (* A circuit input. *)
-type cinp = {
+type cinput = {
   type_ : ctype;
   id    : int;
   name  : string;  (* source-level name, for counter-model display *)
 }
 
-(* A circuit: a register together with its type. *)
-type circ = {
-  reg   : flatcirc;
+(* A closed circuit value: a register together with its type. *)
+type cval = {
+  reg   : Lospecs.Circuit.reg;
   type_ : ctype;
 }
 
-(* A circuit function: a value together with its open inputs. *)
-type 'a cfun = 'a * (cinp list)
-type circuit = circ cfun
+(* A circuit: a value together with its open inputs. *)
+type circuit = {
+  cval   : cval;
+  inputs : cinput list;
+}
 
 (* A satisfying assignment read back from the SMT solver: one value per
    input it materialized, as (id, value) pairs. The queries below return
    it lazily. *)
 type model = (int * string) list
 
-val pp_flatcirc : Format.formatter -> flatcirc -> unit
+val pp_reg : Format.formatter -> Lospecs.Circuit.reg -> unit
 
 (* -------------------------------------------------------------------- *)
 (* Arguments to (parametric) circuit operators. *)
@@ -78,7 +77,7 @@ val update_state   : state -> ident -> circuit -> state
 val state_get_opt  : state -> ident -> circuit option
 val state_get      : state -> ident -> circuit
 val state_bindings : state -> (ident * circuit) list
-val state_lambdas  : state -> cinp list
+val state_lambdas  : state -> cinput list
 val state_is_closed : state -> bool
 val state_close_circuit : state -> circuit -> circuit
 val map_state_var  : (ident -> circuit -> circuit) -> state -> state
@@ -92,13 +91,17 @@ val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> circuit) ->
 
 (* -------------------------------------------------------------------- *)
 (* Operator translation. *)
-val bvget : circuit -> int -> circuit
-val circuit_of_bvop : EcDecl.crb_bvoperator -> circuit
-val circuit_of_parametric_bvop : EcDecl.crb_bvoperator -> arg list -> circuit
+module BVOps : sig
+  val bvget : circuit -> int -> circuit
+  val circuit_of_bvop : EcDecl.crb_bvoperator -> circuit
+  val circuit_of_parametric_bvop : EcDecl.crb_bvoperator -> arg list -> circuit
+end
 
-val array_get     : circuit -> int -> circuit
-val array_set     : circuit -> int -> circuit -> circuit
-val array_oflist  : circuit list -> circuit -> int -> circuit
+module ArrayOps : sig
+  val array_get    : circuit -> int -> circuit
+  val array_set    : circuit -> int -> circuit -> circuit
+  val array_oflist : circuit list -> circuit -> int -> circuit
+end
 
 (* -------------------------------------------------------------------- *)
 (* Circuit type utilities *)
@@ -108,16 +111,16 @@ val can_convert_input_type : ctype -> ctype -> bool
 
 (* Pretty printers *)
 val pp_ctype   : Format.formatter -> ctype -> unit
-val pp_cinp    : Format.formatter -> cinp -> unit
-val pp_circ    : Format.formatter -> circ -> unit
+val pp_cinput    : Format.formatter -> cinput -> unit
+val pp_cval    : Format.formatter -> cval -> unit
 val pp_circuit : Format.formatter -> circuit -> unit
 
 (* General utilities *)
-val circ_of_zint    : size:int -> zint -> circ
+val cval_of_zint    : size:int -> zint -> cval
 val circuit_of_zint : size:int -> zint -> circuit
 
 (* Construct an input *)
-val new_input_circuit : ?name:[`Str of string | `Idn of ident] -> ctype -> circ * cinp
+val new_input_circuit : ?name:[`Str of string | `Idn of ident] -> ctype -> cval * cinput
 val input_of_ctype    : ?name:[`Str of string | `Idn of ident] -> ctype -> circuit
 
 (* Aggregation functions *)

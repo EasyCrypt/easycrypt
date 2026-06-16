@@ -129,7 +129,7 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 *)
 
   EcEnv.notify env `Debug "In the context of the following bindings in the environment:@\n%a@\n"
-  (EcPrinting.pp_list "@\n@\n" (fun fmt cinp -> Format.fprintf fmt "%a@." pp_cinp cinp)) (state_lambdas st);
+  (EcPrinting.pp_list "@\n@\n" (fun fmt cinput -> Format.fprintf fmt "%a@." pp_cinput cinput)) (state_lambdas st);
   st, cs
 
 let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bool =

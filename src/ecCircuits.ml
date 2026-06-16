@@ -58,7 +58,8 @@ let check_with_model
    the counter-model. *)
 let model_names (cs : circuit list) : (int * string) list =
   List.concat_map
-    (fun (_, inps) -> List.map (fun (i : cinp) -> (i.id, i.name)) inps)
+    (fun (c : circuit) ->
+      List.map (fun (i : cinput) -> (i.id, i.name)) c.inputs)
     cs
 
 (* -------------------------------------------------------------------- *)
@@ -228,7 +229,7 @@ module BVOps = struct
         | None -> circ_error (MissingOpBinding p)
       end
     in
-    circuit_of_parametric_bvop op args
+    EcLowCircuits.BVOps.circuit_of_parametric_bvop op args
 
   let circuit_of_bvop
       (env : env)
@@ -242,7 +243,7 @@ module BVOps = struct
         | None -> circ_error (MissingOpBinding p)
       end
     in
-    circuit_of_bvop op
+    EcLowCircuits.BVOps.circuit_of_bvop op
 end
 
 open BVOps
@@ -305,15 +306,15 @@ module ArrayOps = struct
     | _arr, `ToList -> assert false (* We do not translate this to circuit *)
     | _arr, `Get -> begin
       match args with
-      | [`Circuit (({type_ = CArray _}, _inps) as arr); `Constant i] ->
-        array_get arr (BI.to_int i)
+      | [`Circuit ({cval = {type_ = CArray _; _}; _} as arr); `Constant i] ->
+        EcLowCircuits.ArrayOps.array_get arr (BI.to_int i)
       | _args ->
         assert
           false (* Should be caught by EC typechecking + binding correctness *)
     end
     | {size = _, Some size}, `OfList -> begin
       match args with
-      | [`Circuit dfl; `List cs] -> array_oflist cs dfl size
+      | [`Circuit dfl; `List cs] -> EcLowCircuits.ArrayOps.array_oflist cs dfl size
       | _args ->
         assert
           false (* Should be caught by EC typechecking + binding correctness *)
@@ -323,11 +324,11 @@ module ArrayOps = struct
     | _arr, `Set -> begin
       match args with
       | [
-       `Circuit (({type_ = CArray _}, _) as arr);
+       `Circuit ({cval = {type_ = CArray _; _}; _} as arr);
        `Constant i;
-       `Circuit (({type_ = CBitstring _}, _) as bs);
+       `Circuit ({cval = {type_ = CBitstring _; _}; _} as bs);
       ] ->
-        array_set arr (BI.to_int i) bs
+        EcLowCircuits.ArrayOps.array_set arr (BI.to_int i) bs
       | _args ->
         assert
           false (* Should be caught by EC typechecking + binding correctness *)
