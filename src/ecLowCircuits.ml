@@ -495,8 +495,6 @@ module type CircuitInterface = sig
     val open_circ_lambda_pv  : state -> ((memory * symbol) * ctype) list -> state
     val close_circ_lambda : state -> state 
     val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> circuit) -> circuit
-
-    val log : state -> string -> unit
   end
 
   module BVOps : sig

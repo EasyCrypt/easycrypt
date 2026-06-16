@@ -531,10 +531,8 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
           arg_of_circuits cs
   
       | _ ->
-        EcLowCircuits.log st
-        @@ Format.asprintf "Failed to convert form to arg: %a@."
-             EcPrinting.(pp_form ppe)
-             f;
+        EcEnv.notify env `Debug "Failed to convert form to arg: %a@."
+          EcPrinting.(pp_form ppe) f;
         circ_error (BadFormForArg f)
     with CircError e -> propagate_circ_error (`ToArg f) e
 
