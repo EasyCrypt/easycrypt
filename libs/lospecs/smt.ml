@@ -61,7 +61,7 @@ module type SMTInterface = sig
   type ctx
 
   val create : unit -> ctx
-  val equiv : ctx -> reg -> reg -> node -> bool
+  val equiv : ctx -> Circuit.reg -> Circuit.reg -> node -> bool
   val sat : ctx -> node -> bool
   val valid : ctx -> node -> bool
   val model : ctx -> (int * string) list
@@ -147,17 +147,17 @@ module MakeSMTInterface (SMT : SMTInstance) : SMTInterface = struct
     in
     fun (n : Aig.node) -> doit n
 
-  let equiv (ctx : ctx) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool
+  let equiv (ctx : ctx) (r1 : Circuit.reg) (r2 : Circuit.reg) (pcond : Aig.node) : bool
       =
-    assert (Array.length r1 = Array.length r2);
-    assert (Array.length r1 > 0);
-    assert (Array.length r2 > 0);
+    assert (Circuit.Reg.length r1 = Circuit.Reg.length r2);
+    assert (Circuit.Reg.length r1 > 0);
+    assert (Circuit.Reg.length r2 > 0);
 
     let bvterm_of_node = bvterm_of_node ctx in
 
-    let bvterm_of_reg (r : Aig.reg) : _ =
-      Array.map bvterm_of_node r
-      |> Array.reduce (fun acc b -> SMT.bvterm_concat b acc)
+    let bvterm_of_reg (r : Circuit.reg) : _ =
+      List.map bvterm_of_node (Circuit.Reg.to_list r)
+      |> List.reduce (fun acc b -> SMT.bvterm_concat b acc)
     in
 
     let bvinpt1 = bvterm_of_reg r1 in

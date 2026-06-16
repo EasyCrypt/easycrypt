@@ -2,6 +2,34 @@
 open Aig
 
 (* ==================================================================== *)
+(* A register: a bit-vector of AIG nodes. The representation is hidden so
+   that registers cannot be mutated or rebuilt in place; use [Reg] (and the
+   bit-vector combinators further down). *)
+type reg
+
+module Reg : sig
+  val length    : reg -> int
+  val get       : reg -> int -> node
+  val extract   : reg -> int -> int -> reg          (* [extract r off len] *)
+  val split_at  : int -> reg -> reg * reg
+  val singleton : node -> reg
+  val make      : int -> node -> reg
+  val init      : int -> (int -> node) -> reg
+  val append    : reg -> reg -> reg
+  val concat    : reg list -> reg
+  val map2      : (node -> node -> node) -> reg -> reg -> reg
+  val fold_left : ('a -> node -> 'a) -> 'a -> reg -> 'a
+  val to_list   : reg -> node list
+  val of_list   : node list -> reg
+  val to_array  : reg -> node array                 (* fresh copy *)
+  val of_array  : node array -> reg                 (* fresh copy *)
+  val explode   : size:int -> reg -> reg list
+
+  (* Rewrite the inputs of every node of a register ([None] keeps an input). *)
+  val maps : (var -> node option) -> reg -> reg
+end
+
+(* ==================================================================== *)
 val log2 : int -> int
 
 (* ==================================================================== *)
@@ -74,9 +102,9 @@ val lxor_ : reg -> reg -> reg
 
 val lxnor_ : reg -> reg -> reg
 
-val ors : node array -> node
+val ors : reg -> node
 
-val ands : node array -> node
+val ands : reg -> node
 
 (* ==================================================================== *)
 val arshift : offset:int -> reg -> reg

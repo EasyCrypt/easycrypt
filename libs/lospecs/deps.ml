@@ -37,8 +37,8 @@ let rec dep : _ -> tdeps =
       aout
 
 (* -------------------------------------------------------------------- *)
-let deps (n: reg) : tdeps array = 
-  Array.map dep n 
+let deps (n: Circuit.reg) : tdeps array =
+  Array.of_list (List.map dep (Circuit.Reg.to_list n))
 
 (* -------------------------------------------------------------------- *)
 let merge_deps (d1: tdeps) (d2: tdeps) : tdeps = 

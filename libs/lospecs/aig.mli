@@ -20,8 +20,6 @@ and node = private {
   neg  : node;
 }
 
-type reg = node array
-
 (* -------------------------------------------------------------------- *)
 (* Leaves and constants. *)
 val false_   : node
@@ -39,10 +37,9 @@ val xor  : node -> node -> node
 val xnor : node -> node -> node
 
 (* -------------------------------------------------------------------- *)
-(* [map env] / [maps env] rewrite the inputs of a node / register, [env]
-   giving the replacement node for an input (or [None] to keep it). *)
+(* [map env] rewrites the inputs of a node, [env] giving the replacement
+   node for an input (or [None] to keep it). *)
 val map  : (var -> node option) -> node -> node
-val maps : (var -> node option) -> reg -> reg
 
 (* -------------------------------------------------------------------- *)
 (* [get_bit b i] is bit [i] (little-endian) of the byte buffer [b]. *)

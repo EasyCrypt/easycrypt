@@ -15,7 +15,7 @@ module BWZ : sig
 
   (* [equiv ctx r1 r2 pcond] is [true] iff [r1] and [r2] agree on every
      input satisfying the 1-bit precondition [pcond]. *)
-  val equiv : ctx -> Aig.reg -> Aig.reg -> Aig.node -> bool
+  val equiv : ctx -> Circuit.reg -> Circuit.reg -> Aig.node -> bool
 
   val sat   : ctx -> Aig.node -> bool
   val valid : ctx -> Aig.node -> bool

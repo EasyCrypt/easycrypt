@@ -11,7 +11,7 @@ type tdeps = (int, int Set.t) Map.t
 (* [dep n] / [deps r] are the dependencies of a node / of each output bit
    of a register. *)
 val dep  : Aig.node -> tdeps
-val deps : Aig.reg -> tdeps array
+val deps : Circuit.reg -> tdeps array
 
 (* [merge_deps d1 d2] is the pointwise union of [d1] and [d2]: each input
    variable maps to the union of its bit-sets in the two. Use it to pool

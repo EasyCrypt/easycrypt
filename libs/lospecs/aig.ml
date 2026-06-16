@@ -17,9 +17,6 @@ and node = {
 }
 
 (* -------------------------------------------------------------------- *)
-type reg = node array
-
-(* -------------------------------------------------------------------- *)
 module HCons : sig
   val hashcons : node_r -> node
 
@@ -162,10 +159,6 @@ let map (env : var -> node option) : node -> node =
       and_ (doit n1) (doit n2)
 
   in fun (n : node) -> doit n
-
-(* -------------------------------------------------------------------- *)
-let maps (env : var -> node option) : reg -> reg =
-  fun r -> Array.map (map env) r
 
 (* -------------------------------------------------------------------- *)
 let get_bit (b : bytes) (i : int) =

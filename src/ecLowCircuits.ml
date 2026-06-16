@@ -21,50 +21,40 @@ module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
   include Lospecs.Specifications
-  type reg = node array
   type inp = int * int
   type model = (int * string) list
 
-  let pp_node (fmt : Format.formatter) (n: node) = 
+  let pp_node (fmt : Format.formatter) (n: node) =
     Format.fprintf fmt "%a" (fun fmt -> Lospecs.Aig.pp_node fmt) n
 
   exception GetOutOfRange
   exception BadSlice of [`Get | `Set]
 
   let nodes_eq ({id=id1; _}: node) ({id=id2; _}: node) = id1 = id2
-  let size_of_reg = Array.length
+  let size_of_reg = Reg.length
 
-  let node_array_of_reg : reg -> node array = fun x -> x
+  let node_array_of_reg : reg -> node array = Reg.to_array
+  let node_list_of_reg  : reg -> node list  = Reg.to_list
+  let reg_of_node_list  : node list -> reg  = Reg.of_list
+  let reg_of_node_array : node array -> reg = Reg.of_array
+  let reg_of_node       : node -> reg       = Reg.singleton
 
-  let node_list_of_reg : reg -> node list = fun x -> Array.to_list x 
-
-  let reg_of_node_list : node list -> reg = fun x -> Array.of_list x
-
-  let reg_of_node_array : node array -> reg = fun x -> x
-
-  let reg_of_node : node -> reg = fun x -> [| x |]
-  
   (* If this throws it is a programming error *)
-  let node_of_reg : reg -> node = fun x -> x.(0)
+  let node_of_reg : reg -> node = fun r -> Reg.get r 0
 
-  let reg_of_zint ~(size: int) (v: zint) : reg = 
+  let reg_of_zint ~(size: int) (v: zint) : reg =
     of_bigint_all ~size (to_zt v)
 
-    
+  let szint_of_reg (r: reg) : zint =
+    bools_of_reg r |> sbigint_of_bools |> of_zt
 
-  let szint_of_reg (r: reg) : zint = 
-    bools_of_reg r |> sbigint_of_bools |> of_zt 
-
-  let uzint_of_reg (r: reg) : zint = 
+  let uzint_of_reg (r: reg) : zint =
     bools_of_reg r |> ubigint_of_bools |> of_zt
-    
+
   let node_eq (n1: node) (n2: node) = xnor n1 n2
-  let reg_eq (r1: reg) (r2: reg) =
-    Array.fold (fun acc r ->
-      and_ acc r)
-      true_
-      (Array.map2 node_eq r1 r2)
-  let reg_ite (c: node) = Array.map2 (fun t f -> mux2 f t c) 
+  let reg_eq (r1: reg) (r2: reg) = Reg.fold_left and_ true_ (Reg.map2 node_eq r1 r2)
+  let reg_ite (c: node) (r1: reg) (r2: reg) : reg =
+    Reg.map2 (fun t f -> mux2 f t c) r1 r2
 
   let equiv ~(pcond: node) (r1: reg) (r2: reg) : bool * model Lazy.t =
     let ctx = CSMT.BWZ.create () in
@@ -79,56 +69,43 @@ module C = struct
     (CSMT.BWZ.valid ctx n, lazy (CSMT.BWZ.model ctx))
 
   let slice (r: reg) (idx: int) (len: int) : reg =
-    try Array.sub r idx len
+    try Reg.extract r idx len
     with Invalid_argument _ ->
       raise (BadSlice `Get)
 
   let subcirc (r: reg) (outs: int list) : reg =
-    try 
-      List.map (fun i -> r.(i)) outs |> Array.of_list
+    try Reg.of_list (List.map (Reg.get r) outs)
     with Invalid_argument _ ->
       raise (BadSlice `Get)
 
   let insert (r: reg) (idx: int) (r_in: reg) : reg =
     try
-      let ret = Array.copy r in
-      Array.blit r_in 0 ret idx (Array.length r_in);
-      ret
+      let len = Reg.length r_in in
+      Reg.concat [Reg.extract r 0 idx; r_in; Reg.extract r (idx + len) (Reg.length r - idx - len)]
     with Invalid_argument _ ->
       raise (BadSlice `Set)
 
-  let get (r: reg) (idx: int) = 
-    try 
-      r.(idx)
+  let get (r: reg) (idx: int) =
+    try Reg.get r idx
     with Invalid_argument _ ->
       raise GetOutOfRange
 
   let permute (w: int) (perm: int -> int) (r: reg) : reg =
-    Array.init (size_of_reg r) (fun i ->
+    List.init (size_of_reg r) (fun i ->
       let block_idx, bit_idx = perm (i / w), (i mod w) in
-      if block_idx < 0 then None 
-      else
-      let idx = block_idx*w + bit_idx in
-      try
-        Some r.(idx)
-      with Invalid_argument _ ->
-        raise GetOutOfRange
-    ) |> Array.filter_map (fun x -> x)
+      if block_idx < 0 then None
+      else Some (get r (block_idx * w + bit_idx)))
+    |> List.filter_map (fun x -> x)
+    |> Reg.of_list
 
+  let input_of_size ?(offset = 0) ~id (i: int) =
+    Reg.init i (fun i -> input (id, offset + i))
 
-  (* Node operations *)
+  let applys (map_: inp -> node option) : reg -> reg = Reg.maps map_
 
-  let input_of_size ?(offset = 0) ~id (i: int) = Array.init i (fun i -> input (id, offset + i))
-
-
-  let applys (map_: inp -> node option) : reg -> reg =
-    fun r -> Array.map (map map_) r
-
-
-  (* SMTLib Base Ops *)
-  let trunc (r1: reg) (size: int) : reg = Array.sub r1 0 size  
-  let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
-  let flatten (rs: reg list) : reg = Array.concat rs
+  let trunc (r1: reg) (size: int) : reg = Reg.extract r1 0 size
+  let concat (r1: reg) (r2: reg) : reg = Reg.append r1 r2
+  let flatten (rs: reg list) : reg = Reg.concat rs
 end
 
 module CDeps = struct
@@ -229,7 +206,7 @@ module CDeps = struct
       d
 
     let rename_inputs (renamer: (int * int) -> (int * int) option) (r: C.reg) : C.reg =
-      C.maps (fun (id, b) -> 
+      C.Reg.maps (fun (id, b) ->
         Option.map (fun (id, b) -> C.input (id, b)) (renamer (id, b)) 
       ) r 
 

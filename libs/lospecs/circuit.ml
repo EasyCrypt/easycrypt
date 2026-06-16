@@ -57,6 +57,62 @@ let explode (type t) ~(size : int) (r : t array) =
 
 
 (* -------------------------------------------------------------------- *)
+type reg = node array
+
+module Reg = struct
+  let init (n : int) (f : int -> node) : reg =
+    Array.init n f
+
+  let make (n : int) (x : node) : reg =
+    Array.make n x
+
+  let length (r : reg) : int =
+    Array.length r
+
+  let singleton (n : node) : reg =
+    [| n |]
+
+  let get (r : reg) (i : int) : node =
+    r.(i)
+
+  let extract (r : reg) (off : int) (len : int) : reg =
+    Array.sub r off len
+
+  let split_at (n : int) (r : reg) : reg * reg =
+    Array.sub r 0 n, Array.right r (Array.length r - n)
+
+  let append (r1 : reg) (r2 : reg) : reg =
+    Array.append r1 r2
+
+  let concat (rs : reg list) : reg =
+    Array.concat rs
+
+  let map2 (f : node -> node -> node) (r1 : reg) (r2 : reg) : reg =
+    Array.map2 f r1 r2
+
+  let fold_left (f : 'a -> node -> 'a) (a : 'a) (r : reg) : 'a =
+    Array.fold_left f a r
+
+  let to_list (r : reg) : node list =
+    Array.to_list r
+
+  let of_list (l : node list) : reg =
+    Array.of_list l
+
+  let to_array (r : reg) : node array =
+    Array.copy r
+
+  let of_array (a : node array) : reg =
+    Array.copy a
+
+  let explode ~(size : int) (r : reg) : reg list =
+    Array.to_list (explode ~size r)
+
+  let maps (env : var -> node option) : reg -> reg =
+    fun r -> Array.map (map env) r
+end
+
+(* -------------------------------------------------------------------- *)
 let bytes_of_bools (bs : bool array) : bytes =
   let bs = (Array.to_seq (explode ~size:8 bs)) in
   let bs = Seq.map (uint_of_bools %> Char.chr) bs in
@@ -174,11 +230,11 @@ let land_ (r1 : reg) (r2 : reg) : reg =
   Array.map2 and_ r1 r2
 
 (* -------------------------------------------------------------------- *)
-let ors (r : node array) : node =
+let ors (r : reg) : node =
   Array.fold_left or_ false_ r
 
 (* -------------------------------------------------------------------- *)
-let ands (r : node array) : node =
+let ands (r : reg) : node =
   Array.fold_left and_ true_ r
 
 (* -------------------------------------------------------------------- *)
@@ -716,7 +772,7 @@ let compute ?(input_block_size = 16) ?(output_block_size = 16) (r: reg) (inp: in
   let m = (1 lsl input_block_size) - 1 in
   let inp = Array.map (fun i -> i land m) inp in
   let inp = Array.map (of_int ~size:input_block_size) inp |> Array.reduce Array.append in
-  maps (function 
+  Reg.maps (function
     | (0, i) -> Some (inp.(i))
     | _ -> None) r |> bools_of_reg |> explode ~size:output_block_size |> Array.map (uint_of_bools)
 
