@@ -8,35 +8,20 @@ open EcMemory
 (* ==================================================================== *)
 (* Backend bindings (lospecs) and library aliases *)
 (* ==================================================================== *)
-module C = struct
-  include Lospecs.Aig
-  include Lospecs.Circuit
-  include Lospecs.Specifications
-end
-
-module CDeps = struct
-  include Lospecs.Deps
-end
-
-module CSMT = struct
-  include Lospecs.Smt
-end
-
 module Map = Batteries.Map
 module Hashtbl = Batteries.Hashtbl
 module Set = Batteries.Set
 module Option = Batteries.Option
 
-(* Backend implementing minimal functions needed for the translation *)
-(* Minimal expected functionality is QF_ABV *)
-(* Input are: some identifier + some bit *)
+module CSMT = struct
+  include Lospecs.Smt
+end
 
-(* ==================================================================== *)
-(* Register-level helpers over the lospecs backend. *)
-(* ==================================================================== *)
-module Backend = struct
-  type node = C.node
-  type reg = C.node array
+module C = struct
+  include Lospecs.Aig
+  include Lospecs.Circuit
+  include Lospecs.Specifications
+  type reg = node array
   type inp = int * int
   type model = (int * string) list
 
@@ -46,8 +31,8 @@ module Backend = struct
   exception GetOutOfRange
   exception BadSlice of [`Get | `Set]
 
-  let true_ = C.true_
-  let false_ = C.false_
+  let true_ = true_
+  let false_ = false_
   let nodes_eq ({id=id1; _}: node) ({id=id2; _}: node) = id1 = id2
   let size_of_reg = Array.length
 
@@ -65,27 +50,27 @@ module Backend = struct
   let node_of_reg : reg -> node = fun x -> x.(0)
 
   let reg_of_zint ~(size: int) (v: zint) : reg = 
-    C.of_bigint_all ~size (to_zt v)
+    of_bigint_all ~size (to_zt v)
 
   let bool_array_of_reg (r: reg) : bool array = 
-    C.bools_of_reg r
+    bools_of_reg r
     
   let bool_list_of_reg (r: reg) =
-    C.bool_list_of_reg r
+    bool_list_of_reg r
 
   let szint_of_reg (r: reg) : zint = 
-    C.bools_of_reg r |> C.sbigint_of_bools |> of_zt 
+    bools_of_reg r |> sbigint_of_bools |> of_zt 
 
   let uzint_of_reg (r: reg) : zint = 
-    C.bools_of_reg r |> C.ubigint_of_bools |> of_zt
+    bools_of_reg r |> ubigint_of_bools |> of_zt
     
-  let node_eq (n1: node) (n2: node) = C.xnor n1 n2
+  let node_eq (n1: node) (n2: node) = xnor n1 n2
   let reg_eq (r1: reg) (r2: reg) = 
     Array.fold (fun acc r ->
-      C.and_ acc r)
-      C.true_
+      and_ acc r)
+      true_
       (Array.map2 node_eq r1 r2)
-  let node_ite (c: node) (t: node) (f: node) = C.mux2 f t c 
+  let node_ite (c: node) (t: node) (f: node) = mux2 f t c 
   let reg_ite (c: node) = Array.map2 (node_ite c) 
 
   let equiv ~(pcond: node) (r1: reg) (r2: reg) : bool * model Lazy.t =
@@ -139,61 +124,63 @@ module Backend = struct
 
 
   (* Node operations *)
-  let band : node -> node -> node = C.and_
-  let bor : node -> node -> node = C.or_
-  let bxor : node -> node -> node = C.xor
-  let bnot : node -> node = C.neg
-  let bxnor : node -> node -> node = C.xnor
-  let bnand : node -> node -> node = C.nand
-  let bnor : node -> node -> node = fun n1 n2 -> C.neg @@ C.or_ n1 n2 
+  let band : node -> node -> node = and_
+  let bor : node -> node -> node = or_
+  let bxor : node -> node -> node = xor
+  let bnot : node -> node = neg
+  let bxnor : node -> node -> node = xnor
+  let bnand : node -> node -> node = nand
+  let bnor : node -> node -> node = fun n1 n2 -> neg @@ or_ n1 n2 
 
-  let input_node ~id i = C.input (id, i)
-  let input_of_size ?(offset = 0) ~id (i: int) = Array.init i (fun i -> C.input (id, offset + i))
+  let input_node ~id i = input (id, i)
+  let input_of_size ?(offset = 0) ~id (i: int) = Array.init i (fun i -> input (id, offset + i))
 
   let apply (map_: inp -> node option) (n: node) : node= 
-    C.map map_ n
+    map map_ n
 
   let applys (map_: inp -> node option) : reg -> reg =
-    fun r -> Array.map (C.map map_) r
+    fun r -> Array.map (map map_) r
 
   let circuit_from_spec (def: Lospecs.Ast.adef) (args: reg list) : reg = 
-    C.circuit_of_specification args def
+    circuit_of_specification args def
 
   (* SMTLib Base Ops *)
-  let add (r1: reg) (r2: reg) : reg = C.add_dropc r1 r2 
-  let sub (r1: reg) (r2: reg) : reg = C.sub_dropc r1 r2 
-  let opp (r: reg) : reg = C.opp r 
-  let mul (r1: reg) (r2: reg) : reg = C.umull r1 r2 
-  let udiv (r1: reg) (r2: reg) : reg = C.udiv r1 r2 
-  let sdiv (r1: reg) (r2: reg) : reg = C.sdiv r1 r2 
-  let umod (r1: reg) (r2: reg) : reg  = C.umod r1 r2 
-  let smod (r1: reg) (r2: reg) : reg = C.smod r1 r2 
-  let lshl (r1: reg) (r2: reg) : reg = C.shift ~side:`L ~sign:`L r1 r2 
-  let lshr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`L  r1 r2 
-  let ashr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`A  r1 r2 
-  let rol (r1: reg) (r2: reg) : reg = C.rol r1 r2 
-  let ror (r1: reg) (r2: reg) : reg = C.ror r1 r2 
-  let land_ (r1: reg) (r2: reg) : reg = C.land_ r1 r2 
-  let lor_ (r1: reg) (r2: reg) : reg = C.lor_ r1 r2 
-  let lxor_ (r1: reg) (r2: reg) : reg = C.lxor_ r1 r2 
-  let lnot_ (r1: reg) : reg  = C.lnot_ r1 
-  let ult (r1: reg) (r2: reg) : node = C.ugt r2 r1 
-  let slt (r1: reg) (r2: reg) : node = C.sgt r2 r1
-  let ule (r1: reg) (r2: reg) : node = C.uge r2 r1
-  let sle (r1: reg) (r2: reg) : node = C.sge r2 r1
-  let uext (r1: reg) (size: int) : reg = C.uextend ~size r1 
-  let sext (r1: reg) (size: int) : reg = C.sextend ~size r1 
+  let add (r1: reg) (r2: reg) : reg = add_dropc r1 r2 
+  let sub (r1: reg) (r2: reg) : reg = sub_dropc r1 r2 
+  let opp (r: reg) : reg = opp r 
+  let mul (r1: reg) (r2: reg) : reg = umull r1 r2 
+  let udiv (r1: reg) (r2: reg) : reg = udiv r1 r2 
+  let sdiv (r1: reg) (r2: reg) : reg = sdiv r1 r2 
+  let umod (r1: reg) (r2: reg) : reg  = umod r1 r2 
+  let smod (r1: reg) (r2: reg) : reg = smod r1 r2 
+  let lshl (r1: reg) (r2: reg) : reg = shift ~side:`L ~sign:`L r1 r2 
+  let lshr (r1: reg) (r2: reg) : reg = shift ~side:`R ~sign:`L  r1 r2 
+  let ashr (r1: reg) (r2: reg) : reg = shift ~side:`R ~sign:`A  r1 r2 
+  let rol (r1: reg) (r2: reg) : reg = rol r1 r2 
+  let ror (r1: reg) (r2: reg) : reg = ror r1 r2 
+  let land_ (r1: reg) (r2: reg) : reg = land_ r1 r2 
+  let lor_ (r1: reg) (r2: reg) : reg = lor_ r1 r2 
+  let lxor_ (r1: reg) (r2: reg) : reg = lxor_ r1 r2 
+  let lnot_ (r1: reg) : reg  = lnot_ r1 
+  let ult (r1: reg) (r2: reg) : node = ugt r2 r1 
+  let slt (r1: reg) (r2: reg) : node = sgt r2 r1
+  let ule (r1: reg) (r2: reg) : node = uge r2 r1
+  let sle (r1: reg) (r2: reg) : node = sge r2 r1
+  let uext (r1: reg) (size: int) : reg = uextend ~size r1 
+  let sext (r1: reg) (size: int) : reg = sextend ~size r1 
   let trunc (r1: reg) (size: int) : reg = Array.sub r1 0 size  
   let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
   let flatten (rs: reg list) : reg = Array.concat rs
+end
 
-  module Deps = struct
+module CDeps = struct
+  include Lospecs.Deps
     type dep = (int, int Set.t) Map.t
     type deps = dep array
     type block_deps = (int * dep) array
 
-    let dep_of_node = fun n -> CDeps.dep n
-    let deps_of_reg = fun r -> CDeps.deps r
+    let dep_of_node = fun n -> dep n
+    let deps_of_reg = fun r -> deps r
     let block_deps_of_deps (w: int) (d: deps) : block_deps = 
       assert (Array.length d mod w = 0);
       Array.init (Array.length d / w) (fun i ->
@@ -208,7 +195,7 @@ module Backend = struct
         (w, block)
       )
 
-    let block_deps_of_reg (w: int) (r: reg) : block_deps = 
+    let block_deps_of_reg (w: int) (r: C.reg) : block_deps = 
       let deps = deps_of_reg r in
       block_deps_of_deps w deps
 
@@ -240,7 +227,7 @@ module Backend = struct
     let merge_deps (d: deps) : dep =
       match Array.length d with
       | 0 -> Map.empty
-      | _ -> Array.reduce (CDeps.merge_deps) d
+      | _ -> Array.reduce (merge_deps) d
 
     (* Assumes single_dep, returns range (bot, top) such that valid idxs are bot <= i < top *)
     let dep_ranges (d: deps) : (int, int * int) Map.t =
@@ -250,7 +237,7 @@ module Backend = struct
 
     (* Checks that all dependencies of r are in the set inps *)
     (* Each elements of inps is (id, width) *)
-    let check_inputs (r: reg) (inps: (int * int) list) : bool = 
+    let check_inputs (r: C.reg) (inps: (int * int) list) : bool = 
       let ds = deps_of_reg r in
       Array.for_all (fun d -> 
         Map.for_all (fun id b ->
@@ -277,20 +264,19 @@ module Backend = struct
         | None -> true
         | Some bits2 -> Set.is_empty @@ Set.intersect bits1 bits2) d1
 
-    let forall_inputs (check: int -> int -> bool) (r: reg) : bool =
+    let forall_inputs (check: int -> int -> bool) (r: C.reg) : bool =
       let d = deps_of_reg r in
       Array.for_all (fun d -> 
         Map.for_all (fun id bs -> Set.for_all (check id) bs) d) 
       d
 
-    let rename_inputs (renamer: (int * int) -> (int * int) option) (r: reg) : reg =
+    let rename_inputs (renamer: (int * int) -> (int * int) option) (r: C.reg) : C.reg =
       C.maps (fun (id, b) -> 
-        Option.map (fun (id, b) -> input_node ~id b) (renamer (id, b)) 
+        Option.map (fun (id, b) -> C.input_node ~id b) (renamer (id, b)) 
       ) r 
 
-    let excise_bit ?renamings (n: node) : node * (int, int * int) Map.t =
-      CDeps.realign_inputs ?renamings n
-  end
+    let excise_bit ?renamings (n: C.node) : C.node * (int, int * int) Map.t =
+      realign_inputs ?renamings n
 end
 
 (* ==================================================================== *)
@@ -299,7 +285,7 @@ end
   (* -------------------------------------------------------------------- *)
   (* Module Types *)
   (* -------------------------------------------------------------------- *)
-  type flatcirc = Backend.reg
+  type flatcirc = C.reg
   type ctype =
     CArray of {width: int; count: int; }
   | CBitstring of int
@@ -315,7 +301,7 @@ end
   }
   type 'a cfun = 'a * (cinp list)
   type circuit = circ cfun
-  type model = Backend.model
+  type model = C.model
 
   (* -------------------------------------------------------------------- *)
   (* Exceptions *)
@@ -357,13 +343,13 @@ end
   (* -------------------------------------------------------------------- *)
 
   let pp_flatcirc fmt fc = 
-    let r = Backend.node_list_of_reg fc in
+    let r = C.node_list_of_reg fc in
     List.iter (fun n ->
-      Format.fprintf fmt "%a@." Backend.pp_node n
+      Format.fprintf fmt "%a@." C.pp_node n
     ) r
 
   let circ_of_zint ~(size: int) (i: zint) : circ = 
-    {reg = Backend.reg_of_zint ~size i; type_= CBitstring size }
+    {reg = C.reg_of_zint ~size i; type_= CBitstring size }
 
   let circuit_of_zint ~(size: int) (i: zint) : circuit =
     ((circ_of_zint ~size i, []) :> circuit)
@@ -492,7 +478,7 @@ end
       | `Str s -> EcIdent.create s
       in
       { id = name.id_tag; type_ = t; name = EcIdent.name name},
-      ({ reg = Backend.input_of_size ~id:name.id_tag (size_of_ctype t); type_ = t}, [])
+      ({ reg = C.input_of_size ~id:name.id_tag (size_of_ctype t); type_ = t}, [])
         
     (* Circuit lambdas, for managing inputs *)
     let open_circ_lambda (st: state) (bnds: (ident  * ctype) list) : state = 
@@ -535,20 +521,20 @@ end
   let merge_inputs_list (cs: cinp list list) : cinp list =
     List.fold_right (merge_inputs) cs []
 
-  let unify_inputs_renamer (target: cinp list) (inps: cinp list) : Backend.inp -> Backend.node option =
+  let unify_inputs_renamer (target: cinp list) (inps: cinp list) : C.inp -> C.node option =
     let map = List.fold_left2 (fun map inp1 inp2 -> match inp1, inp2 with
       | {type_ = CBitstring w ; id=id_tgt},
         {type_ = CBitstring w'; id=id_orig} when w = w' -> 
-          List.fold_left (fun map i -> Map.add (id_orig, i) (Backend.input_node ~id:id_tgt i) map) 
+          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input_node ~id:id_tgt i) map) 
             map (List.init w (fun i -> i))
       | {type_ = CArray {width=w; count=n}; id=id_tgt},
         {type_ = CArray {width=w'; count=n'}; id=id_orig} when w = w' && n = n' -> 
-          List.fold_left (fun map i -> Map.add (id_orig, i) (Backend.input_node ~id:id_tgt i) map) 
+          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input_node ~id:id_tgt i) map) 
             map (List.init (w*n) (fun i -> i))
       | {type_ = CTuple tys ; id=id_tgt},
         {type_ = CTuple tys'; id=id_orig} when List.for_all2 (=) tys tys' -> 
           let w = List.sum (List.map size_of_ctype tys) in
-          List.fold_left (fun map i -> Map.add (id_orig, i) (Backend.input_node ~id:id_tgt i) map) 
+          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input_node ~id:id_tgt i) map) 
             map (List.init (w) (fun i -> i))
       | _ -> lowcircerror (CircInputUnificationFailure (inp1, inp2))
     ) Map.empty target inps in
@@ -557,7 +543,7 @@ end
   (* Renames circuit2 inputs to match circuit 1 *)
   let unify_inputs (target: cinp list) ((c, inps): circuit) : circ = 
     let map_ = unify_inputs_renamer target inps in
-    {c with reg = Backend.applys map_ c.reg}
+    {c with reg = C.applys map_ c.reg}
 
   let circuit_input_compatible ((c, _): circuit) (cinp: cinp) : bool =
     match c.type_, cinp with
@@ -575,11 +561,11 @@ end
     let idx, ty = List.takedrop i tys in
     let ty = List.hd ty in
     let idx = List.fold_left (+) 0 (List.map size_of_ctype idx) in
-    {reg = (Backend.slice r idx (size_of_ctype ty)); type_ = ty}, inps
+    {reg = (C.slice r idx (size_of_ctype ty)); type_ = ty}, inps
 
   let circuit_tuple_of_circuits (cs: circuit list) : circuit = 
     let tys = (List.map (fun (c : circuit) -> (fst c).type_) cs) in 
-    let circ = Backend.flatten (List.map (fun (c : circuit) -> (fst c).reg) cs) in 
+    let circ = C.flatten (List.map (fun (c : circuit) -> (fst c).reg) cs) in 
     let inps = List.snd cs in
     {reg = circ; type_= CTuple tys}, merge_inputs_list inps
 
@@ -592,7 +578,7 @@ end
       (fun idx ty -> 
         let sz = (size_of_ctype ty) in
         (idx + sz, 
-        ({reg = (Backend.slice tp idx sz); type_ = ty}, tpinps)))
+        ({reg = (C.slice tp idx sz); type_ = ty}, tpinps)))
       0 szs 
 
   (* Convert a circuit's output to a given circuit type *)
@@ -611,9 +597,9 @@ end
   let input_of_ctype ?(name : [`Str of string | `Idn of ident] = `Str "input") (ct: ctype) : circuit =
     let id, nm, c = match name with
     | `Str name -> let id = EcIdent.create name |> tag in
-      id, name, Backend.input_of_size ~id (size_of_ctype ct)
+      id, name, C.input_of_size ~id (size_of_ctype ct)
     | `Idn idn -> let id = idn.id_tag in
-      id, EcIdent.name idn, Backend.input_of_size ~id (size_of_ctype ct)
+      id, EcIdent.name idn, C.input_of_size ~id (size_of_ctype ct)
     in
     { reg = c; type_ = ct; }, [{ id; type_ = ct; name = nm }]
 
@@ -621,23 +607,23 @@ end
     let c, inps = input_of_ctype ~name ty in
     c, List.hd inps
 
-  let circuit_true  = {reg = Backend.reg_of_node Backend.true_; type_ = cbool}, []
-  let circuit_false  = {reg = Backend.reg_of_node Backend.false_; type_ = cbool}, []
+  let circuit_true  = {reg = C.reg_of_node C.true_; type_ = cbool}, []
+  let circuit_false  = {reg = C.reg_of_node C.false_; type_ = cbool}, []
 
   let circuit_and ((c, cinps): circuit) ((d, dinps): circuit) =  
     if c.type_ = d.type_ then
-      { reg = Backend.land_ c.reg d.reg; type_ = c.type_ }, merge_inputs cinps dinps
+      { reg = C.land_ c.reg d.reg; type_ = c.type_ }, merge_inputs cinps dinps
     else
       lowcircerror @@ CircConstructorInvalidArguments And
 
   let circuit_or ((c, cinps): circuit) ((d, dinps): circuit) = 
     if c.type_ = d.type_ then
-      { reg = Backend.lor_ c.reg d.reg; type_ = c.type_ }, merge_inputs cinps dinps
+      { reg = C.lor_ c.reg d.reg; type_ = c.type_ }, merge_inputs cinps dinps
     else
       lowcircerror @@ CircConstructorInvalidArguments Or
 
   let circuit_not ((c, cinps): circuit) =
-    {c with reg = Backend.lnot_ c.reg}, cinps
+    {c with reg = C.lnot_ c.reg}, cinps
 
   let circuit_is_free (f: circuit) : bool = List.is_empty @@ snd f 
 
@@ -647,10 +633,10 @@ end
     | _ -> assert false
     in
     let c = match (fst c).type_ with
-    | CBitstring 1 -> Backend.node_of_reg (fst c).reg
+    | CBitstring 1 -> C.node_of_reg (fst c).reg
     | _ -> assert false
     in
-    let res_r = Backend.reg_ite c (fst t).reg (fst f).reg in
+    let res_r = C.reg_ite c (fst t).reg (fst f).reg in
     match ((fst t).type_, (fst f).type_) with
     | CBitstring nt, CBitstring nf when nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps
     | CArray {width=wt; count=nt}, CArray {width=wf; count=nf} when wt = wf && nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps
@@ -662,7 +648,7 @@ end
     | (CArray _), (CArray _)
     | (CTuple _), (CTuple _)
     | (CBitstring _), (CBitstring _) ->
-      {reg = (Backend.reg_eq (fst c).reg (fst d).reg |> Backend.reg_of_node); type_ = cbool}, merge_inputs (snd c) (snd d)
+      {reg = (C.reg_eq (fst c).reg (fst d).reg |> C.reg_of_node); type_ = cbool}, merge_inputs (snd c) (snd d)
     | _ -> lowcircerror @@ CircConstructorInvalidArguments Eq
 
   (* Ignore types, do extensionally over bits, return the circuits evaluating to the condition *)
@@ -672,10 +658,10 @@ end
     if (size_of_ctype c.type_ <> size_of_ctype d.type_) then 
       lowcircerror @@ CircConstructorInvalidArguments Eqs;
 
-    let cs = Backend.node_list_of_reg c.reg in
-    let ds = Backend.node_list_of_reg d.reg in
+    let cs = C.node_list_of_reg c.reg in
+    let ds = C.node_list_of_reg d.reg in
     List.map2 (fun c d ->
-      let r = Backend.node_eq c d |> Backend.reg_of_node in
+      let r = C.node_eq c d |> C.reg_of_node in
       {reg = r; type_ = cbool}, inps) cs ds
 
     
@@ -697,13 +683,13 @@ end
         match c.type_ with
         | CArray _ | CTuple _ | CBitstring _ ->
           begin try
-            Some (Backend.get c.reg idx)
+            Some (C.get c.reg idx)
           with Invalid_argument _ -> None
           end
       )
     in
     
-    let circ = {(fst c) with reg = Backend.applys map_ (fst c).reg} in
+    let circ = {(fst c) with reg = C.applys map_ (fst c).reg} in
     let inps = merge_inputs_list (List.snd args) in
     (circ, inps)
 
@@ -712,43 +698,43 @@ end
     let c, _ = input_of_ctype ~name:(`Str "uninit") t in
     c, []
 
-  let circ_equiv ?(pcond:circuit option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool * Backend.model Lazy.t =
+  let circ_equiv ?(pcond:circuit option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool * C.model Lazy.t =
     let pcond = Option.map (convert_type cbool) pcond in (* Try to convert to bool *)
     let pcc = match pcond with
     | Some ({reg = b; type_ = CBitstring 1}, pcinps) ->
-        Backend.apply (unify_inputs_renamer inps1 pcinps) (Backend.node_of_reg b)
-    | None -> Backend.true_
+        C.apply (unify_inputs_renamer inps1 pcinps) (C.node_of_reg b)
+    | None -> C.true_
     | _ -> lowcircerror CircEquivNonBoolPCond
     in
     (* This throws, but we let it propagate upwards *)
     let c2 = unify_inputs inps1 (c2, inps2) in
     if (c1.type_ = c2.type_) then
-      Backend.equiv ~pcond:pcc c1.reg c2.reg
+      C.equiv ~pcond:pcc c1.reg c2.reg
     else (false, lazy [])
 
-  let circ_sat ((c, _): circuit) : bool * Backend.model Lazy.t =
+  let circ_sat ((c, _): circuit) : bool * C.model Lazy.t =
     let c = match c with
-    | {type_ = CBitstring 1; reg} -> Backend.node_of_reg reg
+    | {type_ = CBitstring 1; reg} -> C.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
-    Backend.sat c
+    C.sat c
 
-  let circ_valid ((c, _): circuit) : bool * Backend.model Lazy.t =
+  let circ_valid ((c, _): circuit) : bool * C.model Lazy.t =
     let c = match c with
-    | {type_ = CBitstring 1; reg} -> Backend.node_of_reg reg
+    | {type_ = CBitstring 1; reg} -> C.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
-    Backend.valid c
+    C.valid c
 
   (* Inputs mean different things depending on circuit type *)
   (* Allow unaligned slices *)
   let circuit_slice ~(size:int) ((c, inps): circuit) (offset: int) : circuit =
     try 
-      {reg = Backend.slice c.reg offset size; type_ = CBitstring size}, inps
-    with Backend.BadSlice `Get ->
+      {reg = C.slice c.reg offset size; type_ = CBitstring size}, inps
+    with C.BadSlice `Get ->
       lowcircerror @@ CircConstructorInvalidArguments (Slice {
         slice_size = size;
-        bitstring_size = Backend.size_of_reg c.reg;
+        bitstring_size = C.size_of_reg c.reg;
         offset;
       })
     
@@ -756,11 +742,11 @@ end
   (* Does not type check *)
   let circuit_slice_insert ((orig_c, orig_inps): circuit) (idx: int) ((new_c, new_inps): circuit) : circuit = 
     try 
-      { orig_c with reg = (Backend.insert orig_c.reg idx new_c.reg)}, merge_inputs orig_inps new_inps
-    with Backend.BadSlice `Set ->
+      { orig_c with reg = (C.insert orig_c.reg idx new_c.reg)}, merge_inputs orig_inps new_inps
+    with C.BadSlice `Set ->
       lowcircerror @@ CircConstructorInvalidArguments (SliceSet {
-        slice_size = Backend.size_of_reg new_c.reg;
-        bitstring_size = Backend.size_of_reg orig_c.reg;
+        slice_size = C.size_of_reg new_c.reg;
+        bitstring_size = C.size_of_reg orig_c.reg;
         offset = idx;
       })
 
@@ -774,7 +760,7 @@ end
      Implicitly flattens everything to bitstrings
   *)
   let fillet_circuit ((c, inps) : circuit) : circuit list = 
-    let r = c.reg |> Backend.node_list_of_reg in
+    let r = c.reg |> C.node_list_of_reg in
     List.map (fun n ->
       let new_inps = List.map (fun {id=_;type_;name} ->
         {id=EcIdent.create "_" |> tag; type_; name}) inps
@@ -785,14 +771,14 @@ end
       |> List.to_seq |> Map.of_seq 
       in
       let renamings = fun v -> Map.find_opt v renamings in
-      let n', shifts = Backend.Deps.excise_bit ~renamings n in
+      let n', shifts = CDeps.excise_bit ~renamings n in
 
       let new_inps = List.filter_map (fun {id;name;_} ->
         match Map.find_opt id shifts with
         | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1); name}
         | None -> None
       ) new_inps in
-      { reg = Backend.reg_of_node n';
+      { reg = C.reg_of_node n';
         type_ = cbool },
       new_inps
     ) r
@@ -818,7 +804,7 @@ end
     let checks = if sort then begin 
 
     let checks = List.map (fun (c, inps) ->
-      (c, inps), Backend.(Deps.dep_of_node (node_of_reg c.reg))) checks in
+      (c, inps), C.(CDeps.dep_of_node (node_of_reg c.reg))) checks in
     let checks = List.stable_sort (fun (_, d1) (_, d2) ->
       let m1 = (Map.keys d1 |> Set.of_enum |> Set.min_elt_opt) in 
       let m2 = (Map.keys d2 |> Set.of_enum |> Set.min_elt_opt) in 
@@ -836,19 +822,19 @@ end
     checks 
     end else
       List.map (fun c ->
-        c, Backend.(Deps.dep_of_node (node_of_reg (fst c).reg))) checks
+        c, C.(CDeps.dep_of_node (node_of_reg (fst c).reg))) checks
     in
 
-    let rec doit (acc: circuit list) (cur, d: circuit * Backend.Deps.dep) (cs: (circuit * Backend.Deps.dep) list) : circuit list =
+    let rec doit (acc: circuit list) (cur, d: circuit * CDeps.dep) (cs: (circuit * CDeps.dep) list) : circuit list =
       match cs with 
       | [] -> (cur::acc)
       | (c, d')::cs ->
         begin match mode with
-          | `ByEq when Backend.Deps.deps_equal d d' -> 
+          | `ByEq when CDeps.deps_equal d d' -> 
             doit acc ((circuit_and cur c), d) cs
-          | `BySub when Backend.Deps.(dep_contained d d') -> 
+          | `BySub when CDeps.(dep_contained d d') -> 
             doit acc ((circuit_and cur c), d') cs
-          | `BySub when Backend.Deps.(dep_contained d' d) ->
+          | `BySub when CDeps.(dep_contained d' d) ->
             doit acc ((circuit_and cur c), d) cs
           | _ ->
             doit (cur::acc) (c, d') cs
@@ -860,13 +846,13 @@ end
     | c::cs -> doit [] c cs
 
    
-  let attach_compatible_pres ?(mode: [`Cont | `Eq | `Int] = `Cont) (pres: (circuit * Backend.Deps.dep) list) ((post_circ, _) as post: circuit) : circuit =
-    let d = Backend.(Deps.dep_of_node (node_of_reg post_circ.reg)) in
+  let attach_compatible_pres ?(mode: [`Cont | `Eq | `Int] = `Cont) (pres: (circuit * CDeps.dep) list) ((post_circ, _) as post: circuit) : circuit =
+    let d = C.(CDeps.dep_of_node (node_of_reg post_circ.reg)) in
     let compat_pres = List.filteri (fun _i (_c, pre_dep) ->
       match mode with
-      | `Cont -> Backend.Deps.dep_contained pre_dep d
-      | `Eq -> Backend.Deps.deps_equal pre_dep d
-      | `Int -> Backend.Deps.deps_intersect pre_dep d
+      | `Cont -> CDeps.dep_contained pre_dep d
+      | `Eq -> CDeps.deps_equal pre_dep d
+      | `Int -> CDeps.deps_intersect pre_dep d
     ) pres in
     let compat_pres = List.fst compat_pres in
     let pre = List.fold_left circuit_and circuit_true compat_pres in
@@ -874,23 +860,23 @@ end
 
     let sublimate_inputs ((c, cinps): circuit) : circuit = 
     assert (c.type_ = cbool);
-    let node_c = Backend.node_of_reg c.reg in
-    let node_c, shifts = Backend.Deps.excise_bit node_c in
+    let node_c = C.node_of_reg c.reg in
+    let node_c, shifts = CDeps.excise_bit node_c in
     let inps = List.filter_map (fun {id; name; _} ->
       match Map.find_opt id shifts with
       | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1); name}
       | None -> None
     ) cinps in
-    let c = Backend.reg_of_node node_c in
+    let c = C.reg_of_node node_c in
     { reg = c; type_ = cbool}, inps
 
 
   let collapse_lanes (lanes: circuit list) =
     (* Circuit structural equality after renaming *)
     let (===) (c1: circ) (c2: circ) : bool = 
-      let n', _ = Backend.node_of_reg c1.reg |> Backend.Deps.excise_bit in
-      let n, _ = Backend.node_of_reg c2.reg |> Backend.Deps.excise_bit in
-      Backend.nodes_eq n n'
+      let n', _ = C.node_of_reg c1.reg |> CDeps.excise_bit in
+      let n, _ = C.node_of_reg c2.reg |> CDeps.excise_bit in
+      C.nodes_eq n n'
     in
     let rec collapse (acc: circuit list) (cur: circuit) (cs: circuit list) : circuit list = 
       match cs with
@@ -931,7 +917,7 @@ end
   let fillet_tauts (pres: circuit list) (posts: circuit list) : bool =
     (* Assumes everything is single bit outputs. *)
     let posts = List.filter_map (fun ((postc, _) as post) -> 
-      if Backend.nodes_eq (Backend.node_of_reg postc.reg) Backend.true_ then None
+      if C.nodes_eq (C.node_of_reg postc.reg) C.true_ then None
       else Some post
     ) posts in
   
@@ -942,7 +928,7 @@ end
       || (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = cbool) posts)) then
         lowcircerror CircSmtNonBoolCirc;
       let pres = List.map (fun ((c, _) as circ) -> circ,
-        Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
+        CDeps.dep_of_node (C.node_of_reg c.reg)) pres in
       let posts = List.map (attach_compatible_pres ~mode:`Int pres) posts in
       let posts = collapse_lanes posts in
 
@@ -965,26 +951,26 @@ end
     let args = List.map2i (fun i arg inp ->
     match arg, inp with
     | `Circuit c, inp when circuit_input_compatible c inp -> c
-    | `Constant i, {type_ = CBitstring size} -> { reg = (Backend.reg_of_zint ~size i); type_ = CBitstring size}, []
+    | `Constant i, {type_ = CBitstring size} -> { reg = (C.reg_of_zint ~size i); type_ = CBitstring size}, []
     | _ -> lowcircerror @@ CircComputeInvalidArguments i
     ) args inps 
     in
     match circuit_compose c args with
     | {reg = r; type_ = CBitstring _}, [] ->
       Some (if sign
-        then Backend.szint_of_reg r
-        else Backend.uzint_of_reg r)
+        then C.szint_of_reg r
+        else C.uzint_of_reg r)
     | _, _::_ -> assert false (* Should not happen *)
     | _ -> assert false (* Should not happen *)
 
   let circuit_aggregate (cs: circuit list) : circuit =
     let inps = List.snd cs in
     let cs = List.map (fun c -> (fst c).reg) cs in
-    let c = Backend.flatten cs in
+    let c = C.flatten cs in
     let inps = merge_inputs_list inps in
-    {reg = c; type_ = CBitstring (Backend.size_of_reg c)}, inps
+    {reg = c; type_ = CBitstring (C.size_of_reg c)}, inps
 
-  let input_aggregate_renamer (inps: cinp list) : cinp * (Backend.inp -> Backend.node option) =
+  let input_aggregate_renamer (inps: cinp list) : cinp * (C.inp -> C.node option) =
     let new_id = create "aggregated" |> tag in
     let (size, map) = List.fold_left (fun (size, map) inp ->
       match inp with
@@ -1003,16 +989,16 @@ end
       Option.bind base_sz (fun (base, sz) ->
         let idx = bit + base in
         if bit >= 0 && bit < sz then 
-        Some (Backend.input_node ~id:new_id idx)
+        Some (C.input_node ~id:new_id idx)
         else None
       ) 
 
   let circuit_aggregate_inputs ((c, inps): circuit) : circuit =
     let inp, renamer = input_aggregate_renamer inps in
-    {c with reg = Backend.applys renamer c.reg}, [inp]
+    {c with reg = C.applys renamer c.reg}, [inp]
 
   let circuit_from_spec ?(name: symbol option) ((arg_tys, ret_ty) : (ctype list * ctype)) (spec: Lospecs.Ast.adef) : circuit = 
-    let c = Backend.circuit_from_spec spec in
+    let c = C.circuit_from_spec spec in
 
     let name = match name with 
     | Some name -> name ^ "_spec_input"
@@ -1023,7 +1009,7 @@ end
       let nm = name ^ "_" ^ (string_of_int i) in
       let id = EcIdent.create nm |> tag in
       let size : int = size_of_ctype ty in
-      (Backend.input_of_size ~id size, { type_ = ty; id = id; name = nm } )
+      (C.input_of_size ~id size, { type_ = ty; id = id; name = nm } )
       ) arg_tys |> List.split in
     let c = c cinps in
     { reg = c; type_ = ret_ty}, inps 
@@ -1037,8 +1023,8 @@ end
         match c with 
         | {reg; type_ = CBitstring n}, inps when 0 <= i && i < n -> 
           begin try
-            {reg = Backend.reg_of_node (Backend.get reg i); type_ = cbool}, inps
-          with Backend.GetOutOfRange ->
+            {reg = C.reg_of_node (C.get reg i); type_ = cbool}, inps
+          with C.GetOutOfRange ->
             lowcircerror (CircConstructorInvalidArguments (Get {
               bitstring_size = n;
               index = i;
@@ -1094,13 +1080,13 @@ end
             | { type_ = CBitstring _; reg}, inps -> reg, inps 
             | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
             ) 
-          (List.init n (fun i -> {reg = (Backend.slice arr (i*w_i) w_i); type_ = CBitstring w_i}, []))
+          (List.init n (fun i -> {reg = (C.slice arr (i*w_i) w_i); type_ = CBitstring w_i}, []))
           in
           (* Inputs of all components should match after map *)
           if not (List.for_all ((=) (List.hd inps)) inps) then 
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let inps = List.hd inps in
-          let circ = { reg = (Backend.flatten circs); type_ = CArray {width=w_o; count=n}} in  
+          let circ = { reg = (C.flatten circs); type_ = CArray {width=w_o; count=n}} in  
           (circ, inps) 
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
@@ -1115,7 +1101,7 @@ end
           let circs, cinps = List.split @@ List.init n init_f in
           let circs = List.map 
             (function 
-              | {type_ = CBitstring _; reg = r} when Backend.size_of_reg r = w_o -> r 
+              | {type_ = CBitstring _; reg = r} when C.size_of_reg r = w_o -> r 
             (* Invalid type for init component *)
             | _ -> assert false) (* Should be caught by EC typechecking + binding correctness *) 
           circs in
@@ -1123,7 +1109,7 @@ end
           if not (List.for_all ((=) (List.hd cinps)) cinps) then
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let cinps = List.hd cinps in
-          {type_ = CArray {width=w_o; count=n} ; reg = Backend.flatten circs}, cinps 
+          {type_ = CArray {width=w_o; count=n} ; reg = C.flatten circs}, cinps 
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
       | { kind = `Init (_, Some w) } -> 
@@ -1132,7 +1118,7 @@ end
           let circs, cinps = List.split @@ List.init w init_f in
           let circs = List.map 
             (function 
-            | {type_ = CBitstring 1; reg = b} -> Backend.node_of_reg b
+            | {type_ = CBitstring 1; reg = b} -> C.node_of_reg b
             (* Return type should be bool (= bit) for components *)
             | _ -> assert false) (* Should be caught by EC typechecking + binding correctness *)
             circs
@@ -1140,7 +1126,7 @@ end
           if not (List.for_all ((=) (List.hd cinps)) cinps) then
             assert false; (* Should be caught by EC typechecking + binding correctness *)
           let cinps = List.hd cinps in
-          {type_ = CBitstring w; reg = (Backend.reg_of_node_list circs)}, cinps
+          {type_ = CBitstring w; reg = (C.reg_of_node_list circs)}, cinps
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
       | _ -> assert false (* Should not happen because calls should be guarded by call to op_is_parametric_bvop *)
@@ -1151,141 +1137,141 @@ end
       | { kind = `Add (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.add c1 c2 )}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.add c1 c2 )}, [inp1; inp2] 
 
       | { kind = `Sub (_, Some size) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.sub c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.sub c1 c2)}, [inp1; inp2] 
 
       | { kind = `Mul  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.mul c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.mul c1 c2)}, [inp1; inp2] 
 
       | { kind = `Div ((_, Some size), false) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.udiv c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.udiv c1 c2)}, [inp1; inp2] 
 
       | { kind = `Div ((_, Some size), true) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.sdiv c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.sdiv c1 c2)}, [inp1; inp2] 
 
       | { kind = `Rem ((_, Some size), false) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.umod c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.umod c1 c2)}, [inp1; inp2] 
 
       | { kind = `Rem ((_, Some size), true) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.smod c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.smod c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shl  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.lshl c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.lshl c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shr  ((_, Some size), false) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.lshr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.lshr c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shr  ((_, Some size), true) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.ashr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.ashr c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shls  ((_, Some size1), (_, Some size2)) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size2) in
-        {type_ = CBitstring size1; reg = (Backend.lshl c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size1; reg = (C.lshl c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shrs  ((_, Some size1), (_, Some size2), false) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size2) in
-        {type_ = CBitstring size1; reg = (Backend.lshr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size1; reg = (C.lshr c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shrs  ((_, Some size1), (_, Some size2), true) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size2) in
-        {type_ = CBitstring size1; reg = (Backend.ashr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size1; reg = (C.ashr c1 c2)}, [inp1; inp2] 
 
       | { kind = `Rol  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.rol c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.rol c1 c2)}, [inp1; inp2] 
 
       | { kind = `Ror  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.ror c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.ror c1 c2)}, [inp1; inp2] 
 
       | { kind = `And  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.land_ c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.land_ c1 c2)}, [inp1; inp2] 
 
       | { kind = `Or   (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.lor_ c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.lor_ c1 c2)}, [inp1; inp2] 
 
       | { kind = `Xor  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (Backend.lxor_ c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.lxor_ c1 c2)}, [inp1; inp2] 
 
       | { kind = `Not  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
-        {type_ = CBitstring size; reg = (Backend.lnot_ c1)}, [inp1] 
+        {type_ = CBitstring size; reg = (C.lnot_ c1)}, [inp1] 
 
       | { kind = `Opp  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
-        {type_ = CBitstring size; reg = (Backend.opp c1)}, [inp1] 
+        {type_ = CBitstring size; reg = (C.opp c1)}, [inp1] 
 
       | { kind = `Lt ((_, Some size), false) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = Backend.reg_of_node (Backend.ult c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.reg_of_node (C.ult c1 c2)}, [inp1; inp2] 
       
       | { kind = `Lt ((_, Some size), true) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = Backend.reg_of_node (Backend.slt c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.reg_of_node (C.slt c1 c2)}, [inp1; inp2] 
 
       | { kind = `Le ((_, Some size), false) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = Backend.reg_of_node (Backend.ule c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.reg_of_node (C.ule c1 c2)}, [inp1; inp2] 
 
       | { kind = `Le ((_, Some size), true) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = cbool; reg = Backend.reg_of_node (Backend.sle c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = C.reg_of_node (C.sle c1 c2)}, [inp1; inp2] 
 
       | { kind = `Extend ((_, Some size), (_, Some out_size), false) } ->
         (* assert (size <= out_size); *)
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
-        {type_ = CBitstring out_size; reg = (Backend.uext c1 out_size)}, [inp1] 
+        {type_ = CBitstring out_size; reg = (C.uext c1 out_size)}, [inp1] 
 
       | { kind = `Extend ((_, Some size), (_, Some out_size), true) } ->
         (* assert (size <= out_size); *)  
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
-        {type_ = CBitstring out_size; reg = (Backend.sext c1 out_size)}, [inp1] 
+        {type_ = CBitstring out_size; reg = (C.sext c1 out_size)}, [inp1] 
 
       | { kind = `Truncate ((_, Some size), (_, Some out_sz)) } ->
         (* assert (size >= out_sz); *)
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring out_sz; reg = (Backend.trunc c1 out_sz)}, [inp1] 
+        {type_ = CBitstring out_sz; reg = (C.trunc c1 out_sz)}, [inp1] 
 
       | { kind = `Concat ((_, Some sz1), (_, Some sz2), (_, Some szo)) } ->
         (* assert (sz1 + sz2 = szo); *)
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring sz1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring sz2) in
-        {type_ = CBitstring szo; reg = (Backend.concat c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring szo; reg = (C.concat c1 c2)}, [inp1; inp2] 
 
       | { kind = `A2B (((_, Some w), (_, Some n)), (_, Some m))} ->
         (* assert (n * w = m); *)
@@ -1310,8 +1296,8 @@ end
         match c with 
         | ({reg = c; type_ = CArray {width=w; count=n}}, inps) -> 
           begin try
-            { type_ = CBitstring w; reg = (Backend.slice c (i*w) w)}, inps  
-          with Backend.BadSlice `Get ->
+            { type_ = CBitstring w; reg = (C.slice c (i*w) w)}, inps  
+          with C.BadSlice `Get ->
             lowcircerror @@ CircConstructorInvalidArguments (AGet {
               container_size = n;
               index = i;
@@ -1323,9 +1309,9 @@ end
         | (({reg = arr; type_ =  CArray {width=w; count=n}}, inps) : circuit), (({reg = bs; type_ = CBitstring w'}, cinps): circuit) -> 
           begin try
             assert (w = w');
-            { type_ = CArray {width=w; count=n}; reg = (Backend.insert arr (pos * w) bs)},
+            { type_ = CArray {width=w; count=n}; reg = (C.insert arr (pos * w) bs)},
             merge_inputs inps cinps
-          with Backend.BadSlice `Set -> 
+          with C.BadSlice `Set -> 
             lowcircerror @@ CircConstructorInvalidArguments (ASet {
               container_size = n;
               index = pos;
@@ -1344,7 +1330,7 @@ end
             | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
           ) circs
         in
-        { type_ = CArray {width=Backend.size_of_reg (List.hd circs); count=len}; reg = (Backend.flatten circs)}, merge_inputs_list inps 
+        { type_ = CArray {width=C.size_of_reg (List.hd circs); count=len}; reg = (C.flatten circs)}, merge_inputs_list inps 
     end
 include CArgs
 include TranslationState
