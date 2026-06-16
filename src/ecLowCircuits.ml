@@ -930,10 +930,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let circuit_is_free (f: circuit) : bool = List.is_empty @@ snd f 
 
   let circuit_ite ~(c: circuit) ~(t: circuit) ~(f: circuit) : circuit =
-    let strict = true in
     let inps = match c, t, f with
-    | (_, []), (_, []), (_, []) when strict -> []
-    | (_, cinps), (_, tinps), (_, finps) when (not strict) && cinps = tinps && cinps = finps -> cinps
+    | (_, []), (_, []), (_, []) -> []
     | _ -> assert false
     in
     let c = match (fst c).type_ with
