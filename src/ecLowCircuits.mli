@@ -19,7 +19,9 @@ type ctype =
   | CArray of {width: int; count: int}
   | CBitstring of int
   | CTuple of ctype list
-  | CBool
+
+(* Booleans are 1-bit bitstrings; soft constructor [cbool = CBitstring 1]. *)
+val cbool : ctype
 
 (* A circuit input. *)
 type cinp = {

@@ -431,11 +431,11 @@ end
 (* ==================================================================== *)
 module type CircuitInterface = sig
   type flatcirc
-  type ctype = 
+  type ctype =
     CArray of {width: int; count: int}
-  | CBitstring of int 
-  | CTuple of ctype list 
-  | CBool
+  | CBitstring of int
+  | CTuple of ctype list
+  val cbool : ctype
   type cinp = {
     type_ : ctype;
     id   : int;
@@ -588,11 +588,10 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   (* Module Types *)
   (* -------------------------------------------------------------------- *)
   type flatcirc = Backend.reg
-  type ctype = 
-    CArray of {width: int; count: int; } 
-  | CBitstring of int 
-  | CTuple of ctype list 
-  | CBool
+  type ctype =
+    CArray of {width: int; count: int; }
+  | CBitstring of int
+  | CTuple of ctype list
   type circ = {
     reg: flatcirc; 
     type_: ctype; 
@@ -657,20 +656,22 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let circuit_of_zint ~(size: int) (i: zint) : circuit =
     ((circ_of_zint ~size i, []) :> circuit)
 
-  let rec size_of_ctype (t: ctype) : int = 
-    match t with 
+  (* Booleans are 1-bit bitstrings; [cbool] is the soft constructor for
+     building such values (there is no distinct [CBool] constructor). *)
+  let cbool : ctype = CBitstring 1
+
+  let rec size_of_ctype (t: ctype) : int =
+    match t with
     | CBitstring n -> n
     | CArray {width; count} -> width * count
     | CTuple tys -> List.sum (List.map size_of_ctype tys)
-    | CBool -> 1
 
   (* -------------------------------------------------------------------- *)
   (* Pretty printers *)
   (* -------------------------------------------------------------------- *)
   let rec pp_ctype (fmt: Format.formatter) (t: ctype) : unit = 
     match t with
-    | CArray {width; count}  -> Format.fprintf fmt "Array(%d@%d)" count width 
-    | CBool -> Format.fprintf fmt "Bool"
+    | CArray {width; count}  -> Format.fprintf fmt "Array(%d@%d)" count width
     | CTuple szs -> Format.fprintf fmt "Tuple(%a)" (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ") pp_ctype) szs
     | CBitstring w -> Format.fprintf fmt "Bitstring@%d" w
 
@@ -837,9 +838,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           let w = List.sum (List.map size_of_ctype tys) in
           List.fold_left (fun map i -> Map.add (id_orig, i) (Backend.input_node ~id:id_tgt i) map) 
             map (List.init (w) (fun i -> i))
-      | {type_ = CBool; id=id_tgt},
-        {type_ = CBool; id=id_orig} ->
-          Map.add (id_orig, 0) (Backend.input_node ~id:id_tgt 0) map
       | _ -> lowcircerror (CircInputUnificationFailure (inp1, inp2))
     ) Map.empty target inps in
     fun inp -> Map.find_opt inp map
@@ -849,14 +847,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let map_ = unify_inputs_renamer target inps in
     {c with reg = Backend.applys map_ c.reg}
 
-  let circuit_input_compatible ?(strict = false) ((c, _): circuit) (cinp: cinp) : bool =
+  let circuit_input_compatible ((c, _): circuit) (cinp: cinp) : bool =
     match c.type_, cinp with
     | CBitstring n, { type_ = CBitstring n' } when n = n' -> true
     | CArray {width=w; count=n}, { type_ = CArray {width=w'; count=n'}} when w = w' && n = n' -> true
     | CTuple (szs), { type_ = CTuple szs' } when List.all2 (=) szs szs' -> true
-    | CBool, { type_ = CBool } -> true
-    | CBool, { type_ = CBitstring 1 } when not strict -> true
-    | CBitstring 1, { type_ = CBool } when not strict -> true
     | _ -> false
 
   (* Circuit tuples *)
@@ -914,8 +909,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let c, inps = input_of_ctype ~name ty in
     c, List.hd inps
 
-  let circuit_true  = {reg = Backend.reg_of_node Backend.true_; type_ = CBool}, [] 
-  let circuit_false  = {reg = Backend.reg_of_node Backend.false_; type_ = CBool}, [] 
+  let circuit_true  = {reg = Backend.reg_of_node Backend.true_; type_ = cbool}, []
+  let circuit_false  = {reg = Backend.reg_of_node Backend.false_; type_ = cbool}, []
 
   let circuit_and ((c, cinps): circuit) ((d, dinps): circuit) =  
     if c.type_ = d.type_ then
@@ -942,29 +937,22 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | _ -> assert false
     in
     let c = match (fst c).type_ with
-    | CBool -> Backend.node_of_reg (fst c).reg
+    | CBitstring 1 -> Backend.node_of_reg (fst c).reg
     | _ -> assert false
     in
     let res_r = Backend.reg_ite c (fst t).reg (fst f).reg in
     match ((fst t).type_, (fst f).type_) with
     | CBitstring nt, CBitstring nf when nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps
-    | CArray {width=wt; count=nt}, CArray {width=wf; count=nf} when wt = wf && nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps  
-    | CTuple szs_t, CTuple szs_f when List.all2 (=) szs_t szs_f -> {reg = res_r; type_ = (fst t).type_}, inps 
-    | CBool, CBool -> {reg = res_r; type_ = (fst t).type_}, inps
+    | CArray {width=wt; count=nt}, CArray {width=wf; count=nf} when wt = wf && nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps
+    | CTuple szs_t, CTuple szs_f when List.all2 (=) szs_t szs_f -> {reg = res_r; type_ = (fst t).type_}, inps
     | _ -> lowcircerror @@ CircConstructorInvalidArguments Ite
 
   let circuit_eq (c: circuit) (d: circuit) : circuit =  
     match (fst c).type_, (fst d).type_ with
-    | (CArray _), (CArray _) 
-    | (CTuple _), (CTuple _) 
+    | (CArray _), (CArray _)
+    | (CTuple _), (CTuple _)
     | (CBitstring _), (CBitstring _) ->
-      {reg = (Backend.reg_eq (fst c).reg (fst d).reg |> Backend.reg_of_node); type_ = CBool}, merge_inputs (snd c) (snd d)
-    | CBool, CBool ->
-      {reg = (Backend.reg_eq (fst c).reg (fst d).reg |> Backend.reg_of_node); type_ = CBool}, merge_inputs (snd c) (snd d)
-    | CBool, CBitstring 1 ->
-      {reg = (Backend.reg_eq (fst c).reg (fst d).reg |> Backend.reg_of_node); type_ = CBool}, merge_inputs (snd c) (snd d)
-    | CBitstring 1, CBool ->
-      {reg = (Backend.reg_eq (fst c).reg (fst d).reg |> Backend.reg_of_node); type_ = CBool}, merge_inputs (snd c) (snd d)
+      {reg = (Backend.reg_eq (fst c).reg (fst d).reg |> Backend.reg_of_node); type_ = cbool}, merge_inputs (snd c) (snd d)
     | _ -> lowcircerror @@ CircConstructorInvalidArguments Eq
 
   (* Ignore types, do extensionally over bits, return the circuits evaluating to the condition *)
@@ -978,7 +966,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let ds = Backend.node_list_of_reg d.reg in
     List.map2 (fun c d ->
       let r = Backend.node_eq c d |> Backend.reg_of_node in
-      {reg = r; type_ = CBool}, inps) cs ds
+      {reg = r; type_ = cbool}, inps) cs ds
 
     
   let circuit_compose (c: circuit) (args: circuit list) : circuit = 
@@ -997,14 +985,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let circ = Map.find_opt id map in
       Option.bind circ (fun c -> 
         match c.type_ with
-        | CArray _ | CTuple _ | CBitstring _ -> 
+        | CArray _ | CTuple _ | CBitstring _ ->
           begin try
             Some (Backend.get c.reg idx)
-          with Invalid_argument _ -> None 
+          with Invalid_argument _ -> None
           end
-        | CBool when idx = 0 -> Some (Backend.node_of_reg c.reg)
-        | _ -> None
-      ) 
+      )
     in
     
     let circ = {(fst c) with reg = Backend.applys map_ (fst c).reg} in
@@ -1017,9 +1003,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     c, []
 
   let circ_equiv ?(pcond:circuit option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool * Backend.model Lazy.t =
-    let pcond = Option.map (convert_type CBool) pcond in (* Try to convert to bool *)
+    let pcond = Option.map (convert_type cbool) pcond in (* Try to convert to bool *)
     let pcc = match pcond with
-    | Some ({reg = b; type_ = CBool}, pcinps) ->
+    | Some ({reg = b; type_ = CBitstring 1}, pcinps) ->
         Backend.apply (unify_inputs_renamer inps1 pcinps) (Backend.node_of_reg b)
     | None -> Backend.true_
     | _ -> lowcircerror CircEquivNonBoolPCond
@@ -1032,14 +1018,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let circ_sat ((c, _): circuit) : bool * Backend.model Lazy.t =
     let c = match c with
-    | {type_ = CBool; reg} -> Backend.node_of_reg reg
+    | {type_ = CBitstring 1; reg} -> Backend.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
     Backend.sat c
 
   let circ_valid ((c, _): circuit) : bool * Backend.model Lazy.t =
     let c = match c with
-    | {type_ = CBool; reg} -> Backend.node_of_reg reg
+    | {type_ = CBitstring 1; reg} -> Backend.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
     in
     Backend.valid c
@@ -1097,7 +1083,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         | None -> None
       ) new_inps in
       { reg = Backend.reg_of_node n';
-        type_ = CBool },
+        type_ = cbool },
       new_inps
     ) r
 
@@ -1177,7 +1163,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     circuit_or (circuit_not pre) post
 
     let sublimate_inputs ((c, cinps): circuit) : circuit = 
-    assert (c.type_ = CBool);
+    assert (c.type_ = cbool);
     let node_c = Backend.node_of_reg c.reg in
     let node_c, shifts = Backend.Deps.excise_bit node_c in
     let inps = List.filter_map (fun {id; name; _} ->
@@ -1186,7 +1172,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | None -> None
     ) cinps in
     let c = Backend.reg_of_node node_c in
-    { reg = c; type_ = CBool}, inps
+    { reg = c; type_ = cbool}, inps
 
 
   let collapse_lanes (lanes: circuit list) =
@@ -1242,8 +1228,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     match posts with
     | [] -> true
     | posts ->
-      if (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = CBool) pres))
-      || (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = CBool) posts)) then
+      if (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = cbool) pres))
+      || (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = cbool) posts)) then
         lowcircerror CircSmtNonBoolCirc;
       let pres = List.map (fun ((c, _) as circ) -> circ,
         Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
@@ -1302,8 +1288,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { type_ = CTuple tys; id} ->
         let w = List.sum @@ List.map size_of_ctype tys in
         (size + w, Map.add id (size, w) map)
-      | { type_ = CBool; id} ->
-        (size + 1, Map.add id (size, 1) map)
       ) (0, Map.empty) inps
     in
     {type_ = CBitstring size; id=new_id; name = "aggregated"},
@@ -1346,7 +1330,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         match c with 
         | {reg; type_ = CBitstring n}, inps when 0 <= i && i < n -> 
           begin try
-            {reg = Backend.reg_of_node (Backend.get reg i); type_ = CBool}, inps
+            {reg = Backend.reg_of_node (Backend.get reg i); type_ = cbool}, inps
           with Backend.GetOutOfRange ->
             lowcircerror (CircConstructorInvalidArguments (Get {
               bitstring_size = n;
@@ -1441,8 +1425,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           let circs, cinps = List.split @@ List.init w init_f in
           let circs = List.map 
             (function 
-            | {type_ = CBitstring 1; reg = b}
-            | {type_ = CBool; reg = b} -> Backend.node_of_reg b 
+            | {type_ = CBitstring 1; reg = b} -> Backend.node_of_reg b
             (* Return type should be bool (= bit) for components *)
             | _ -> assert false) (* Should be caught by EC typechecking + binding correctness *)
             circs
@@ -1559,22 +1542,22 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { kind = `Lt ((_, Some size), false) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBool; reg = Backend.reg_of_node (Backend.ult c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = Backend.reg_of_node (Backend.ult c1 c2)}, [inp1; inp2] 
       
       | { kind = `Lt ((_, Some size), true) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBool; reg = Backend.reg_of_node (Backend.slt c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = Backend.reg_of_node (Backend.slt c1 c2)}, [inp1; inp2] 
 
       | { kind = `Le ((_, Some size), false) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBool; reg = Backend.reg_of_node (Backend.ule c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = Backend.reg_of_node (Backend.ule c1 c2)}, [inp1; inp2] 
 
       | { kind = `Le ((_, Some size), true) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBool; reg = Backend.reg_of_node (Backend.sle c1 c2)}, [inp1; inp2] 
+        {type_ = cbool; reg = Backend.reg_of_node (Backend.sle c1 c2)}, [inp1; inp2] 
 
       | { kind = `Extend ((_, Some size), (_, Some out_size), false) } ->
         (* assert (size <= out_size); *)
