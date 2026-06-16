@@ -31,8 +31,6 @@ module C = struct
   exception GetOutOfRange
   exception BadSlice of [`Get | `Set]
 
-  let true_ = true_
-  let false_ = false_
   let nodes_eq ({id=id1; _}: node) ({id=id2; _}: node) = id1 = id2
   let size_of_reg = Array.length
 
@@ -52,11 +50,7 @@ module C = struct
   let reg_of_zint ~(size: int) (v: zint) : reg = 
     of_bigint_all ~size (to_zt v)
 
-  let bool_array_of_reg (r: reg) : bool array = 
-    bools_of_reg r
     
-  let bool_list_of_reg (r: reg) =
-    bool_list_of_reg r
 
   let szint_of_reg (r: reg) : zint = 
     bools_of_reg r |> sbigint_of_bools |> of_zt 
@@ -65,13 +59,12 @@ module C = struct
     bools_of_reg r |> ubigint_of_bools |> of_zt
     
   let node_eq (n1: node) (n2: node) = xnor n1 n2
-  let reg_eq (r1: reg) (r2: reg) = 
+  let reg_eq (r1: reg) (r2: reg) =
     Array.fold (fun acc r ->
       and_ acc r)
       true_
       (Array.map2 node_eq r1 r2)
-  let node_ite (c: node) (t: node) (f: node) = mux2 f t c 
-  let reg_ite (c: node) = Array.map2 (node_ite c) 
+  let reg_ite (c: node) = Array.map2 (fun t f -> mux2 f t c) 
 
   let equiv ~(pcond: node) (r1: reg) (r2: reg) : bool * model Lazy.t =
     let ctx = CSMT.BWZ.create () in
@@ -124,50 +117,15 @@ module C = struct
 
 
   (* Node operations *)
-  let band : node -> node -> node = and_
-  let bor : node -> node -> node = or_
-  let bxor : node -> node -> node = xor
-  let bnot : node -> node = neg
-  let bxnor : node -> node -> node = xnor
-  let bnand : node -> node -> node = nand
-  let bnor : node -> node -> node = fun n1 n2 -> neg @@ or_ n1 n2 
 
-  let input_node ~id i = input (id, i)
   let input_of_size ?(offset = 0) ~id (i: int) = Array.init i (fun i -> input (id, offset + i))
 
-  let apply (map_: inp -> node option) (n: node) : node= 
-    map map_ n
 
   let applys (map_: inp -> node option) : reg -> reg =
     fun r -> Array.map (map map_) r
 
-  let circuit_from_spec (def: Lospecs.Ast.adef) (args: reg list) : reg = 
-    circuit_of_specification args def
 
   (* SMTLib Base Ops *)
-  let add (r1: reg) (r2: reg) : reg = add_dropc r1 r2 
-  let sub (r1: reg) (r2: reg) : reg = sub_dropc r1 r2 
-  let opp (r: reg) : reg = opp r 
-  let mul (r1: reg) (r2: reg) : reg = umull r1 r2 
-  let udiv (r1: reg) (r2: reg) : reg = udiv r1 r2 
-  let sdiv (r1: reg) (r2: reg) : reg = sdiv r1 r2 
-  let umod (r1: reg) (r2: reg) : reg  = umod r1 r2 
-  let smod (r1: reg) (r2: reg) : reg = smod r1 r2 
-  let lshl (r1: reg) (r2: reg) : reg = shift ~side:`L ~sign:`L r1 r2 
-  let lshr (r1: reg) (r2: reg) : reg = shift ~side:`R ~sign:`L  r1 r2 
-  let ashr (r1: reg) (r2: reg) : reg = shift ~side:`R ~sign:`A  r1 r2 
-  let rol (r1: reg) (r2: reg) : reg = rol r1 r2 
-  let ror (r1: reg) (r2: reg) : reg = ror r1 r2 
-  let land_ (r1: reg) (r2: reg) : reg = land_ r1 r2 
-  let lor_ (r1: reg) (r2: reg) : reg = lor_ r1 r2 
-  let lxor_ (r1: reg) (r2: reg) : reg = lxor_ r1 r2 
-  let lnot_ (r1: reg) : reg  = lnot_ r1 
-  let ult (r1: reg) (r2: reg) : node = ugt r2 r1 
-  let slt (r1: reg) (r2: reg) : node = sgt r2 r1
-  let ule (r1: reg) (r2: reg) : node = uge r2 r1
-  let sle (r1: reg) (r2: reg) : node = sge r2 r1
-  let uext (r1: reg) (size: int) : reg = uextend ~size r1 
-  let sext (r1: reg) (size: int) : reg = sextend ~size r1 
   let trunc (r1: reg) (size: int) : reg = Array.sub r1 0 size  
   let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
   let flatten (rs: reg list) : reg = Array.concat rs
@@ -272,7 +230,7 @@ module CDeps = struct
 
     let rename_inputs (renamer: (int * int) -> (int * int) option) (r: C.reg) : C.reg =
       C.maps (fun (id, b) -> 
-        Option.map (fun (id, b) -> C.input_node ~id b) (renamer (id, b)) 
+        Option.map (fun (id, b) -> C.input (id, b)) (renamer (id, b)) 
       ) r 
 
     let excise_bit ?renamings (n: C.node) : C.node * (int, int * int) Map.t =
@@ -525,16 +483,16 @@ end
     let map = List.fold_left2 (fun map inp1 inp2 -> match inp1, inp2 with
       | {type_ = CBitstring w ; id=id_tgt},
         {type_ = CBitstring w'; id=id_orig} when w = w' -> 
-          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input_node ~id:id_tgt i) map) 
+          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input (id_tgt, i)) map) 
             map (List.init w (fun i -> i))
       | {type_ = CArray {width=w; count=n}; id=id_tgt},
         {type_ = CArray {width=w'; count=n'}; id=id_orig} when w = w' && n = n' -> 
-          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input_node ~id:id_tgt i) map) 
+          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input (id_tgt, i)) map) 
             map (List.init (w*n) (fun i -> i))
       | {type_ = CTuple tys ; id=id_tgt},
         {type_ = CTuple tys'; id=id_orig} when List.for_all2 (=) tys tys' -> 
           let w = List.sum (List.map size_of_ctype tys) in
-          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input_node ~id:id_tgt i) map) 
+          List.fold_left (fun map i -> Map.add (id_orig, i) (C.input (id_tgt, i)) map) 
             map (List.init (w) (fun i -> i))
       | _ -> lowcircerror (CircInputUnificationFailure (inp1, inp2))
     ) Map.empty target inps in
@@ -702,7 +660,7 @@ end
     let pcond = Option.map (convert_type cbool) pcond in (* Try to convert to bool *)
     let pcc = match pcond with
     | Some ({reg = b; type_ = CBitstring 1}, pcinps) ->
-        C.apply (unify_inputs_renamer inps1 pcinps) (C.node_of_reg b)
+        C.map (unify_inputs_renamer inps1 pcinps) (C.node_of_reg b)
     | None -> C.true_
     | _ -> lowcircerror CircEquivNonBoolPCond
     in
@@ -989,7 +947,7 @@ end
       Option.bind base_sz (fun (base, sz) ->
         let idx = bit + base in
         if bit >= 0 && bit < sz then 
-        Some (C.input_node ~id:new_id idx)
+        Some (C.input (new_id, idx))
         else None
       ) 
 
@@ -998,7 +956,7 @@ end
     {c with reg = C.applys renamer c.reg}, [inp]
 
   let circuit_from_spec ?(name: symbol option) ((arg_tys, ret_ty) : (ctype list * ctype)) (spec: Lospecs.Ast.adef) : circuit = 
-    let c = C.circuit_from_spec spec in
+    let c args = C.circuit_of_specification args spec in
 
     let name = match name with 
     | Some name -> name ^ "_spec_input"
@@ -1137,17 +1095,17 @@ end
       | { kind = `Add (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (C.add c1 c2 )}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.add_dropc c1 c2 )}, [inp1; inp2] 
 
       | { kind = `Sub (_, Some size) } ->
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (C.sub c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.sub_dropc c1 c2)}, [inp1; inp2] 
 
       | { kind = `Mul  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (C.mul c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.umull c1 c2)}, [inp1; inp2] 
 
       | { kind = `Div ((_, Some size), false) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
@@ -1172,32 +1130,32 @@ end
       | { kind = `Shl  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (C.lshl c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.shift ~side:`L ~sign:`L c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shr  ((_, Some size), false) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (C.lshr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.shift ~side:`R ~sign:`L c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shr  ((_, Some size), true) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size) in
-        {type_ = CBitstring size; reg = (C.ashr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size; reg = (C.shift ~side:`R ~sign:`A c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shls  ((_, Some size1), (_, Some size2)) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size2) in
-        {type_ = CBitstring size1; reg = (C.lshl c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size1; reg = (C.shift ~side:`L ~sign:`L c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shrs  ((_, Some size1), (_, Some size2), false) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size2) in
-        {type_ = CBitstring size1; reg = (C.lshr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size1; reg = (C.shift ~side:`R ~sign:`L c1 c2)}, [inp1; inp2] 
 
       | { kind = `Shrs  ((_, Some size1), (_, Some size2), true) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size1) in 
         let {reg = c2;_}, inp2 = new_input_circuit (CBitstring size2) in
-        {type_ = CBitstring size1; reg = (C.ashr c1 c2)}, [inp1; inp2] 
+        {type_ = CBitstring size1; reg = (C.shift ~side:`R ~sign:`A c1 c2)}, [inp1; inp2] 
 
       | { kind = `Rol  (_, Some size) } -> 
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
@@ -1255,12 +1213,12 @@ end
       | { kind = `Extend ((_, Some size), (_, Some out_size), false) } ->
         (* assert (size <= out_size); *)
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
-        {type_ = CBitstring out_size; reg = (C.uext c1 out_size)}, [inp1] 
+        {type_ = CBitstring out_size; reg = (C.uextend ~size:out_size c1)}, [inp1] 
 
       | { kind = `Extend ((_, Some size), (_, Some out_size), true) } ->
         (* assert (size <= out_size); *)  
         let {reg = c1;_}, inp1 = new_input_circuit (CBitstring size) in 
-        {type_ = CBitstring out_size; reg = (C.sext c1 out_size)}, [inp1] 
+        {type_ = CBitstring out_size; reg = (C.sextend ~size:out_size c1)}, [inp1] 
 
       | { kind = `Truncate ((_, Some size), (_, Some out_sz)) } ->
         (* assert (size >= out_sz); *)
