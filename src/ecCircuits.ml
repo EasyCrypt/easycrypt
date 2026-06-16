@@ -956,7 +956,12 @@ let circuit_state_of_memenv
           match ov_name with
           | Some v -> begin
             try Some ((m, v), ctype_of_ty env ov_type)
-            with CircError err -> propagate_circ_error (`Memenv me) err
+            with
+            (* A local of a non-circuit type (e.g. [int]) is not a circuit
+               input; skip it rather than failing the whole translation.
+               Mirrors [circuit_state_of_hyps]. *)
+            | CircError (MissingTyBinding _ | AbstractTyBinding _) -> None
+            | CircError err -> propagate_circ_error (`Memenv me) err
           end
           | None -> None)
         decls
