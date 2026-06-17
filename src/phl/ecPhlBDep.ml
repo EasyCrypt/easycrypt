@@ -8,6 +8,7 @@ open EcFol
 open EcLowCircuits
 open EcCircuits
 open LDecl
+open FApi
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
@@ -16,42 +17,38 @@ module Set = Batteries.Set
 module Option = Batteries.Option
 
 (* -------------------------------------------------------------------- *)
-let int_of_form = EcCircuits.int_of_form
-
-(* FIXME PY: move? V *)
 let form_list_from_iota (hyps : hyps) (f : form) : form list =
-  match f.f_node with
-  | Fapp ({f_node = Fop (p, _)}, [n; m]) when p = EcCoreLib.CI_List.p_iota ->
+  match sform_of_form f with
+  | SFop ((p, _), [n; m]) when EcPath.p_equal p EcCoreLib.CI_List.p_iota ->
     let n = int_of_form hyps n in
     let m = int_of_form hyps m in
     List.init (BI.to_int m) (fun i -> f_int BI.(add n (of_int i)))
   | _ -> raise (DestrError "iota")
 
 let rec form_list_of_form (f : form) : form list =
-  match destr_op_app f with
-  | (pc, _), [h; {f_node = Fop (p, _)}]
-    when pc = EcCoreLib.CI_List.p_cons && p = EcCoreLib.CI_List.p_empty ->
-    [h]
-  | (pc, _), [h; t] when pc = EcCoreLib.CI_List.p_cons ->
+  match sform_of_form f with
+  | SFop ((p, _), []) when EcPath.p_equal p EcCoreLib.CI_List.p_empty -> []
+  | SFop ((p, _), [h; t]) when EcPath.p_equal p EcCoreLib.CI_List.p_cons ->
     h :: form_list_of_form t
   | _ -> raise (DestrError "list")
 
-(* FIXME PY: move? A *)
+(* -------------------------------------------------------------------- *)
+let rec destr_conjunction (hyps : hyps) (f : form) : form list =
+  let redmode = { (circ_red hyps) with zeta = false } in
 
-let rec destr_conj (hyps : hyps) (f : form) : form list =
-  let redmode = {(circ_red hyps) with zeta = false} in
-  (* Head-normalize only: enough to expose the top connective (/\, all, =).
-     The conjuncts' interiors are left to [circuit_of_form], which reduces
-     on demand -- a full [norm_cbv] here re-does that work (and is costly on
-     large equalities, e.g. a Keccak-state postcondition). *)
-  let f = EcReduction.h_red_until redmode hyps f in
-  match sform_of_form f with
-  | SFand (_, (f1, f2)) -> destr_conj hyps f1 @ destr_conj hyps f2
-  | SFop ((p, _), [pred; lst]) when p = EcCoreLib.CI_List.p_all ->
-    let fs = form_list_from_iota hyps lst in
-    List.map (fun farg -> f_app pred [farg] tbool) fs
+  match sform_of_form (EcReduction.h_red_until redmode hyps f) with
+  | SFand (_, (f1, f2)) ->
+    destr_conjunction hyps f1 @ destr_conjunction hyps f2
+
+  | SFop ((p, _), [pred; lst]) when EcPath.p_equal p EcCoreLib.CI_List.p_all -> begin
+    match form_list_from_iota hyps lst with
+    | fs -> List.map (fun farg -> f_app pred [farg] tbool) fs
+    | exception DestrError _ -> [f]
+  end
+
   | _ -> [f]
 
+(* -------------------------------------------------------------------- *)
 (* Should return a list of circuits corresponding to the atomic parts of the pre *)
 (* 
   This means: 
@@ -61,8 +58,6 @@ let rec destr_conj (hyps : hyps) (f : form) : form list =
 (* Returns _open_ circuits *)
 let process_pre ?(st : state option) (tc : tcenv1) (f : form) :
     state * circuit list =
-  let env = FApi.tc1_env tc in
-  let ppe = EcPrinting.PPEnv.ofenv env in
   let hyps = FApi.tc1_hyps tc in
 
   (* Maybe move this to be a parameter and just supply it from outside *)
@@ -74,32 +69,22 @@ let process_pre ?(st : state option) (tc : tcenv1) (f : form) :
 
   (* Takes in a form of the form /\_i f_i 
      and returns a list of the conjunction terms [ f_i ]*)
-  let destr_conj = destr_conj hyps in
 
-  let fs = destr_conj f in
+  let fs = destr_conjunction hyps f in
 
-  EcEnv.notify env `Debug "Destructured conj, obtained:@.%a@."
-    (EcPrinting.pp_list ";@\n" EcPrinting.(pp_form PPEnv.(ofenv env)))
-    fs;
-
-  (* If f is of the form (a_ = a) (aka prog_var = log_var) 
+  (* If f is of the form (a_ = a) (aka prog_var = log_var)
     then add it to the state, otherwise do nothing *)
   (* Processes explicit equations *)
   let process_equality (s : state) (f : form) : state =
     let f = EcCallbyValue.norm_cbv (circ_red hyps) hyps f in
-    match f.f_node with
-    | Fapp ({f_node = Fop (p, _); _}, [a; b]) -> begin
+    match sform_of_form f with
+    | SFeq (a, b) -> begin
       match
-        ( EcFol.op_kind p,
-          EcCallbyValue.norm_cbv (circ_red hyps) hyps a,
+        ( EcCallbyValue.norm_cbv (circ_red hyps) hyps a,
           EcCallbyValue.norm_cbv (circ_red hyps) hyps b )
       with
-      | Some `Eq, {f_node = Fpvar (PVloc pv, m); _}, fv
-      | Some `Eq, fv, {f_node = Fpvar (PVloc pv, m); _} ->
-        EcEnv.notify env `Debug
-          "Adding equality to known information for translation: %a@."
-          EcPrinting.(pp_form PPEnv.(ofenv env))
-          f;
+      | {f_node = Fpvar (PVloc pv, m); _}, fv
+      | fv, {f_node = Fpvar (PVloc pv, m); _} ->
         update_state_pv s m pv (circuit_of_form st hyps fv)
       | _ -> s
     end
@@ -111,9 +96,8 @@ let process_pre ?(st : state option) (tc : tcenv1) (f : form) :
   (* If convertible to circuit then add to precondition conjunction.
      Use state from previous as well *)
   let process_form (f : form) : circuit list =
-    match f.f_node with
-    | Fapp ({f_node = Fop (p, _); _}, [f1; f2]) when EcFol.op_kind p = Some `Eq
-      ->
+    match sform_of_form f with
+    | SFeq (f1, f2) ->
       let c1 =
         circuit_of_form st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f1)
       in
@@ -122,23 +106,11 @@ let process_pre ?(st : state option) (tc : tcenv1) (f : form) :
       in
       circuit_eqs c1 c2
     | _ -> begin
-      EcEnv.notify env `Debug "Processing form: %a@.Simplified version: %a@."
-        EcPrinting.(pp_form ppe)
-        f
-        EcPrinting.(pp_form ppe)
-        (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
       try
         [
           circuit_of_form st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
         ]
-      with e ->
-        begin
-          EcEnv.notify env `Debug
-            "Encountered exception when converting part of the pre to circuit: \
-             %s@."
-            (Printexc.to_string e);
-          []
-        end
+      with _ -> []
     end
   in
 
@@ -146,39 +118,21 @@ let process_pre ?(st : state option) (tc : tcenv1) (f : form) :
     List.fold_left (fun acc f -> List.rev_append (process_form f) acc) [] fs
     |> List.rev
   in
-  (*
-  EcEnv.notify env `Debug "Translated as much as possible from pre to circuits, got:@.%a@\n"
-    (EcPrinting.pp_list "@\n@\n" pp_circuit) cs;
-*)
-
-  EcEnv.notify env `Debug
-    "In the context of the following bindings in the environment:@\n%a@\n"
-    (EcPrinting.pp_list "@\n@\n" (fun fmt cinput ->
-         Format.fprintf fmt "%a@." pp_cinput cinput))
-    (state_lambdas st);
   st, cs
 
+(* -------------------------------------------------------------------- *)
 let solve_post ~(st : state) ~(pres : circuit list) (hyps : hyps) (post : form)
     : bool =
   let env = toenv hyps in
   let lap = EcCircuits.stopwatch env in
-  let destr_conj = destr_conj hyps in
-  let posts = destr_conj post in
+  let posts = destr_conjunction hyps post in
   lap "Done with postcondition normalization (destr_conj)";
   let pres = List.map (state_close_circuit st) pres in
 
   posts |> List.to_seq
   |> Seq.concat_map (fun post ->
-         EcEnv.notify (toenv hyps) `Debug "Translating post: %a@."
-           EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps)))
-           post;
-         match post.f_node with
-         | Fapp ({f_node = Fop (p, _); _}, [f1; f2]) -> begin
-           match EcFol.op_kind p with
-           | Some `Eq -> circuits_of_equality ~st ~hyps f1 f2 |> List.to_seq
-           | _ ->
-             Seq.return (circuit_of_form st hyps post |> state_close_circuit st)
-         end
+         match sform_of_form post with
+         | SFeq (f1, f2) -> circuits_of_equality ~st ~hyps f1 f2 |> List.to_seq
          | _ ->
            Seq.return (circuit_of_form st hyps post |> state_close_circuit st))
   |> List.of_seq
@@ -248,8 +202,6 @@ let t_bdep_solve (tc : tcenv1) =
       assert (ctxt.h_tvar = []);
       let st = circuit_state_of_hyps hyps in
       let cgoal = circuit_of_form st hyps goal |> state_close_circuit st in
-      (* FIXME: make this lazy *)
-      (*       EcEnv.notify env `Debug "goal: %a@." pp_flatcirc (fst cgoal).reg; *)
       if circ_valid cgoal then FApi.close !@tc VBdep
       else
         tc_error (FApi.tc1_penv tc)
@@ -260,6 +212,7 @@ let t_bdep_solve (tc : tcenv1) =
         err
   end
 
+(* -------------------------------------------------------------------- *)
 let t_bdep_simplify (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let goal = FApi.tc1_goal tc in
@@ -281,11 +234,6 @@ let t_bdep_simplify (tc : tcenv1) =
         EcCallbyValue.norm_cbv (circ_red hyps) hyps (POE.lower (hs_po hs)).inv
       in
 
-      EcEnv.notify env `Debug
-        "[W] Post after simplify (before circuit pass):@. %a@."
-        EcPrinting.(pp_form PPEnv.(ofenv env))
-        post;
-
       lap "Done with first simplify";
       let f =
         EcCircuits.circ_simplify_form_bitstring_equality ~st ~pres hyps post
@@ -298,10 +246,6 @@ let t_bdep_simplify (tc : tcenv1) =
           (POE.lift {inv = f; m})
       in
 
-      EcEnv.notify env `Debug "[W] Goal after simplify:@. %a@."
-        EcPrinting.(pp_form PPEnv.(ofenv env))
-        new_goal;
-
       FApi.mutate1 tc (fun _ -> VBdep) new_goal |> FApi.tcenv_of_tcenv1
     with CircError err ->
       tc_error (FApi.tc1_penv tc) "Circuit simplify failed with error: %a"
@@ -310,18 +254,14 @@ let t_bdep_simplify (tc : tcenv1) =
   end
   | _ -> assert false
 
-(* ================ EXTENS TACTIC  ==================== *)
-open FApi
 
+(* -------------------------------------------------------------------- *)
 let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
   (* Find goal shape 
        -> generate one goal for each value
        -> solve goal by applying the tactic
      *)
-  let open EcAst in
   let lap = EcCircuits.stopwatch (tc1_env tc) in
-
-  let solved = ref 0 in
 
   let rec do_all (goals : form list) =
     match goals with
@@ -333,8 +273,6 @@ let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
       | `Success new_tc -> (
         match tc_opened new_tc with
         | [] ->
-          incr solved;
-          (* EcEnv.notify ~immediate:true (tc1_env tc) `Warning "Solved goal %d@." !solved; *)
           do_all goals
         | hd :: _ -> Some (get_pregoal_by_id hd (tc_penv new_tc)).g_concl))
   in
@@ -355,54 +293,38 @@ let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
              let f = ss_inv_of_expr mem e in
              let fi = EcPV.PVM.subst env sb f.inv in
              let fi = EcCallbyValue.norm_cbv redmode hyps fi in
-             let e =
-               try expr_of_ss_inv {f with inv = fi}
-               with CannotTranslate ->
-                 EcEnv.notify env `Debug "Failed on form : %a@."
-                   EcPrinting.(pp_form PPEnv.(ofenv env))
-                   fi;
-                 raise CannotTranslate
-             in
+             let e = expr_of_ss_inv {f with inv = fi} in
              EcCoreModules.i_asgn (lv, e)
            | _ -> raise CannotTranslate)
          s.s_node)
   in
 
   let goals =
-    match (tc1_goal tc).f_node, v with
-    | Fapp ({f_node = Fop (p, [tp]); _}, [fpred; flist]), None
-      when p = EcCoreLib.CI_List.p_all && tp = tint ->
-      EcEnv.notify (tc1_env tc) `Debug "Found list all@.";
+    match sform_of_form (tc1_goal tc), v with
+    | SFop ((p, [tp]), [fpred; flist]), None
+      when EcPath.p_equal p EcCoreLib.CI_List.p_all && tp = tint ->
       begin
-        match flist.f_node with
-        | Fapp ({f_node = Fop (p, []); _}, [fstart; flen])
-          when p = EcCoreLib.CI_List.p_iota ->
+        match sform_of_form flist with
+        | SFop ((p, []), [fstart; flen])
+          when EcPath.p_equal p EcCoreLib.CI_List.p_iota ->
           let start =
-            match fstart.f_node with
-            | Fint i -> EcBigInt.to_int i
+            match sform_of_form fstart with
+            | SFint i -> EcBigInt.to_int i
             | _ -> tc_error (tc1_penv tc) "Iota start should be constant"
           in
 
           let len =
-            match flen.f_node with
-            | Fint i -> EcBigInt.to_int i
+            match sform_of_form flen with
+            | SFint i -> EcBigInt.to_int i
             | _ -> tc_error (tc1_penv tc) "Iota length should be constant"
           in
 
-          let goals =
-            List.init len (fun i ->
-                EcTypesafeFol.f_app (tc1_hyps tc) fpred
-                  [f_int EcBigInt.(of_int (i + start))])
-          in
-
-          EcEnv.notify (tc1_env tc) `Debug "Got iota => [%d, %d)@.Goals: %a@."
-            start len
-            EcPrinting.(pp_list " | " (pp_form PPEnv.(ofenv (tc1_env tc))))
-            goals;
-          goals
+          List.init len (fun i ->
+              EcTypesafeFol.f_app (tc1_hyps tc) fpred
+                [f_int EcBigInt.(of_int (i + start))])
         | _ -> tc_error (tc1_penv tc) "Unsupported List pattern"
       end
-    | FhoareS hs, Some v ->
+    | SFhoareS hs, Some v ->
       if not (POE.is_empty (hs_po hs).hsi_inv) then
         tc_error !!tc "exceptions not supported";
 
@@ -436,7 +358,6 @@ let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
         | _ -> tc_error (tc1_penv tc) "Only finite size bitstring supported"
       in
       let ngoals = 1 lsl size in
-      (*       let ngoals = min ngoals 5 in *)
       List.init ngoals (fun i ->
           let subst =
             EcPV.PVM.(
@@ -449,13 +370,8 @@ let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
           let subst = EcPV.PVM.subst (tc1_env tc) subst in
           let pr = subst (hs_pr hs).inv in
           let po = subst (POE.lower (hs_po hs)).inv in
-          let goal = f_hoareS mt {inv = pr; m} s (POE.lift {inv = po; m}) in
-          EcEnv.notify (FApi.tc1_env tc) `Debug "[W] Generated goal %d => %a@."
-            i
-            EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc)))
-            goal;
-          goal)
-    | _ -> tc_error (tc1_penv tc) "Wrong goal shape@."
+          f_hoareS mt {inv = pr; m} s (POE.lift {inv = po; m}))
+    | _ -> tc_error (tc1_penv tc) "Wrong goal shape"
   in
 
   match do_all goals with
@@ -463,6 +379,6 @@ let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
     lap "Extens";
     close (tcenv_of_tcenv1 tc) VBdep
   | Some gfail ->
-    tc_error (tc1_penv tc) "Failed to close goal:@. %a@."
+    tc_error (tc1_penv tc) "Failed to close goal:@. %a"
       EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc)))
       gfail false
