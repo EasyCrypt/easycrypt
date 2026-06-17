@@ -23,10 +23,6 @@
   markdown
   (pcre2 (>= 8))
   (why3 (and (>= 1.8.0) (< 1.9)))
-  hex
-  iter
-  cmdliner
-  progress
   yojson
   (zarith (>= 1.10))
 ))
