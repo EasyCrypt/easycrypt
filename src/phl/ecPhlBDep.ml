@@ -47,15 +47,11 @@ let rec destr_conj (hyps : hyps) (f : form) : form list =
   match EcReduction.h_red_opt redmode hyps f with
   | Some f -> destr_conj hyps f
   | None -> (
-    match f.f_node with
-    | Fapp ({f_node = Fop (p, _)}, fs) -> begin
-      match EcFol.op_kind p, fs with
-      | Some (`And _), _ -> List.flatten @@ List.map (destr_conj hyps) fs
-      | None, [f; fs] when p = EcCoreLib.CI_List.p_all ->
-        let fs = form_list_from_iota hyps fs in
-        List.map (fun farg -> f_app f [farg] tbool) fs
-      | _ -> [f]
-    end
+    match sform_of_form f with
+    | SFand (_, (f1, f2)) -> destr_conj hyps f1 @ destr_conj hyps f2
+    | SFop ((p, _), [pred; lst]) when p = EcCoreLib.CI_List.p_all ->
+      let fs = form_list_from_iota hyps lst in
+      List.map (fun farg -> f_app pred [farg] tbool) fs
     | _ -> [f])
 
 (* Should return a list of circuits corresponding to the atomic parts of the pre *)
