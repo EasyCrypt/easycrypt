@@ -92,6 +92,15 @@ module Pragmas = struct
 
 end
 
+(* Boolean gstate flags settable in-script via [pragma +name.] / [pragma -name.]
+   and, from the CLI, via [-pragmas +name] (see [apply_pragma_option]). *)
+let gstate_bool_flags = [
+  EcGState.old_mem_restr;
+  EcGState.pp_showtvi;
+  EcGState.circuit_timing;
+  EcGState.circuit_debug_smt;
+]
+
 exception InvalidPragma of string
 
 let apply_pragma (x : string) =
@@ -718,10 +727,7 @@ and process_pragma (scope : EcScope.scope) opt =
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
   match value with
-  | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr
-                  || EcLocation.unloc name = EcGState.pp_showtvi
-                  || EcLocation.unloc name = EcGState.circuit_timing
-                  || EcLocation.unloc name = EcGState.circuit_debug_smt ->
+  | `Bool value when List.mem (EcLocation.unloc name) gstate_bool_flags ->
     let gs = EcEnv.gstate (EcScope.env scope) in
     EcGState.setflag (unloc name) value gs; scope
 
@@ -1002,6 +1008,21 @@ let notify (level : EcGState.loglevel) fmt =
 (* -------------------------------------------------------------------- *)
 let current () =
   (oget !context).ct_current
+
+(* Like [apply_pragma], but also accepts the [+name]/[-name] option form (as on
+   the [pragma +name.] command) for the boolean gstate flags, so they can be set
+   from the CLI via [-pragmas +name]. *)
+let apply_pragma_option (x : string) =
+  let setflag (name : string) (value : bool) =
+    if List.mem name gstate_bool_flags then
+      EcGState.setflag name value (EcScope.gstate (current ()))
+    else
+      raise (InvalidPragma x)
+  in
+  let n = String.length x in
+  if   n > 1 && x.[0] = '+' then setflag (String.sub x 1 (n - 1)) true
+  else if n > 1 && x.[0] = '-' then setflag (String.sub x 1 (n - 1)) false
+  else apply_pragma x
 
 (* -------------------------------------------------------------------- *)
 let uuid () : int =

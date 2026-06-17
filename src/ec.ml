@@ -752,7 +752,7 @@ let main () =
               ~checkmode
               ~checkproof;
             (try
-               List.iter EcCommands.apply_pragma state.prvopts.prvo_pragmas
+               List.iter EcCommands.apply_pragma_option state.prvopts.prvo_pragmas
              with EcCommands.InvalidPragma x ->
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 

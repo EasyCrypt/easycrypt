@@ -73,3 +73,4 @@ val pragma_check   : EcScope.Ax.proofmode -> unit
 exception InvalidPragma of string
 
 val apply_pragma : string -> unit
+val apply_pragma_option : string -> unit
