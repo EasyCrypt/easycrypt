@@ -934,7 +934,7 @@ let collapse_lanes (lanes : circuit list) =
   let rec doit (cs : circuit list) : circuit list =
     match cs with
     | [] -> []
-    | c :: [] -> c :: []
+    | [c] -> [c]
     | c :: cs -> begin
       try
         let idx, _ = List.findi (fun _ c2 -> c.cval === c2.cval) cs in

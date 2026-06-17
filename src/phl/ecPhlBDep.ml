@@ -56,10 +56,10 @@ let rec destr_conj (hyps: hyps) (f: form) : form list =
     | Some (`And _), _ -> List.flatten @@ List.map (destr_conj hyps) fs
     | (None, [f;fs]) when p = EcCoreLib.CI_List.p_all -> 
       let fs = form_list_from_iota hyps fs in
-      List.map (fun farg -> f_app f (farg::[]) tbool) fs
-    | _ -> f::[]
+      List.map (fun farg -> f_app f [farg] tbool) fs
+    | _ -> [f]
   end
-  | _ -> f::[]
+  | _ -> [f]
 
 
 (* Should return a list of circuits corresponding to the atomic parts of the pre *)
@@ -121,7 +121,7 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
       "Processing form: %a@.Simplified version: %a@."
         EcPrinting.(pp_form ppe) f
         EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
-      try (circuit_of_form st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f))::[] with
+      try [circuit_of_form st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f)] with
       e -> begin 
         EcEnv.notify env `Debug "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
         [] end
