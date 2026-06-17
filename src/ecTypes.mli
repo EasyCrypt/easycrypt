@@ -46,7 +46,6 @@ val txint   : ty
 val treal   : ty
 val tdistr  : ty -> ty
 val toption : ty -> ty
-val tlist   : ty -> ty
 val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
 
@@ -55,7 +54,6 @@ val txreal : ty
 
 exception TyDestrError of string
 
-val tfrom_tlist : ty -> ty
 val tfrom_tfun2 : ty -> ty * ty
 
 val tytuple_flat : ty -> ty list

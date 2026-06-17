@@ -73,7 +73,6 @@ let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
 
 let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
 let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
-let tlist ty   = tconstr EcCoreLib.CI_List.p_list     [ty]
 let treal      = tconstr EcCoreLib.CI_Real .p_real    []
 let tcpred ty  = tfun ty tbool
 
@@ -90,11 +89,6 @@ let toarrow dom ty =
   List.fold_right tfun dom ty
 
 exception TyDestrError of string
-
-let tfrom_tlist ty =
-  match ty.ty_node with
-  | Tconstr (p, [ty]) when EcPath.p_equal p EcCoreLib.CI_List.p_list -> ty
-  | _ -> raise (TyDestrError "list") 
 
 let tfrom_tfun2 ty =
   match ty.ty_node with
