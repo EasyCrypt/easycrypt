@@ -1686,6 +1686,12 @@ let check_conv ?ri hyps f1 f2 =
   if is_conv ?ri hyps f1 f2 then ()
   else raise (IncompatibleForm ((LDecl.toenv hyps), (f1, f2)))
 
+let ss_inv_is_conv ?(ri = full_red) hyps (inv1 : ss_inv) (inv2 : ss_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.m inv2.m in
+  let f1 = Fsubst.f_subst subst inv1.inv in
+  let f2 = inv2.inv in
+  is_conv ~ri hyps f1 f2
+
 (* -------------------------------------------------------------------- *)
 let h_red ri hyps f =
   try

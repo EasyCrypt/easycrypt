@@ -111,7 +111,7 @@ let compute_equiv_call_post
   let fpost =
     let s =
       PVM.of_list env
-        [((pv_res, mr), fresr.inv); ((pv_res, ml), fresl.inv)] in    
+        [((pv_res, mr), fresr.inv); ((pv_res, ml), fresl.inv)] in
     PVM.subst env s fpost in
 
   let post =
@@ -247,13 +247,13 @@ let t_ehoare_call_core fpre fpost tc =
   let hyps, env, hs, s, f, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   if not (List.is_empty s.s_node) then
     tc_error !!tc  "ehoare call core rule: only single call statements are accepted";
-  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs) wppost) then
+  if not (EcReduction.ss_inv_is_conv hyps (ehs_po hs) wppost) then
     (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong post-condition %a instead %a"
        (EcPrinting.pp_form ppe) (ehs_po hs).inv (EcPrinting.pp_form ppe) wppost.inv);
 
-  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_pr hs) wppre) then
+  if not (EcReduction.ss_inv_is_conv hyps (ehs_pr hs) wppre) then
     (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong pre-condition %a instead %a"
