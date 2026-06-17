@@ -331,7 +331,73 @@ type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 type select_result = (EcPath.path * ty list) * ty * unienv * sbody option
 
 (* -------------------------------------------------------------------- *)
-let select_op
+type op_failure =
+  | OF_argument of int * ty * ty   (* 1-based index, expected (param), provided (arg) *)
+  | OF_result   of ty * ty         (* operator result type, expected result type *)
+  | OF_arity    of int * int       (* expected arity (at most), provided *)
+
+(* -------------------------------------------------------------------- *)
+(* Constrained type parameters of an operator (those bound while applying it). *)
+type op_instance = (EcIdent.t * ty) list
+
+type select_outcome =
+  | OK of select_result
+  | KO of EcPath.path * op_instance * ty * op_failure
+    (* operator path, partial instantiation, declared operator type, reason *)
+
+(* -------------------------------------------------------------------- *)
+(* [None] if [top] applies to [psig] (and [retty]), updating [ue]; otherwise
+   [Some] of the first argument/result/arity failure. *)
+let classify_application
+   (env  : EcEnv.env)
+   (ue   : unienv)
+   (top  : ty)
+   (psig : ty list)
+   (retty : ty option)
+  : op_failure option
+=
+  let exception Failure_with of op_failure in
+
+  let resolve ty = ty_subst (Tuni.subst (UniEnv.assubst ue)) ty in
+  let whnf ty = EcEnv.ty_hnorm (resolve ty) env in
+
+  let rec peel i cur args =
+    match args with
+    | [] -> begin
+        match retty with
+        | None -> None
+        | Some r ->
+            try  unify env ue cur r; None
+            with UnificationFailure _ ->
+              Some (OF_result (resolve cur, resolve r))
+      end
+
+    | a :: args ->
+        match (whnf cur).ty_node with
+        | Tfun (d, c) ->
+            (try  unify env ue d a
+             with UnificationFailure _ ->
+               raise_notrace (Failure_with (OF_argument (i, resolve d, resolve a))));
+            peel (i+1) c args
+
+        | Tunivar _ ->
+            let d = UniEnv.fresh ue in
+            let c = UniEnv.fresh ue in
+            (try  unify env ue cur (tfun d c)
+             with UnificationFailure _ ->
+               raise_notrace (Failure_with (OF_arity (List.length psig, i-1))));
+            (try  unify env ue d a
+             with UnificationFailure _ ->
+               raise_notrace (Failure_with (OF_argument (i, resolve d, resolve a))));
+            peel (i+1) c args
+
+        | _ ->
+            Some (OF_arity (List.length psig, i-1))
+  in
+    try peel 1 top psig with Failure_with f -> Some f
+
+(* -------------------------------------------------------------------- *)
+let select_op_outcomes
   ?(hidden : bool = false)
   ?(filter : EcPath.path -> operator -> bool = fun _ _ -> true)
    (tvi    : tvar_inst option)
@@ -339,7 +405,7 @@ let select_op
    (name   : qsymbol)
    (ue     : unienv)
    (sig_   : ty list * ty option)
-  : select_result list
+  : select_outcome list
 =
   ignore hidden;                (* FIXME *)
 
@@ -369,33 +435,50 @@ let select_op
   in
 
   let select (path, op) =
-    let module E = struct exception Failure end in
-
     let subue = UniEnv.copy ue in
 
-    try
-      let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
-      let top = ty_subst tip op.D.op_ty in
-      let texpected = tfun_expected subue ?retty psig in
+    let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
+    let top = ty_subst tip op.D.op_ty in
 
-      (try  unify env subue top texpected
-       with UnificationFailure _ -> raise E.Failure);
+    let resolve ty = ty_subst (Tuni.subst (UniEnv.assubst subue)) ty in
 
-      let bd =
-        match op.D.op_kind with
-        | OB_nott nt ->
-           let substnt () =
-             let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
-             let es = e_subst tip in
-             let bd = es nt.D.ont_body in
-             (xs, bd)
-           in Some (Lazy.from_fun substnt)
+    let failure = classify_application env subue top psig retty in
 
-        | _ -> None
+    match failure with
+    | Some f ->
+        let instance =
+          List.combine op.D.op_tparams tvs
+          |> List.filter_map (fun (tp, tv) ->
+               match (resolve tv).ty_node with
+               | Tunivar _ -> None
+               | _         -> Some (tp, resolve tv))
+        in
+        KO (path, instance, op.D.op_ty, f)
+    | None ->
+        let bd =
+          match op.D.op_kind with
+          | OB_nott nt ->
+             let substnt () =
+               let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
+               let es = e_subst tip in
+               let bd = es nt.D.ont_body in
+               (xs, bd)
+             in Some (Lazy.from_fun substnt)
 
-      in Some ((path, tvs), top, subue, bd)
+          | _ -> None
 
-    with E.Failure -> None
+        in OK ((path, tvs), top, subue, bd)
 
   in
-    List.pmap select (EcEnv.Op.all ~check:filter ~name env)
+    List.map select (EcEnv.Op.all ~check:filter ~name env)
+
+(* -------------------------------------------------------------------- *)
+let select_op
+  ?hidden ?filter (tvi : tvar_inst option)
+  (env : EcEnv.env) (name : qsymbol) (ue : unienv)
+  (sig_ : ty list * ty option)
+  : select_result list
+=
+  List.filter_map
+    (function OK r -> Some r | KO _ -> None)
+    (select_op_outcomes ?hidden ?filter tvi env name ue sig_)

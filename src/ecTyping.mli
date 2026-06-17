@@ -20,6 +20,13 @@ type opmatch = [
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg
 ]
 
+(* A failed application candidate, tagged by the kind of entity. *)
+type appcand = [
+  | `Op of EcPath.path * EcUnify.op_instance * EcTypes.ty
+  | `Pv of EcTypes.prog_var * EcTypes.ty
+  | `Lc of EcIdent.t * EcTypes.ty
+]
+
 type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 
 
@@ -152,6 +159,8 @@ type tyerror =
 | NotAnInductive
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
+| UnappliedOp            of qsymbol * ty list * ty option
+                           * (appcand * EcUnify.op_failure) list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
