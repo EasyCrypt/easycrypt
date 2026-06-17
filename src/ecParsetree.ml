@@ -1388,6 +1388,7 @@ type global_action =
 type global = {
   gl_action : global_action located;
   gl_fail   : bool;
+  gl_expect : string located option;   (* [expect fail "…"]: expected error *)
   gl_debug  : [`Timed | `Break] option;
 }
 

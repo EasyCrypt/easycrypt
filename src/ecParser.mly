@@ -3999,11 +3999,17 @@ stop:
 | DROP DOT { }
 
 global:
-| db=debug_global? fail=boption(FAIL) g=global_action ep=FINAL
+| db=debug_global? f=failmode g=global_action ep=FINAL
   { let lc = EcLocation.make $startpos ep in
     { gl_action = EcLocation.mk_loc lc g;
-      gl_fail   = fail;
+      gl_fail   = fst f;
+      gl_expect = snd f;
       gl_debug  = db; } }
+
+%inline failmode:
+| (* empty *)               { (false, None  ) }
+| FAIL                      { (true , None  ) }
+| EXPECT FAIL s=loc(STRING) { (true , Some s) }
 
 debug_global:
 | TIME  { `Timed }
