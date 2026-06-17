@@ -193,7 +193,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
     | Punroll info              -> EcPhlLoopTx.process_unroll info
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
-    | Pcall (side, info)        -> EcPhlCall.process_call side info
+    | Pcall info                -> EcPhlCall.process_call info
     | Pcallconcave info         -> EcPhlCall.process_call_concave info
     | Pswap sw                  -> EcPhlSwap.process_swap sw
     | Pinline info              -> EcPhlInline.process_inline info

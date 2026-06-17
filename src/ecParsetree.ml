@@ -586,18 +586,25 @@ type pswap_kind = {
 
 type interleave_info = oside * (int * int) * ((int * int) list) * int
 
+type pspattern = unit
+
 type pipattern =
   | PtAny
   | PtAsgn  of psymbol list
   | PtIf    of pspattern * [`NoElse | `MaybeElse | `Else of pspattern]
   | PtWhile of pspattern
 
-and pspattern = unit
+type fun_upto_info = {
+  fui_is_ll_variant : bool option;
+  fui_bad : pformula;
+  fui_pre : pformula;
+  fui_pos : pformula option;
+}
 
 type call_info =
   | CI_spec of (pformula * phoare_post)
   | CI_inv of pformula
-  | CI_upto of (pformula * pformula * pformula option)
+  | CI_upto of fun_upto_info
 
 type p_seq_xt_info =
   | PSeqNone
@@ -668,7 +675,7 @@ type fun_info = [
   | `Def
   | `Code
   | `Abs  of pformula
-  | `Upto of pformula * pformula * pformula option
+  | `Upto of fun_upto_info
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -830,7 +837,7 @@ type phltactic =
   | Pfusion        of (oside * pcodepos * (int * (int * int)))
   | Punroll        of (oside * pcodepos * [`While | `For of bool])
   | Psplitwhile    of (pexpr * oside * pcodepos)
-  | Pcall          of oside * call_info gppterm
+  | Pcall          of (oside * call_info gppterm)
   | Pcallconcave   of (pformula * call_info gppterm)
   | Prcond         of (oside * bool * pcodepos1)
   | Prmatch        of (oside * symbol * pcodepos1)

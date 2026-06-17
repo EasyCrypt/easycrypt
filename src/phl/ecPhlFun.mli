@@ -15,12 +15,10 @@ val subst_pre :
   -> EcPV.PVM.subst
 
 (* -------------------------------------------------------------------- *)
-type p_upto_info = pformula * pformula * (pformula option)
-
 val process_fun_def       : FApi.backward
 val process_fun_abs       : pformula -> FApi.backward
-val process_fun_upto_info : p_upto_info -> tcenv1 -> ss_inv * ts_inv * ts_inv
-val process_fun_upto      : p_upto_info -> FApi.backward
+val process_fun_upto_info : fun_upto_info -> tcenv1 -> bool option * ss_inv * ts_inv * ts_inv
+val process_fun_upto      : fun_upto_info -> FApi.backward
 val process_fun_to_code   : FApi.backward
 
 (* -------------------------------------------------------------------- *)
@@ -49,7 +47,7 @@ val t_bdhoareF_fun_def : FApi.backward
 val t_equivF_fun_def   : FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_equivF_abs_upto : ss_inv -> ts_inv -> ts_inv -> FApi.backward
+val t_equivF_abs_upto : bool option -> ss_inv -> ts_inv -> ts_inv -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_fun : inv -> FApi.backward

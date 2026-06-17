@@ -21,6 +21,15 @@
     pty_locality = locality;
   }
 
+  let map_gppterm f a =
+    let fp_head = match a.fp_head with
+      | FPNamed _ as x -> x
+      | FPCut x -> FPCut (f x)
+    in
+    { a with fp_head }
+
+  let apply_gppterm x = map_gppterm (fun f -> f x)
+
   let opdef_of_opbody ty b =
     match b with
     | None            -> PO_abstr ty
@@ -2324,6 +2333,13 @@ intro_pattern:
 | cm=crushmode
    { IPCrush cm }
 
+gpterm_head0(F):
+| p=qident tvi=tvars_app?
+   { (false, FPNamed (p, tvi)) }
+
+| LPAREN exp=iboption(AT) UNDERSCORE? COLON f=F RPAREN
+   { (exp, FPCut f) }
+
 gpterm_head(F):
 | exp=iboption(AT) p=qident tvi=tvars_app?
    { (exp, FPNamed (p, tvi)) }
@@ -2362,7 +2378,7 @@ gpterm_arg:
     { EA_tactic `DoneSmt }
 
 gpterm(F):
-| hd=gpterm_head(F)
+| hd=gpterm_head0(F)
    { mk_pterm (fst hd) (snd hd) [] }
 
 | LPAREN hd=gpterm_head(F) args=loc(gpterm_arg)* RPAREN
@@ -2543,13 +2559,15 @@ conseq_xt:
 
 call_info:
 | f1=form LONGARROW f2=form poe=hoare_epost(none)
-    { CI_spec (f1, { pnormal = f2; pexcept = poe}) }
+    { fun _ -> CI_spec (f1, { pnormal = f2; pexcept = poe}) }
 | f=form
-    { CI_inv  (f) }
-| bad=form COMMA p=form
-    { CI_upto (bad,p,None) }
-| bad=form COMMA p=form COMMA q=form
-    { CI_upto (bad,p,Some q) }
+    { fun _ -> CI_inv  (f) }
+| fui_bad=form COMMA fui_pre=form
+    { fun fui_is_ll_variant ->
+      CI_upto {fui_is_ll_variant; fui_bad; fui_pre; fui_pos = None} }
+| fui_bad=form COMMA fui_pre=form COMMA pos=form
+    { fun fui_is_ll_variant ->
+      CI_upto {fui_is_ll_variant; fui_bad; fui_pre; fui_pos = Some pos} }
 
 icodepos_r:
 | IF       { (`If     :> pcp_match) }
@@ -2655,11 +2673,11 @@ s_codegap1_before_(I):
 | LBRACKET cps=codepos1 DOTDOT cpe=codepos1 RBRACKET
     { (GapBefore cps, GapAfter cpe) }
 
-| LBRACKET cps=codepos1 PLUSGT cpo=loc(mparen(sword)) RBRACKET { 
+| LBRACKET cps=codepos1 PLUSGT cpo=loc(mparen(sword)) RBRACKET {
     if unloc cpo > 0 then begin
         let (offset, base) = cps in
         (GapBefore cps, GapAfter (offset + unloc cpo, base))
-    end else 
+    end else
         parse_error (loc cpo) (Some "cannot give negative offset for codepos range end")
   }
 
@@ -2964,7 +2982,7 @@ eager_tac:
     { Peager_fun_abs f }
 
 | CALL info=gpterm(call_info)
-    { Peager_call info }
+    { Peager_call (apply_gppterm None info) }
 
 form_or_double_form:
 | f=sform
@@ -3042,8 +3060,8 @@ direction:
 | PROC f=sform
    { Pfun (`Abs f) }
 
-| PROC bad=sform p=sform q=sform?
-   { Pfun (`Upto (bad, p, q)) }
+| PROC fui_is_ll_variant=calloptions fui_bad=sform fui_pre=sform fui_pos=sform?
+   { Pfun (`Upto { fui_is_ll_variant; fui_bad; fui_pre; fui_pos }) }
 
 | PROC STAR
    { Pfun `Code }
@@ -3066,11 +3084,11 @@ direction:
 | ASYNC WHILE info=async_while_tac_info
     { Pasyncwhile info }
 
-| CALL s=side? info=gpterm(call_info)
-    { Pcall (s, info) }
+| CALL c=calloptions s=side? info=gpterm(call_info)
+    { Pcall (s, apply_gppterm c info) }
 
 | CALL SLASH fc=sform info=gpterm(call_info)
-    { Pcallconcave (fc,info) }
+    { Pcallconcave (fc, apply_gppterm None info) }
 
 | RCONDT s=side? i=codepos1
     { Prcond (s, true, i) }
@@ -3454,6 +3472,20 @@ caseoption:
 
 %inline caseoptions:
 | AT xs=bracket(caseoption+) { xs }
+
+
+calloption:
+| b=boption(MINUS) x=lident {
+    match unloc x with
+    | "ll" -> (not b)
+    | _ ->
+       parse_error x.pl_loc
+         (Some ("invalid option: " ^ (unloc x) ^ ", [-]ll expected"))
+  }
+
+%inline calloptions:
+| AT b=bracket(calloption) { Some b }
+| { None }
 
 %inline do_repeat:
 | n=word? NOT      { (`All, n) }
