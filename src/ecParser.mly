@@ -377,6 +377,7 @@
 %token ALIAS
 %token AMP
 %token APPLY
+%token ARRAY
 %token AS
 %token ASSUMPTION
 %token ASYNC
@@ -386,6 +387,8 @@
 %token AXIOMATIZED
 %token BACKSLASH
 %token BETA
+%token BITSTRING
+%token BIND
 %token BY
 %token BYEQUIV
 %token BYPHOARE
@@ -394,6 +397,7 @@
 %token BYUPTO
 %token CALL
 %token CASE
+%token CIRCUIT
 %token CBV
 %token CEQ
 %token CFOLD
@@ -441,6 +445,7 @@
 %token EXLIM
 %token EXPECT
 %token EXPORT
+%token EXTENS
 %token FAIL
 %token FEL
 %token FIRST
@@ -653,7 +658,10 @@ _lident:
 | x=LIDENT   { x }
 | ABORT      { "abort"      }
 | ADMITTED   { "admitted"   }
+| ARRAY      { "array"      }
 | ASYNC      { "async"      }
+| BIND       { "bind"       }
+| BITSTRING  { "bitstring"  }
 | DEBUG      { "debug"      }
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
@@ -709,6 +717,7 @@ _lident:
 
 %inline sword:
 |       n=word {  n }
+| PLUS  n=word {  n }
 | MINUS n=word { -n }
 
 (* -------------------------------------------------------------------- *)
@@ -3306,11 +3315,21 @@ direction:
 | PROC REWRITE AT tg=ident f=pterm
     { Pprocrewriteat (tg, f) }
 
+| PROC CHANGE CIRCUIT b=option(bracket(ptybindings)) o=codepos PLUS w=word s=brace(stmt)
+    { Prwprgm (`Change (o, b, w, s)) }
+
 | HOARE SPLIT
     { Phoaresplit }
 
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
+
+%public phltactic:
+| CIRCUIT
+  { Pcircuit (`Solve ) }
+
+| CIRCUIT SIMPLIFY
+  { Pcircuit (`Simplify ) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
@@ -3478,6 +3497,9 @@ tactic_core_r:
 
     { Pcase (odfl false eq, odfl [] opts,
              { pr_view = vw; pr_rev = gp; } ) }
+
+| EXTENS v=option(bracket(lident)) COLON t=tactic_core
+  { Pextens (t, v) }
 
 | PROGRESS opts=pgoptions? t=tactic_core? {
     Pprogress (odfl [] opts, t)
@@ -3933,6 +3955,32 @@ user_red_option:
   }
 
 (* -------------------------------------------------------------------- *)
+(* Circuit & bo bindings                                                *)
+spec_binding:
+| op=qoident LARROW circ=loc(STRING)
+  { (op, circ) }
+
+cr_binding_r:
+| BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=qoident size=sform
+  { CRB_Bitstring { from_; to_; touint; tosint; ofint; type_; size; } }
+
+| BIND ARRAY get=qoident set=qoident tolist=qoident oflist=qoident type_=qoident size=sform
+  { CRB_Array { get; set; tolist; oflist; type_; size; } }
+  
+| BIND OP type_=qident operator=qoident name=loc(STRING)
+  { CRB_BvOperator { types = [type_]; operator; name; } }
+
+| BIND OP types=bracket(plist1(qident, AMP)) operator=qoident name=loc(STRING)
+  { CRB_BvOperator { types; operator; name; } }
+
+| BIND CIRCUIT bindings=plist1(spec_binding, COMMA) FROM file=loc(STRING)
+  { CRB_Circuit { bindings; file } }
+
+%inline cr_binding:
+| locality=is_local binding=cr_binding_r
+  { { locality; binding; }}
+
+(* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
 %inline search: x=sform_h { x }
 
@@ -3970,6 +4018,7 @@ global_action:
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
 | hint             { Ghint        $1 }
+| cr_binding       { Gcrbinding   $1 } 
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | EXPECT s=loc(STRING) BY PRINT p=print

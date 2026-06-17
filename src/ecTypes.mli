@@ -52,6 +52,10 @@ val toarrow : ty list -> ty -> ty
 val trealp : ty
 val txreal : ty
 
+exception TyDestrError of string
+
+val tfrom_tfun2 : ty -> ty * ty
+
 val tytuple_flat : ty -> ty list
 val tyfun_flat   : ty -> (dom * ty)
 

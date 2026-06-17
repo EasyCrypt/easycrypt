@@ -776,6 +776,38 @@ type matchmode = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type bdepvar = [`Var of psymbol | `VarRange of psymbol * int | `Slice of psymbol * (pqsymbol * zint)]
+
+type bdep_info =
+  { n     : int
+  ; m     : int
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; pcond : psymbol
+  ; lane  : psymbol
+  ; perm  : psymbol option 
+  ; debug : bool }
+
+type bdep_eval_info =
+  { in_ty     : pty
+  ; out_ty    : pty
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; lane  : psymbol 
+  ; range : pformula 
+  ; sign  : bool }
+
+type bdepeq_info =
+  { n          : int
+  ; inpvs_l    : bdepvar list
+  ; inpvs_r    : bdepvar list
+  ; out_blocks : (int * bdepvar list * bdepvar list) list
+  ; pcond      : psymbol option 
+  ; preprocess : bool }
+
+(* -------------------------------------------------------------------- *)
 type prrewrite = [`Rw of ppterm | `Simpl]
 
 (* -------------------------------------------------------------------- *)
@@ -836,7 +868,6 @@ type phltactic =
   | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
-  | Prwprgm of rwprgm
   | Pprocrewrite   of side option * pcodepos * prrewrite
   | Pprocrewriteat of psymbol * ppterm
   | Pchangestmt    of side option * ptybindings option * prange1_or_insert * pstmt
@@ -857,8 +888,20 @@ type phltactic =
   | Pauto
   | Plossless
 
+    (* Map-reduce *)
+  | Pcircuit of circuit_mode
+
+    (* Program rewriting *)
+  | Prwprgm of rwprgm
+
 and rwprgm = [
   | `IdAssign of pcodepos * pqsymbol
+  | `Change   of pcodepos * ptybindings option * int * pstmt
+]
+
+and circuit_mode = [
+  | `Simplify
+  | `Solve
 ]
 
 and pcfold =
@@ -1094,6 +1137,7 @@ and ptactic_core_r =
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
   | Pcase       of (bool * pcaseoptions * prevertv)
+  | Pextens     of (ptactic_core * psymbol option)
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option
@@ -1345,6 +1389,46 @@ type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
 
 (* -------------------------------------------------------------------- *)
+type pbind_bitstring =
+  { from_  : pqsymbol
+  ; to_    : pqsymbol
+  ; touint : pqsymbol
+  ; tosint : pqsymbol
+  ; ofint  : pqsymbol
+  ; type_  : pqsymbol
+  ; size   : pformula }
+  
+(* -------------------------------------------------------------------- *)
+type pbind_array =
+  { get    : pqsymbol
+  ; set    : pqsymbol
+  ; tolist : pqsymbol
+  ; oflist : pqsymbol
+  ; type_  : pqsymbol
+  ; size   : pformula }
+
+(* -------------------------------------------------------------------- *)
+type pbind_bvoperator =
+  { name     : string located
+  ; types    : pqsymbol list
+  ; operator : pqsymbol }
+
+(* -------------------------------------------------------------------- *)
+type pbind_circuit =
+  { bindings : (pqsymbol * string located) list 
+  ; file     : string located }
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding_r =
+  | CRB_Bitstring  of pbind_bitstring
+  | CRB_Array      of pbind_array
+  | CRB_BvOperator of pbind_bvoperator
+  | CRB_Circuit    of pbind_circuit
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding = { locality : is_local; binding : pcrbinding_r }
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
@@ -1384,6 +1468,7 @@ type global_action =
   | Gpragma      of psymbol
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
+  | Gcrbinding   of pcrbinding
 
 type global = {
   gl_action : global_action located;

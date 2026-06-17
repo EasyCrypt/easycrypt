@@ -71,6 +71,18 @@ let get_pp_showtvi (g : gstate) : bool =
   getflag ~default:false pp_showtvi g
 
 (* -------------------------------------------------------------------- *)
+let circuit_timing = "Circuit:timing"
+
+let get_circuit_timing (g : gstate) : bool =
+  getflag ~default:false circuit_timing g
+
+(* -------------------------------------------------------------------- *)
+let circuit_debug_smt = "Circuit:debug_smt"
+
+let get_circuit_debug_smt (g : gstate) : bool =
+  getflag ~default:false circuit_debug_smt g
+
+(* -------------------------------------------------------------------- *)
 let add_notifier (notifier : loglevel -> string Lazy.t -> unit) (gs : gstate) =
   let notifier = { nt_id = EcUid.unique (); nt_cb = notifier; } in
   gs.gs_notifiers <- notifier :: gs.gs_notifiers; notifier.nt_id
@@ -119,3 +131,14 @@ let notify (lvl : loglevel) (msg : string Lazy.t) (gs : gstate) =
 
   if accept_log ~level:gs.gs_loglevel ~wanted:lvl then
     List.iter do1 gs.gs_notifiers
+
+(* printf-style front-end to [notify]: format [msg] into a buffer lazily
+   and forward it to the registered notifiers. *)
+let notify_fmt (lvl : loglevel) (gs : gstate) msg =
+  let buf  = Buffer.create 0 in
+  let fbuf = Format.formatter_of_buffer buf in
+  Format.kfprintf
+    (fun _ ->
+      Format.pp_print_flush fbuf ();
+      notify lvl (lazy (Buffer.contents buf)) gs)
+    fbuf msg

@@ -951,7 +951,8 @@ let rec form_of_expr_r ?m (e : expr) =
   | Evar pv ->
     begin
      match m with
-     | None -> failwith "expecting memory"
+     | None -> 
+       failwith "expecting memory"
      | Some m -> (f_pvar pv e.e_ty m).inv
     end
 
