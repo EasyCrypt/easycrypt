@@ -360,6 +360,7 @@ module CircuitSpec = struct
 
     let unroll_fty (ty : ty) : ty list * ty =
       let rec doit (acc : ty list) (ty : ty) : ty list * ty =
+        let ty = EcEnv.ty_hnorm ty env in
         try
           let a, b = EcTypes.tfrom_tfun2 ty in
           doit (a :: acc) b
