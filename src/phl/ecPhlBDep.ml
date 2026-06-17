@@ -42,9 +42,15 @@ let rec form_list_of_form (f: form) : form list =
 
 (* FIXME PY: move? A *)
 
-let rec destr_conj (hyps: hyps) (f: form) : form list = 
+let rec destr_conj (hyps: hyps) (f: form) : form list =
   let redmode = {(circ_red hyps) with zeta = false} in
-  let f = (EcCallbyValue.norm_cbv redmode hyps f) in
+  (* Head-normalize only: enough to expose the top connective (/\, all, =).
+     The conjuncts' interiors are left to [circuit_of_form], which reduces
+     on demand -- a full [norm_cbv] here re-does that work (and is costly on
+     large equalities, e.g. a Keccak-state postcondition). *)
+  match EcReduction.h_red_opt redmode hyps f with
+  | Some f -> destr_conj hyps f
+  | None ->
   match f.f_node with
   | Fapp ({f_node = Fop (p, _)}, fs) -> begin match (EcFol.op_kind p, fs) with
     | Some (`And _), _ -> List.flatten @@ List.map (destr_conj hyps) fs
@@ -134,8 +140,10 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 
 let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bool =
   let env = toenv hyps in
+  let lap = EcCircuits.stopwatch env in
   let destr_conj = destr_conj hyps in
   let posts = destr_conj post in
+  lap "Done with postcondition normalization (destr_conj)";
   let pres = List.map (state_close_circuit st) pres in
 
   posts |> List.to_seq |> Seq.concat_map (fun post ->
