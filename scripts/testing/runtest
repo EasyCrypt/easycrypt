@@ -140,7 +140,6 @@ def _options():
         args         = '',
         exclude      = '',
         file_exclude = '',
-        file_include = '',
         okdirs       = '',
         kodirs       = '',
     )
@@ -184,7 +183,6 @@ def _options():
         scenario.kodirs   = config.get(test, 'kodirs')
         scenario.dexclude = config.get(test, 'exclude').split()
         scenario.fexclude = config.get(test, 'file_exclude').split()
-        scenario.finclude = config.get(test, 'file_include').split()
         options.scenarios[test[5:]] = scenario
 
     for x in options.targets:
@@ -336,17 +334,10 @@ class Gather:
     @staticmethod
     def is_file_excluded(src, excludes):
         for exclude in excludes:
+            print(os.path.basename(src), exclude)
             if fnmatch.fnmatch(src, exclude):
                 return True
         return False
-
-    @staticmethod
-    def is_file_included(src, includes):
-        # An empty include list means "include everything"; otherwise the
-        # file is kept only if it matches at least one glob.
-        if not includes:
-            return True
-        return any(fnmatch.fnmatch(src, include) for include in includes)
 
     @staticmethod
     def is_file_statically_ignored(src):
@@ -407,8 +398,7 @@ class Gather:
         files = [
             x for x in files if
             not cls.is_file_statically_ignored(x.filename) and
-            not cls.is_file_excluded(x.filename, scenario.fexclude) and
-            cls.is_file_included(x.filename, scenario.finclude)
+            not cls.is_file_excluded(x.filename, scenario.fexclude)
         ]
 
         return files
