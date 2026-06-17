@@ -44,15 +44,13 @@ let rec destr_conj (hyps : hyps) (f : form) : form list =
      The conjuncts' interiors are left to [circuit_of_form], which reduces
      on demand -- a full [norm_cbv] here re-does that work (and is costly on
      large equalities, e.g. a Keccak-state postcondition). *)
-  match EcReduction.h_red_opt redmode hyps f with
-  | Some f -> destr_conj hyps f
-  | None -> (
-    match sform_of_form f with
-    | SFand (_, (f1, f2)) -> destr_conj hyps f1 @ destr_conj hyps f2
-    | SFop ((p, _), [pred; lst]) when p = EcCoreLib.CI_List.p_all ->
-      let fs = form_list_from_iota hyps lst in
-      List.map (fun farg -> f_app pred [farg] tbool) fs
-    | _ -> [f])
+  let f = EcReduction.h_red_until redmode hyps f in
+  match sform_of_form f with
+  | SFand (_, (f1, f2)) -> destr_conj hyps f1 @ destr_conj hyps f2
+  | SFop ((p, _), [pred; lst]) when p = EcCoreLib.CI_List.p_all ->
+    let fs = form_list_from_iota hyps lst in
+    List.map (fun farg -> f_app pred [farg] tbool) fs
+  | _ -> [f]
 
 (* Should return a list of circuits corresponding to the atomic parts of the pre *)
 (* 
