@@ -41,6 +41,6 @@ val t_equiv_call1  : side -> ss_inv -> ss_inv -> backward
 val t_call         : oside -> form -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_call : oside -> call_info gppterm -> backward
+val process_call : oside * call_info gppterm -> backward
 
 val process_call_concave : pformula * call_info gppterm -> backward

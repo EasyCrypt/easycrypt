@@ -531,7 +531,7 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
 let ensure_none_poe tc poe =
   if not (is_none poe) then tc_error !!tc "exception are not supported"
 
-let process_call side info tc =
+let process_call (side, info) tc =
   let process_spec_2 tc side pre post =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side with
@@ -649,7 +649,7 @@ let process_call side info tc =
         let ml, mr = fst es.es_ml, fst es.es_mr in
         let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
         let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-        let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
+        let weakened_pre,bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
         let bad2 = ss_inv_generalize_as_right bad ml mr in
         let invP = ts_inv_rebind invP ml mr in
         let invQ = ts_inv_rebind invQ ml mr in
@@ -664,7 +664,7 @@ let process_call side info tc =
         let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
         let pre    = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands (eq_params::lpre)) in
         let post   = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands [eq_res;eqglob;invP]) in
-        (bad,invP,invQ, f_equivF pre fl fr post)
+        (weakened_pre,bad,invP,invQ, f_equivF pre fl fr post)
 
     | _ -> tc_error !!tc "the conclusion is not an equiv" in
 
@@ -691,10 +691,10 @@ let process_call side info tc =
       end
 
     | CI_upto info ->
-      let bad, p, q, form = process_upto tc side info in
+      let weakened_pre, bad, p, q, form = process_upto tc side info in
       let t_tr = FApi.t_or (t_assumption `Conv) t_trivial in
       subtactic := (fun tc ->
-        FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto bad p q tc));
+        FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto weakened_pre bad p q tc));
       form
 
   in
