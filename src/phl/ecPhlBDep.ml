@@ -36,7 +36,7 @@ let rec form_list_of_form (f : form) : form list =
 let rec destr_conjunction (hyps : hyps) (f : form) : form list =
   let redmode = { (circ_red hyps) with zeta = false } in
 
-  match sform_of_form (EcReduction.h_red_until redmode hyps f) with
+  match sform_of_form (EcCallbyValue.norm_cbv redmode hyps f) with
   | SFand (_, (f1, f2)) ->
     destr_conjunction hyps f1 @ destr_conjunction hyps f2
 
