@@ -1470,20 +1470,20 @@ and generalize_ctheory
     add_clear genenv (`Th path)
   else
     let scenv = enter_theory name `Global cth.cth_mode genenv.tg_env in
-    let genenv_tmp = List.fold_left
+    let genenv_thy = List.fold_left
       (fun x -> generalize_th_item x path)
       { genenv with tg_env = scenv } cth.cth_items in
 
-    let _, compiled, _ = exit_theory genenv_tmp.tg_env in
+    let _, compiled, _ = exit_theory genenv_thy.tg_env in
 
     match compiled with
     | None ->
-      genenv
+      { genenv_thy with tg_env = genenv.tg_env }
     | Some compiled when List.is_empty compiled.ctheory.cth_items ->
-      genenv
+      { genenv_thy with tg_env = genenv.tg_env }
     | Some compiled ->
       let scenv = add_th ~import:true compiled genenv.tg_env in
-      { genenv with tg_env = scenv; }
+      { genenv_thy with tg_env = scenv; }
 
 and generalize_lc_item (genenv : to_gen) (prefix : path) (item : sc_item) =
   match item with
