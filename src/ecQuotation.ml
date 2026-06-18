@@ -1,11 +1,15 @@
 (* -------------------------------------------------------------------- *)
 (* Black-box quotation preprocessor support.                            *)
 (*                                                                      *)
-(* A quotation {% name ... %} is lexed as a single opaque token         *)
-(* (see ecLexer.mll). EcIo expands it by shelling out to an external    *)
+(* Quotations are either fragmented (generating a fragment of a         *)
+(* sentence) or whole (generating a sequence of sentences). See         *)
+(* ecLexer.mll for the syntax, and see doc/quotations.rst for more      *)
+(* information.                                                         *)
+
+(* EcIo expands a quotation by shelling out to an external              *)
 (* handler over stdin/stdout, re-lexes the produced EC source, and      *)
 (* remaps every position back into the original source file using the   *)
-(* segment map returned by the handler.  See preprocessor/DESIGN.md.    *)
+(* segment map returned by the handler.                                 *)
 (* -------------------------------------------------------------------- *)
 open EcUtils
 
@@ -18,10 +22,12 @@ module L = Lexing
 (* the original file; its [pos_cnum] is the absolute body-start offset  *)
 (* referred to as [q0] in the design.                                   *)
 type quotation = {
-  q_name : string;
-  q_body : string;
-  q_bpos : L.position;        (* position of body start in original file *)
-  q_epos : L.position;        (* position just after the closing "%}"    *)
+  q_name  : string;
+  q_body  : string;
+  q_debug : bool;        (* should expansion be printed for user?   *)
+  q_frag  : bool;        (* quotation fragment?                     *)
+  q_bpos  : L.position;  (* position of body start in original file *)
+  q_epos  : L.position;  (* position just after the closing "%}"    *)
 }
 
 (* -------------------------------------------------------------------- *)

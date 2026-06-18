@@ -395,18 +395,32 @@ rule main = parse
 
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 
-  (* black-box quotation: {% name <body> %} (see ecQuotation.ml) *)
-  | "{%" blank* (lident as name) {
+  (* black-box quotation: see doc/quotations.rst *)
+  | "{%" ('!'? as non_frag) ('*'? as debug) blank* (lident as name) {
+      (* fragmented or whole quotation? debugging? *)
+      let frag = non_frag <> "!" and debug = debug = "*" in
       (* body starts at the current position (after name and the blanks/
          newline that follow it on this rule's match) *)
       let bpos = Lexing.lexeme_end_p lexbuf in
       let buf  = Buffer.create 256 in
-      let epos = quotation buf 0 lexbuf in
+      let epos = quotation buf 0 frag lexbuf in
       [QUOTATION EcQuotation.{
-         q_name = name;
-         q_body = Buffer.contents buf;
-         q_bpos = bpos;
-         q_epos = epos; }]
+         q_name  = name;
+         q_body  = Buffer.contents buf;
+         q_debug = debug;
+         q_frag  = frag;
+         q_bpos  = bpos;
+         q_epos  = epos; }]
+    }
+
+  (* after a whole black-box quotation is processed, issue a `noop`
+     pragma to get Proof General to display the current goal *)
+  | "!%}" blank* '.' (eof | blank | newline as r) {
+      if r = "\n" then
+        Lexing.new_line lexbuf;
+      let lc = Lexing.lexeme_start_p lexbuf in
+      let lc = { lc with pos_cnum = lc.pos_cnum + 1; } in
+      [PRAGMA; LIDENT "noop"; FINAL lc]
     }
 
   (* string symbols *)
@@ -497,28 +511,41 @@ and doccomment kind buf = parse
       doccomment kind buf lexbuf
   }
 
-and quotation buf depth = parse
+and quotation buf depth frag = parse
   | "%}" {
       if depth = 0 then
-        Lexing.lexeme_end_p lexbuf
+        if not frag then
+          lex_error lexbuf "must end whole quotation with '.'"
+        else
+          Lexing.lexeme_end_p lexbuf
       else begin
         Buffer.add_string buf "%}";
-        quotation buf (depth - 1) lexbuf
+        quotation buf (depth - 1) frag lexbuf
       end
     }
   | "{%" {
       Buffer.add_string buf "{%";
-      quotation buf (depth + 1) lexbuf
+      quotation buf (depth + 1) frag lexbuf
     }
   | newline {
       Lexing.new_line lexbuf;
       Buffer.add_char buf '\n';
-      quotation buf depth lexbuf
+      quotation buf depth frag lexbuf
+    }
+  | '.' ((eof | blank | newline) as t) {
+      if depth = 0 then
+        if frag then
+          lex_error lexbuf "quotation fragment cannot be terminated with '.'"
+        else begin
+          if t = "\n" then Lexing.new_line lexbuf;
+          Lexing.lexeme_end_p lexbuf
+        end
+      else lex_error lexbuf "cannot terminate with '.' inside nested quotation"
     }
   | eof { lex_error lexbuf "unterminated quotation" }
   | _ as c {
       Buffer.add_char buf c;
-      quotation buf depth lexbuf
+      quotation buf depth frag lexbuf
     }
 
 and string buf = parse

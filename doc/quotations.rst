@@ -19,20 +19,45 @@ standard output, so it can be written in any language.
    quotation is a hard error, never a silent skip or a silent execution. Only
    enable quotations for sources you trust.
 
-Quotations are processed during lexing, before parsing. A quotation expands
-to a **sentence fragment**: its tokens are spliced into the surrounding
-sentence, so a quotation may stand for only *part* of a sentence and several
-quotations may appear in one sentence. The sentence terminator (``.``) is
-always written by the user and never produced by a quotation. When the
-external tool — or EasyCrypt's handling of its output — produces an error, the
-location reported by EasyCrypt is mapped back to the **original** quoted text,
-not to the generated code.
+When using Proof General, the following code can be put in one's
+`.emacs` file to allow the enabling of quotations to be toggled on and off::
+
+  (defun easycrypt-enable-quotations-toggle ()
+    "Toggle enabling quotations in easycrypt mode"
+    (interactive)
+    (if (member "-enable-quotations" easycrypt-prog-args)
+        (progn
+          (setq easycrypt-prog-args
+                (remove "-enable-quotations" easycrypt-prog-args))
+          (message "quotations disabled"))
+      (setq easycrypt-prog-args
+            (append easycrypt-prog-args (list "-enable-quotations")))
+      (message "quotations enabled")))
+
+(Note that one has to exit EasyCrypt to have the toggling take effect.)
+
+Quotations are processed during lexing, before parsing. When the
+external tool - or EasyCrypt's handling of its output — produces an
+error, the location reported by EasyCrypt is mapped back to the
+**original** quoted text, not to the generated code.
+
+There are two kinds of quotations, **fragmented** and
+**whole**.
 
 ------------------------------------------------------------------------
-Syntax
+Kinds of quotations
 ------------------------------------------------------------------------
 
-A quotation is delimited by ``{%`` and ``%}``:
+Fragmented Quotations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A fragmented quotation expands to a **sentence fragment**: its tokens
+are spliced into the surrounding sentence, so a quotation may stand
+for only *part* of a sentence and several quotations may appear in one
+sentence. The sentence terminator (``.``) is always written by the
+user - outside of a quotation - and never produced by a quotation.
+
+A fragmented quotation is delimited by ``{%`` and ``%}``:
 
 .. admonition:: Syntax
 
@@ -63,6 +88,46 @@ sentence::
 It is an error for a quotation's expansion to contain a sentence terminator
 (``.``): the fragment must not close the sentence itself.
 
+Whole Quotations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An whole quotation is terminated within the quotation by the
+sentence terminator (``.``), of which there must be only one occurrence.
+And it exands to a nonempty **sequence** of sentences.
+
+A whole quotation has the form:
+
+.. admonition:: Syntax
+
+  ``{%! {name} {body} . !%} .``
+
+Here ``{name}`` and ``{body}`` are as with fragmented quotations,
+and ``{body}`` may not have any occurrences of the sentence terminator
+(``.``).
+
+A whole quotation consists of two EasyCrypt sentences.  The expansion
+of ``{body}`` happens during the processing of the first
+sentence, after which the resulting sentences are processed by
+EasyCrypt. The second sentence, ``!%}.``, is just an abbreviation
+for the `noop` pragma. In the case where the sentences in the expansion
+are proof tactics, ``!%}.`` causes Proof General to display the
+next open goal. (Undoing this noop takes one to a useless proof state;
+instead undo both it and the first sentence.)
+
+Note: although whole quotations can be used for purposes other than
+parameterizing sequences of proof tactics, Proof General doesn't
+display all the effects, say of the definition of multiple operators,
+and so this isn't very easy to work with.
+
+------------------------------------------------------------------------
+Debugging quotations
+------------------------------------------------------------------------
+
+The user can view the expansions of quotations by beginning them with
+``{%*`` (in the case of fragmented quotations) or ``{%!*`` (in the
+case of whole quotations). In Proof General, the expansions of
+quotations are printed in the ``*response*`` buffer.
+
 ------------------------------------------------------------------------
 Configuring handlers
 ------------------------------------------------------------------------
@@ -71,16 +136,18 @@ A quotation ``name`` is resolved to a shell command in this order:
 
 - a binding in ``easycrypt.project`` (see below);
 
-- ``EC_QUOTE_<NAME>`` — where ``<NAME>`` is ``name`` uppercased — gives the
-  command for that specific quotation name;
+- the enviroment variable ``EC_QUOTE_<NAME>`` — where ``<NAME>`` is
+  ``name`` uppercased — gives the command for that specific quotation
+  name;
 
-- ``EC_QUOTE_CMD`` — a fallback command used for any quotation whose specific
-  variable is unset;
+- the environment variable ``EC_QUOTE_CMD`` — a fallback command used
+  for any quotation whose specific variable is unset;
 
-- otherwise, an executable ``handlers/<name>`` (also tried with the ``.py``
-  and ``.sh`` extensions) sitting next to the source file. This lets a
-  directory of files be self-contained, needing no environment to set up — it
-  is how the test suite binds its handlers.
+- otherwise, an executable ``handlers/<name>`` (also tried with the
+  ``.py`` and ``.sh`` extensions) sitting in the same directory as the
+  source file. This lets a directory of files be self-contained,
+  needing no environment to set up — it is how the test suite binds
+  its handlers.
 
 The recommended way is the project file. In the ``[general]`` section of
 ``easycrypt.project``, add one repeatable ``quote`` entry per handler, of the
@@ -241,6 +308,28 @@ segment lets EasyCrypt point at the exact original character on error. Given::
 EasyCrypt reports the unknown-identifier error at the column of ``no_such_op``
 inside the quotation, even though that identifier sits at a different offset in
 the generated buffer.
+
+An ``ecm4`` handler that uses the m4 macro processor to process the
+quotation's body using macros defined in an included m4 file. Suppose
+we are given a file ``foo.m4`` with the macro definition::
+
+  define(Test,
+  $1.
+  $2.
+  )
+
+Then processing::
+
+  {%! ecm4 foo.m4
+  Foo(left, right).
+
+produces the expansion::
+
+  left.
+  right.
+
+Finally, processing ``!%}.`` will cause Proof General to display the
+next open goal.
 
 .. note::
 
