@@ -28,7 +28,7 @@ let stopwatch (env : env) : string -> unit =
       let now = Unix.gettimeofday () in
       (* Emitted at [`Warning] so it shows even at the default
          (compile-mode) verbosity; gated by the [Circuit:timing] flag. *)
-      EcEnv.notify ~immediate:true env `Warning "[timing] %s: %.3fs@." msg
+      EcEnv.notify ~immediate:true env `Warning "[timing] %s: %.3fs" msg
         (now -. !last);
       last := now
   end
