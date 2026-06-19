@@ -125,7 +125,7 @@ let debug (q : EcQuotation.quotation) (expanded : string) : unit =
 (* A WHOLE quotation, on the other hand, must expand to a nonempty        *)
 (* sequence of sentences.                                                 *)
 
-let expand_quotation (q : EcQuotation.quotation)
+let expand_quotation (q : EcQuotation.quotation) (top_lexbuf : L.lexbuf)
   : (EcParser.token * L.position * L.position) list =
   let (expanded, sm) = EcQuotation.run q in
   let () = if q.q_debug then debug q expanded in
@@ -158,9 +158,16 @@ let expand_quotation (q : EcQuotation.quotation)
       EcQuotation.error q
       "expansion of quotation fragment may not end sentence"
   end
-  else begin
-    if List.is_empty triples ||
-       let (t, _, _) = List.last triples in not (isfinal t) then
+  else if List.is_empty triples ||
+          let (t, _, _) = List.last triples in not (isfinal t) then begin
+    (* ensure the sentence termination in top_lexbuf will be re-read, when
+       lexing is resumed after the exception is caught; otherwise Proof
+       General will be stuck (see drain) *)
+    let end_pos = top_lexbuf.lex_curr_p in
+    let lookahead_len = 2 in
+    top_lexbuf.lex_curr_pos <- top_lexbuf.lex_curr_pos - lookahead_len;
+    top_lexbuf.lex_curr_p <-
+      { end_pos with pos_cnum = end_pos.pos_cnum - lookahead_len };
     EcQuotation.error q "expansion of whole quotation must end sentence"
   end;
   triples
@@ -208,7 +215,7 @@ let rec lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
   match ecreader.ecr_tokens with
   | EcParser.QUOTATION q :: queue ->
       ecreader.ecr_tokens <- queue;
-      ecreader.ecr_expand <- expand_quotation q;
+      ecreader.ecr_expand <- expand_quotation q ecreader.ecr_lexbuf;
       lexer ?checkpoint ecreader
   | _ ->
 

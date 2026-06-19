@@ -8,3 +8,7 @@ define(TwoOps,
 op $1 = 3.
 op $2 = $1 + 1.
 )
+define(NonTerm,
+$1.
+$2
+)
