@@ -533,14 +533,28 @@ and quotation buf depth frag = parse
       quotation buf depth frag lexbuf
     }
   | '.' ((eof | blank | newline) as t) {
+      let restore () =
+        (* ensure the sentence termination will be re-read, when
+           lexing is resumed after the exception is caught;
+           otherwise Proof General will be stuck *)
+        let end_pos = lexbuf.lex_curr_p in
+        let lookahead_len = 2 in
+        lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - lookahead_len;
+        lexbuf.lex_curr_p <-
+          { end_pos with pos_cnum = end_pos.pos_cnum - lookahead_len } in
       if depth = 0 then
-        if frag then
+        if frag then begin
+          restore ();
           lex_error lexbuf "quotation fragment cannot be terminated with '.'"
+        end
         else begin
           if t = "\n" then Lexing.new_line lexbuf;
           Lexing.lexeme_end_p lexbuf
         end
-      else lex_error lexbuf "cannot terminate with '.' inside nested quotation"
+      else begin
+        restore ();
+        lex_error lexbuf "cannot terminate with '.' inside nested quotation"
+      end
     }
   | eof { lex_error lexbuf "unterminated quotation" }
   | _ as c {
