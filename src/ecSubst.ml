@@ -217,6 +217,10 @@ let fresh_elocals_opt (s : subst) (locals : (EcIdent.t option * ty) list) =
   List.fold_left_map fresh_elocal_opt s locals
 
 let add_flocal (s : subst) (x : EcIdent.t) (f : EcCoreFol.form) =
+  let s =
+    match EcCoreFol.expr_of_form f with
+    | e -> add_elocal s x e
+    | exception EcCoreFol.CannotTranslate -> s in
   { s with sb_flocal = Mid.add x f s.sb_flocal }
 
 let add_flocals (s : subst) (xs : EcIdent.t list) (fs : EcCoreFol.form list) =
@@ -1215,4 +1219,3 @@ let inv_rebind (inv : inv) (ms : memory list) : inv =
   | Inv_ts ts, [ml; mr] -> Inv_ts (ts_inv_rebind ts ml mr)
   | Inv_hs hs, [m] -> Inv_hs (hs_inv_rebind hs m)
   | _, _ -> assert false
-

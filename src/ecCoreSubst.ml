@@ -95,6 +95,10 @@ let bind_elocals (s : f_subst) (esloc : expr Mid.t) : f_subst =
 
 (* -------------------------------------------------------------------- *)
 let f_bind_local (s : f_subst) (x : ident) (t : form) : f_subst =
+  let s =
+    match EcCoreFol.expr_of_form t with
+    | e -> bind_elocal s x e
+    | exception EcCoreFol.CannotTranslate -> s in
   let fs_loc = Mid.add x t s.fs_loc in
   let fs_fv = fv_union (f_fv t) s.fs_fv in
   { s with fs_loc; fs_fv; }
