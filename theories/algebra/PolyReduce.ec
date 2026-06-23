@@ -58,7 +58,8 @@ hint exact : idI.
 clone include RingQuotientDflInv with
   op p <- I
   proof IdealAxioms.*
-  rename "qT" as "polyXnD1".
+  rename "qT" as "polyXnD1"
+  rename "piK" as "piK'".
 
 realize IdealAxioms.ideal_p by apply/idI.
 
