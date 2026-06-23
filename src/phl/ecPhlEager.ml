@@ -168,7 +168,12 @@ let t_eager_seq_r (i, j) s (r2, r1) tc =
 
   let (_, ml_ty), (_, mr_ty) = (eC.es_ml, eC.es_mr) in
   let c1, c2 = s_split env i c and c1', c2' = s_split env j c' in
-  let eqMem1 = eq_on_form_and_stmt env r1 (stmt c1')
+  let m = EcIdent.create "m" in
+  let existsP = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr eC) in
+  let eqMem1 =
+    map_ts_inv2 f_and
+      (eq_on_form_and_stmt env r1 (stmt c1'))
+      (ss_inv_generalize_left existsP r1.ml)
   and eqQ1 = eq_on_sided_form env (es_po eC) in
 
   let a =
@@ -243,7 +248,13 @@ let t_eager_while_r i tc =
   if (not (ER.EqTest.for_expr env e (sub_to_left_mem _e))) then
     tc_error !!tc "eager: both while guards must be syntactically equal";
   
-  let eqMem1 = eq_on_form_and_stmt env i c' and eqI = eq_on_sided_form env i in
+  let m = EcIdent.create "m" in
+  let existsI = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr es) in
+  let eqMem1 =
+    map_ts_inv2 f_and
+      (eq_on_form_and_stmt env i c')
+      (ss_inv_generalize_left existsI i.ml)
+  and eqI = eq_on_sided_form env i in
 
   let el = ss_inv_of_expr ml e and er = ss_inv_of_expr mr e in
 
