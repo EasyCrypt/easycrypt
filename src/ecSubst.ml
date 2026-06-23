@@ -1283,6 +1283,9 @@ let ss_inv_generalize_as_right ({inv;m}: ss_inv) (ml: memory) (mr: memory) : ts_
 let f_forall_mems_ss_inv menv inv =
   f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv
 
+let f_exists_mems_ss_inv menv inv =
+  f_exists_mems [menv] (ss_inv_rebind inv (fst menv)).inv
+
 let ts_inv_rebind_left ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
   if ml = m then
     { inv; ml; mr }
@@ -1314,12 +1317,23 @@ let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
 let f_forall_mems_ts_inv menvl menvr inv =
   f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
 
+let f_exists_mems_ts_inv menvl menvr inv =
+  f_exists_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
+
 let ss_inv_forall_ml_ts_inv menvl inv =
   let inv' = f_forall_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
   { inv=inv'; m=inv.mr}
 
 let ss_inv_forall_mr_ts_inv menvr inv =
   let inv' = f_forall_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
+  { inv=inv'; m=inv.ml }
+
+let ss_inv_exists_ml_ts_inv menvl inv =
+  let inv' = f_exists_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
+  { inv=inv'; m=inv.mr}
+
+let ss_inv_exists_mr_ts_inv menvr inv =
+  let inv' = f_exists_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
   { inv=inv'; m=inv.ml }
 
 (* -------------------------------------------------------------------- *)
