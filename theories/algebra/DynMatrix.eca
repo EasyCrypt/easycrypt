@@ -42,39 +42,17 @@ type prevector = (int -> R) * int.
 op vclamp (pv: prevector): prevector =
   ((fun i => if 0 <= i < pv.`2 then pv.`1 i else zeror), max 0 pv.`2).
 
-lemma vclamp_idemp pv: vclamp (vclamp pv) = vclamp pv.
-proof. rewrite /vclamp /#. qed.
+clone include Quotient.CanonQuotient with
+type T <- prevector,
+op canon <- vclamp
+rename "canon" as "vclamp"
+rename "repr"  as "tofunv"
+rename "pi"    as "offunv"
+rename "qT"    as "vector"
+rename "quot"  as "vector"
+proof * by smt().
 
-op eqv (pv1 pv2: prevector) =
-  vclamp pv1 = vclamp pv2.
-
-lemma eqv_vclamp pv: eqv pv (vclamp pv). 
-proof. by rewrite /eqv vclamp_idemp. qed.
-
-clone import Quotient.EquivQuotient as QuotientVec with
-  type T <- prevector,
-  op eqv <- eqv
-  rename [type] "qT" as "vector"
-  proof * by smt().
-
-type vector = QuotientVec.vector.
-
-op tofunv v = vclamp (repr v).
-
-op offunv pv = pi (vclamp pv).
-
-lemma tofunvK: cancel tofunv offunv.
-proof. 
-rewrite /tofunv /offunv /cancel => v; rewrite vclamp_idemp.
-by rewrite -{2}[v]reprK -eqv_pi /eqv vclamp_idemp. 
-qed.
-
-lemma offunvK pv: tofunv (offunv pv) = vclamp pv.
-proof. by rewrite /tofunv /offunv eqv_repr vclamp_idemp. qed.
-
-lemma vectorW (P : vector -> bool): 
-  (forall pv, P (offunv pv)) => forall v, P v.
-proof. by move=> P_pv v; rewrite -tofunvK; apply: P_pv. qed.
+hint simplify vclampK, offunvK.
 
 (* Dimension of the vector *)
 op size v = (tofunv v).`2.
@@ -86,7 +64,7 @@ lemma max0size v: max 0 (size v) = size v by smt().
 hint simplify max0size.
 
 lemma offunv_max f n: offunv (f, max 0 n) = offunv (f, n).
-proof. rewrite /offunv -eqv_pi /eqv /vclamp /#. qed.
+proof. by rewrite /offunv /vclamp /#. qed.
 
 lemma size_offunv f n: size (offunv (f, n)) = max 0 n.
 proof. by rewrite /size offunvK /#. qed.
@@ -100,7 +78,7 @@ abbrev "_.[_]" (v: vector) (i : int) = get v i.
 
 lemma get_offunv f n (i : int) : 0 <= i < n =>
   (offunv (f, n)).[i] = f i.
-proof. by rewrite /get /= offunvK /vclamp /= => ->. qed.
+proof. by rewrite /get /= /vclamp /= => ->. qed.
 
 lemma getv0E v i: !(0 <= i < size v) => v.[i] = zeror by smt().
 
@@ -665,40 +643,17 @@ op mclamp (pm: prematrix): prematrix =
   ((fun i j => if 0 <= i < pm.`2 /\ 0 <= j < pm.`3 then pm.`1 i j else zeror),
    max 0 pm.`2, max 0 pm.`3).
 
-lemma mclamp_idemp pm: mclamp (mclamp pm) = mclamp pm.
-proof. by rewrite /mclamp /#. qed.
+clone include Quotient.CanonQuotient with
+type T <- prematrix,
+op canon <- mclamp
+rename "canon" as "mclamp"
+rename "repr"  as "tofunm"
+rename "pi"    as "offunm"
+rename "qT"    as "matrix"
+rename "quot"  as "matrix"
+proof * by smt().
 
-hint simplify mclamp_idemp.
-
-op eqv (pm1 pm2: prematrix) = mclamp pm1 = mclamp pm2.
-
-clone import Quotient.EquivQuotient as QuotientMat with
-  type T <- prematrix,
-  op eqv <- eqv
-  rename [type] "qT" as "matrix"
-  proof * by smt().
-
-type matrix = QuotientMat.matrix.
-
-op tofunm m = mclamp (repr m).
-
-op offunm pm = pi (mclamp pm).
-
-lemma tofunmK : cancel tofunm offunm.
-proof. 
-rewrite /tofunm /offunm /cancel => m /=. 
-have ->: pi (mclamp (repr m)) = pi (repr m) by rewrite -eqv_pi /eqv.
-apply reprK.
-qed.
-
-lemma offunmK pm: tofunm (offunm pm) = mclamp pm.
-proof. by rewrite /tofunm /offunm eqv_repr. qed.
-
-hint simplify offunmK.
-
-lemma matrixW (P : matrix -> bool) : (forall pm, P (offunm pm)) =>
-  forall m, P m.
-proof. by move=> P_pm m; rewrite -tofunmK; exact: P_pm. qed.
+hint simplify mclampK, offunmK.
 
 (* Number of rows and columns of matrices *)
 op rows m = (tofunm m).`2.
@@ -873,7 +828,7 @@ lemma cols_addm (m1 m2: matrix): cols (m1 + m2) = max (cols m1) (cols m2).
 proof. rewrite /(+) cols_offunm /#. qed.
 
 lemma size_addm (m1 m2: matrix): size m1 = size m2 => size (m1 + m2) = size m1.
-proof. move => size_eq; rewrite rows_addm cols_addm /#. qed.
+proof. move => [rows_eq cols_eq]; rewrite rows_addm cols_addm /#. qed.
 
 lemma get_addm (m1 m2 : matrix) i j: (m1 + m2).[i, j] = m1.[i, j] + m2.[i, j].
 proof.
@@ -1756,7 +1711,7 @@ qed.
 lemma scalarNm (m: matrix) (s: t): (- s) *** m = - (s *** m).
 proof.
 rewrite eq_matrixP.
-split => [| i j bound]; 1: rewrite !size_scalarm /=; 1: smt(size_scalarm).
+split => [| i j bound]; 1: rewrite !size_scalarm /= rows_scalarm cols_scalarm //. 
 by rewrite /= !get_scalarm /= mulrN.
 qed.
 

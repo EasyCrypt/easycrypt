@@ -30,9 +30,51 @@ proof. by move=> Py x; rewrite -(reprK x); apply/Py; rewrite reprK. qed.
 end CoreQuotient.
 
 (* -------------------------------------------------------------------- *)
+(* This theory defines the effective quotient using an idempotent map,  *)
+(* canon. It builds on the previous theory by using for [qT] the        *)
+(* elements that are stable under canon.                                *)
+(* -------------------------------------------------------------------- *)
+
+abstract theory CanonQuotient.
+
+type T.
+
+op canon : T -> T.
+
+axiom canonK (x : T): canon (canon x) = canon x.
+
+op iscanon x = canon x = x.
+
+lemma iscanon_canon x : iscanon (canon x).
+proof. by rewrite /iscanon canonK. qed.
+
+subtype qT as QSub = {x : T | iscanon x}.
+realize inhabited by exists (canon witness); apply canonK.
+
+import QSub.
+
+(* NOTE: The `canon` in `repr` might look like it does nothing,         *)
+(*       but it can make `iscanon_repr` trivial when `iscanon_canon` is *)
+clone include CoreQuotient with
+  type T     <- T,
+  type qT    <- qT,
+  op   pi    =  fun x => QSub.insubd (canon x),
+  op   repr  =  fun x => canon (QSub.val x)
+
+  proof *.
+realize reprK by move => q; rewrite /pi /repr canonK valP valKd.
+
+lemma iscanon_repr v : iscanon (repr v) by rewrite iscanon_canon. 
+
+lemma piK x : repr (pi x) = canon x.
+proof. by rewrite /repr insubdK // iscanon_canon. qed.
+
+end CanonQuotient.
+
+(* -------------------------------------------------------------------- *)
 (* This theory defines the effective quotient by an equivalence         *)
-(* relation. It is build on the former theory, using for [qT] the       *)
-(* elements of [T] that are stable by repr \o pi.                       *)
+(* relation. It is build on the former theory, using for canon the      *)
+(* choice map selecting a member of the equivalence class.              *)
 (* -------------------------------------------------------------------- *)
 abstract theory EquivQuotient.
 
@@ -54,32 +96,26 @@ proof. by exists x; rewrite eqv_refl. qed.
 op canon (x : T) = choiceb (eqv x) x.
 
 lemma eqv_canon (x : T) : eqv x (canon x).
-proof.
-rewrite /canon; apply: (@choicebP (eqv x) x).
-by exists x; apply: eqv_refl.
-qed.
+proof. apply (@choicebP (eqv x) x); by exists x; apply eqv_refl. qed.
 
 lemma eqv_canon_eq (x y : T): eqv x y => canon x = canon y.
 proof.
-move=> eqv_xy; rewrite /canon (@eq_choice (eqv x) (eqv y)).
-- move=> z; split => [eqv_xz|eqv_yz].
-  - by apply/(eqv_trans x) => //; rewrite eqv_sym.
-  - by apply/(eqv_trans _ eqv_xy eqv_yz).
-by apply: choice_dfl_irrelevant; exists y; apply: eqv_refl.
+move=> eqv_xy; rewrite /canon (@eq_choice (eqv x) (eqv y)) => [z|].
+- split => [eqv_xz|eqv_yz].
+  + by apply (eqv_trans x) => //; rewrite eqv_sym.
+  + by apply (eqv_trans _ eqv_xy eqv_yz).
+by apply choice_dfl_irrelevant; exists y; apply eqv_refl.
 qed.
 
-lemma canonK x : canon (canon x) = canon x.
-proof. by rewrite &(eqv_canon_eq) eqv_sym eqv_canon. qed.
+clone include CanonQuotient with
+  type T <- T,
+  op canon <- canon
+  proof *.
+realize canonK by move => x; rewrite &(eqv_canon_eq) eqv_sym eqv_canon.
 
-op iscanon x = canon x = x.
+import QSub.
 
-lemma canon_iscanon x : iscanon x => canon x = x.
-proof. by move=> @/iscanon /eq_sym ->; apply: canonK. qed.
-
-lemma iscanon_canon x : iscanon (canon x).
-proof. by rewrite /iscanon canonK. qed.
-
-lemma eqvP x y : (eqv x y) <=> (canon x = canon y).
+lemma eqvP x y : eqv x y <=> canon x = canon y.
 proof.
 split=> [/eqv_canon_eq //|eq].
 rewrite &(eqv_trans (canon y)) -1:eqv_sym -1:eqv_canon.
@@ -87,35 +123,12 @@ apply/(eqv_trans (canon x)); first by apply/eqv_canon.
 by rewrite eq &(eqv_refl).
 qed.
 
-subtype qT as QSub = { x : T | iscanon x }.
-
-realize inhabited.
-proof. smt(canonK). qed.
-
-import QSub.
-
-clone include CoreQuotient with
-  type T     <- T,
-  type qT    <- qT,
-  op   pi    =  fun x => QSub.insubd (canon x),
-  op   repr  =  fun x => QSub.val x
-
-  proof *.
-
-
-realize reprK. proof.
-by move=> q; rewrite /pi /repr /insubd canon_iscanon 1:valP valK.
-qed.
-
-lemma eqv_pi : forall x y , eqv x y <=> pi x = pi y.
+lemma eqv_pi x y : eqv x y <=> pi x = pi y.
 proof.
-move=> x y @/pi; split=> [eq_xy|]; first by congr; apply: eqv_canon_eq.
-by move/(congr1 val); rewrite !val_insubd !iscanon_canon /= => /eqvP.
+rewrite eqvP /pi; split => [->//|].
+by move => /(congr1 val); rewrite !val_insubd !iscanon_canon.
 qed.
 
-lemma eqv_repr : forall x, eqv (repr (pi x)) x.
-proof.
-move=> x @/pi @/repr; rewrite val_insubd.
-by rewrite iscanon_canon /= eqv_sym &(eqv_canon).
-qed.
+lemma eqv_repr x : eqv (repr (pi x)) x.
+proof. rewrite /repr val_insubd iscanon_canon eqv_sym /= canonK eqv_canon. qed.
 end EquivQuotient.
