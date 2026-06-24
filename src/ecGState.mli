@@ -33,6 +33,14 @@ val pp_showtvi : string
 val get_pp_showtvi : gstate -> bool
 
 (* --------------------------------------------------------------------- *)
+val circuit_timing : string
+val get_circuit_timing : gstate -> bool
+
+(* --------------------------------------------------------------------- *)
+val circuit_debug_smt : string
+val get_circuit_debug_smt : gstate -> bool
+
+(* --------------------------------------------------------------------- *)
 type nid_t
 type loglevel = [`Debug | `Info | `Warning | `Critical]
 
@@ -45,3 +53,5 @@ val rem_notifier : nid_t -> gstate -> unit
 val loglevel     : gstate-> loglevel
 val set_loglevel : loglevel -> gstate -> unit
 val notify       : loglevel -> string Lazy.t -> gstate -> unit
+val notify_fmt   :
+  loglevel -> gstate -> ('a, Format.formatter, unit, unit) format4 -> 'a
