@@ -13,7 +13,8 @@
  (sites (lib theories) (libexec commands) (lib doc) (lib config))
  (depends
   (ocaml (>= 4.08.0))
-  (batteries (>= 3))
+  (batteries (>= 3.9))
+  bitwuzla-cxx
   (camlp-streams (>= 5))
   camlzip
   dune

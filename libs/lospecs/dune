@@ -1,0 +1,13 @@
+(library
+  (name lospecs)
+  (public_name easycrypt.lospecs)
+  (flags
+    (:standard -open Batteries))
+  (libraries batteries bitwuzla-cxx menhirLib zarith))
+
+(ocamllex lexer)
+
+(menhir
+  (modules parser)
+  (explain true)
+  (flags --table))
