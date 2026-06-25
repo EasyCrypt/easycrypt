@@ -90,8 +90,69 @@ let process_change fp (tc : tcenv1) =
   t_change fp tc
 
 (* -------------------------------------------------------------------- *)
+let process_local_hint (hint : plocalhint) (tc : tcenv1) =
+  let env = FApi.tc1_env tc in
+  let simpl = FApi.tc1_simplify_context tc in
+
+  let simpl =
+    match hint with
+    | PLHClause h ->
+        let opts = EcTheory.{ ur_delta = false; ur_eqtrue = false; } in
+
+        (* signed database deltas: [+d] activate, [-d] deactivate *)
+        let simpl =
+          List.fold_left (fun simpl (add, d) ->
+            if   add
+            then EcEnv.SimplifyContext.activate   [d] simpl
+            else EcEnv.SimplifyContext.deactivate [d] simpl)
+            simpl h.ph_dbs
+        in
+
+        (* lemma additions to the default DB (add-only) *)
+        let simpl =
+          List.fold_left (fun simpl lemma ->
+            let path = EcEnv.Ax.lookup_path (unloc lemma) env in
+            let rule = EcReduction.User.compile ~opts ~prio:0 env path in
+            EcEnv.SimplifyContext.add_rules [(path, rule)] simpl)
+            simpl h.ph_lemmas
+        in
+
+        (* an unsigned database list sets the proof-local default *)
+        let simpl =
+          match h.ph_select with
+          | [] -> simpl
+          | _  -> EcEnv.SimplifyContext.set_default_db h.ph_select simpl
+        in
+
+        (* a head filter sets the proof-local default head filter *)
+        let hd =
+          h.ph_hd |> omap (fun (mode, ops) ->
+            let ops =
+              List.fold_left (fun acc ps ->
+                match EcEnv.Op.lookup_opt (unloc ps) env with
+                | None   -> tc_lookup_error !!tc ~loc:ps.pl_loc `Operator (unloc ps)
+                | Some p -> (fst p) :: acc
+              ) [] ops
+            in
+            (mode, List.rev ops))
+        in
+        hd |> Option.fold ~none:simpl ~some:(fun hd ->
+          EcEnv.SimplifyContext.set_default_hd (Some hd) simpl)
+
+    | PLHClear base ->
+        EcEnv.SimplifyContext.clear ?base simpl
+
+    | PLHClearDefault ->
+        EcEnv.SimplifyContext.clear_default simpl
+  in
+
+  FApi.tcenv_of_tcenv1
+    (FApi.map_pregoal1 (fun goal -> { goal with g_simpl = simpl }) tc)
+
+(* -------------------------------------------------------------------- *)
 let process_simplify_info ri (tc : tcenv1) =
   let env, hyps, _ = FApi.tc1_eflat tc in
+  let simpl = FApi.tc1_simplify_context tc in
 
   let do1 (sop, sid) ps =
     match ps.pl_desc with
@@ -112,6 +173,61 @@ let process_simplify_info ri (tc : tcenv1) =
       |> odfl ((fun _ -> `IfTransparent), predT)
   in
 
+  let hint = ri.phint in
+
+  (* Head filter: the clause filter if any, else the proof-local default. *)
+  let user_hd =
+    match hint.ph_hd with
+    | None -> EcEnv.SimplifyContext.default_hd simpl
+    | Some (mode, ops) ->
+        let ops =
+          List.fold_left (fun acc ps ->
+            match EcEnv.Op.lookup_opt (unloc ps) env with
+            | None   -> tc_lookup_error !!tc ~loc:ps.pl_loc `Operator (unloc ps)
+            | Some p -> Sp.add (fst p) acc
+          ) Sp.empty ops
+        in
+        Some (match mode with
+          | `Include -> `Include ops
+          | `Exclude -> `Exclude ops)
+  in
+
+  (* Per-call lemma additions (add-only): compiled and applied to the
+     default DB of a local copy of the proof-local context. *)
+  let simpl =
+    let opts = EcTheory.{ ur_delta = false; ur_eqtrue = false; } in
+    List.fold_left (fun simpl lemma ->
+      let path = EcEnv.Ax.lookup_path (unloc lemma) env in
+      let rule = EcReduction.User.compile ~opts ~prio:0 env path in
+      EcEnv.SimplifyContext.add_rules [(path, rule)] simpl
+    ) simpl hint.ph_lemmas
+  in
+
+  (* Database list consulted by this call: the unsigned selection if any
+     (else the proof-local default / active set), with the signed
+     activate / deactivate deltas applied in order. [None] when no [hint]
+     clause is present, letting [EcReduction] use its own fallback. *)
+  let user_db =
+    if hint.ph_select = [] && hint.ph_dbs = [] then
+      None
+    else begin
+      let base =
+        if hint.ph_select <> [] then hint.ph_select else
+          match EcEnv.SimplifyContext.default_db simpl with
+          | Some dbs -> dbs
+          | None     -> EcSymbols.Ssym.elements (EcEnv.SimplifyContext.active simpl)
+      in
+      let dbs =
+        List.fold_left (fun dbs (add, d) ->
+          if add
+          then dbs @ [d]
+          else List.filter (fun d' -> d' <> d) dbs)
+          base hint.ph_dbs
+      in
+      Some dbs
+    end
+  in
+
   {
     EcReduction.beta    = ri.pbeta;
     EcReduction.delta_p = delta_p;
@@ -122,6 +238,12 @@ let process_simplify_info ri (tc : tcenv1) =
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
     EcReduction.user    = ri.puser;
+    EcReduction.user_db = user_db;
+    EcReduction.user_local = simpl;
+    EcReduction.user_hd =
+      (match user_hd with
+       | Some _ as hd -> hd
+       | None -> EcEnv.SimplifyContext.default_hd simpl);
   }
 
 (*-------------------------------------------------------------------- *)
