@@ -187,12 +187,22 @@ end = struct
       let tparams = List.map tvar params in
       let ty_body1 = tyd1.tyd_type in
       let ty_body2 = EcSubst.open_tydecl tyd2 tparams in
+      let subtype1 = CS.Tvar.sty_subst ~freshen:false tyd1.tyd_params tparams tyd1.tyd_subtype in
+      let subtype2 = CS.Tvar.sty_subst ~freshen:false tyd2.tyd_params tparams tyd2.tyd_subtype in
 
       let hyps = EcEnv.LDecl.init env params in
 
       match ty_body1, ty_body2 with
-      | Abstract, _ -> ()
-
+      | Abstract, _ -> begin
+        match subtype1, subtype2 with
+        | Some (ty1, f1), Some (ty2, f2) ->
+          if not (EcReduction.EqTest.for_type (toenv hyps) ty1 ty2) then
+            raise (Incompatible (SubtypeType (ty1, Some ty2)));
+          if not (EcReduction.is_conv ~ri:ri_compatible hyps f1 f2) then
+            raise (Incompatible (SubtypePred (f1, f2)))
+        |  Some (ty1, _), None -> raise (Incompatible (SubtypeType (ty1, None)))
+        | _, _ -> ()
+        end
       | _, _ -> tybody hyps ty_body1 ty_body2
 
     with CoreIncompatible -> raise (Incompatible TyBody)
@@ -484,12 +494,18 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
                           nargs in
             let ue    = EcUnify.UniEnv.create (Some nargs) in
             let ntyd  = EcTyping.transty EcTyping.tp_tydecl env ue ntyd in
+            let subtype =
+              match ntyd.ty_node with
+              | Tconstr (p, tys) ->
+                  let reftyd = EcEnv.Ty.by_path p env in
+                  CS.Tvar.sty_subst ~freshen:false reftyd.tyd_params tys reftyd.tyd_subtype
+              | _ -> None in
             let decl  =
               { tyd_params   = nargs;
                 tyd_type     = Concrete ntyd;
                 tyd_loca     = otyd.tyd_loca;
                 tyd_clinline = (mode <> `Alias);
-                tyd_subtype  = None; }
+                tyd_subtype  = subtype; }
 
             in (decl, ntyd)
 
@@ -515,6 +531,7 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
 
         | `Direct ty -> begin
           assert (List.is_empty otyd.tyd_params);
+          assert (otyd.tyd_subtype = None);
           let decl  =
             { tyd_params   = [];
               tyd_type     = Concrete ty;
