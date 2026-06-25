@@ -15,6 +15,8 @@ type incompatible =
 | DifferentType of EcTypes.ty * EcTypes.ty
 | OpBody (* of (EcPath.path * EcDecl.operator) * (EcPath.path * EcDecl.operator) *)
 | TyBody (* of (EcPath.path * EcDecl.tydecl) * (EcPath.path * EcDecl.tydecl) *)
+| SubtypeType of (EcTypes.ty * EcTypes.ty option)
+| SubtypePred of (EcAst.form * EcAst.form)
 
 type ovkind =
 | OVK_Type
