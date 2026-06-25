@@ -43,7 +43,7 @@ uninstall:
 	$(DUNE) uninstall
 
 unit: build
-	$(CHECK) unit
+	$(CHECK) unit quotations-disabled
 
 stdlib: build
 	$(CHECK) prelude stdlib

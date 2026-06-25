@@ -69,15 +69,17 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string * bool) list;
-  ldro_boot  : bool;
+  ldro_idirs  : (string option * string * bool) list;
+  ldro_boot   : bool;
+  ldro_quotes : (string * string) list;
 }
 
 and glb_options = {
-  o_why3     : string option;
-  o_reloc    : bool;
-  o_ovrevict : string list;
-  o_loader   : ldr_options;
+  o_why3       : string option;
+  o_reloc      : bool;
+  o_ovrevict   : string list;
+  o_loader     : ldr_options;
+  o_enable_quotes : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -90,6 +92,7 @@ type ini_options = {
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
+  ini_quotes   : (string * string) list;
 }
 
 type ini_context = {
@@ -116,6 +119,8 @@ module Ini : sig
 
   val get_rdirs : ini_context -> (string option * string) list
 
+  val get_quotes : ini_context -> (string * string) list
+
   (* ------------------------------------------------------------------ *)
   val get_all_ppwidth : ini_context list -> int option
 
@@ -132,6 +137,8 @@ module Ini : sig
   val get_all_idirs : ini_context list -> (string option * string) list
 
   val get_all_rdirs : ini_context list -> (string option * string) list
+
+  val get_all_quotes : ini_context list -> (string * string) list
 end = struct
   (* ------------------------------------------------------------------ *)
   let absolute ?(root : string option) (filename : string) =
@@ -174,6 +181,20 @@ end = struct
       (snd_map (absolute ?root:ini.inic_root))
       ini.inic_ini.ini_rdirs
 
+  (* A quotation command is resolved against the project directory only when
+     it is, verbatim, a relative path to an existing file (the common
+     [handlers/foo.py] case).  Anything else -- a command with arguments, an
+     absolute path, or a name on the PATH -- is passed through unchanged. *)
+  let get_quotes (ini : ini_context) =
+    let resolve (cmd : string) =
+      match ini.inic_root with
+      | Some root when Filename.is_relative cmd
+                    && Sys.file_exists (Filename.concat root cmd) ->
+          Filename.concat root cmd
+      | _ -> cmd
+    in
+    List.map (snd_map resolve) ini.inic_ini.ini_quotes
+
   (* ------------------------------------------------------------------ *)
   let get_all_ppwidth (ini : ini_context list) =
     List.find_map_opt get_ppwidth ini
@@ -198,6 +219,9 @@ end = struct
 
   let get_all_rdirs (ini : ini_context list) =
     List.flatten (List.map get_rdirs ini)
+
+  let get_all_quotes (ini : ini_context list) =
+    List.flatten (List.map get_quotes ini)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -355,6 +379,8 @@ let specs = {
     `Spec  ("why3"    , `String, "why3 configuration file");
     `Spec  ("reloc"   , `Flag  , "<for internal use>");
     `Spec  ("no-evict", `String, "Don't evict given prover");
+    `Spec  ("enable-quotations", `Flag,
+            "Allow {% %} quotations to run external handler programs");
 
     `Group "loader";
   ];
@@ -463,6 +489,13 @@ let parse_idir s =
   | None -> (None, expand s)
   | Some (nm, s) -> (Some (expand nm), expand s)
 
+(* A quotation binding is [name:command]; split on the first ':'. *)
+let parse_quote s =
+  match String.Exceptionless.split ~by:":" s with
+  | Some (nm, cmd) when String.trim nm <> "" ->
+      Some (String.trim nm, String.trim cmd)
+  | _ -> None
+
 (* -------------------------------------------------------------------- *)
 let dirs_of_env =
   let parse_ecpath s =
@@ -476,7 +509,7 @@ let dirs_of_env =
 (* -------------------------------------------------------------------- *)
 let ldr_options_of_values ~env ?(ini = []) values =
   if get_flag "boot" values then
-    { ldro_idirs = []; ldro_boot = true; }
+    { ldro_idirs = []; ldro_boot = true; ldro_quotes = Ini.get_all_quotes ini; }
   else
     let add_rec (fl : bool) ((nm, x) : string option * string) =
       (nm, x, fl) in
@@ -490,8 +523,9 @@ let ldr_options_of_values ~env ?(ini = []) values =
     let rdirs   = List.map (add_rec true) rdirs in
     let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
 
-    { ldro_idirs = idirs @ idirs_I @ rdirs @ idirs_R;
-      ldro_boot  = false; }
+    { ldro_idirs  = idirs @ idirs_I @ rdirs @ idirs_R;
+      ldro_boot   = false;
+      ldro_quotes = Ini.get_all_quotes ini; }
 
 let glb_options_of_values ~env ini values =
   let why3 =
@@ -501,10 +535,20 @@ let glb_options_of_values ~env ini values =
 
   let ovrevict = Ini.get_all_ovrevict ini in
 
+  (* Enabling quotations runs external programs, so it is taken ONLY from the
+     command line or the environment -- never from [ini]/easycrypt.project,
+     which ships inside the checked-out tree. *)
+  let enable_quotes =
+    get_flag "enable-quotations" values
+    || (env && (match Sys.getenv_opt "EC_ENABLE_QUOTATIONS" with
+                | Some ("" | "0" | "false") | None -> false
+                | Some _ -> true)) in
+
   { o_why3     = why3;
     o_reloc    = get_flag "reloc" values;
     o_ovrevict = ovrevict @ (get_strings "no-evict" values);
-    o_loader   = ldr_options_of_values ~env ~ini values; }
+    o_loader   = ldr_options_of_values ~env ~ini values;
+    o_enable_quotes = enable_quotes; }
 
 let prv_options_of_values ini values =
   let provers =
@@ -747,7 +791,8 @@ let read_ini_file (filename : string) =
       ini_quorum   = tryint  "quorum"  ;
       ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
-      ini_rdirs    = List.map parse_idir (trylist "rdirs"); } in
+      ini_rdirs    = List.map parse_idir (trylist "rdirs");
+      ini_quotes   = List.filter_map parse_quote (trylist "quote"); } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
     ini_why3     = omap expand ini.ini_why3;
@@ -756,4 +801,5 @@ let read_ini_file (filename : string) =
     ini_quorum   = ini.ini_quorum;
     ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
-    ini_rdirs    = ini.ini_rdirs; }
+    ini_rdirs    = ini.ini_rdirs;
+    ini_quotes   = ini.ini_quotes; }

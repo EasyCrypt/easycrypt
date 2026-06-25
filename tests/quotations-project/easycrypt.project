@@ -1,0 +1,5 @@
+[general]
+provers = CVC5@1.0
+provers = Z3@4.12
+quote = calc:calc.py
+quote = verbatim:verbatim.py

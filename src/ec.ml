@@ -398,6 +398,14 @@ let main () =
       ldropts.ldro_idirs;
   end;
 
+  (* Quotations: enabled only via CLI/env (never easycrypt.project), and the
+     handlers declared in easycrypt.project are registered only then. *)
+  EcQuotation.set_enabled options.o_options.o_enable_quotes;
+  if options.o_options.o_enable_quotes then
+    List.iter
+      (fun (name, command) -> EcQuotation.register ~name ~command)
+      ldropts.ldro_quotes;
+
   (* Initialize printer *)
   EcCorePrinting.Registry.register (module EcPrinting);
 
@@ -780,6 +788,14 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+                   (* Mechanism B: a location should never escape quotation
+                      position-remapping (EcIo) carrying the synthetic buffer
+                      filename.  If one does, collapse it rather than print
+                      meaningless <quotation:...> coordinates. *)
+                   let loc =
+                     if EcQuotation.is_sentinel loc.EcLocation.loc_fname
+                     then EcLocation._dummy else loc
+                   in
 
                    (* -upto: if this command starts past the target, print goals and exit *)
                    if past_upto loc then begin
