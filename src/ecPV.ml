@@ -1139,6 +1139,11 @@ module Mpv2 = struct
       when EcReduction.EqTest.for_type env ty1 ty2
         && EcReduction.EqTest.for_type env b1.e_ty b2.e_ty ->
       List.fold_left2 (add_eqs_loc env local) eqs (b1::es1) (b2::es2)
+    | _, _ when EcReduction.EqTest.for_expr env e1 e2 -> 
+      let fv1 = e_read env e1 in
+      let fv2 = e_read env e2 in
+      union eqs (eq_refl (PV.union fv1 fv2))
+
     | _, _ -> raise EqObsInError
 
   let add_eqs env e1 e2 eqs =  add_eqs_loc env Mid.empty eqs e1 e2
