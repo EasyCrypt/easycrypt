@@ -738,4 +738,11 @@ module Tvar = struct
 
   let f_subst ~(freshen : bool) (lv : ident list) (lt : ty list) : form -> form =
     Fsubst.f_subst_tvar ~freshen (init lv lt)
+
+  let sty_subst ~(freshen : bool) (lv : ident list) (lt : ty list) : (ty * form) option -> (ty * form) option =
+    let tsubst = init lv lt in
+    Option.map
+      (fun (ty, f) ->
+        ( subst tsubst ty,
+        Fsubst.f_subst_tvar ~freshen tsubst f ))
 end

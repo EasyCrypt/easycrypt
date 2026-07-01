@@ -839,6 +839,17 @@ end = struct
       Format.fprintf fmt "incompatible body"
     | TyBody  ->
       Format.fprintf fmt "incompatible type declaration"
+    | SubtypeType (ty1, None) ->
+      Format.fprintf fmt "incompatible type. Not a subtype of %a"
+        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty1
+    | SubtypeType (ty1, Some ty2) ->
+      Format.fprintf fmt "incompatible type. The type is a subtype of %a instead of %a"
+        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty2
+        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty1
+    | SubtypePred (f1, f2) ->
+      Format.fprintf fmt "incompatible predicate for subtypes. The predicate for the subtype is %a instead of %a"
+        (EcPrinting.pp_form  (EcPrinting.PPEnv.ofenv env)) f2
+        (EcPrinting.pp_form  (EcPrinting.PPEnv.ofenv env)) f1
 
   let pp_clone_error env fmt error =
     let msg x = Format.fprintf fmt x in

@@ -44,10 +44,11 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Tvar : sig
-  val init    : EcIdent.t list -> ty list -> ty Mid.t
-  val subst1  : (EcIdent.t * ty) -> ty -> ty
-  val subst   : ty Mid.t -> ty -> ty
-  val f_subst : freshen:bool -> EcIdent.t list -> ty list -> form -> form
+  val init      : EcIdent.t list -> ty list -> ty Mid.t
+  val subst1    : (EcIdent.t * ty) -> ty -> ty
+  val subst     : ty Mid.t -> ty -> ty
+  val f_subst   : freshen:bool -> EcIdent.t list -> ty list -> form -> form
+  val sty_subst : freshen:bool -> EcIdent.t list -> ty list -> (ty * form) option -> (ty * form) option
 end
 
 (* -------------------------------------------------------------------- *)
