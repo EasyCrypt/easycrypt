@@ -334,11 +334,15 @@ let select_pv env side name ue tvi (psig, retty)
     try
       let (pv, ty) = EcEnv.Var.lookup_progvar ?side name env in
       let subue = UE.copy ue in
-      match EcUnify.classify_application env subue ty psig retty with
-      | None   -> ([(pv, ty, subue)], [])
-      | Some f ->
-          let pv0 = match pv with `Var p -> p | `Proj (p, _) -> p in
-          ([], [(`Pv (pv0, ty), f)])
+      let expected = toarrow psig (ofdfl (fun () -> UE.fresh subue) retty) in
+      try
+        EcUnify.unify env subue ty expected;
+        ([(pv, ty, subue)], [])
+      with EcUnify.UnificationFailure _ ->
+        let subue = UE.copy ue in
+        let f = oget (EcUnify.classify_application env subue ty psig retty) in
+        let pv0 = match pv with `Var p -> p | `Proj (p, _) -> p in
+        ([], [(`Pv (pv0, ty), f)])
     with EcEnv.LookupFailure _ -> ([], [])
 
 (* -------------------------------------------------------------------- *)
@@ -374,10 +378,8 @@ let gen_select_op
     (ue       : EcUnify.unienv)
     (psig     : EcTypes.dom * EcTypes.ty option)
 
-    : OpSelect.gopsel list * OpSelect.opfailure list
+    : OpSelect.gopsel list * OpSelect.opfailure list Lazy.t
 =
-
-  let opfailures = ref [] in
 
   let fpv me (pv, ty, ue) : OpSelect.gopsel =
     (`Pv (me, pv), ty, ue, (pv :> opmatch))
@@ -417,30 +419,22 @@ let gen_select_op
       |>  Option.to_list
     else [] in
 
+  let pvfailures = ref [] in
+
   let ops () : OpSelect.gopsel list =
-    let outcomes =
-      EcUnify.select_op_outcomes ~filter:ue_filter tvi env name ue psig in
-    let ops =
-      List.filter_map
-        (function EcUnify.OK r -> Some r | EcUnify.KO _ -> None) outcomes in
-    opfailures := !opfailures @
-      List.filter_map
-        (function
-          | EcUnify.KO (p, inst, ty, f) -> Some (`Op (p, inst, ty), f)
-          | EcUnify.OK _ -> None)
-        outcomes;
+    let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
     let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
     let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
     (List.map fop ops)
 
   and pvs () : OpSelect.gopsel list =
-    let me, (pvs, pvfailures) =
+    let me, (pvs, pvf) =
       match EcEnv.Memory.get_active_ss env, actonly with
       | None, true -> (None, ([], []))
       | me  , _    -> (  me, select_pv env me name ue tvi psig)
     in
-    opfailures := !opfailures @ pvfailures;
+    pvfailures := pvf;
     List.map (fpv me) pvs
   in
 
@@ -460,7 +454,15 @@ let gen_select_op
         else
           select [locals; pvs; ops]
   in
-  (selected, !opfailures)
+
+  let opfailures = lazy (
+    !pvfailures
+    @ List.map
+        (fun (p, inst, ty, f) -> (`Op (p, inst, ty), f))
+        (EcUnify.select_op_failures ~filter:ue_filter tvi env name ue psig)
+  ) in
+
+  (selected, opfailures)
 
 (* -------------------------------------------------------------------- *)
 let select_exp_op env mode opsc name ue tvi psig =
@@ -475,10 +477,11 @@ let select_form_op env mode ~forcepv opsc name ue tvi psig =
 (* -------------------------------------------------------------------- *)
 (* [UnappliedOp] when candidates of that name exist but fail, else
    [UnknownVarOrOp]. *)
-let tyerror_noop env loc name esig retty (opfailures : OpSelect.opfailure list) =
-  match opfailures with
+let tyerror_noop env loc name esig retty
+    (opfailures : OpSelect.opfailure list Lazy.t) =
+  match Lazy.force opfailures with
   | [] -> tyerror loc env (UnknownVarOrOp (name, esig))
-  | _  -> tyerror loc env (UnappliedOp (name, esig, retty, opfailures))
+  | opfailures -> tyerror loc env (UnappliedOp (name, esig, retty, opfailures))
 
 (* -------------------------------------------------------------------- *)
 let select_proj env opsc name ue tvi recty =
