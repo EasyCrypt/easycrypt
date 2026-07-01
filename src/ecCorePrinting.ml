@@ -136,6 +136,7 @@ module type PrinterAPI = sig
     val pr_th  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_ax  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_mod : Format.formatter -> EcEnv.env -> qsymbol -> unit
+    val pr_fun : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_mty : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_rw  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_at  : Format.formatter -> EcEnv.env -> symbol -> unit

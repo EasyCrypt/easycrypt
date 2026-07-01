@@ -1261,6 +1261,7 @@ type pprint =
   | Pr_pr   of pqsymbol
   | Pr_ax   of pqsymbol
   | Pr_mod  of pqsymbol
+  | Pr_proc of pqsymbol
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located
   | Pr_goal of int
