@@ -3645,6 +3645,44 @@ and pp_block ppe fmt s =
 and pp_stmt ppe fmt s =
   pp_list "@," (pp_instr ppe) fmt s.s_node
 
+let pp_function ppe fmt (fun_ : function_) =
+  let pp_item ppe fmt = function
+    | `Var pv ->
+        Format.fprintf fmt "@[<hov 2>var %a;@]" (pp_pvdecl ppe) pv
+    | `Instr i ->
+        Format.fprintf fmt "%a" (pp_instr ppe) i
+    | `Return e ->
+        Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]" (pp_expr ppe) e
+  in
+
+  let pp_funhdr ppe fmt fun_ =
+    let with_sig = match fun_.f_def with FBalias _ -> false | _ -> true in
+    Format.fprintf fmt "%a" (pp_funsig ~with_sig ppe) fun_.f_sig in
+
+  let pp_fundef ppe fmt fun_ =
+    match fun_.f_def with
+    | (FBdef def) ->
+      let dummy_mem = EcIdent.create "&hr_dummy" in
+      let _, me = EcEnv.Fun.actmem_body dummy_mem fun_ in
+      let ppe  = PPEnv.push_mem ppe ~active:true me in
+      let vars = List.map (fun x -> `Var    x) def.f_locals in
+      let stmt = List.map (fun x -> `Instr  x) def.f_body.s_node in
+      let ret  = List.map (fun x -> `Return x) (otolist def.f_ret) in
+      let all  = List.filter (fun x -> not (List.is_empty x)) [vars; stmt; ret] in
+
+      if List.is_empty all then Format.fprintf fmt "{}" else
+        Format.fprintf fmt "{@,  @[<v>%a@]@,}"
+          (pp_list "@,@," (pp_list "@," (pp_item ppe))) all;
+
+    | FBalias g ->
+        Format.fprintf fmt "%a" (pp_funname ppe) g
+
+    | FBabs _ ->
+        Format.fprintf fmt "?ABSTRACT?"
+  in
+
+  Format.fprintf fmt "@[<v>%a = %a@]" (pp_funhdr ppe) fun_ (pp_fundef ppe) fun_
+
 let rec pp_modexp ppe fmt (p, me) =
   let params =
     match me.me_body with
@@ -3676,42 +3714,7 @@ and pp_moditem ppe fmt (p, i) =
       Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe) v
 
   | MI_Function f ->
-    let pp_item ppe fmt = function
-      | `Var pv ->
-          Format.fprintf fmt "@[<hov 2>var %a;@]" (pp_pvdecl ppe) pv
-      | `Instr i ->
-          Format.fprintf fmt "%a" (pp_instr ppe) i
-      | `Return e ->
-          Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]" (pp_expr ppe) e
-    in
-
-    let pp_funsig ppe fmt fun_ =
-      let with_sig = match fun_.f_def with FBalias _ -> false | _ -> true in
-      Format.fprintf fmt "%a" (pp_funsig ~with_sig ppe) fun_.f_sig in
-
-    let pp_fundef ppe fmt fun_ =
-      match fun_.f_def with
-      | (FBdef def) ->
-        let dummy_mem = EcIdent.create "&hr_dummy" in
-        let _, me = EcEnv.Fun.actmem_body dummy_mem fun_ in
-        let ppe  = PPEnv.push_mem ppe ~active:true me in
-        let vars = List.map (fun x -> `Var    x) def.f_locals in
-        let stmt = List.map (fun x -> `Instr  x) def.f_body.s_node in
-        let ret  = List.map (fun x -> `Return x) (otolist def.f_ret) in
-        let all  = List.filter (fun x -> not (List.is_empty x)) [vars; stmt; ret] in
-
-        if List.is_empty all then Format.fprintf fmt "{}" else
-          Format.fprintf fmt "{@,  @[<v>%a@]@,}"
-            (pp_list "@,@," (pp_list "@," (pp_item ppe))) all;
-
-      | FBalias g ->
-          Format.fprintf fmt "%a" (pp_funname ppe) g
-
-      | FBabs _ ->
-          Format.fprintf fmt "?ABSTRACT?"
-    in
-
-    Format.fprintf fmt "@[<v>%a = %a@]" (pp_funsig ppe) f (pp_fundef ppe) f
+    pp_function ppe fmt f
 
 let pp_modexp ppe fmt (mp, me) =
   Format.fprintf fmt "%a." (pp_modexp ppe) (mp, me)
@@ -4104,6 +4107,31 @@ module ObjectInfo = struct
   let pr_mod = pr_gen pr_mod_r
 
   (* ------------------------------------------------------------------ *)
+  let pr_fun_r =
+    (* Prefer the substituting lookup so that a concrete or fully-applied
+       procedure prints with its instantiated names.  When the enclosing
+       module still has functor parameters, that lookup fails; we then fall
+       back to the suspended view, which keeps the parameters abstract. *)
+    let lookup qs env =
+      try
+        let (xp, f) = EcEnv.Fun.lookup qs env in
+        (xp, { EcEnv.sp_target = f; sp_params = (0, []); })
+      with EcEnv.LookupFailure _ -> EcEnv.Fun.sp_lookup qs env in
+    { od_name    = "procedures";
+      od_lookup  = lookup;
+      od_printer =
+        (fun ppe fmt (_, susp) ->
+          let (_, params) = susp.EcEnv.sp_params in
+          let (ppe, pp_params) = pp_mod_params ppe params in
+          if List.is_empty params then
+            pp_function ppe fmt susp.EcEnv.sp_target
+          else
+            Format.fprintf fmt "@[<v>(* in functor %t *)@ %a@]"
+              pp_params (pp_function ppe) susp.EcEnv.sp_target); }
+
+  let pr_fun = pr_gen pr_fun_r
+
+  (* ------------------------------------------------------------------ *)
   let pr_mty_r =
     { od_name    = "module types";
       od_lookup  = EcEnv.ModTy.lookup;
@@ -4148,6 +4176,7 @@ module ObjectInfo = struct
                     pr_gen_r ~prcat:true pr_th_r ;
                     pr_gen_r ~prcat:true pr_ax_r ;
                     pr_gen_r ~prcat:true pr_mod_r;
+                    pr_gen_r ~prcat:true pr_fun_r;
                     pr_gen_r ~prcat:true pr_mty_r;
                     pr_gen_r ~prcat:true pr_rw_r ;
                     pr_gen_r ~prcat:true pr_at_r ; ] in

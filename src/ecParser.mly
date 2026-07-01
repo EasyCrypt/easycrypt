@@ -3881,6 +3881,7 @@ print:
 | AXIOM       qs=qident          { Pr_ax   qs            }
 | LEMMA       qs=qident          { Pr_ax   qs            }
 | MODULE      qs=qident          { Pr_mod  qs            }
+| PROC        qs=qident          { Pr_proc qs            }
 | MODULE TYPE qs=qident          { Pr_mty  qs            }
 | GLOB        qs=loc(mod_qident) { Pr_glob qs            }
 | GOAL        n=sword            { Pr_goal n             }

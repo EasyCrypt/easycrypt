@@ -390,6 +390,7 @@ let process_pr fmt scope p =
   | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
   | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   (unloc qs)
   | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   (unloc qs)
+  | Pr_proc qs -> EcPrinting.ObjectInfo.pr_fun  fmt env   (unloc qs)
   | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   (unloc qs)
   | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   (unloc qs)
 
