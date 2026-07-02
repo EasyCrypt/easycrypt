@@ -6,8 +6,11 @@ open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t
-type ty_params = ty_param list
+type ty_params = {
+  idxvars : EcIdent.t list;
+  tyvars  : EcIdent.t list;
+}
+
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type ty_record =

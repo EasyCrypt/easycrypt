@@ -38,7 +38,7 @@ let f_op_app
   let opty  = EcCoreSubst.ty_subst subst opty in
   let tvars = List.map (EcCoreSubst.ty_subst subst) tvars in
 
-  f_app (f_op op tvars opty) args rty
+  f_app (f_op op ~tyargs:tvars opty) args rty
   
 (* -------------------------------------------------------------------- *)
 let f_app

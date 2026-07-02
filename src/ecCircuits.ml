@@ -200,7 +200,7 @@ let rec pp_circ_error ppe fmt (err : circuit_error) =
 let rec ctype_of_ty (env : env) (ty : ty) : ctype =
   match ty.ty_node with
   | Ttuple tys -> CTuple (List.map (ctype_of_ty env) tys)
-  | Tconstr (pth, []) when pth = EcCoreLib.CI_Bool.p_bool -> cbool
+  | Tconstr (pth, { indices = []; types = [] }) when pth = EcCoreLib.CI_Bool.p_bool -> cbool
   | _ -> begin
     match EcEnv.Circuit.lookup_array_and_bitstring env ty with
     | Some ({size = _, Some size_arr}, {size = _, Some size_bs}) ->
@@ -581,7 +581,7 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
             arg_of_init (fun i ->
                 circuit_of_node isubst st (fapply_safe f [f_int (BI.of_int i)]))
         end
-      | {ty_node = Tconstr (p, [t])}
+      | {ty_node = Tconstr (p, { indices = []; types = [t] })}
         when EcPath.p_equal p EcCoreLib.CI_List.p_list
              && type_has_bindings env t ->
         let cs =

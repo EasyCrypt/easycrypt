@@ -38,15 +38,15 @@ let datatype_proj_path (p : EP.path) (x : symbol) =
 
 (* -------------------------------------------------------------------- *)
 let indsc_of_record (rc : record) =
-  let targs  = List.map tvar rc.rc_tparams in
-  let recty  = tconstr rc.rc_path targs in
+  let tyargs = List.map tvar rc.rc_tparams.tyvars in
+  let recty  = tconstr_r rc.rc_path (mk_targs ~types:tyargs ()) in
   let recx   = fresh_id_of_ty recty in
   let recfm  = FL.f_local recx recty in
   let predty = tfun recty tbool in
   let predx  = EcIdent.create "P" in
   let pred   = FL.f_local predx predty in
   let ctor   = record_ctor_path rc.rc_path in
-  let ctor   = FL.f_op ctor targs (toarrow (List.map snd rc.rc_fields) recty) in
+  let ctor   = FL.f_op ctor ~tyargs (toarrow (List.map snd rc.rc_fields) recty) in
   let prem   =
     let ids  = List.map (fun (_, fty) -> (fresh_id_of_ty fty, fty)) rc.rc_fields in
     let vars = List.map (fun (x, xty) -> FL.f_local x xty) ids in
@@ -138,7 +138,7 @@ let ty_params_compat =
     declaration [decl] (with name [p]).
     This function provide error context in case the check fails. *)
 let rec check_positivity_in_decl fct p decl ident =
-  let check x () = check_positivity_ident fct p decl.tyd_params ident x
+  let check x () = check_positivity_ident fct p decl.tyd_params.tyvars ident x
   and iter l f = List.iter f l in
 
   match decl.tyd_type with
@@ -158,12 +158,15 @@ and check_positivity_ident fct p params ident ty =
   | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple tys -> List.iter (check_positivity_ident fct p params ident) tys
   | Tconstr (q, args) when EcPath.p_equal q p ->
-      if not (ty_params_compat args params) then
+      (* Indices play no role in positivity: the recursion is on the
+         type, and indices are non-negative integer expressions that
+         carry no embedded type information. *)
+      if not (ty_params_compat args.types params) then
         non_positive p (TypePositionRestriction ty)
   | Tconstr (q, args) ->
       let decl = fct q in
-      List.iter (check_positivity_ident fct p params ident) args;
-      List.combine args decl.tyd_params
+      List.iter (check_positivity_ident fct p params ident) args.types;
+      List.combine args.types decl.tyd_params.tyvars
       |> List.filter_map (fun (arg, ident') ->
              if EcTypes.var_mem ident arg then Some ident' else None)
       |> List.iter (check_positivity_in_decl fct q decl)
@@ -177,11 +180,12 @@ let rec check_positivity_path fct p ty =
   | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple tys -> List.iter (check_positivity_path fct p) tys
   | Tconstr (q, args) when EcPath.p_equal q p ->
-      if List.exists (occurs p) args then non_positive p (NonPositiveOcc ty)
+      if List.exists (occurs p) args.types then
+        non_positive p (NonPositiveOcc ty)
   | Tconstr (q, args) ->
       let decl = fct q in
-      List.iter (check_positivity_path fct p) args;
-      List.combine args decl.tyd_params
+      List.iter (check_positivity_path fct p) args.types;
+      List.combine args.types decl.tyd_params.tyvars
       |> List.filter_map (fun (arg, ident) ->
              if occurs p arg then Some ident else None)
       |> List.iter (check_positivity_in_decl fct q decl)
@@ -223,11 +227,12 @@ let indsc_of_datatype ?(normty = identity) (mode : indmode) (dt : datatype) =
             |> omap (FL.f_forall [x, GTty ty1])
 
   and schemec mode (targs, p) pred (ctor, tys) =
-    let indty = tconstr p (List.map tvar targs) in
+    let tyargs = List.map tvar targs.tyvars in
+    let indty = tconstr ~tyargs p in
     let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
     let cargs = List.map (fun (x, xty) -> FL.f_local x xty) xs in
     let ctor  = EcPath.pqoname (EcPath.prefix tpath) ctor in
-    let ctor  = FL.f_op ctor (List.map tvar targs) (toarrow tys indty) in
+    let ctor  = FL.f_op ctor ~tyargs (toarrow tys indty) in
     let form  = FL.f_app pred [FL.f_app ctor cargs indty] tbool in
     let form  =
       match mode with
@@ -247,7 +252,7 @@ let indsc_of_datatype ?(normty = identity) (mode : indmode) (dt : datatype) =
       form
 
   and scheme mode (targs, p) ctors =
-    let indty  = tconstr p (List.map tvar targs) in
+    let indty  = tconstr ~tyargs:(List.map tvar targs.tyvars) p in
     let indx   = fresh_id_of_ty indty in
     let indfm  = FL.f_local indx indty in
     let predty = tfun indty tbool in
@@ -264,7 +269,7 @@ let indsc_of_datatype ?(normty = identity) (mode : indmode) (dt : datatype) =
 
 (* -------------------------------------------------------------------- *)
 let datatype_projectors (tpath, tparams, { tydt_ctors = ctors }) =
-  let thety = tconstr tpath (List.map tvar tparams) in
+  let thety = tconstr ~tyargs:(List.map tvar tparams.tyvars) tpath in
 
   let do1 i (cname, cty) =
     let thv = EcIdent.create "the" in
@@ -378,7 +383,7 @@ let indsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
     FL.f_forall ctor.prc_bds px
   in
 
-  let sc = FL.f_op p (List.map tvar pr.ip_tparams) prty in
+  let sc = FL.f_op p ~tyargs:(List.map tvar pr.ip_tparams.tyvars) prty in
   let sc = FL.f_imp (FL.f_app sc prag tbool) pred in
   let sc = FL.f_imps (List.map for1 pri.pri_ctors) sc in
   let sc = FL.f_forall [predx, FL.gtty tbool] sc in
@@ -391,7 +396,7 @@ let introsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
   let bds  = List.map (snd_map FL.gtty) pri.pri_args in
   let clty = toarrow (List.map snd pri.pri_args) tbool in
   let clag = (List.map (curry FL.f_local) pri.pri_args) in
-  let cl   = FL.f_op p (List.map tvar pr.ip_tparams) clty in
+  let cl   = FL.f_op p ~tyargs:(List.map tvar pr.ip_tparams.tyvars) clty in
   let cl   = FL.f_app cl clag tbool in
 
   let for1 ctor =

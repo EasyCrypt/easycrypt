@@ -34,7 +34,7 @@ type mode = [`Det | `Distr]
 (* -------------------------------------------------------------------- *)
 (* FIXME: MOVE ME                                                       *)
 let eop_dunit (ty : ty) =
-  e_op EcCoreLib.CI_Distr.p_dunit [ty] (tfun ty (tdistr ty))
+  e_op EcCoreLib.CI_Distr.p_dunit ~tyargs:[ty] (tfun ty (tdistr ty))
 
 let e_dunit (e : expr) =
   e_app (eop_dunit e.e_ty) [e] (tdistr e.e_ty)
@@ -181,7 +181,7 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
       let fd   = oget (EcEnv.Fun.by_xpath_opt xp env.env) in
       let args = translate_e env (e_tuple args) in
       let op   = EcPath.pqname (oget (EcPath.prefix p)) f in
-      let op   = e_op op [] (tfun fd.f_sig.fs_arg fd.f_sig.fs_ret) in
+      let op   = e_op op (tfun fd.f_sig.fs_arg fd.f_sig.fs_ret) in
       let op   = e_app op [args] fd.f_sig.fs_ret in
       let lv   = translate_lv env' lv  in
 
@@ -232,7 +232,7 @@ and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
             raise SemNotSupported
           else begin
             match ic.e_node with
-            | Eapp ({ e_node = Eop (op, []) }, [{ e_node = Evar (PVloc y') }; { e_node = Eint inc }])
+            | Eapp ({ e_node = Eop (op, _) }, [{ e_node = Evar (PVloc y') }; { e_node = Eint inc }])
                  when    y = y'
                       && EcBigInt.lt EcBigInt.zero inc
                       && EcPath.p_equal op EcCoreLib.CI_Int.p_int_add
@@ -245,7 +245,7 @@ and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
        if BI.gt inc BI.one then begin
          let mx =
            e_app
-             (e_op EcCoreLib.CI_Int.p_int_mul [] (toarrow [tint; tint] tint))
+             (e_op EcCoreLib.CI_Int.p_int_mul (toarrow [tint; tint] tint))
              [e_int inc; e_var (pv_loc x) tint] tint in
          let subst = EcPV.Mpv.add env.env (pv_loc x) mx EcPV.Mpv.empty in
          EcPV.Mpv.issubst env.env subst body
@@ -253,7 +253,7 @@ and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
 
      let bd =
        match c.e_node with
-       | Eapp ({ e_node = Eop (op, []) }, [{ e_node = Evar (PVloc y) }; bd])
+       | Eapp ({ e_node = Eop (op, _) }, [{ e_node = Evar (PVloc y) }; bd])
             when    x = y
                  && EcPath.p_equal op EcCoreLib.CI_Int.p_int_lt -> bd
        | _ -> raise SemNotSupported in
@@ -361,12 +361,12 @@ and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
             List.map
               (fun (z, zty) ->
                 match Msym.find_opt z env.subst with
-                | None -> e_op EcCoreLib.CI_Witness.p_witness [zty] zty
+                | None -> e_op EcCoreLib.CI_Witness.p_witness ~tyargs:[zty] zty
                 | Some z -> e_local z zty)
               wr in
           let args = e_tuple args in
           let cmode, c = translate_s env' cont (stmt s_tail) in
-          let aout = e_op EcCoreLib.CI_Int.p_iteri [aty] in
+          let aout = e_op EcCoreLib.CI_Int.p_iteri ~tyargs:[aty] in
           let aout = aout (toarrow [tint; (toarrow [tint; aty] aty); aty] aty) in
           let aout = e_app aout [niter; body; args] aty in
           (cmode, e_let lv aout c)
@@ -376,12 +376,12 @@ and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
             List.map
               (fun (z, zty) ->
                 match Msym.find_opt z env.subst with
-                | None -> e_op EcCoreLib.CI_Witness.p_witness [zty] zty
+                | None -> e_op EcCoreLib.CI_Witness.p_witness ~tyargs:[zty] zty
                 | Some z -> e_local z zty)
               wr in
           let args = e_tuple args in
           let cmode, c = translate_s env' cont (stmt s_tail) in
-          let aout = e_op EcCoreLib.CI_Distr.p_dfold [aty] in
+          let aout = e_op EcCoreLib.CI_Distr.p_dfold ~tyargs:[aty] in
           let aout = aout (toarrow [toarrow [tint; aty] (tdistr aty); aty; tint] (tdistr aty)) in
           let aout = e_app aout [body; args; niter] (tdistr aty) in
 

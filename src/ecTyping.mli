@@ -14,7 +14,7 @@ open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
-  | `Op   of EcPath.path * EcTypes.ty list
+  | `Op   of EcPath.path * EcAst.tindex list * EcTypes.ty list
   | `Lc   of EcIdent.t
   | `Var  of EcTypes.prog_var
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg
@@ -145,7 +145,11 @@ type tyerror =
 | AmbiguousProj          of qsymbol
 | AmbiguousProji         of int * ty
 | InvalidTypeAppl        of qsymbol * int * int
+| InvalidIndexAppl       of qsymbol * int * int
+| UnboundIndexVariable   of symbol
+| IndexMismatch          of tindex * tindex
 | DuplicatedTyVar
+| DuplicatedIndexVar     of symbol
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
 | DuplicatedException    of qsymbol
@@ -212,7 +216,13 @@ val tp_nothing : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transtyvars:
+  ?idxparams:psymbol list ->
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
+
+(* Bind every idxvar of the unienv as an int-typed formula-local in
+   the env, so that a bound idxvar [n] can also appear as an integer
+   term in the body of the surrounding declaration. *)
+val bind_idx_locals : env -> EcUnify.unienv -> env
 
 (* -------------------------------------------------------------------- *)
 val transty : typolicy -> env -> EcUnify.unienv -> pty -> ty

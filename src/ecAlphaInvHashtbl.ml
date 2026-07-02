@@ -78,7 +78,7 @@ let hash_memo (memo : (int, int) Hashtbl.t) (f0 : form) : int =
       combine 3 (pv_hash pv)
     | Fglob (mp, _m) -> combine 4 (id_hash mp)
     | Fop (p, tys) ->
-      combine 5 (combine_list (EcPath.p_hash p) (List.map ty_hash tys))
+      combine 5 (combine_list (EcPath.p_hash p) (List.map ty_hash tys.types))
     | Fif (c, t, f) -> combine 6 (combine_list 0 [hash e c; hash e t; hash e f])
     | Fmatch (c, bs, ty) ->
       combine 7 (combine_list (ty_hash ty) (hash e c :: List.map (hash e) bs))

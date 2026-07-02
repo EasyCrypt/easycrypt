@@ -80,7 +80,7 @@ module Axioms = struct
     let addctt = fun subst x f -> EcSubst.add_opdef subst (xpath x) ([], f) in
 
     let subst  =
-      EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
+      EcSubst.add_tydef EcSubst.empty (xpath tname) ([], [], cr.r_type) in
     let subst  =
       List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
     let subst  = odfl subst (cr.r_opp |> omap (fun p -> add subst opp p)) in
@@ -123,7 +123,7 @@ module Axioms = struct
 
     let for1 axname =
       let ax = EcEnv.Ax.by_path (EcPath.pqname tmod axname) env in
-        assert (ax.ax_tparams = [] && is_axiom ax.ax_kind);
+        assert (ax.ax_tparams.tyvars = [] && ax.ax_tparams.idxvars = [] && is_axiom ax.ax_kind);
         (axname, EcSubst.subst_form subst ax.ax_spec)
     in
       List.map for1 axs

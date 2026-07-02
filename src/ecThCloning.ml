@@ -40,6 +40,10 @@ type clone_error =
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
+| CE_IdxArgMism        of ovkind * qsymbol
+(* Cloning of indexed declarations is not yet supported (Phase 3
+   landed the binders but not the index-instantiation surface). *)
+| CE_IndexedNotYetSupported of ovkind * qsymbol
 | CE_NoExceptions
 
 exception CloneError of EcEnv.env * clone_error
@@ -61,7 +65,7 @@ type xty_override =
 (* ------------------------------------------------------------------ *)
 type xop_override = [
   | op_override_def genoverride
-  | `Direct of EcDecl.ty_params * EcAst.form
+  | `Direct of EcIdent.t list * EcAst.form
 ] * clmode
 
 (* ------------------------------------------------------------------ *)
@@ -315,10 +319,13 @@ end = struct
 
   (* ------------------------------------------------------------------ *)
   let ty_ovrd oc ((proofs, evc) : state) name (tyd : ty_override) =
-    let ntyargs =
+    let nidxargs, ntyargs =
       match fst tyd with
-      | `BySyntax (tyargs, _) -> List.length tyargs
-      | `ByPath p -> List.length (EcEnv.Ty.by_path p oc.oc_env).tyd_params in
+      | `BySyntax (idxargs, tyargs, _) ->
+          (List.length idxargs, List.length tyargs)
+      | `ByPath p ->
+          let p = (EcEnv.Ty.by_path p oc.oc_env).tyd_params in
+          (List.length p.idxvars, List.length p.tyvars) in
 
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
@@ -327,7 +334,9 @@ end = struct
       | None ->
          clone_error oc.oc_env (CE_UnkOverride (OVK_Type, name));
       | Some refty ->
-         if List.length refty.tyd_params <> ntyargs then
+         if List.length refty.tyd_params.idxvars <> nidxargs then
+           clone_error oc.oc_env (CE_IdxArgMism (OVK_Type, name));
+         if List.length refty.tyd_params.tyvars <> ntyargs then
            clone_error oc.oc_env (CE_TypeArgMism (OVK_Type, name)) in
 
     let evc =

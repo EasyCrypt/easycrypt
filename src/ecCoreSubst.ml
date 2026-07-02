@@ -25,6 +25,15 @@ type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
   fs_u       : ty Muid.t;
   fs_v       : ty Mid.t;
+  (* Index-variable substitution. Used at op-application time to
+     replace each of the op's idxvar idents with a fresh TIUnivar
+     allocated by EcUnify. Consulted by [tindex_subst] before
+     falling back to [fs_loc]. *)
+  fs_idx     : tindex Mid.t;
+  (* Index-univar substitution. Populated when an index unification
+     resolves a TIUnivar; applied lazily when subsituting through
+     types that still mention the univar. *)
+  fs_iu      : tindex Muid.t;
   fs_mod     : EcPath.mpath Mid.t;
   fs_modex   : mod_extra Mid.t;
   fs_loc     : form Mid.t;
@@ -58,17 +67,23 @@ let f_subst_init
       ?(freshen=false)
       ?(tu=Muid.empty)
       ?(tv=Mid.empty)
+      ?(idx=Mid.empty)
+      ?(iu=Muid.empty)
       ?(esloc=Mid.empty)
       () =
   let fv = Mid.empty in
   let fv = Muid.fold (fun _ t s -> fv_union s (ty_fv t)) tu fv in
   let fv = fv_Mid ty_fv tv fv in
   let fv = fv_Mid e_fv esloc fv in
+  let fv = fv_Mid tindex_fv idx fv in
+  let fv = Muid.fold (fun _ t s -> fv_union s (tindex_fv t)) iu fv in
 
   {
     fs_freshen  = freshen;
     fs_u        = tu;
     fs_v        = tv;
+    fs_idx      = idx;
+    fs_iu       = iu;
     fs_mod      = Mid.empty;
     fs_modex    = Mid.empty;
     fs_loc      = Mid.empty;
@@ -160,13 +175,55 @@ let f_rem_mod (s : f_subst) (x : ident) : f_subst =
     fs_modex = Mid.remove x s.fs_modex; }
 
 (* -------------------------------------------------------------------- *)
+(* True when no substitution can affect a type. Indices share the
+   formula-locals namespace (Phase 2), so [fs_loc] participates here
+   even though it is otherwise a formula-only map. The dedicated
+   [fs_idx] map (Phase 3.5, op-application substitution) does too. *)
 let is_ty_subst_id (s : f_subst) : bool =
      Mid.is_empty s.fs_mod
   && Muid.is_empty s.fs_u
   && Mid.is_empty s.fs_v
+  && Mid.is_empty s.fs_idx
+  && Muid.is_empty s.fs_iu
+  && Mid.is_empty s.fs_loc
 
 (* -------------------------------------------------------------------- *)
-let rec ty_subst (s : f_subst) (ty : ty) : ty =
+let rec tindex_subst_ (s : f_subst) (ti : tindex) : tindex =
+  match ti with
+  | TIVar id -> begin
+      match Mid.find_opt id s.fs_idx with
+      | Some ti' -> ti'
+      | None ->
+        match Mid.find_opt id s.fs_loc with
+        | None   -> ti
+        | Some f ->
+            match tindex_of_form f with
+            | Some ti' -> ti'
+            | None ->
+                failwith
+                  (Printf.sprintf
+                     "tindex_subst: index variable %s is bound to a \
+                      formula not expressible as a tindex"
+                     (EcIdent.name id))
+    end
+  | TIUnivar u -> begin
+      (* Resolve through the unifier-produced assignment map. Walk
+         chains in case the assignment itself contains univars. *)
+      match Muid.find_opt u s.fs_iu with
+      | None    -> ti
+      | Some ti -> tindex_subst_ s ti
+    end
+  | TIConst _ -> ti
+  | TIAdd (l, r) ->
+      let l' = tindex_subst_ s l in
+      let r' = tindex_subst_ s r in
+      if l == l' && r == r' then ti else TIAdd (l', r')
+  | TIMul (l, r) ->
+      let l' = tindex_subst_ s l in
+      let r' = tindex_subst_ s r in
+      if l == l' && r == r' then ti else TIMul (l', r')
+
+and ty_subst (s : f_subst) (ty : ty) : ty =
   match ty.ty_node with
   | Tglob m ->
        Mid.find_opt m s.fs_modex
@@ -178,12 +235,37 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
     |> Option.value ~default:ty
   | Tvar id ->
     Mid.find_def ty id s.fs_v
+  | Tconstr (p, ta) ->
+      (* Walk both index and type arguments — [ty_map] would only
+         touch the type arguments. *)
+      let indices = List.Smart.map (tindex_subst_ s) ta.indices in
+      let types   = List.Smart.map (ty_subst s) ta.types in
+      if indices == ta.indices && types == ta.types then ty
+      else tconstr_r p { indices; types }
   | _ ->
     ty_map (ty_subst s) ty
 
 (* -------------------------------------------------------------------- *)
 let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
+
+(* -------------------------------------------------------------------- *)
+(* Public name for the polynomial-substitution helper used internally
+   by [ty_subst] above. *)
+let tindex_subst = tindex_subst_
+
+(* -------------------------------------------------------------------- *)
+let targs_subst (s : f_subst) (ta : targs) : targs =
+  let indices = List.Smart.map (tindex_subst s) ta.indices in
+  let types   = List.Smart.map (ty_subst s) ta.types in
+
+  if indices == ta.indices && types == ta.types then
+    ta
+  else { indices; types }
+
+(* -------------------------------------------------------------------- *)
+let targs_subst (s : f_subst) : targs -> targs =
+  if is_ty_subst_id s then identity else targs_subst s
 
 (* -------------------------------------------------------------------- *)
 let is_e_subst_id (s : f_subst) =
@@ -259,10 +341,10 @@ let rec e_subst (s : f_subst) (e : expr) : expr =
     let ty' = ty_subst s e.e_ty in
     e_var pv' ty'
 
-  | Eop (p, tys) ->
-    let tys' = List.Smart.map (ty_subst s) tys in
+  | Eop (p, ta) ->
+    let ta'  = targs_subst s ta in
     let ty'  = ty_subst s e.e_ty in
-    e_op p tys' ty'
+    e_op_r p ta' ty'
 
   | Elet (lp, e1, e2) ->
     let e1' = e_subst s e1 in
@@ -435,10 +517,10 @@ module Fsubst = struct
         f_local id ty'
     end
 
-    | Fop (p, tys) ->
-      let ty'  = ty_subst s fp.f_ty in
-      let tys' = List.Smart.map (ty_subst s) tys in
-      f_op p tys' ty'
+    | Fop (p, ta) ->
+      let ty' = ty_subst s fp.f_ty in
+      let ta' = targs_subst s ta in
+      f_op_r p ta' ty'
 
     | Fpvar (pv, m) ->
       let pv' = pv_subst s pv in

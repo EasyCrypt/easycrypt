@@ -11,9 +11,12 @@ module Ssym = EcSymbols.Ssym
 module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t
-type ty_params = ty_param list
-type ty_pctor  = [ `Int of int | `Named of ty_params ]
+type ty_params = {
+  idxvars : EcIdent.t list;
+  tyvars  : EcIdent.t list;
+}
+
+type ty_pctor = [ `Int of int | `Named of ty_params ]
 
 type ty_record =
   EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
@@ -55,16 +58,19 @@ let tydecl_as_record (td : tydecl) =
   match td.tyd_type with Record (x, y) -> Some (x, y) | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(params = `Int 0) lc =
-  let params =
+let abs_tydecl ?(params : ty_pctor = `Int 0) (lc : locality) =
+  let params : ty_params =
     match params with
     | `Named params ->
         params
+
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
-        List.map
-          (fun x -> (EcIdent.create x))
-          (EcUid.NameGen.bulk ~fmt n)
+        let tyvars =
+          List.map
+            (fun x -> EcIdent.create x)
+            (EcUid.NameGen.bulk ~fmt n)
+        in { tyvars; idxvars = []; }
   in
 
   { tyd_params   = params;
@@ -75,7 +81,7 @@ let abs_tydecl ?(params = `Int 0) lc =
 
 (* -------------------------------------------------------------------- *)
 let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = CS.Tvar.init params args in
+  let subst = CS.Tvar.init params.tyvars args in
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
@@ -282,7 +288,7 @@ let operator_as_exception (op : operator) =
 
 let operator_of_exception (ex: exception_) =
   let ty = EcTypes.toarrow ex.exn_dom EcTypes.texn in
-  mk_op ~opaque: optransparent [] ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
+  mk_op ~opaque: optransparent { idxvars = []; tyvars = [] } ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
 
 (* -------------------------------------------------------------------- *)
 let axiomatized_op 
@@ -294,7 +300,7 @@ let axiomatized_op
   : axiom
 =
   let axbd, axpm =
-    let bdpm = tparams in
+    let bdpm = tparams.tyvars in
     let axpm = List.map EcIdent.fresh bdpm in
       (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
        axpm)
@@ -310,11 +316,11 @@ let axiomatized_op
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
   let tyargs = List.map EcTypes.tvar axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
+  let op     = f_op path ~tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 
-  { ax_tparams = axpm;
+  { ax_tparams = { idxvars = []; tyvars = axpm };
     ax_spec    = axspec;
     ax_kind    = `Axiom (Ssym.empty, false);
     ax_loca    = lc;

@@ -28,10 +28,16 @@ type subst = {
   sb_module   : EcPath.mpath Mid.t;
   sb_path     : EcPath.path Mp.t;
   sb_tyvar    : ty Mid.t;
+  (* Index-variable substitution. Populated during the
+     Tconstr-with-tydef case of [subst_ty] to bind the source type's
+     idxvars to the call-site index arguments. Consulted by
+     [subst_tindex] before the [sb_flocal] formula-locals fallback. *)
+  sb_idxvar   : tindex Mid.t;
   sb_elocal   : expr Mid.t;
   sb_flocal   : EcCoreFol.form Mid.t;
   sb_fmem     : EcIdent.t Mid.t;
-  sb_tydef    : (EcIdent.t list * ty) Mp.t;
+  (* (idxvars, tyvars, body) — both binder lists may be empty. *)
+  sb_tydef    : (EcIdent.t list * EcIdent.t list * ty) Mp.t;
   sb_def      : (EcIdent.t list * [`Op of  expr | `Pred of form]) Mp.t;
   sb_moddef   : EcPath.mpath Mp.t; (* Only top-level modules *)
 }
@@ -41,6 +47,7 @@ let empty : subst = {
   sb_module   = Mid.empty;
   sb_path     = Mp.empty;
   sb_tyvar    = Mid.empty;
+  sb_idxvar   = Mid.empty;
   sb_elocal   = Mid.empty;
   sb_flocal   = Mid.empty;
   sb_fmem     = Mid.empty;
@@ -53,6 +60,7 @@ let is_empty s =
   Mid.is_empty s.sb_module
   && Mp.is_empty s.sb_path
   && Mid.is_empty s.sb_tyvar
+  && Mid.is_empty s.sb_idxvar
   && Mid.is_empty s.sb_elocal
   && Mid.is_empty s.sb_flocal
   && Mid.is_empty s.sb_fmem
@@ -151,6 +159,38 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
   List.fold_left2 add_tyvar s xs tys
 
 (* -------------------------------------------------------------------- *)
+let rec subst_tindex (s : subst) (ti : tindex) : tindex =
+  match ti with
+  | TIVar id -> begin
+      (* sb_idxvar (cloning instantiation) wins over the formula
+         locals fallback. *)
+      match Mid.find_opt id s.sb_idxvar with
+      | Some ti' -> ti'
+      | None ->
+      match Mid.find_opt id s.sb_flocal with
+      | None -> ti
+      | Some f ->
+          match EcCoreFol.tindex_of_form f with
+          | Some ti' -> ti'
+          | None ->
+              failwith
+                (Printf.sprintf
+                   "subst_tindex: index variable %s is bound to a \
+                    formula not expressible as a tindex"
+                   (EcIdent.name id))
+    end
+  | TIUnivar _ -> ti
+  | TIConst _ -> ti
+  | TIAdd (l, r) ->
+      let l' = subst_tindex s l in
+      let r' = subst_tindex s r in
+      if l == l' && r == r' then ti else TIAdd (l', r')
+  | TIMul (l, r) ->
+      let l' = subst_tindex s l in
+      let r' = subst_tindex s r in
+      if l == l' && r == r' then ti else TIMul (l', r')
+
+(* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
   match ty.ty_node with
   | Tglob mp ->
@@ -163,17 +203,23 @@ let rec subst_ty (s : subst) (ty : ty) =
      Mid.find_def ty a s.sb_tyvar
 
   | Ttuple tys ->
-     ttuple (subst_tys s tys)
+     ttuple (List.map (subst_ty s) tys)
 
-  | Tconstr (p, tys) -> begin
-      let tys = subst_tys s tys in
+  | Tconstr (p, ta) -> begin
+      let ta = subst_targs s ta in
 
       match Mp.find_opt p s.sb_tydef with
       | None ->
-         tconstr (subst_path s p) tys
+         tconstr_r (subst_path s p) ta
 
-      | Some (args, body) ->
-         let s = List.fold_left2 add_tyvar empty args tys in
+      | Some (idxs, args, body) ->
+         (* Bind the source type's idxvars/tyvars to the call-site
+            index/type arguments, then substitute through the body. *)
+         let s = List.fold_left2 add_tyvar empty args ta.types in
+         let s =
+           List.fold_left2
+             (fun s id ti -> { s with sb_idxvar = Mid.add id ti s.sb_idxvar })
+             s idxs ta.indices in
          subst_ty s body
     end
 
@@ -181,8 +227,10 @@ let rec subst_ty (s : subst) (ty : ty) =
      tfun (subst_ty s t1) (subst_ty s t2)
 
 (* -------------------------------------------------------------------- *)
-and subst_tys (s : subst) (tys : ty list) =
-  List.map (subst_ty s) tys
+and subst_targs (s : subst) (ta : targs) : targs =
+  let types = List.map (subst_ty s) ta.types in
+  let indices = List.map (subst_tindex s) ta.indices in
+  { types; indices; }
 
 (* -------------------------------------------------------------------- *)
 let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
@@ -272,9 +320,9 @@ let add_path (s : subst) ~src ~dst =
   assert (Mp.find_opt src s.sb_path = None);
   { s with sb_path = Mp.add src dst s.sb_path }
 
-let add_tydef (s : subst) p (ids, ty) =
+let add_tydef (s : subst) p ((idxs, ids, ty) : EcIdent.t list * EcIdent.t list * ty) =
   assert (Mp.find_opt p s.sb_tydef = None);
-  { s with sb_tydef = Mp.add p (ids, ty) s.sb_tydef }
+  { s with sb_tydef = Mp.add p (idxs, ids, ty) s.sb_tydef }
 
 let add_opdef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
@@ -332,24 +380,24 @@ let rec subst_expr (s : subst) (e : expr) =
   | Evar pv ->
      e_var (subst_progvar s pv) (subst_ty s e.e_ty)
 
-  | Eapp ({ e_node = Eop (p, tys) }, args) when has_opdef s p ->
-      let tys  = subst_tys s tys in
+  | Eapp ({ e_node = Eop (p, ta) }, args) when has_opdef s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s e.e_ty in
       let body = oget (get_opdef s p) in
       let args = List.map (subst_expr s) args in
-      subst_eop ty tys args body
+      subst_eop ty ta args body
 
-  | Eop (p, tys) when has_opdef s p ->
-      let tys  = subst_tys s tys in
+  | Eop (p, ta) when has_opdef s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s e.e_ty in
       let body = oget (get_opdef s p) in
-      subst_eop ty tys [] body
+      subst_eop ty ta [] body
 
-  | Eop (p, tys) ->
-      let p   = subst_path s p in
-      let tys = subst_tys s tys in
-      let ty  = subst_ty s e.e_ty in
-      e_op p tys ty
+  | Eop (p, ta) ->
+      let p  = subst_path s p in
+      let ta = subst_targs s ta in
+      let ty = subst_ty s e.e_ty in
+      e_op_r p ta ty
 
   | Elet (lp, e1, e2) ->
       let e1 = subst_expr s e1 in
@@ -365,8 +413,13 @@ let rec subst_expr (s : subst) (e : expr) =
   | _ -> e_map (subst_ty s) (subst_expr s) e
 
 (* -------------------------------------------------------------------- *)
-and subst_eop ety tys args (tyids, e) =
-  let s = add_tyvars empty tyids tys in
+and subst_eop
+  (ety : ty)
+  (ta : targs)
+  (args : expr list)
+  ((tyids, e) : EcIdent.t list * expr)
+=
+  let s = add_tyvars empty tyids ta.types in
 
   let (s, args, e) =
     match e.e_node with
@@ -514,24 +567,24 @@ let rec subst_form (s : subst) (f : form) =
      let m = subst_mem s m in
      (f_glob mp m).inv
 
-  | Fapp ({ f_node = Fop (p, tys) }, args) when has_def s p ->
-      let tys  = subst_tys s tys in
+  | Fapp ({ f_node = Fop (p, ta) }, args) when has_def s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s f.f_ty in
       let body = oget (get_def s p) in
       let args = List.map (subst_form s) args in
-      subst_fop ty tys args body
+      subst_fop ty ta args body
 
-  | Fop (p, tys) when has_def s p ->
-      let tys  = subst_tys s tys in
+  | Fop (p, ta) when has_def s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s f.f_ty in
       let body = oget (get_def s p) in
-      subst_fop ty tys [] body
+      subst_fop ty ta [] body
 
-  | Fop (p, tys) ->
+  | Fop (p, ta) ->
       let p   = subst_path s p in
-      let tys = subst_tys s tys in
+      let ta  = subst_targs s ta in
       let ty  = subst_ty s f.f_ty in
-      f_op p tys ty
+      f_op_r p ta ty
 
   | FhoareF hf ->
      let hf_f  = subst_xpath s hf.hf_f in
@@ -618,8 +671,13 @@ let rec subst_form (s : subst) (f : form) =
      f_map (subst_ty s) (subst_form s) f
 
 (* -------------------------------------------------------------------- *)
-and subst_fop fty tys args (tyids, f) =
-  let s = add_tyvars empty tyids tys in
+and subst_fop
+  (fty : ty)
+  (ta : targs)
+  (args : form list)
+  ((tyids, f) : EcIdent.t list * form)
+=
+  let s = add_tyvars empty tyids ta.types in
 
   let (s, args, f) =
     match f.f_node with
@@ -834,14 +892,22 @@ let subst_top_module (s : subst) (m : top_module_expr) =
     tme_loca = m.tme_loca; }
 
 (* -------------------------------------------------------------------- *)
-let fresh_tparam (s : subst) (x : ty_param) =
+let fresh_tparam (s : subst) (x : EcIdent.t) =
   let newx = EcIdent.fresh x in
   let s    = add_tyvar s x (tvar newx) in
   (s, newx)
 
 (* -------------------------------------------------------------------- *)
+let fresh_idxparam (s : subst) (x : EcIdent.t) =
+  let newx = EcIdent.fresh x in
+  let s = { s with sb_idxvar = Mid.add x (TIVar newx) s.sb_idxvar } in
+  (s, newx)
+
+(* -------------------------------------------------------------------- *)
 let fresh_tparams (s : subst) (tparams : ty_params) =
-  List.fold_left_map fresh_tparam s tparams
+  let s, idxvars = List.fold_left_map fresh_idxparam s tparams.idxvars in
+  let s, tyvars  = List.fold_left_map fresh_tparam   s tparams.tyvars  in
+  (s, { idxvars; tyvars })
 
 (* -------------------------------------------------------------------- *)
 let subst_genty (s : subst) (tparams, ty) =
@@ -1150,7 +1216,7 @@ let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbin
 (* -------------------------------------------------------------------- *)
 let subst_exception (s : subst) (ex : exception_) =
   { exn_loca = ex.exn_loca;
-    exn_dom = subst_tys s ex.exn_dom }
+    exn_dom = List.map (subst_ty s) ex.exn_dom }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
@@ -1242,12 +1308,12 @@ let init_tparams (params : (EcIdent.t * ty) list) : subst =
 
 (* -------------------------------------------------------------------- *)
 let open_oper op tys =
-  let s = List.combine op.op_tparams tys in
+  let s = List.combine op.op_tparams.tyvars tys in
   let s = init_tparams s in
   (subst_ty s op.op_ty, subst_op_kind s op.op_kind)
 
 let open_tydecl tyd tys =
-  let s = List.combine tyd.tyd_params tys in
+  let s = List.combine tyd.tyd_params.tyvars tys in
   let s = init_tparams s in
   subst_tydecl_body s tyd.tyd_type
 

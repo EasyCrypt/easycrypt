@@ -35,6 +35,13 @@ type pt_env = {
   pte_hy : LDecl.hyps;       (* local context *)
   pte_ue : EcUnify.unienv;   (* unification env. *)
   pte_ev : mevmap ref;       (* metavar env. *)
+  (* Link from a lemma's idxvar idents to their fresh tindex-univar
+     uids. Used by [concretize_env] to bridge tindex resolution and
+     formula-locals: when [?u_id := TIVar concrete] is set in [pte_ue],
+     [Flocal n_lem] in the lemma's body is rewritten to [Flocal
+     concrete] (typed int) by adding a corresponding [fs_loc] entry
+     to the substitution. *)
+  pte_idx_link : (EcIdent.t * EcUid.uid) list ref;
 }
 
 type pt_ev = {

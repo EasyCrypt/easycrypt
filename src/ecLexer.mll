@@ -418,6 +418,7 @@ rule main = parse
   (* string symbols *)
   | ".."    { [DOTDOT   ] }
   | ".["    { [DLBRACKET] }
+  | "[:"    { [LBRACKETCOLON] }
   | ".`"    { [DOTTICK  ] }
   | "{0,1}" { [RBOOL    ] }
 
