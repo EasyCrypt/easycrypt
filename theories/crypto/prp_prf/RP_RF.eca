@@ -1,0 +1,307 @@
+require import AllCore Distr List FSet FMap.
+require import Dexcepted.
+require (*--*) PRP.
+(*---*) import RField StdOrder.RealOrder.
+
+require (*--*) FelTactic.
+
+(** We assume a finite domain D, equipped with a full and lossless
+distribution. (We need fullness and losslessness to know that
+resampling always works.) **)
+type D.
+
+op [lossless full] dD: D distr.
+op hmin_dD: { real | forall x, mu1 dD x <= hmin_dD } as hmin_dDP.
+
+lemma ge0_hmin_dD: 0%r <= hmin_dD.
+proof.
+apply: (ler_trans (mu1 dD witness)).
++ exact: ge0_mu.
+exact: hmin_dDP.
+qed.
+
+(** and a type K equipped with a lossless distribution **)
+type K.
+
+clone import PRP as PRPt with
+  type D  <- D
+proof *.
+
+clone import StrongPRP as PRPSec
+proof *.
+
+clone import RP as PRPi with
+    op dD <- dD
+proof *
+rename "RP" as "PRPi".
+realize dD_ll by exact: dD_ll.
+
+clone import PRF as PRFt with
+  type D <- D,
+  type R <- D
+proof *.
+
+clone import RF with
+  op dR _ <- dD
+proof *
+rename "RF" as "PRFi".
+realize dR_ll by rewrite dD_ll.
+
+module Count (P: PRF): PRF = {
+  var count: int
+
+  proc init() = {
+    P.init();
+    count <- 0;
+  }
+
+  proc f(x) = {
+    var r;
+
+    r <@ P.f(x);
+    count <- count + 1;
+    return r;
+  }
+}.
+
+section.
+
+(** The following is a proof that holds **)
+(** For all lossless distinguisher D ... **)
+declare module D <: Distinguisher { -PRPi, -PRFi, -Count }.
+declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
+
+(** ... that makes at most q queries for some non-negative q. **)
+declare op q : { int | 0 <= q } as ge0_q.
+declare axiom D_count (O <: PRF { -D, -Count }) c0:
+  hoare [D(Count(O)).distinguish: Count.count = c0 ==> Count.count <= c0 + q].
+
+(** We make use of a generic principle for sampling in a conditional
+    distribution **)
+local clone import TwoStepSampling with
+  type i    <- unit,
+  type t    <- D,
+  op   dt _ <- dD
+proof *.
+
+(** And we put some work into turning our random function (PRFi) and
+    random permutation (PRPi) into part of a distinguisher against a
+    sampling procedure. **)
+local module type Sample_t = {
+  proc sample(X: D -> bool): D
+}.
+
+local module Direct : Sample_t = {
+  proc sample(X) = {
+    var r;
+
+    r <@ S.direct((), fun _=> X);
+    return r;
+  }
+}.
+
+local module Indirect : Sample_t = {
+  proc sample(X) = {
+    var r;
+
+    r <@ S.indirect((), fun _=> X);
+    return r;
+  }
+}.
+
+local equiv eq_Direct_Indirect:
+  Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
+proof.
+by proc; call ll_direct_indirect_eq; auto; rewrite dD_ll.
+qed.
+
+local module PRPi' (S:Sample_t) = {
+  proc init = PRPi.init
+
+  proc f(x:D): D = {
+    var r;
+    if (x \notin PRPi.m) {
+      r <@ S.sample(rng PRPi.m);
+      PRPi.m.[x] <- r;
+    }
+    return oget PRPi.m.[x];
+  }
+}.
+
+(* We need bad flags *)
+local module PRFi'_bad = {
+  var bad: bool
+
+  proc init() = {
+    PRPi.init();
+    bad <- false;
+  }
+
+  proc f(x: D): D = {
+    var r;
+
+    if (x \notin PRPi.m) {
+      r <$ dD;
+      bad <- bad \/ rng PRPi.m r;
+      PRPi.m.[x] <- r;
+    }
+    return oget PRPi.m.[x];
+  }
+}.
+
+local module PRPi'_bad = {
+  proc init() = {
+    PRPi.init();
+    PRFi'_bad.bad <- false;
+  }
+
+  proc f(x: D): D = {
+    var r;
+
+    if (x \notin PRPi.m) {
+      r <$ dD;
+      if (rng PRPi.m r) {
+        PRFi'_bad.bad <- true;
+        r <$ dD \ (rng PRPi.m);
+      }
+      PRPi.m.[x] <- r;
+    }
+    return oget PRPi.m.[x];
+  }
+}.
+
+(* FIXME: lift out and share with Strong RP RF *)
+local lemma notin_supportIP (P : 'a -> bool) (d : 'a distr):
+  (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
+proof.
+rewrite (mu_split _ predT P) /predI /predT /predC /=.
+rewrite (exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ a \in d)) /=.
++ by move=> a /=; rewrite andbC.
+by rewrite -(witness_support (predC P)) -/(predC _) /#.
+qed.
+
+local lemma excepted_lossless (m:(D,D) fmap):
+  (exists x, x \notin m) =>
+  mu (dD \ (rng m)) predT = 1%r.
+proof. 
+move=> /endo_dom_rng [x h]; rewrite dexcepted_ll // 1:dD_ll.
+by rewrite -dD_ll; apply: notin_supportIP; exists x; rewrite dD_fu.
+qed.
+
+(** We split this into extremely small steps, but this is not
+    necessary **)
+local lemma pr_PRPi_PRPi'_Direct &m:
+    Pr[IND(PRPi, D).main() @ &m: res]
+  = Pr[IND(PRPi'(Direct), D).main() @ &m:res].
+proof.
+byequiv=> //; proc; call (: ={PRPi.m}).
++ by proc; if=> //; inline *; auto.
+by inline *; auto.
+qed.
+
+local lemma pr_PRPi'_Direct_PRPi'_Indirect &m:
+    Pr[IND(PRPi'(Direct), D).main() @ &m: res]
+  = Pr[IND(PRPi'(Indirect), D).main() @ &m: res].
+proof.
+byequiv=> //; proc; call (: ={PRPi.m}).
++ proc; if=> //; auto.
+  by call eq_Direct_Indirect; auto=> |>; rewrite dD_ll.
+by inline *; auto.
+qed.
+
+local lemma pr_PRPi'_Indirect_PRPi'_bad &m:
+    Pr[IND(PRPi'(Indirect), D).main() @ &m: res]
+  = Pr[IND(PRPi'_bad, D).main() @ &m: res].
+proof.
+byequiv=> //; proc; call (: ={PRPi.m}).
++ proc; if=> //; inline *.
+  do ! cfold {1} 1.
+  seq 1 1: (#pre /\ r1{1} = r{2}); 1:by auto.
+  by if=> //; auto.
+by inline *; auto.
+qed.
+
+local lemma pr_PRFi'_PRFi &m:
+    Pr[IND(PRFi, D).main() @ &m: res]
+  = Pr[IND(PRFi'_bad, D).main() @ &m: res].
+proof.
+byequiv=> //; proc; call (: ={m}(PRFi, PRPi)); 1:by sim.
+by inline *; auto.
+qed.
+
+local lemma pr_PRPi'_Indirect_PRFi &m:
+     `|  Pr[IND(PRPi'_bad, D).main() @ &m: res]
+       - Pr[IND(PRFi, D).main() @ &m: res]|
+  <= Pr[IND(PRFi'_bad, D).main() @ &m: PRFi'_bad.bad].
+proof.
+rewrite pr_PRFi'_PRFi; byequiv: PRFi'_bad.bad=> //=; 2:smt().
+proc.
+call (: PRFi'_bad.bad
+      , !PRFi'_bad.bad{2} /\ ={PRPi.m} /\ ={PRFi'_bad.bad}
+      , PRFi'_bad.bad{2} /\ ={PRFi'_bad.bad}).
++ exact: D_ll.
++ proc; if=> //=; inline *.
+  seq 1 1: (#pre /\ ={r}); 1:by auto.
+  if {1}; auto=> |> &1 _ x_notin_m _.
+  by apply: excepted_lossless; exists x{1}.
++ move=> &2 bad; proc; if; 2:by auto.
+  seq 1: (PRFi'_bad.bad{2} /\ PRFi'_bad.bad = PRFi'_bad.bad{2} /\ x \notin PRPi.m)=> //.
+  + by auto=> |>; rewrite dD_ll.
+  + if; auto=> |> &1 _ x_notin_m _ @/predT /=.
+    by apply: excepted_lossless; exists x{1}.
+  + by hoare; auto.
+  + by move=> &1; proc; if; auto=> |>; rewrite dD_ll.
+by inline *; auto=> |> /#.
+qed.
+
+import StdBigop.Bigreal BRA.
+
+local lemma pr_PRFi'_bad &m:
+     Pr[IND(PRFi'_bad, D).main() @ &m: PRFi'_bad.bad]
+  <= (q^2 - q)%r / 2%r * hmin_dD.
+proof.
+(** This is easier than instantiating Birthday bound, still **)
+have ->: Pr[IND(PRFi'_bad, D).main() @ &m: PRFi'_bad.bad]
+       = Pr[IND(Count(PRFi'_bad), D).main() @ &m: PRFi'_bad.bad /\ Count.count <= q].
++ byequiv (: ={glob D} ==> ={PRFi'_bad.bad} /\ Count.count{2} <= q)=> //.
+  conseq (: _ ==> ={PRFi'_bad.bad}) _ (: _ ==> Count.count <= q)=> //.
+  + by proc; call (D_count PRFi'_bad 0); inline *; auto.
+  proc; call (: ={PRPi.m, PRFi'_bad.bad})=> //.
+  + by proc; inline *; sp; if; auto.
+  by inline *; auto.
+fel 1 (Count.count) (fun i=> i%r * hmin_dD) q
+    PRFi'_bad.bad
+    [] (card (frng PRPi.m) <= Count.count)=> //.
++ by rewrite -mulr_suml sumidE 1:ge0_q mulrDr expr2 mulrN1.
++ by inline *; auto=> |>; rewrite frng0 fcards0.
++ exlim Count.count=> c; conseq (: _: <= (c%r * hmin_dD))=> //.
+  proc; inline *; sp; if=> //.
+  + wp; rnd (rng PRPi.m); auto=> |> &0 ge0_count lt_count_q.
+    move=> _ size_rng_m _; rewrite (mu_eq _ _ (mem (frng PRPi.m{0}))).
+    + by move=> x; rewrite mem_frng.
+    apply: (ler_trans ((card (frng PRPi.m{0}))%r * hmin_dD)).
+    + by apply: Mu_mem.mu_mem_le=> x _; exact: hmin_dDP.
+    apply: ler_wpmul2r; 1:exact: ge0_hmin_dD.
+    by apply: le_fromint=> /#.
+  by hoare; auto=> |>; smt(ge0_hmin_dD).
++ move=> c; proc; inline *; sp; if; auto=> |>; 2:smt().
+  move=> &0 card_rng_m x_notin_m r _; split=> [/#|].
+  have ->: frng PRPi.m.[x <- r]{0} = frng PRPi.m{0} `|` fset1 r.
+  + apply: fsetP=> z; rewrite in_fsetU1 !mem_frng.
+    rewrite rng_set; congr; congr.
+    apply: fmap_eqP=> z0; rewrite remE.
+    case: (z0 = x{0})=> |>.
+    by move: x_notin_m; rewrite domE=> /= ->.
+  by rewrite fcardU1; smt().
+qed.
+
+lemma RP_RF_Switching &m:
+     `|  Pr[IND(PRPi, D).main() @ &m: res]
+       - Pr[IND(PRFi, D).main() @ &m: res]|
+  <= (q ^ 2 - q)%r / 2%r * hmin_dD.
+proof.
+rewrite (pr_PRPi_PRPi'_Direct &m) (pr_PRPi'_Direct_PRPi'_Indirect &m).
+rewrite (pr_PRPi'_Indirect_PRPi'_bad &m).
+smt(pr_PRPi'_Indirect_PRFi pr_PRFi'_bad).
+qed.
+end section.
