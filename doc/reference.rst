@@ -1,8 +1,8 @@
-EasyCrypt Documentation
+Reference Material
 ========================================================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :glob:
 
-   tutorials
-   reference
+   reference/*
