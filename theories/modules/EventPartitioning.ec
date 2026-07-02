@@ -128,7 +128,6 @@ theory ResultPartitioning.
     = big predT (fun a=> Pr[M.f(i) @ &m: E i (glob M) res /\ res = a]) (undup (X i))
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem (X i) res].
   proof.
-print mem_undup.
   have->:Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (res{hr} \in X i)]=
          Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (res{hr} \in undup (X i))].
   - smt(mem_undup).

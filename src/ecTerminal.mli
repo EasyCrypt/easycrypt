@@ -22,6 +22,7 @@ type progress = [ `Human | `Script | `Silent ]
 val from_channel :
      ?gcstats:bool
   -> ?progress:progress
+  -> ?lastgoals:bool
   -> name:string
   -> in_channel
   -> terminal

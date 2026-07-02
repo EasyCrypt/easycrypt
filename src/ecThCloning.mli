@@ -36,6 +36,7 @@ type clone_error =
 | CE_ProofForLemma     of qsymbol
 | CE_IdxArgMism        of ovkind * qsymbol
 | CE_IndexedNotYetSupported of ovkind * qsymbol
+| CE_NoExceptions
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -46,8 +47,10 @@ type xty_override =
   [ty_override_def genoverride | `Direct of EcAst.ty] * clmode
 
 (* ------------------------------------------------------------------ *)
-type xop_override =
-  [op_override_def genoverride | `Direct of EcAst.form] * clmode
+type xop_override = [
+  | op_override_def genoverride
+  | `Direct of EcIdent.t list * EcAst.form
+] * clmode
 
 (* ------------------------------------------------------------------ *)
 type xpr_override =
@@ -103,6 +106,7 @@ and rk_categories = {
   rkc_lemmas  : bool;
   rkc_ops     : bool;
   rkc_preds   : bool;
+  rkc_exns    : bool;
   rkc_types   : bool;
   rkc_module  : bool;
   rkc_modtype : bool;

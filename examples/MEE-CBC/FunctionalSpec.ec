@@ -466,7 +466,7 @@ phoare mee_encrypt_correct _mk _ek _p _c:
 proof.
   have->: mu1 (dapply (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) _c
           = mu1 (dmap dblock (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)) _c by move.
-  rewrite dmap1E /preim /pred1 /=.
+  rewrite dmap1E /pred1 /=.
   proc; inline MAC.tag PRPc.PseudoRP.f.
   swap 6 -5 => //=; alias 2 iv = s.
   while (   0 <= i <= size (pad _p (hmac_sha256 _mk _p))
@@ -528,7 +528,7 @@ conseq (_: true ==> true) (_: _ ==> _)=> //=.
   rewrite (ler_asym (size p) (size (behead _c)) _);
     rewrite ?ge_szc_p ?le_szc_p // take_size => p_def.
   split.
-  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t.
+  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= - [] m t.
     by rewrite /mee_dec /= -p_def=> -> /=.
   by rewrite /mee_dec -p_def /= => ->.
  proc; inline *; wp; while true (size c - i); auto =>/#.

@@ -157,6 +157,7 @@ and validation =
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
 | VShuffle of ident list             (* goal shuffling *)
+| VBdep                              (* map-reduce *)
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
@@ -867,7 +868,7 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let t_ors_map (totc : 'a -> backward) (xs : 'a list) (tc : tcenv1) =
-    t_ors_pmap (some |- totc) xs tc
+    t_ors_pmap (some -| totc) xs tc
 
   (* ------------------------------------------------------------------ *)
   let t_ors (tts : backward list) (tc : tcenv1) =

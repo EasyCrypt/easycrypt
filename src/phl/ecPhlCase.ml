@@ -9,8 +9,16 @@ let t_hoare_case_r ?(simplify = true) f tc =
   let fand = if simplify then f_and_simpl else f_and in
   let hs = tc1_as_hoareS tc in
   let mt = snd hs.hs_m in
-  let concl1 = f_hoareS mt (map_ss_inv2 fand (hs_pr hs) f) hs.hs_s (hs_po hs) in
-  let concl2 = f_hoareS mt (map_ss_inv2 fand (hs_pr hs) (map_ss_inv1 f_not f)) hs.hs_s (hs_po hs) in
+  let concl1 =
+    f_hoareS mt (map_ss_inv2 fand (hs_pr hs) f) hs.hs_s (hs_po hs)
+  in
+  let concl2 =
+    f_hoareS
+      mt
+      (map_ss_inv2 fand (hs_pr hs) (map_ss_inv1 f_not f))
+      hs.hs_s
+      (hs_po hs)
+  in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)
@@ -73,6 +81,7 @@ let t_hl_case_r ?simplify f tc =
       ~tbh:err
       ~te:(t_equiv_case ?simplify f)
       tc
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let t_hl_case ?simplify = FApi.t_low1 "hl-case" (t_hl_case_r ?simplify)

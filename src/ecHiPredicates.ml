@@ -85,7 +85,14 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
 
   let dom     = Tuni.subst_dom uidmap dom in
 
-  EcDecl.mk_pred ~opaque:optransparent tparams dom body pr.pp_locality
+  let tags    = Ssym.of_list (List.map unloc pr.pp_tags) in
+  let opaque  = {
+    EcDecl.smt       = Ssym.mem "smt_opaque" tags;
+    EcDecl.reduction = Ssym.mem "opaque" tags;
+    EcDecl.inline    = Ssym.mem "smt_inline" tags;
+  } in
+
+  EcDecl.mk_pred ~opaque tparams dom body pr.pp_locality
 
 (* -------------------------------------------------------------------- *)
 let trans_preddecl (env : EcEnv.env) (pr : ppredicate located) =

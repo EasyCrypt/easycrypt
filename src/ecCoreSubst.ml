@@ -110,6 +110,10 @@ let bind_elocals (s : f_subst) (esloc : expr Mid.t) : f_subst =
 
 (* -------------------------------------------------------------------- *)
 let f_bind_local (s : f_subst) (x : ident) (t : form) : f_subst =
+  let s =
+    match EcCoreFol.expr_of_form t with
+    | e -> bind_elocal s x e
+    | exception EcCoreFol.CannotTranslate -> s in
   let fs_loc = Mid.add x t s.fs_loc in
   let fs_fv = fv_union (f_fv t) s.fs_fv in
   { s with fs_loc; fs_fv; }
@@ -414,8 +418,7 @@ let rec s_subst_top (s : f_subst) : stmt -> stmt =
 
       i_match (e_subst e, List.Smart.map forb b)
 
-    | Sassert e ->
-      i_assert (e_subst e)
+    | Sraise e -> i_raise (e_subst e)
 
     | Sabstract _ ->
       i
@@ -536,15 +539,15 @@ module Fsubst = struct
       let hf_f   = x_subst s hf.hf_f in
       let (s, m) = add_m_binding s hf.hf_m in
       let hf_pr  = f_subst ~tx s (hf_pr hf).inv in
-      let hf_po  = f_subst ~tx s (hf_po hf).inv in
-      f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
+      let hf_po = POE.map (f_subst ~tx s) (hf_po hf).hsi_inv in
+      f_hoareF {m;inv=hf_pr} hf_f {hsi_m=m;hsi_inv=hf_po}
 
     | FhoareS hs ->
       let hs_s    = s_subst s hs.hs_s in
       let s, (m, mt) = add_me_binding s hs.hs_m in
       let hs_pr   = f_subst ~tx s (hs_pr hs).inv in
-      let hs_po   = f_subst ~tx s (hs_po hs).inv in
-      f_hoareS mt {m;inv=hs_pr} hs_s {m;inv=hs_po}
+      let hs_po = POE.map (f_subst ~tx s) (hs_po hs).hsi_inv in
+      f_hoareS mt {m;inv=hs_pr} hs_s {hsi_m=m;hsi_inv=hs_po}
 
     | FeHoareF hf ->
       let hf_f  = x_subst s hf.ehf_f in

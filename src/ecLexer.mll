@@ -53,7 +53,7 @@
     "match"       , MATCH      ;        (* KW: prog *)
     "for"         , FOR        ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
-    "assert"      , ASSERT     ;        (* KW: prog *)
+    "raise"       , RAISE      ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
     "res"         , RES        ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
@@ -68,6 +68,7 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "expect"      , EXPECT     ;        (* KW: tactical *)
+    "extens"      , EXTENS     ;        (* KW: tactical *)
 
     (* Lambda tactics *)
     "beta"        , BETA       ;        (* KW: tactic *)
@@ -168,7 +169,11 @@
     "splitwhile"  , SPLITWHILE ;        (* KW: tactic *)
     "kill"        , KILL       ;        (* KW: tactic *)
     "eager"       , EAGER      ;        (* KW: tactic *)
-
+    
+    "array"       , ARRAY      ;        (* KW: global *)
+    "bind"        , BIND       ;        (* KW: global *)
+    "circuit"     , CIRCUIT    ;        (* KW: global *)
+    "bitstring"   , BITSTRING  ;        (* KW: global *)
     "axiom"       , AXIOM      ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
@@ -190,6 +195,7 @@
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
+    "exception"   , EXCEPTION  ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "inductive"   , INDUCTIVE  ;        (* KW: global *)
     "notation"    , NOTATION   ;        (* KW: global *)
@@ -261,8 +267,6 @@
     ("+"   , (PLUS             , false));
     ("-"   , (MINUS            , false));
     ("*"   , (STAR             , false));
-    ("<<"  , (BACKS            , false));
-    (">>"  , (FWDS             , false));
     ("<:"  , (LTCOLON          , false));
     ("==>" , (LONGARROW        , false));
     ("="   , (EQ               , false));
@@ -274,6 +278,7 @@
     ("<*>" , (LTSTARGT         , false));
     ("<<*>", (LTLTSTARGT       , false));
     ("<*>>", (LTSTARGTGT       , false));
+    ("+>"  , (PLUSGT           , false));
   ]
 
   (* ------------------------------------------------------------------ *)
@@ -287,7 +292,7 @@
     List.iter (curry (Hashtbl.add table)) _operators; table
 
   let opre =
-    let ops = List.map fst (List.filter (snd |- snd) _operators) in
+    let ops = List.map fst (List.filter (snd -| snd) _operators) in
     let ops = List.ksort ~key:(String.length) ~cmp:compare ~rev:true ops in
     let ops = String.join "|" (List.map EcRegexp.quote ops) in
     let ops = Printf.sprintf "(%s)" ops in
@@ -302,7 +307,22 @@
     | _                     -> LOP4 (name |> odfl op)
 
   (* ------------------------------------------------------------------ *)
+  (* Repeated bullet characters (`--`, `+++`, `***`, ...) are emitted as
+     a single token so that the parser can distinguish them from two
+     separate operator characters. Single-character forms keep going
+     through the standard operator path for backward compatibility. *)
+  let lex_bullet_chunk (op : string) =
+    let n = String.length op in
+    if      EcRegexp.match_ (`S "^-{2,}$"  ) op then Some (MINUSn n)
+    else if EcRegexp.match_ (`S "^\\+{2,}$") op then Some (PLUSn  n)
+    else if EcRegexp.match_ (`S "^\\*{2,}$") op then Some (STARn  n)
+    else None
+
+  (* ------------------------------------------------------------------ *)
   let lex_operators (op : string) =
+    match lex_bullet_chunk op with
+    | Some tok -> [tok]
+    | None ->
     let baseop (op : string) =
       try  fst (Hashtbl.find operators op)
       with Not_found ->
@@ -336,7 +356,9 @@ let upper   = ['A'-'Z']
 let lower   = ['a'-'z']
 let letter  = upper | lower
 let digit   = ['0'-'9']
+let xdigit  = ['0'-'9' 'a'-'f' 'A'-'F']
 let uint    = digit+
+let uxint   = "0x" xdigit+
 
 let ichar  = (letter | digit | '_' | '\'')
 let lident = (lower ichar*) | ('_' ichar+)
@@ -363,6 +385,7 @@ rule main = parse
   | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
   | uint         { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
+  | uxint        { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
 
   | (digit+ as n) '.' (digit+ as f) {
       let nv, fv = BI.of_string n, BI.of_string f in

@@ -126,7 +126,7 @@ section SchnorrPKSecurity.
     rewrite /R /R_DL; move => sigmarel.
     byphoare (_: h = x /\ w' = w ==> _) => //; rewrite sigmarel.
     proc; inline*; swap 3 -2; swap 8 -7.
-    wp; rewrite /snd /=; auto => &hr />.
+    auto=> &hr />.
     by rewrite dt_ll => /> *; algebra.
   qed.
 

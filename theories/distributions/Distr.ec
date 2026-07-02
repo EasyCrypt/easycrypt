@@ -2821,7 +2821,7 @@ pose F x := fun n : int => mass (df n) x.
 split=> @/mdlim /= [x|s uq_s].
 - case: (converge (F x))%RealSeq => [|/lim_Ncnv ->//].
   apply: (geC_lim_from 0) => n _.
-  by rewrite /s /F massE ge0_mu1.
+  by rewrite /F massE ge0_mu1.
 rewrite (@bigID _ _ (fun x => RealSeq.converge (F x))).
 rewrite addrC big1 -1:add0r.
 - by move=> x [_ @/predC] /lim_Ncnv /=; apply.
@@ -3411,11 +3411,11 @@ lemma Jensen_fin ['a] (d : 'a distr) f g :
   => (forall a b, convex g a b)
   => g (E d f) <= E d (g \o f).
 proof.
-move=> fin_d ll_d cvx_g; rewrite !fin_expE /(\o) //; pose s := to_seq _.
+move=> fin_d ll_d cvx_g; rewrite !fin_expE //; pose s := to_seq _.
 move: ll_d; rewrite /is_lossless weightE !(@sumE_fin _ s) ?uniq_to_seq //=.
 - by move=> a; rewrite -supportP mem_to_seq.
 move=> {fin_d}; case: s => [|i s]; first by rewrite BRA.big_nil.
-rewrite !BRA.big_consT /=.
+rewrite !BRA.big_consT /(\o) /=.
 elim: s (mu1 d i) (ge0_mu d (pred1 i)) (f i) => [|x s ih] l ge0_l v.
 - by rewrite !BRA.big_nil /= => ->.
 rewrite !BRA.big_consT /=; have := ge0_mu d (pred1 x).

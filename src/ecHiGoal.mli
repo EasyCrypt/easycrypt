@@ -14,7 +14,6 @@ type ttenv = {
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;
-  tt_und_delta : bool;
 }
 
 type engine  = ptactic_core -> backward
@@ -41,13 +40,18 @@ module LowRewrite : sig
   | LRW_IdRewriting
   | LRW_RPatternNoMatch
   | LRW_RPatternNoRuleMatch
+  | LRW_RPatternNotLinear
+  | LRW_RPatternNoVariable
 
   exception RewriteError of error
 
   val find_rewrite_patterns:
     rwside -> pt_ev -> (pt_ev * rwmode * (form * form)) list
 
-  type rwinfos = rwside * EcFol.form option * EcMatching.occ option
+  type rwinfos =
+      rwside
+    * (form * (EcIdent.t * EcTypes.ty) option) option
+    * EcMatching.occ option
 
   val t_rewrite_r:
       ?mode:[ `Full | `Light] ->
@@ -75,7 +79,7 @@ val process_clear       : clear_info -> backward
 val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos option -> backward
 val process_coq         : loc:EcLocation.t -> name:string -> ttenv -> EcProvers.coq_mode option -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t * prevert option -> backward
-val process_delta       : und_delta:bool -> ?target:psymbol -> (rwside * rwocc * pformula) -> backward
+val process_delta       : ?target:psymbol -> (rwside * rwocc * pformula) -> backward
 val process_rewrite     : ttenv -> ?target:psymbol -> rwarg list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : ?mode:cutmode -> engine -> ttenv -> cut_t -> backward
@@ -83,10 +87,11 @@ val process_cutdef      : ttenv -> cutdef_t -> backward
 val process_left        : backward
 val process_right       : backward
 val process_split       : ?i:int -> backward
+val process_split_all   : must:bool -> backward
 val process_elim        : prevert * pqsymbol option -> backward
 val process_case        : ?doeq:bool -> prevertv -> backward
 val process_exists      : ppt_arg located list -> backward
-val process_congr       : backward
+val process_congr       : pcongr_mode -> backward
 val process_solve       : ?bases:symbol list -> ?depth:int -> backward
 val process_trivial     : backward
 val process_change      : pformula -> backward

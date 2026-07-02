@@ -312,7 +312,7 @@ let instantiate tparams ~textra targs tres tys =
       (fun mtv tv ty -> WTy.Mtv.add tv ty mtv)
       WTy.Mtv.empty tparams tys in
   let textra = List.map (WTy.ty_inst mtv) textra in
-  let targs = List.map (some |- WTy.ty_inst mtv) targs in
+  let targs = List.map (some -| WTy.ty_inst mtv) targs in
   let tres  = tres |> omap (WTy.ty_inst mtv) in
   (textra, targs, tres)
 
@@ -830,8 +830,35 @@ and trans_kpatterns env (ks : (kpattern * w3_known_op) list) (f : form) =
        ks)
 
 (* -------------------------------------------------------------------- *)
+(* Operators tagged `[smt_inline]` are δ/β-reduced at their use sites instead
+   of being emitted as a symbol plus a defining axiom. This keeps lambdas
+   occurring in their bodies monomorphic at the call's instantiation, which
+   avoids the polymorphic higher-order encoding (uni/t2tb bridges) that
+   weaker SMT solvers fail to navigate. *)
+and try_inline ((genv, _) : tenv * lenv) (fp : form) =
+  let hd, args =
+    match fp.f_node with
+    | Fapp (hd, args) -> (hd, args)
+    | _               -> (fp, []) in
+  match hd.f_node with
+  | Fop (p, tys) -> begin
+      match Op.by_path_opt p genv.te_env with
+      | Some op when op.op_opaque.inline -> begin
+          match op.op_kind with
+          | OB_oper (Some (OP_Plain _)) | OB_pred (Some (PR_Plain _)) ->
+              Some (f_app_simpl (Op.reduce ~mode:`Force genv.te_env p tys) args fp.f_ty)
+          | _ -> None
+        end
+      | _ -> None
+    end
+  | _ -> None
+
 and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   try trans_kpatterns env genv.tk_known_w3 fp with CanNotTranslate ->
+
+  match try_inline env fp with
+  | Some fp -> trans_form env fp
+  | None ->
 
   match fp.f_node with
   | Fquant (qt, bds, body) ->
@@ -1905,43 +1932,8 @@ let select env pi hyps concl execute_task =
   else
     let rs = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
     let ri, other = init_relevant env pi rs in
-    if not pi.P.pr_iterate then begin
-      ignore (relevant_clause ri other);
-      (execute_task ri.toadd = Some true)
-    end else
-      let other, res =
-        if List.is_empty ri.toadd then
-          let other = relevant_clause ri other in
-          other, execute_task ri.toadd
-        else other, execute_task ri.toadd in
-
-      match res with Some res -> res | None ->
-        let rec aux ml other i =
-          if i <= 0 then begin
-            ri.ri_max <- max_int;
-            ri.ri_p   <- 0.;
-            ri.toadd  <- [];
-            let other = relevant_clause ri other in
-            if List.is_empty ri.toadd then
-              (execute_task (List.fst other) = Some true)
-            else
-              match execute_task ri.toadd with
-              | None -> (execute_task (List.fst other) = Some true)
-              | Some res -> res
-          end else begin
-            ri.ri_max <- ml;
-            ri.toadd  <- [];
-            let other = relevant_clause ri other in
-            let ml = min (2*ml+30) max_int in
-            if   List.is_empty ri.toadd
-            then aux ml other (i-1)
-            else
-              match execute_task ri.toadd with
-              | None -> aux ml other (i-1)
-              | Some res -> res
-          end
-
-        in aux pi.P.pr_max other 4
+    ignore (relevant_clause ri other);
+    (execute_task ri.toadd = Some true)
 
 (* -------------------------------------------------------------------- *)
 let cnt = Counter.create ()

@@ -174,7 +174,7 @@ lemma dlist_fu (d: 'a distr) (xs:'a list):
   xs \in dlist d (size xs).
 proof.
 move=> fu; rewrite /support dlist1E 1:size_ge0 /=.
-by apply Bigreal.prodr_gt0_seq => /= a Hin _;apply fu.
+by apply Bigreal.prodr_gt0_seq => /= a Hin _; apply fu.
 qed.
 
 lemma dlist_uni (d:'a distr) n :
@@ -289,6 +289,162 @@ rewrite fcards0 RField.expr0 RField.mulr1 => <-.
 apply: mu_eq_support => xs; rewrite supp_dlist //= => -[? ?]; smt(in_fset0).
 qed.
 
+lemma dmap_dlist_partial_perm ['a] (x0 : 'a) (d : 'a distr) (f : int -> int) (n k : int) :
+     0 <= k
+  => 0 <= n
+  => is_lossless d
+  => (forall i j, 0 <= i < k => 0 <= j < k => f i = f j => i = j)
+  => (forall i, 0 <= i < k => 0 <= f i < n)
+  =>   dmap (dlist d n) (fun xs => mkseq (fun i => nth x0 xs (f i)) k)
+     = dlist d k.
+proof.
+move=> ge0_k ge0_n lld injf inrgf.
+elim: k ge0_k n ge0_n f injf inrgf.
+- move=> n ge0_n f injf inrgf; rewrite [dlist d 0]dlist0 //.
+  rewrite -(eq_dmap _ (fun _ => [])) //=.
+  - by move=> ? /=; rewrite mkseq0.
+  by rewrite dmap_cst //; apply/dlist_ll/lld.
+move=> k ge0_k ih n ge0_n f injf inrgf.
+pose k1 := f k; pose k2 := n - (k1 + 1).
+have ->: n = (k1 + 1) + k2 by rewrite /k1 /k2 #ring.
+rewrite dlist_djoin 1:/# -cat_nseq ~-1:/# nseqSr 1:/#.
+rewrite -cats1 -catA /= djoin_perm_s1s /= dmap_dlet /=.
+rewrite -!dlist_djoin ~-1:/# /=.
+pose c (i : int) := f i - b2i (k1 <= f i).
+pose h (a : 'a list) := mkseq (fun i => nth x0 a (c i)) k.
+pose C (a : 'a list * 'a list) := a.`1 ++ a.`2.
+pose F (a : 'a list) (x : 'a) := rcons (h a) x.
+rewrite -(in_eq_dlet (fun (ds : 'a list * 'a list) => dmap d (F (C ds)))).
+- move=> ds /supp_dprod => /= []; rewrite !supp_dlist ~-1:/#.
+  move=> [#] hsz1 _ hsz2 _; rewrite dmap_comp &(eq_dmap) /=.
+  move=> x @/(\o) /=; rewrite mkseqS 1:/# /F /=; congr; last first.
+  - by rewrite nth_cat ifF 1:/# /= ifT 1:/#.
+  apply: eq_in_mkseq => i rgi /=; rewrite !nth_cat.
+  rewrite /c hsz1 lezNgt; case: (f i < k1) => /= [->//|?].
+  by rewrite !ifF ~-1:/# addrAC.
+rewrite -(dlet_dmap _ C (fun ds => dmap d (F ds))) -dlist_add ~-1:/#.
+rewrite -(dmap_dprodE _ _ (fun (xy : _ * _) => F xy.`1 xy.`2)) /F /=.
+rewrite dlistSr ~-1:/# /= !dmap_dprodE_swap /= &(in_eq_dlet) /=.
+move=> x _; rewrite -(dmap_comp h (fun xs => rcons xs x)); congr.
+apply: ih; 2,3: by smt().
+have ->: k1 + (n - (k1 + 1)) = n - 1 by ring.
+by have := inrgf 0 _; smt().
+qed.
+
+abstract theory ParametricProgram.
+  type t.
+
+  module Sample = {
+    proc sample(d: t distr, n:int): t list = {
+      var r;
+
+      r <$ dlist d n;
+      return r;
+    }
+  }.
+
+  module SampleCons = {
+    proc sample(d: t distr, n:int): t list = {
+      var r, rs;
+
+      rs <$ dlist d (n - 1);
+      r  <$ d;
+      return r::rs;
+    }
+  }.
+
+  module Loop = {
+    proc sample(d: t distr, n:int): t list = {
+      var i, r, l;
+
+      i <- 0;
+      l <- [];
+      while (i < n) {
+        r <$ d;
+        l <- r :: l;
+        i <- i + 1;
+      }
+      return l;
+    }
+  }.
+
+  module LoopSnoc = {
+    proc sample(d: t distr, n:int): t list = {
+      var i, r, l;
+
+      i <- 0;
+      l <- [];
+      while (i < n) {
+        r <$ d;
+        l <- l ++ [r];
+        i <- i + 1;
+      }
+      return l;
+    }
+  }.
+
+  lemma pr_Sample _d _n &m xs:
+    Pr[Sample.sample(_d, _n) @ &m: res = xs] = mu (dlist _d _n) (pred1 xs).
+  proof. by byphoare (: d = _d /\ n = _n ==> res = xs)=> //=; proc; rnd. qed.
+
+  equiv Sample_SampleCons_eq: Sample.sample ~ SampleCons.sample: 0 < n{1} /\ ={d, n} ==> ={res}.
+  proof.
+    bypr (res{1}) (res{2})=> //= &1 &2 xs [lt0_n] [] <- <-.
+    rewrite (pr_Sample d{1} n{1} &1 xs); move: lt0_n; case (size xs = n{1})=> [<-|].
+    + case: xs=> [|x xs lt0_n]; 1: smt().
+      rewrite dlistS1E.
+      byphoare (: d = d{1} /\ n = size xs + 1 ==> x::xs = res)=> //=; 2: by rewrite addrC. 
+      proc; seq 1: (rs = xs) (mu (dlist d{1} (size xs)) (pred1 xs)) (mu d{1} (pred1 x)) _ 0%r (d = d{1}) => //.
+      + by auto.
+      + by rnd (pred1 xs); skip; smt().
+      + by rnd (pred1 x); skip; smt().
+      + by hoare; auto; smt().
+      + smt().
+    move=> len_xs gt0_n; rewrite dlist1E 1:/# ifF 1:/#.
+    byphoare (_: n = n{1} ==> xs = res)=> //=; hoare.
+    proc; auto=> />; smt(supp_dlist_size).
+  qed.
+
+  equiv Sample_Loop_eq: Sample.sample ~ Loop.sample: ={d, n} ==> ={res}.
+  proof.
+    proc*; exists* n{1}; elim* => _n.
+    move: (eq_refl _n); case (_n <= 0)=> //= h.
+    + inline *;rcondf{2} 5;auto;smt (supp_dlist0 weight_dlist0).
+    have {h} h: 0 <= _n by smt ().
+    call (_: _n = n{1} /\ ={d, n} ==> ={res})=> //=.
+    elim _n h=> //= [|_n le0_n ih].
+    + by proc; rcondf{2} 3; auto=> />; smt(supp_dlist0 weight_dlist0).
+    case (_n = 0)=> [-> | h].
+    + proc; rcondt{2} 3; 1:(by auto); rcondf{2} 6; 1:by auto.
+      wp; rnd (fun x => head witness x) (fun x => [x]).
+      auto => /> &0;split => [ rR ? | _ rL ].
+      + by rewrite dlist1E //= big_consT big_nil.
+      by rewrite supp_dlist //;case rL => //=; smt (size_eq0).
+    transitivity SampleCons.sample
+                 (={d, n} /\ 0 < n{1} ==> ={res})
+                 (_n + 1 = n{1} /\ ={d, n} /\ 0 < n{1} ==> ={res})=> //=; 1:smt().
+    + by conseq Sample_SampleCons_eq.
+    proc; splitwhile{2} 3: (i < n - 1).
+    rcondt{2} 4; 1:by auto; while (i < n); auto; smt().
+    rcondf{2} 7; 1:by auto; while (i < n); auto; smt().
+    wp; rnd.
+    outline {1} 1 ~ Sample.sample.
+    rewrite equiv[{1} 1 ih].
+    inline.
+    by wp; while (={i, l} /\ d0{1} = d{2} /\ n0{1} = n{2} - 1); auto; smt().
+  qed.
+
+  equiv Sample_LoopSnoc_eq: Sample.sample ~ LoopSnoc.sample: ={d, n} ==> ={res}.
+  proof.
+    proc*. 
+    replace* {1} { x } by { x; r <- rev r; }.
+      inline *; wp; rnd rev; auto.
+      smt(revK dlist_rev).
+    rewrite equiv[{1} 1 Sample_Loop_eq].
+    inline *; wp; while (={i, n0, d0} /\ rev l{1} = l{2}); auto => />.
+    smt(rev_cons cats1).
+  qed.
+end ParametricProgram.
 
 abstract theory Program.
   type t.
@@ -343,63 +499,63 @@ abstract theory Program.
     }
   }.
 
-  lemma pr_Sample _n &m xs: Pr[Sample.sample(_n) @ &m: res = xs] = mu (dlist d _n) (pred1 xs).
-  proof. by byphoare (_: n = _n ==> res = xs)=> //=; proc; rnd. qed.
+  section.
+
+  local clone ParametricProgram as PP with
+    type t <- t
+  proof *.
+
+  lemma pr_Sample _n &m xs:
+    Pr[Sample.sample(_n) @ &m: res = xs] = mu (dlist d _n) (pred1 xs).
+  proof.
+  rewrite -(PP.pr_Sample d _n &m xs).
+  byequiv (: ={n} /\ d{2} = d ==> ={res})=> //.
+  by proc; auto.
+  qed.
 
   equiv Sample_SampleCons_eq: Sample.sample ~ SampleCons.sample: 0 < n{1} /\ ={n} ==> ={res}.
   proof.
-    bypr (res{1}) (res{2})=> //= &1 &2 xs [lt0_n] <-.
-    rewrite (pr_Sample n{1} &1 xs); case (size xs = n{1})=> [<<-|].
-      case xs lt0_n=> [|x xs lt0_n]; 1: smt().
-      rewrite dlistS1E.
-      byphoare (_: n = size xs + 1 ==> x::xs = res)=> //=; 2: by rewrite addrC. 
-      proc; seq 1: (rs = xs) (mu (dlist d (size xs)) (pred1 xs)) (mu d (pred1 x)) _ 0%r => //.
-        by rnd (pred1 xs); skip; smt().
-        by rnd (pred1 x); skip; smt().
-        by hoare; auto; smt().
-        smt().
-    move=> len_xs; rewrite dlist1E 1:/# ifF 1:/#.
-    byphoare (_: n = n{1} ==> xs = res)=> //=; hoare.
-    proc; auto=> />; smt(supp_dlist_size).
+  transitivity PP.Sample.sample
+    (={n} /\ d{2} = d ==> ={res})
+    (0 < n{1} /\ ={n} /\ d{1} = d ==> ={res})=> //.
+  + by move=> |> &2 gt0_arg2; exists (d, arg{2}).
+  + by proc; auto.
+  transitivity PP.SampleCons.sample
+    (0 < n{1} /\ ={d, n} ==> ={res})
+    (={n} /\ d{1} = d ==> ={res})=> //.
+  + by move=> |> &2 gt0_n2 <-; exists (d{2}, n{2}).
+  + exact: PP.Sample_SampleCons_eq.
+  by proc; auto.
   qed.
 
   equiv Sample_Loop_eq: Sample.sample ~ Loop.sample: ={n} ==> ={res}.
   proof.
-    proc*; exists* n{1}; elim* => _n.
-    move: (eq_refl _n); case (_n <= 0)=> //= h.
-    + inline *;rcondf{2} 4;auto;smt (supp_dlist0 weight_dlist0).
-    have {h} h: 0 <= _n by smt ().
-    call (_: _n = n{1} /\ ={n} ==> ={res})=> //=.
-    elim _n h=> //= [|_n le0_n ih].
-      proc; rcondf{2} 3; auto=> />. smt(supp_dlist0 weight_dlist0).
-    case (_n = 0)=> [-> | h].
-      proc; rcondt{2} 3; 1:(by auto); rcondf{2} 6; 1:by auto.
-      wp; rnd (fun x => head witness x) (fun x => [x]).
-      auto => />;split => [ rR ? | _ rL ].
-      + by rewrite dlist1E //= big_consT big_nil.
-      rewrite supp_dlist //;case rL => //=; smt (size_eq0).
-    transitivity SampleCons.sample
-                 (={n} /\ 0 < n{1} ==> ={res})
-                 (_n + 1 = n{1} /\ ={n} /\ 0 < n{1} ==> ={res})=> //=; 1:smt().
-      by conseq Sample_SampleCons_eq.
-    proc; splitwhile{2} 3: (i < n - 1).
-    rcondt{2} 4; 1:by auto; while (i < n); auto; smt().
-    rcondf{2} 7; 1:by auto; while (i < n); auto; smt().
-    wp; rnd.
-    outline {1} 1 ~ Sample.sample.
-    rewrite equiv[{1} 1 ih].
-    inline.
-    by wp; while (={i} /\ ={l} /\ n0{1} = n{2} - 1); auto; smt().
+  transitivity PP.Sample.sample
+    (={n} /\ d{2} = d ==> ={res})
+    (={n} /\ d{1} = d ==> ={res})=> //.
+  + by move=> |> &2; exists (d, arg{2}).
+  + by proc; auto.
+  transitivity PP.Loop.sample
+    (={d, n} ==> ={res})
+    (={n} /\ d{1} = d ==> ={res})=> //.
+  + by move=> |> &2 <-; exists (d{2}, n{2}).
+  + exact: PP.Sample_Loop_eq.
+  by proc; while (={i, n, l} /\ d{1} = d); auto.
   qed.
 
   equiv Sample_LoopSnoc_eq: Sample.sample ~ LoopSnoc.sample: ={n} ==> ={res}.
   proof.
-    proc*. 
-    replace* {1} { x } by { x; r <- rev r; }.
-      inline *; wp; rnd rev; auto.
-      smt(revK dlist_rev).
-    rewrite equiv[{1} 1 Sample_Loop_eq].
-    inline *; wp; while (={i, n0} /\ rev l{1} = l{2}); auto => />.
-    smt(rev_cons cats1).
+  transitivity PP.Sample.sample
+    (={n} /\ d{2} = d ==> ={res})
+    (={n} /\ d{1} = d ==> ={res})=> //.
+  + by move=> |> &2; exists (d, arg{2}).
+  + by proc; auto.
+  transitivity PP.LoopSnoc.sample
+    (={d, n} ==> ={res})
+    (={n} /\ d{1} = d ==> ={res})=> //.
+  + by move=> |> &2 <-; exists (d{2}, n{2}).
+  + exact: PP.Sample_LoopSnoc_eq.
+  by proc; while (={i, n, l} /\ d{1} = d); auto.
   qed.
+  end section.
 end Program.

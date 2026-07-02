@@ -440,7 +440,7 @@ proof. by rewrite /filter /"_.[_]" filter_valE SmtMap.offunE. qed.
 
 lemma mem_filter (m : ('a,'b) fmap) (p : 'a -> 'b -> bool) x : 
    x \in filter p m <=> x \in m /\ p x (oget m.[x]).
-proof. smt(filterE). qed.
+proof. by smt(filterE fmapP). qed.
 
 lemma get_filter (m : ('a,'b) fmap) (p : 'a -> 'b -> bool) x : 
   x \in filter p m => (filter p m).[x] = m.[x].
@@ -547,7 +547,7 @@ qed.
 
 lemma offset_get s (e: 'a): (offset s).[e] = if e \in s then Some () else None.
 proof.
-rewrite getE /ofset ofmapK.
+rewrite getE ofmapK.
 - move: (FSet.finite_mem s).
   apply/eq_ind/fun_ext => y.
   rewrite offunE /#.
@@ -690,7 +690,7 @@ proof. by case _ : (find P m) => // [x /find_some] /#. qed.
 
 lemma find_eq_none (p : 'a -> 'b -> bool) (m : ('a,'b) fmap): 
   (forall x, x \in m => !p x (oget m.[x])) => find p m = None.
-proof. by move=> np; apply contraT => /find_not_none /#. qed.
+proof. by move=> np; apply contraT=> /find_not_none; smt(find_some). qed.
 
 (* -------------------------------------------------------------------- *)
 inductive find_spec (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =

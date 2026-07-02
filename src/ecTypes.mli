@@ -49,6 +49,7 @@ val ty_fv_and_tvar : ty -> int Mid.t
 val tunit   : ty
 val tbool   : ty
 val tint    : ty
+val texn    : ty   (* type of exception *)
 val txint   : ty
 val treal   : ty
 val tdistr  : ty -> ty
@@ -58,6 +59,10 @@ val toarrow : ty list -> ty -> ty
 
 val trealp : ty
 val txreal : ty
+
+exception TyDestrError of string
+
+val tfrom_tfun2 : ty -> ty * ty
 
 val tytuple_flat : ty -> ty list
 val tyfun_flat   : ty -> (dom * ty)
@@ -184,6 +189,7 @@ val e_var      : prog_var -> ty -> expr
 val e_op       : EcPath.path -> ?indices:tindex list -> ?tyargs:ty list -> ty -> expr
 val e_op_r     : EcPath.path -> targs -> ty -> expr
 val e_app      : expr -> expr list -> ty -> expr
+val e_not      : expr -> expr
 val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr

@@ -38,6 +38,8 @@ module UniEnv : sig
      otherwise. *)
   val openidx    : unienv -> ty_params -> tvi -> tindex EcIdent.Mid.t
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * ty list
+  val openty_r   : unienv -> ty_params -> tvi
+                -> EcCoreSubst.f_subst * tindex list * ty list
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * ty list
   val closed     : unienv -> bool
   val close      : unienv -> ty Muid.t
@@ -68,6 +70,24 @@ type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 type select_result =
   (EcPath.path * tindex list * ty list) * ty * unienv * sbody option
 
+type op_failure =
+  | OF_argument of int * ty * ty   (* 1-based index, expected (param), provided (arg) *)
+  | OF_result   of ty * ty         (* operator result type, expected result type *)
+  | OF_arity    of int * int       (* expected arity (at most), provided *)
+
+(* Constrained type parameters of an operator (those bound while applying it). *)
+type op_instance = (EcIdent.t * ty) list
+
+type select_outcome =
+  | OK of select_result
+  | KO of EcPath.path * op_instance * ty * op_failure
+    (* operator path, partial instantiation, declared operator type, reason *)
+
+(* [None] if [top] applies to [psig] (and [retty]), updating [ue]; otherwise
+   [Some] of the first argument/result/arity failure. *)
+val classify_application :
+  EcEnv.env -> unienv -> ty -> ty list -> ty option -> op_failure option
+
 val select_op :
      ?hidden:bool
   -> ?filter:(path -> operator -> bool)
@@ -77,3 +97,13 @@ val select_op :
   -> unienv
   -> dom * ty option
   -> select_result list
+
+val select_op_outcomes :
+     ?hidden:bool
+  -> ?filter:(path -> operator -> bool)
+  -> tvi
+  -> EcEnv.env
+  -> qsymbol
+  -> unienv
+  -> dom * ty option
+  -> select_outcome list

@@ -113,14 +113,21 @@ let destr_pr_has pr =
   let m = pr.pr_event.m in
   match pr.pr_event.inv.f_node with
   | Fapp ({ f_node = Fop(op, { indices = []; types = [ty_elem] }) }, [f_f; f_l]) ->
-      if EcPath.p_equal p_list_has op then
-        Some(ty_elem, {m;inv=f_f}, {m;inv=f_l})
+      if EcPath.p_equal p_list_has op && not (Mid.mem m f_l.f_fv) then
+        Some(ty_elem, {m;inv=f_f}, f_l)
       else None
   | _ -> None
+
+let is_eq_w_const_rhs (f: ss_inv): bool =
+  try 
+    let _, rhs = destr_eq f.inv in
+    not (Mid.mem f.m rhs.f_fv)
+  with DestrError _ -> false
+
 (*
  lemma mu_has_le ['a 'b] (P : 'a -> 'b -> bool) (d : 'a distr) (s : 'b list) :
    mu d (fun a => has (P a) s) <= BRA.big predT (fun b => mu d (fun a => P a b)) s.
-   Pr [f(args)@ &m : has P s] <= BRA.big predT (fun b => Pr [f(args) &m : P b])
+   Pr [f(args)@ &m : has Pa s] <= BRA.big predT (fun b => Pr [f(args) &m : Pa b]) s
 *)
 let pr_has_le f_pr =
   let pr = destr_pr f_pr in
@@ -131,8 +138,7 @@ let pr_has_le f_pr =
   let f_pr1 = f_pr_r {pr with pr_event} in
   let f_fsum = f_lambda [idx, GTty ty_elem] f_pr1 in
   let f_sum =
-    (* FIXME: Ensure that `f_l` does not use its memory *)
-    f_app (f_op p_BRA_big ~tyargs:[ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l.inv] EcTypes.treal in
+    f_app (f_op p_BRA_big ~tyargs:[ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l] EcTypes.treal in
   f_real_le f_pr f_sum
 
 (* -------------------------------------------------------------------- *)
@@ -141,7 +147,7 @@ exception FoundPr of form
 let select_pr on_ev sid f =
   match f.f_node with
   | Fpr { pr_event = ev } ->
-      if on_ev ev.inv && Mid.set_disjoint f.f_fv sid then raise (FoundPr f)
+      if on_ev ev && Mid.set_disjoint f.f_fv sid then raise (FoundPr f)
       else false
   | _ -> false
 
@@ -185,7 +191,7 @@ let select_pr_muhasle sid f =
       if EcPath.p_equal EcCoreLib.CI_Real.p_real_le op then
         match destr_pr_has pr with
         | Some (_, _, f_l) when
-          Mid.set_disjoint f_l.inv.f_fv (Mid.add f_l.m () sid) ->
+          Mid.set_disjoint f_l.f_fv sid ->
             raise (FoundPr f_pr)
         | _ -> false
       else false
@@ -223,13 +229,13 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
 
   let select =
     match kind with
-    | `Mu1LeEqMu1 -> select_pr is_eq
-    | `MuDisj | `MuOr -> select_pr is_or
+    | `Mu1LeEqMu1 -> select_pr is_eq_w_const_rhs
+    | `MuDisj | `MuOr -> select_pr (fun inv -> is_or inv.inv)
     | `MuEq -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Bool.p_eq)
-    | `MuFalse -> select_pr is_false
+    | `MuFalse -> select_pr (fun inv -> is_false inv.inv)
     | `MuGe0 -> select_pr_ge0
     | `MuLe1 -> select_pr_le1
-    | `MuNot -> select_pr is_not
+    | `MuNot -> select_pr (fun inv -> is_not inv.inv)
     | `MuSplit -> select_pr (fun _ev -> true)
     | `MuSub -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Real.p_real_le)
     | `MuSum -> select_pr (fun _ev -> true)
@@ -251,8 +257,15 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
       let (resv, k) = map_ss_inv_destr2 destr_eq pr.pr_event in
       let k_id = EcEnv.LDecl.fresh_id hyps "k" in
       let d = (oget dof) tc torw (EcTypes.tdistr k.inv.f_ty) in
-      (* FIXME: Ensure that d.inv does not use d.m *)
-      (* FIXME: Ensure that k.inv does not use k.m *)
+      (* Check that k and d do not reference the post-execution memory.
+         Otherwise the rewrite is unsound: the event `res = k` would use
+         k from the post-state, but `mu1 d k` treats k as a constant. *)
+      if Mid.mem k.m k.inv.f_fv then
+        (* This case should already be filtered by selection *)
+        assert false;
+      if Mid.mem d.m d.inv.f_fv then
+        tc_error !!tc
+          "Pr-rewrite: the distribution must not depend on memories";
       (pr_mu1_le_eq_mu1 pr_mem pr_fun pr_args resv k.inv k_id d.inv, 2)
 
     | (`MuEq | `MuSub as kind) -> begin

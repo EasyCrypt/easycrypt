@@ -5,21 +5,22 @@ open EcParsetree
 open EcCoreGoal.FApi
 open EcMatching.Position
 
-val process_seq : pcodepos1 pair -> pstmt -> pformula doption -> backward
+val process_seq : pcodegap1 pair -> pstmt -> pformula doption -> backward
 (** Tactic [eager seq] derives the following proof:
     {v
   (a) S; c₁ ~ c₁'; S : P ==> R₂
   (b) S; c₂ ~ c₂'; S : R₁ ==> Q
-  (c) c₁' ~ c₁' : Eq ==> R₁
+  (c) c₁' ~ c₁' : Eq /\ ∃m. P m m₂ ==> R₁
   (d) c₂ ~ c₂ : R₂ ==> ={Q.1}
  -----------------------------------
   S; c₁; c₂ ~ c₁'; c₂'; S : P ==> Q
     v}
     where [R₁] and [R₂] are provided manually (and equal if a single value was
     provided), as well as [S]. The predicate [={Q.1}] means equality on all free
-    variables bound to the first memory in [Q]. *)
+    variables bound to the first memory in [Q]. Memory [m₂] is the implicitly
+    lambda-quantified memory of the right program. *)
 
-val t_eager_seq : codepos1 pair -> stmt -> ts_inv pair -> backward
+val t_eager_seq : codegap1 pair -> stmt -> ts_inv pair -> backward
 (** Internal variant of [eager seq] *)
 
 val process_if : backward
@@ -43,15 +44,15 @@ val process_while : pformula -> backward
   (a) I => ={e, I.1}
   (b) S; c ~ c'; S : I /\ e{1} ==> I
   (c) forall b &2, S : e = b ==> e = b
-  (d) c' ~ c' : Eq ==> I
+  (d) c' ~ c' : Eq /\ ∃m. I m m₂ ==> I
   (e) c ~ c : I ==> I
   (f) S ~ S : I /\ !e{1} ==> I
  --------------------------------------------------------
   S; while e do c ~ while e do c'; S : I ==> I /\ !e{1}
     v}
-    Where the invariant [I] is manually provided.
-    Please note that the guard [e] is syntactically identical in both
-    programs. *)
+    Where the invariant [I] is manually provided. Please note that the guard [e]
+    is syntactically identical in both programs. Memory [m₂] is the implicitly
+    lambda-quantified memory of the right program. *)
 
 val t_eager_while : ts_inv -> backward
 (** Internal variant of [eager while] *)

@@ -7,9 +7,10 @@ exception Restart
 (* -------------------------------------------------------------------- *)
 type loader
 
-val loader   : loader
-val addidir  : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
+val loader : loader
+val addidir : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (EcLoader.namespace option * string) list
+val set_current_path : string -> unit
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit
@@ -20,8 +21,8 @@ type checkmode = {
   cm_cpufactor: int;
   cm_nprovers : int;
   cm_provers  : string list option;
+  cm_quorum   : int option;
   cm_profile  : bool;
-  cm_iterate  : bool;
 }
 
 val initial : checkmode:checkmode -> boot:bool -> checkproof:bool -> EcScope.scope
@@ -60,6 +61,7 @@ val doc_comment : [`Global | `Item] * string -> unit
 
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : ?all:bool -> Format.formatter -> unit
+val pp_current_goal_or_noproof : ?all:bool -> Format.formatter -> unit
 val pp_maybe_current_goal : Format.formatter -> unit
 val pp_all_goals : unit -> string list
 
@@ -71,3 +73,4 @@ val pragma_check   : EcScope.Ax.proofmode -> unit
 exception InvalidPragma of string
 
 val apply_pragma : string -> unit
+val apply_pragma_option : string -> unit

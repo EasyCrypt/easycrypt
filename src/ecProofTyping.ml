@@ -2,6 +2,7 @@
 open EcUtils
 open EcIdent
 open EcTypes
+open EcPath
 open EcFol
 open EcEnv
 open EcCoreGoal
@@ -32,15 +33,19 @@ let process_form_opt ?mv hyps pf oty =
     EcTyping.tyerror pf.EcLocation.pl_loc
       (LDecl.toenv hyps) EcTyping.FreeTypeVariables
 
+(* ------------------------------------------------------------------ *)
 let process_form ?mv hyps pf ty =
   process_form_opt ?mv hyps pf (Some ty)
 
+(* ------------------------------------------------------------------ *)
 let process_formula ?mv hyps pf =
   process_form hyps ?mv pf tbool
 
+(* ------------------------------------------------------------------ *)
 let process_xreal ?mv hyps pf =
   process_form hyps ?mv pf txreal
 
+(* ------------------------------------------------------------------ *)
 let process_dformula ?mv hyps pf =
   match pf with
   | Single pf -> Single(process_formula ?mv hyps pf)
@@ -49,6 +54,31 @@ let process_dformula ?mv hyps pf =
     let f = process_xreal ?mv hyps pf in
     Double(p,f)
 
+(* ------------------------------------------------------------------ *)
+let process_type hyps pty =
+  let env = LDecl.toenv hyps in
+  let ue  = unienv_of_hyps hyps in
+  let ty  = EcTyping.transty EcTyping.tp_tydecl env ue pty in
+
+  if not (EcUnify.UniEnv.closed ue) then
+    EcTyping.tyerror (EcLocation.loc pty) env EcTyping.FreeTypeVariables;
+
+  let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+  EcCoreSubst.ty_subst ts ty
+
+(* ------------------------------------------------------------------ *)
+let process_stmt hyps s =
+  let env = LDecl.toenv hyps in
+  let ue  = unienv_of_hyps hyps in
+  let s   = EcTyping.transstmt env ue s in
+
+  try
+    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    s_subst ts s
+  with EcUnify.UninstantiateUni ->
+    EcTyping.tyerror EcLocation._dummy env EcTyping.FreeTypeVariables
+
+(* ------------------------------------------------------------------ *)
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
@@ -56,6 +86,7 @@ let process_exp hyps mode oty e =
   let ts  = Tuni.subst (EcUnify.UniEnv.close ue)  in
   e_subst ts e
 
+(* ------------------------------------------------------------------ *)
 let process_pattern hyps fp =
   let ps = ref Mid.empty in
   let ue = unienv_of_hyps hyps in
@@ -83,6 +114,14 @@ let pf_process_exp pe hyps mode oty e =
 
 let pf_process_pattern pe hyps fp =
   Exn.recast_pe pe hyps (fun () -> process_pattern hyps fp)
+
+(* ------------------------------------------------------------------ *)
+let pf_process_poe hyps poe =
+  let env  = LDecl.toenv hyps in
+  let ue = unienv_of_hyps hyps in
+  let m = EcTyping.trans_poe env ue poe in
+  let ts  = Tuni.subst (EcUnify.UniEnv.close ue) in
+  Mop.map (EcFol.Fsubst.f_subst ts) m
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_form_opt ?mv tc oty pf =
@@ -165,7 +204,7 @@ let tc1_process_Xhl_form ?side tc ty pf =
 
   let mv =
     match concl.f_node with
-    | FhoareS   hs -> Some ((hs_pr hs).inv , (hs_po hs).inv )
+    | FhoareS   hs -> Some ((hs_pr  hs).inv, (hs_po  hs).hsi_inv.main)
     | FeHoareS  hs -> Some ((ehs_pr hs).inv, (ehs_po hs).inv)
     | FbdHoareS hs -> Some ((bhs_pr hs).inv, (bhs_po hs).inv)
     | _            -> None
@@ -252,3 +291,41 @@ let destruct_exists ?(reduce = true) hyps fp : dexists option =
     | _ -> raise NoMatch
   in
     lazy_destruct ~reduce hyps doit fp
+
+(* -------------------------------------------------------------------- *)
+let merge2_poe_list (poe1 : form Mop.t) (poe2 : form Mop.t) =
+  let remove_default (poe : form Mop.t) =
+    match Mop.find_opt None poe with
+    | None   -> poe, None
+    | Some x -> Mop.remove None poe, Some x
+  in
+  let poe1, d1 = remove_default poe1 in
+  let poe2, d2 = remove_default poe2 in
+  let get_default d =
+    match d with
+    | Some d -> d
+    | None ->  failwith "no default exception"
+  in
+  let aux _ a b =
+    match a,b with
+    | Some a, Some b ->
+      let bd, body = decompose_lambda a in
+      let args = List.map (fun (x, gty) -> f_local x (gty_as_ty gty)) bd in
+      Some (f_forall bd (f_imp (f_app_simpl b args tbool) body))
+
+    | Some a, None ->
+      let bd, body = decompose_lambda a in
+      Some (f_forall bd (f_imp (get_default d2) body))
+
+    | None, Some b ->
+      let bd, body = decompose_lambda b in
+      Some (f_forall bd (f_imp body (get_default d1)))
+
+    | None, None -> assert false
+  in
+  let epost = Mop.merge aux poe1 poe2 in
+  let poe = List.map snd (Mop.bindings epost) in
+  match d2, d1 with
+  | None, _ -> poe
+  | Some d2, Some d1 -> f_imp d2 d1 :: poe
+  | _, _ -> failwith "no default exception"

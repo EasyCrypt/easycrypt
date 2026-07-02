@@ -26,6 +26,11 @@ let getkind ext =
   | "eca" -> `EcA
   | _     -> raise (BadExtension ("." ^ ext))
 
+let string_of_namespace ns = 
+  match ns with
+  | `System -> "System"
+  | `Named s -> s
+
 (* -------------------------------------------------------------------- *)
 let create () = { ecl_idirs = []; }
 
@@ -74,7 +79,7 @@ let rec addidir ?namespace ?(recursive = false) (idir : string) (ecl : ecloader)
             ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
 
       | _ ->
-          if not (List.exists ((=) idx |- snd) idirs) then
+          if not (List.exists ((=) idx -| snd) idirs) then
             ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
   end
 

@@ -666,6 +666,16 @@ end BitReverse.
 theory BitChunking.
 op chunk r (bs : 'a list) =
   mkseq (fun i => take r (drop (r * i)%Int bs)) (size bs %/ r).
+  
+lemma chunk_nil ['a] (n : int) : chunk<:'a> n [] = [].
+proof. by rewrite /chunk /= mkseq0. qed.
+
+lemma chunk_exact ['a] (xs : 'a list) : xs <> [] => chunk (size xs) xs = [xs].
+proof.
+rewrite /chunk divzz; case: (xs = []) => //.
+rewrite size_eq0 => -> _; rewrite b2i1 /= mkseq1; congr=> /=.
+by rewrite drop0 take_oversize.
+qed.
 
 lemma chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
 proof.
@@ -805,7 +815,7 @@ move=> s1 s2; rewrite mulzDl /= [_ + n]addrC => szE1 szE2.
 have := size_eqD _ _ _ _ _ szE1; ~-1: move=> //#.
 have := size_eqD _ _ _ _ _ szE2; ~-1: move=> //#.
 case=> [s1a s1b] [# sz1a sz1b ->] [s2a s2b] [# sz2a sz2b ->].
-rewrite !mkseqSr /(\o) //= !drop0 !take_catl ?(sz1a, sz2a) //.
+rewrite !mkseqSr //= /(\o) !drop0 !take_catl ?(sz1a, sz2a) //.
 rewrite !take_oversize ?(sz1a, sz2a) // => -[<-].
 move=> eq_tl; congr; apply: ih => //.
 apply: (eq_trans _ _ (eq_trans _ eq_tl _)).

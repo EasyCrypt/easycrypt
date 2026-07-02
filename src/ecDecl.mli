@@ -33,9 +33,19 @@ type ty_body =
 
 
 type tydecl = {
-  tyd_params : ty_params;
-  tyd_type   : ty_body;
-  tyd_loca   : locality;
+  tyd_params   : ty_params;
+  tyd_type     : ty_body;
+  tyd_loca     : locality;
+  tyd_clinline : bool;
+  (* For [subtype]-declared types: the carrier and the predicate. The
+     declared type itself stays [tyd_type = Abstract], because a
+     subtype is semantically a fresh abstract type — but its dependency
+     on free type variables (when declared inside a section) must be
+     visible to the section-close machinery. [tydecl_fv] unions the
+     carrier+predicate fv into the type's fv when this field is set,
+     so a subtype declared inside [section. declare type c.] gets the
+     section's tparams added at close, just like type aliases do.      *)
+  tyd_subtype  : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
@@ -46,6 +56,14 @@ val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list)
 val abs_tydecl : ?params:ty_pctor -> locality -> tydecl
 
 val ty_instantiate : ty_params -> ty list -> ty -> ty
+
+(* -------------------------------------------------------------------- *)
+type exception_ = {
+  exn_loca : locality;
+  exn_dom  : ty list;
+}
+
+val mk_exception : locality -> ty list -> exception_
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
@@ -61,6 +79,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
+  | OP_Exn    of ty list
   | OP_TC
 
 and prbody =
@@ -112,17 +131,18 @@ type operator = {
   op_unfold   : int option;
 }
 
-and opopaque = { smt: bool; reduction: bool; }
+and opopaque = { smt: bool; reduction: bool; inline: bool; }
 
-val op_ty     : operator -> ty
-val is_pred   : operator -> bool
-val is_oper   : operator -> bool
-val is_ctor   : operator -> bool
-val is_proj   : operator -> bool
-val is_rcrd   : operator -> bool
-val is_fix    : operator -> bool
-val is_abbrev : operator -> bool
-val is_prind  : operator -> bool
+val op_ty        : operator -> ty
+val is_pred      : operator -> bool
+val is_oper      : operator -> bool
+val is_ctor      : operator -> bool
+val is_proj      : operator -> bool
+val is_rcrd      : operator -> bool
+val is_fix       : operator -> bool
+val is_abbrev    : operator -> bool
+val is_prind     : operator -> bool
+val is_exception : operator -> bool
 
 val optransparent : opopaque
 
@@ -138,6 +158,9 @@ val operator_as_rcrd  : operator -> EcPath.path
 val operator_as_proj  : operator -> EcPath.path * int * int
 val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
+
+val operator_as_exception : operator -> exception_
+val operator_of_exception : exception_ -> operator
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
@@ -200,3 +223,88 @@ type field = {
   f_div  : EcPath.path option;
 }
 val field_equal : field -> field -> bool
+
+(* -------------------------------------------------------------------- *)
+type binding_size = form * (int option)
+
+type crb_theory1_kind =
+  | CRBT_Type   of EcPath.path
+  | CRBT_Op     of ty_params * expr
+  | CRBT_Lemma  of EcPath.path
+
+type crb_theory1 = 
+  { name: EcSymbols.symbol
+  ; kind: crb_theory1_kind }
+
+type crb_theory =
+  crb_theory1 list
+
+type crb_bitstring =
+  { type_  : EcPath.path
+  ; from_  : EcPath.path
+  ; to_    : EcPath.path
+  ; ofint  : EcPath.path
+  ; touint : EcPath.path
+  ; tosint : EcPath.path
+  ; size   : binding_size
+  ; theory : crb_theory }
+  
+type crb_array =
+  { type_  : EcPath.path
+  ; get    : EcPath.path
+  ; set    : EcPath.path
+  ; tolist : EcPath.path
+  ; oflist : EcPath.path
+  ; size   : binding_size
+  ; theory : crb_theory }
+  
+type bv_opkind = [
+  | `Add      of binding_size (* size *)
+  | `Sub      of binding_size (* size *)
+  | `Mul      of binding_size (* size *)
+  | `Div      of binding_size * bool (* size + sign *)
+  | `Rem      of binding_size * bool (* size + sign *)
+  | `Shl      of binding_size (* size *)
+  | `Shr      of binding_size * bool (* size + sign *)
+  | `Shls     of binding_size * binding_size (* size *)
+  | `Shrs     of binding_size * binding_size * bool (* size + sign *)
+  | `Rol      of binding_size (* size *)
+  | `Rol      of binding_size (* size *)
+  | `Ror      of binding_size (* size *)
+  | `And      of binding_size (* size *)
+  | `Or       of binding_size (* size *)
+  | `Xor      of binding_size (* size *)
+  | `Not      of binding_size (* size *)
+  | `Opp      of binding_size (* size *)
+  | `Lt       of binding_size * bool (* size + sign *) 
+  | `Le       of binding_size * bool (* size + sign *)
+  | `Extend   of binding_size * binding_size * bool (* size in + size out + sign *)
+  | `Truncate of binding_size * binding_size (* size in + size out *)
+  | `Extract  of binding_size * binding_size * bool (* size in + size out * aligned *)
+  | `Insert   of binding_size * binding_size (* size in + size out *)
+  | `Concat   of binding_size * binding_size * binding_size (* size in1 + size in2 *)
+  | `Init     of binding_size (* size_out *)
+  | `Get      of binding_size (* size_in *)
+  | `AInit    of binding_size * binding_size (* arr_len + size_out *)
+  | `Map      of binding_size * binding_size * binding_size (* size_in + size_out + arr_size *)
+  | `A2B      of (binding_size * binding_size) * binding_size (* (arr_len, elem_sz), out_size *)
+  | `B2A      of binding_size * (binding_size * binding_size) (* size in, (arr_len, elem_sz)  *)
+  | `ASliceGet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_out *)
+  | `ASliceSet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_in *)
+]
+  
+type crb_bvoperator =
+  { kind     : bv_opkind
+  ; types    : EcPath.path list
+  ; operator : EcPath.path }
+  
+type crb_circuit =
+{ name     : string
+; circuit  : Lospecs.Ast.adef
+; operator : EcPath.path }
+
+type crbinding =
+| CRB_Bitstring  of crb_bitstring
+| CRB_Array      of crb_array
+| CRB_BvOperator of crb_bvoperator
+| CRB_Circuit    of crb_circuit

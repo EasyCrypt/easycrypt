@@ -1,31 +1,90 @@
-name: EasyCrypt compilation & check
+name: EasyCrypt CI
 
 on:
   push:
     branches:
       - 'main'
+      - 'release'
+      - 'latest'
+    tags:
+      - 'r[0-9]+.[0-9]+'
   pull_request:
+  merge_group:
 
 env:
-  HOME: /home/charlie
-  OPAMYES: true
-  OPAMJOBS: 2
+  IMAGE_TAG: ci-${{ github.run_id }}
 
 jobs:
-  compile-opam:
-    name: EasyCrypt compilation (opam)
+  # ── Phase 1: Build Docker images and share via artifact ──
+
+  docker:
+    name: Build Docker images
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/easycrypt/ec-build-box
+    permissions:
+      packages: read
     steps:
     - uses: actions/checkout@v4
-    - name: Install EasyCrypt dependencies
+    - name: Build base image
+      if: github.event_name == 'push'
+      run: make -C scripts/docker build VARIANT=base TAG=$IMAGE_TAG
+    - name: Build base-build image
+      if: github.event_name == 'push'
+      run: make -C scripts/docker build VARIANT=base-build TAG=$IMAGE_TAG
+    - uses: docker/login-action@v3
+      if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Retrieve base-build image
+      if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
       run: |
-        opam pin add -n easycrypt .
-        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
-        opam install --deps-only easycrypt
-    - name: Compile EasyCrypt
-      run: opam exec -- make PROFILE=ci
+        docker pull ghcr.io/easycrypt/ec-base-build-box:main
+        docker tag ghcr.io/easycrypt/ec-base-build-box:main ghcr.io/easycrypt/ec-base-build-box:$IMAGE_TAG
+    - name: Build build image
+      run: make -C scripts/docker build VARIANT=build TAG=$IMAGE_TAG BARGS='--build-arg BASE_BUILD_LAYER=ghcr.io/easycrypt/ec-base-build-box:${IMAGE_TAG}'
+    - name: Save images for downstream jobs
+      run: |
+        docker save "ghcr.io/easycrypt/ec-base-box:$IMAGE_TAG" | gzip > base-image.tar.gz
+        docker save "ghcr.io/easycrypt/ec-base-build-box:$IMAGE_TAG" | gzip > base-build-image.tar.gz
+        docker save "ghcr.io/easycrypt/ec-build-box:$IMAGE_TAG" | gzip > build-image.tar.gz
+    - uses: actions/upload-artifact@v4
+      with:
+        name: docker-images
+        path: |
+          base-image.tar.gz
+          base-build-image.tar.gz
+          build-image.tar.gz
+        retention-days: 1
+
+  # ── Phase 2: CI ──
+
+  compile-opam:
+    name: EasyCrypt compilation (opam)
+    needs: docker
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: docker-images
+    - run: gunzip -c build-image.tar.gz | docker load
+    - name: Install dependencies & compile
+      run: |
+        docker run --rm \
+          -v "$PWD:/workspace" \
+          -w /workspace \
+          -e HOME=/home/charlie \
+          -e OPAMYES=true \
+          -e OPAMJOBS=2 \
+          "ghcr.io/easycrypt/ec-build-box:$IMAGE_TAG" \
+          bash -c "
+            set -e
+            opam pin add -n easycrypt .
+            opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
+            opam install --deps-only easycrypt
+            opam exec -- make PROFILE=ci
+          "
 
   compile-nix:
     name: EasyCrypt compilation (nix)
@@ -49,31 +108,38 @@ jobs:
 
   check:
     name: Check EasyCrypt Libraries
-    needs: compile-opam
+    needs: [docker, compile-opam]
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/easycrypt/ec-build-box
     strategy:
       fail-fast: false
       matrix:
         target: [unit, stdlib, examples]
     steps:
     - uses: actions/checkout@v4
-    - name: Install EasyCrypt dependencies
+    - uses: actions/download-artifact@v4
+      with:
+        name: docker-images
+    - run: gunzip -c build-image.tar.gz | docker load
+    - name: Install, compile & test (${{ matrix.target }})
       run: |
-        opam pin add -n easycrypt .
-        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
-        opam install --deps-only easycrypt
-    - name: Compile EasyCrypt
-      run: opam exec -- make
-    - name: Detect SMT provers
-      run: |
-        rm -f ~/.why3.conf
-        opam exec -- ./ec.native why3config -why3 ~/.why3.conf
-    - name: Compile Library (${{ matrix.target }})
-      env:
-        TARGET: ${{ matrix.target }}
-      run: opam exec -- make $TARGET
+        docker run --rm \
+          -v "$PWD:/workspace" \
+          -w /workspace \
+          -e HOME=/home/charlie \
+          -e OPAMYES=true \
+          -e OPAMJOBS=2 \
+          -e TARGET=${{ matrix.target }} \
+          "ghcr.io/easycrypt/ec-build-box:$IMAGE_TAG" \
+          bash -c "
+            set -e
+            opam pin add -n easycrypt .
+            opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
+            opam install --deps-only easycrypt
+            opam exec -- make
+            rm -f ~/.why3.conf
+            opam exec -- ./ec.native why3config -why3 ~/.why3.conf
+            opam exec -- make \$TARGET
+          "
     - uses: actions/upload-artifact@v4
       name: Upload report.log
       if: always()
@@ -98,10 +164,8 @@ jobs:
 
   external:
     name: Check EasyCrypt External Projects
-    needs: [compile-opam, fetch-external-matrix]
+    needs: [docker, compile-opam, fetch-external-matrix]
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/easycrypt/ec-build-box
     strategy:
       fail-fast: false
       matrix:
@@ -111,8 +175,8 @@ jobs:
       with:
         path: easycrypt
     - name: Extract target branch name
-      run: echo "branch=merge-${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
       id: extract_branch
+      run: echo "branch=merge-${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
     - name: Find remote branch
       id: branch_name
       run: |
@@ -127,25 +191,34 @@ jobs:
           -b ${{ steps.branch_name.outputs.REPO_BRANCH }} \
           ${{ matrix.target.repository }} \
           project/${{ matrix.target.name }}
-    - name: Install EasyCrypt dependencies
+    - uses: actions/download-artifact@v4
+      with:
+        name: docker-images
+    - run: gunzip -c build-image.tar.gz | docker load
+    - name: Install, compile & test external project
       run: |
-        opam pin add -n easycrypt easycrypt
-        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
-        opam install --deps-only easycrypt
-    - name: Compile & Install EasyCrypt
-      run: opam exec -- make -C easycrypt build install
-    - name: Detect SMT provers
-      run: |
-        rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
-        opam exec -- easycrypt why3config
-    - name: Compile project
-      working-directory: project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
-      run: |
-        opam exec -- easycrypt runtest  \
-          -report report.log            \
-          ${{ matrix.target.options  }} \
-          ${{ matrix.target.config   }} \
-          ${{ matrix.target.scenario }}
+        docker run --rm \
+          -v "$PWD:/workspace" \
+          -w /workspace \
+          -e HOME=/home/charlie \
+          -e OPAMYES=true \
+          -e OPAMJOBS=2 \
+          "ghcr.io/easycrypt/ec-build-box:$IMAGE_TAG" \
+          bash -c "
+            set -e
+            opam pin add -n easycrypt easycrypt
+            opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
+            opam install --deps-only easycrypt
+            opam exec -- make -C easycrypt build install
+            rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
+            opam exec -- easycrypt why3config
+            cd project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
+            opam exec -- easycrypt runtest  \
+              -report report.log            \
+              ${{ matrix.target.options  }} \
+              ${{ matrix.target.config   }} \
+              ${{ matrix.target.scenario }}
+          "
     - name: Compute real-path to report.log
       if: always()
       run: |
@@ -168,6 +241,56 @@ jobs:
       with:
         jobs: ${{ toJSON(needs) }}
         allowed-skips: external
+
+  # ── Phase 3: Publish to GHCR (only on push after CI passes) ──
+
+  publish:
+    name: Publish Docker images
+    if: github.event_name == 'push'
+    needs: [compile-opam, compile-nix, check, external, external-status, docker]
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: docker-images
+    - run: gunzip -c base-image.tar.gz | docker load
+    - run: gunzip -c base-build-image.tar.gz | docker load
+      if: github.ref_name == 'main'
+    - run: gunzip -c build-image.tar.gz | docker load
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Push base image
+      run: |
+        docker tag "ghcr.io/easycrypt/ec-base-box:$IMAGE_TAG" \
+          "ghcr.io/easycrypt/ec-base-box:${{ github.ref_name }}"
+        docker push "ghcr.io/easycrypt/ec-base-box:${{ github.ref_name }}"
+    - name: Push base-build image
+      if: github.ref_name == 'main'
+      run: |
+        docker tag "ghcr.io/easycrypt/ec-base-build-box:$IMAGE_TAG" \
+          "ghcr.io/easycrypt/ec-base-build-box:${{ github.ref_name }}"
+        docker push "ghcr.io/easycrypt/ec-base-build-box:${{ github.ref_name }}"
+    - name: Push build image
+      run: |
+        docker tag "ghcr.io/easycrypt/ec-build-box:$IMAGE_TAG" \
+          "ghcr.io/easycrypt/ec-build-box:${{ github.ref_name }}"
+        docker push "ghcr.io/easycrypt/ec-build-box:${{ github.ref_name }}"
+    - name: Build and push test image
+      if: |
+        github.ref == 'refs/heads/release' ||
+        github.ref == 'refs/heads/latest' ||
+        github.ref_type == 'tag'
+      run: |
+        make -C scripts/docker build publish VARIANT=test TAG=${{ github.ref_name }} \
+          BARGS='--build-arg BUILD_LAYER=ghcr.io/easycrypt/ec-build-box:${{ github.ref_name }}'
+
+  # ── Notification ──
 
   notification:
     name: Notification

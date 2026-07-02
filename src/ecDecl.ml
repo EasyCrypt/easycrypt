@@ -38,9 +38,11 @@ type ty_body =
 
 
 type tydecl = {
-  tyd_params : ty_params;
-  tyd_type   : ty_body;
-  tyd_loca   : locality;
+  tyd_params   : ty_params;
+  tyd_type     : ty_body;
+  tyd_loca     : locality;
+  tyd_clinline : bool;
+  tyd_subtype  : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 let tydecl_as_concrete (td : tydecl) =
@@ -71,7 +73,11 @@ let abs_tydecl ?(params : ty_pctor = `Int 0) (lc : locality) =
         in { tyvars; idxvars = []; }
   in
 
-  { tyd_params = params; tyd_type = Abstract; tyd_loca = lc; }
+  { tyd_params   = params;
+    tyd_type     = Abstract;
+    tyd_loca     = lc;
+    tyd_clinline = false;
+    tyd_subtype  = None; }
 
 (* -------------------------------------------------------------------- *)
 let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
@@ -92,6 +98,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
+  | OP_Exn    of ty list
   | OP_TC
 
 and prbody =
@@ -143,7 +150,7 @@ type operator = {
   op_unfold   : int option;
 }
 
-and opopaque = { smt: bool; reduction: bool; }
+and opopaque = { smt: bool; reduction: bool; inline: bool; }
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
@@ -157,6 +164,12 @@ type axiom = {
 
 let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+
+(* -------------------------------------------------------------------- *)
+type exception_ = {
+  exn_loca : locality;
+  exn_dom  : ty list;
+}
 
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
@@ -191,6 +204,11 @@ let is_fix op =
   | OB_oper (Some (OP_Fix _)) -> true
   | _ -> false
 
+let is_exception op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Exn _)) -> true
+  | _ -> false
+
 let is_abbrev op =
   match op.op_kind with
   | OB_nott _ -> true
@@ -217,11 +235,14 @@ let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
 let optransparent : opopaque =
-  { smt = false; reduction = false; }
+  { smt = false; reduction = false; inline = false; }
 
 let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
+
+let mk_exception (exn_loca : locality) (exn_dom : ty list) : exception_ =
+  { exn_loca; exn_dom; }
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
@@ -258,6 +279,16 @@ let operator_as_prind (op : operator) =
   match op.op_kind with
   | OB_pred (Some (PR_Ind pri)) -> pri
   | _ -> assert false
+
+let operator_as_exception (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Exn exn_dom)) ->
+      { exn_loca = op.op_loca; exn_dom; }
+  | _ -> assert false
+
+let operator_of_exception (ex: exception_) =
+  let ty = EcTypes.toarrow ex.exn_dom EcTypes.texn in
+  mk_op ~opaque: optransparent { idxvars = []; tyvars = [] } ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
 
 (* -------------------------------------------------------------------- *)
 let axiomatized_op 
@@ -361,3 +392,88 @@ let field_equal f1 f2 =
      ring_equal f1.f_ring f2.f_ring
   && EcPath.p_equal f1.f_inv f2.f_inv
   && EcUtils.oall2 EcPath.p_equal f1.f_div f2.f_div
+
+(* -------------------------------------------------------------------- *)
+type binding_size = form * (int option)
+
+type crb_theory1_kind =
+  | CRBT_Type   of EcPath.path
+  | CRBT_Op     of ty_params * expr
+  | CRBT_Lemma  of EcPath.path
+
+type crb_theory1 = 
+  { name: EcSymbols.symbol
+  ; kind: crb_theory1_kind }
+
+type crb_theory =
+  crb_theory1 list
+
+type crb_bitstring =
+  { type_  : EcPath.path
+  ; from_  : EcPath.path
+  ; to_    : EcPath.path
+  ; ofint  : EcPath.path
+  ; touint : EcPath.path
+  ; tosint : EcPath.path
+  ; size   : binding_size
+  ; theory : crb_theory }
+  
+type crb_array =
+  { type_  : EcPath.path
+  ; get    : EcPath.path
+  ; set    : EcPath.path
+  ; tolist : EcPath.path
+  ; oflist : EcPath.path
+  ; size   : binding_size
+  ; theory : crb_theory }
+  
+type bv_opkind = [
+  | `Add      of binding_size (* size *)
+  | `Sub      of binding_size (* size *)
+  | `Mul      of binding_size (* size *)
+  | `Div      of binding_size * bool (* size + sign *)
+  | `Rem      of binding_size * bool (* size + sign *)
+  | `Shl      of binding_size (* size *)
+  | `Shr      of binding_size * bool (* size + sign *)
+  | `Shls     of binding_size * binding_size (* size *)
+  | `Shrs     of binding_size * binding_size * bool (* size + sign *)
+  | `Rol      of binding_size (* size *)
+  | `Rol      of binding_size (* size *)
+  | `Ror      of binding_size (* size *)
+  | `And      of binding_size (* size *)
+  | `Or       of binding_size (* size *)
+  | `Xor      of binding_size (* size *)
+  | `Not      of binding_size (* size *)
+  | `Opp      of binding_size (* size *)
+  | `Lt       of binding_size * bool (* size + sign *) 
+  | `Le       of binding_size * bool (* size + sign *)
+  | `Extend   of binding_size * binding_size * bool (* size in + size out + sign *)
+  | `Truncate of binding_size * binding_size (* size in + size out *)
+  | `Extract  of binding_size * binding_size * bool (* size in + size out * aligned *)
+  | `Insert   of binding_size * binding_size (* size in + size out *)
+  | `Concat   of binding_size * binding_size * binding_size (* size in1 + size in2 *)
+  | `Init     of binding_size (* size_out *)
+  | `Get      of binding_size (* size_in *)
+  | `AInit    of binding_size * binding_size (* arr_len + size_out *)
+  | `Map      of binding_size * binding_size * binding_size (* size_in + size_out + arr_size *)
+  | `A2B      of (binding_size * binding_size) * binding_size (* (arr_len, elem_sz), out_size *)
+  | `B2A      of binding_size * (binding_size * binding_size) (* size in, (arr_len, elem_sz)  *)
+  | `ASliceGet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_out *)
+  | `ASliceSet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_in *)
+]
+  
+type crb_bvoperator =
+  { kind     : bv_opkind
+  ; types    : EcPath.path list
+  ; operator : EcPath.path }
+  
+type crb_circuit =
+{ name     : string
+; circuit  : Lospecs.Ast.adef
+; operator : EcPath.path }
+
+type crbinding =
+| CRB_Bitstring  of crb_bitstring
+| CRB_Array      of crb_array
+| CRB_BvOperator of crb_bvoperator
+| CRB_Circuit    of crb_circuit

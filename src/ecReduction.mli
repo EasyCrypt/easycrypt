@@ -119,3 +119,6 @@ val xconv : xconv -> LDecl.hyps -> form -> form -> bool
 
 val ss_inv_alpha_eq : LDecl.hyps -> ss_inv -> ss_inv -> bool
 val ts_inv_alpha_eq : LDecl.hyps -> ts_inv -> ts_inv -> bool
+val hs_inv_alpha_eq : LDecl.hyps -> hs_inv -> hs_inv -> bool
+
+val ss_inv_is_conv :  ?ri:reduction_info -> LDecl.hyps -> ss_inv -> ss_inv -> bool

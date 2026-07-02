@@ -26,6 +26,7 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
     - [Visual Studio Code](#visual-studio-code)
 - [Useful Resources](#useful-resources)
   - [Examples](#examples)
+  - [LaTeX Formatting](#latex-formatting)
 
 # Installation
 
@@ -185,3 +186,10 @@ Examples of how to use EasyCrypt are in the `examples` directory. You
 will find basic examples at the root of this directory, as well as a
 more advanced example in the `MEE-CBC` sub-directory and a tutorial on
 how to use the complexity system in `cost` sub-directory.
+
+## LaTeX Formatting
+
+LaTeX style file is in `assets/latex` directory. The basic usages are
+`\begin{eclst} ... \end{eclst}` (display mode) and
+`\ecinl{proc main() = { ...  }}` (inline mode).
+

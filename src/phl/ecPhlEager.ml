@@ -4,7 +4,7 @@ open EcEnv
 open EcFol
 open EcLowGoal
 open EcLowPhlGoal
-open EcMatching.Zipper
+open EcMatching.Position
 open EcModules
 open EcPV
 open EcTypes
@@ -69,8 +69,8 @@ let destruct_eager tc s =
   and ss = List.length s.s_node in
 
   let c, c' = (es.es_sl, es.es_sr) in
-  let z, c = s_split env (Zpr.cpos ss) c
-  and c', z' = s_split env (Zpr.cpos (List.length c'.s_node - ss)) c' in
+  let z, c = s_split env (gap_after_n ss) c 
+  and c', z' = s_split env (gap_before_last_n ss) c' in
 
   let env, _, _ = FApi.tc1_eflat tc in
   let z_eq_s = ER.EqTest.for_stmt env (stmt z) s
@@ -96,9 +96,11 @@ let destruct_on_op id_op tc =
   let env = FApi.tc1_env tc and es = tc1_as_equivS tc in
   let s =
     try
-      let s, _ = split_at_cpos1 env (-1, `ByMatch (None, id_op)) es.es_sl
+      let s, _ = split_by_match env ~occ:(-1) ~gap:`Before id_op es.es_sl in
       (* ensure the right statement also contains an [id_op]: *)
-      and _, _ = split_at_cpos1 env (1, `ByMatch (None, id_op)) es.es_sr in
+      if not @@ exists_match env id_op es.es_sr then 
+        tc_error_lazy !!tc (fun fmt ->
+          Format.fprintf fmt "eager: right side does not match operator");
       s
     with InvalidCPos ->
       tc_error_lazy !!tc (fun fmt ->
@@ -166,7 +168,12 @@ let t_eager_seq_r (i, j) s (r2, r1) tc =
 
   let (_, ml_ty), (_, mr_ty) = (eC.es_ml, eC.es_mr) in
   let c1, c2 = s_split env i c and c1', c2' = s_split env j c' in
-  let eqMem1 = eq_on_form_and_stmt env r1 (stmt c1')
+  let m = EcIdent.create "m" in
+  let existsP = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr eC) in
+  let eqMem1 =
+    map_ts_inv2 f_and
+      (eq_on_form_and_stmt env r1 (stmt c1'))
+      (ss_inv_generalize_left existsP r1.ml)
   and eqQ1 = eq_on_sided_form env (es_po eC) in
 
   let a =
@@ -203,7 +210,8 @@ let t_eager_if_r tc =
     let eqb = f_eq fe (f_local b tbool) in
     let pre = { m = ml; inv = f_and pr_inv eqb } in
     let post = { m = ml; inv = eqb } in
-    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ] (f_hoareS ml_ty pre s post)
+    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ]
+      (f_hoareS ml_ty pre s (empty_hs post))
   in
 
   let cT =
@@ -237,10 +245,16 @@ let t_eager_while_r i tc =
     subst_expr (add_memory empty mr ml)
   in
 
-  if (not (e_equal e (sub_to_left_mem _e))) then
+  if (not (ER.EqTest.for_expr env e (sub_to_left_mem _e))) then
     tc_error !!tc "eager: both while guards must be syntactically equal";
   
-  let eqMem1 = eq_on_form_and_stmt env i c' and eqI = eq_on_sided_form env i in
+  let m = EcIdent.create "m" in
+  let existsI = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr es) in
+  let eqMem1 =
+    map_ts_inv2 f_and
+      (eq_on_form_and_stmt env i c')
+      (ss_inv_generalize_left existsI i.ml)
+  and eqI = eq_on_sided_form env i in
 
   let el = ss_inv_of_expr ml e and er = ss_inv_of_expr mr e in
 
@@ -258,7 +272,8 @@ let t_eager_while_r i tc =
     let eqb = f_eq el.inv (f_local b tbool) in
     let pre = { m = ml; inv = f_and pr_inv eqb } in
     let post = { m = ml; inv = eqb } in
-    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ] (f_hoareS ml_ty pre s post)
+    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ]
+      (f_hoareS ml_ty pre s (empty_hs post))
   and dT = f_equivS ml_ty mr_ty eqMem1 c' c' i
   and eT = f_equivS ml_ty mr_ty i c c i
   and fT =
@@ -317,7 +332,7 @@ let t_eager_fun_def_r tc =
 let t_eager_fun_abs_r i tc =
   let env, _, _ = FApi.tc1_eflat tc and eg = tc1_as_eagerF tc in
 
-  if not (s_equal eg.eg_sl eg.eg_sr) then
+  if not (ER.EqTest.for_stmt env eg.eg_sl eg.eg_sr) then
     tc_error !!tc "eager: both swapping statements must be identical";
 
   if not (ensure_eq_shape tc i.ml i.mr i.inv) then
@@ -359,11 +374,14 @@ let t_eager_fun_abs_r i tc =
 let t_eager_call_r fpre fpost tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
-  let fpre = EcSubst.ts_inv_rebind fpre (fst es.es_ml) (fst es.es_mr) in
-  let fpost = EcSubst.ts_inv_rebind fpost (fst es.es_ml) (fst es.es_mr) in
 
-  let (lvl, fl, argsl), sl = pf_last_call !!tc es.es_sl in
-  let (lvr, fr, argsr), sr = pf_first_call !!tc es.es_sr in
+  let ml, mr = (fst es.es_ml, fst es.es_mr) in
+
+  let fpre  = EcSubst.ts_inv_rebind fpre  ml mr in
+  let fpost = EcSubst.ts_inv_rebind fpost ml mr in
+
+  let ((_, fl, argsl) as call_l), sl = pf_last_call !!tc es.es_sl in
+  let ((_, fr, _) as call_r), sr = pf_first_call !!tc es.es_sr in
 
   let swl = s_write env sl in
   let swr = s_write env sr in
@@ -380,15 +398,18 @@ let t_eager_call_r fpre fpost tc =
 
   List.iter check_a argsl;
 
-  let modil = PV.union (f_write env fl) swl in
-  let modir = PV.union (f_write env fr) swr in
   let post =
-    EcPhlCall.wp2_call env fpre fpost (lvl, fl, argsl) modil (lvr, fr, argsr)
-      modir (es_po es) hyps
+    EcPhlCall.compute_equiv_call_post
+      hyps ~mods:(swl, swr) (ml, mr) (fpre.inv, fpost.inv)
+      call_l call_r (es_po es).inv
   in
-  let f_concl = f_eagerF fpre sl fl fr sr fpost in
+  let post = { ml; mr; inv = post } in
+
+  let f_concl =
+    f_eagerF fpre sl fl fr sr fpost in
+
   let concl =
-    f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) (stmt []) (stmt []) post
+    f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s_empty s_empty post
   in
 
   FApi.xmutate1 tc `EagerCall [ f_concl; concl ]
@@ -405,7 +426,7 @@ let t_eager_call = FApi.t_low2 "eager-call" t_eager_call_r
 let process_seq (i, j) s factor tc =
   let open BatTuple.Tuple2 in
   let indices =
-    mapn (tc1_process_codepos1 tc) ((Some `Left, i), (Some `Right, j))
+    mapn (tc1_process_codegap1 tc) ((Some `Left, i), (Some `Right, j))
   and factor =
     factor
     |> ( function Single p -> (p, p) | Double pp -> pp )
@@ -456,7 +477,7 @@ let process_call info tc =
     f_eagerF { ml; mr; inv = fpre } sl fl fr sr { ml; mr; inv = fpost }
   in
   let process_cut = function
-    | EcParsetree.CI_spec (fpre, fpost) -> process_cut' fpre fpost
+    | EcParsetree.CI_spec (fpre, fpost) -> process_cut' fpre fpost.pnormal
     | CI_inv inv -> process_cut' inv inv
     | _ -> tc_error !!tc "eager: invalid call specification"
   in

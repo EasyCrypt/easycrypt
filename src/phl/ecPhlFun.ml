@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcParsetree
 open EcPath
 open EcAst
 open EcTypes
@@ -79,8 +78,11 @@ let t_hoareF_fun_def_r tc =
   let (memenv, (fsig, fdef), env) = Fun.hoareS hf.hf_m f env in
   let m = EcMemory.memory memenv in
   let fres = odfl {m;inv=f_tt} (omap (ss_inv_of_expr m) fdef.f_ret) in
-  let post = map_ss_inv2 (PVM.subst1 env pv_res m) fres (hf_po hf) in
+  let post, epost = POE.destruct (hf_po hf).hsi_inv in
+  let post = {m=(hf_po hf).hsi_m;inv=post} in
+  let post = map_ss_inv2 (PVM.subst1 env pv_res m) fres  post in
   let pre  = map_ss_inv1 (PVM.subst env (subst_pre env fsig m PVM.empty)) (hf_pr hf) in
+  let post = { hsi_m = post.m; hsi_inv = POE.mk post.inv epost; } in
   let concl' = f_hoareS (snd memenv) pre fdef.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
@@ -160,7 +162,7 @@ module FunAbsLow = struct
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env inv.m inv.inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF inv o inv in
+    let ospec o = f_hoareF inv o (POE.lift inv) in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
@@ -181,7 +183,7 @@ module FunAbsLow = struct
     PV.check_depend env fv top;
     let ospec o =
       check_oracle_use pf env top o;
-      f_bdHoareF inv o inv FHeq {m=inv.m;inv=f_r1} in
+      f_bdHoareF inv o inv FHge {m=inv.m;inv=f_r1} in
 
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, lossless_hyps env top f.x_sub :: sg)
@@ -248,7 +250,7 @@ let t_hoareF_abs_r inv tc =
   let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_f inv in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
-  FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
+  FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre (POE.lift post) tc)
 
 let t_ehoareF_abs_r inv tc =
   let env = FApi.tc1_env tc in
@@ -259,19 +261,32 @@ let t_ehoareF_abs_r inv tc =
   FApi.t_last tactic (EcPhlConseq.t_ehoareF_conseq pre post tc)
 
 (* ------------------------------------------------------------------ *)
-let t_bdhoareF_abs_r inv tc =
+let t_bdhoareF_abs_ge_r inv tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
 
   match bhf.bhf_cmp with
-  | FHeq when f_equal (bhf_bd bhf).inv f_r1 ->
+  | FHge when f_equal (bhf_bd bhf).inv f_r1 ->
       let pre, post, sg =
         FunAbsLow.bdhoareF_abs_spec !!tc env bhf.bhf_f inv
       in
       let tactic tc = FApi.xmutate1 tc `FunAbs sg in
       FApi.t_last tactic (EcPhlConseq.t_bdHoareF_conseq pre post tc)
 
-  | _ -> tc_error !!tc "bound must of \"= 1\""
+  | _ -> tc_error !!tc "bound must \">= 1%%r\""
+
+let t_bdhoareF_abs_r inv tc =
+  let bhf = tc1_as_bdhoareF tc in
+
+  match bhf.bhf_cmp with
+  | FHeq when f_equal (bhf_bd bhf).inv f_r1 ->
+    let tc = FApi.t_seqsub (EcPhlConseq.t_bdHoareF_conseq_bd FHge (bhf_bd bhf)) [EcLowGoal.t_close EcLowGoal.t_trivial; t_bdhoareF_abs_ge_r inv] tc in
+    let pl_goal_count = FApi.tc_count tc - 3 in
+    assert (pl_goal_count >= 0);
+    FApi.t_lasts (EcPhlConseq.t_bdHoareF_conseq_bd FHeq (bhf_bd bhf) |- FApi.t_first (EcLowGoal.t_close EcLowGoal.t_trivial)) pl_goal_count tc
+  | FHge when f_equal (bhf_bd bhf).inv f_r1 ->
+      t_bdhoareF_abs_ge_r inv tc
+  | _ -> tc_error !!tc "bound must \"= 1%%r\" or \">= 1%%r\""
 
 (* ------------------------------------------------------------------ *)
 let t_equivF_abs_r inv tc =
@@ -293,7 +308,9 @@ let t_equivF_abs   = FApi.t_low1 "equiv-fun-abs"   t_equivF_abs_r
 (* -------------------------------------------------------------------- *)
 module UpToLow = struct
   (* ------------------------------------------------------------------ *)
-  let equivF_abs_upto pf env fl fr (bad: ss_inv) (invP: ts_inv) (invQ: ts_inv) =
+  let equivF_abs_upto pf env weakened_pre fl fr (bad: ss_inv) (invP: ts_inv) (invQ: ts_inv) =
+    let weakened_pre = Option.value ~default:false weakened_pre in
+    
     let (topl, _fl, oil, sigl), (topr, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
@@ -329,23 +346,38 @@ module UpToLow = struct
       let pre   = map_ts_inv EcFol.f_ands [map_ts_inv1 EcFol.f_not bad2; eq_params; invP] in
       let post  = map_ts_inv3 EcFol.f_if_simpl bad2 invQ (map_ts_inv2 f_and eq_res invP) in
       let cond1 = f_equivF pre o_l o_r post in
-      let cond2 =
-        let f_r1 = {m=invQ.ml; inv=f_r1} in
-        let concl = ts_inv_lower_left1 (fun bq -> (f_bdHoareF bq o_l bq FHeq f_r1)) invQ in
-        f_forall_mems_ss_inv (mr, abstract_mt)
-          (map_ss_inv2 f_imp bad concl) in
-      let cond3 =
-        let f_r1 = {m=invQ.mr; inv=f_r1} in
-        let bq = map_ts_inv2 f_and bad2 invQ in
-          f_forall_mems_ss_inv (ml, abstract_mt) (ts_inv_lower_right1 (fun bq -> f_bdHoareF bq o_r bq FHeq f_r1) bq) in
+      if not weakened_pre then
+        let cond2 =
+          let f_r1 = {m=invQ.ml; inv=f_r1} in
+          let concl = ts_inv_lower_left1 (fun bq -> (f_bdHoareF bq o_l bq FHeq f_r1)) invQ in
+          f_forall_mems_ss_inv (mr, abstract_mt)
+            (map_ss_inv2 f_imp bad concl) in
+        let cond3 =
+          let f_r1 = {m=invQ.mr; inv=f_r1} in
+          let bq = map_ts_inv2 f_and bad2 invQ in
+            f_forall_mems_ss_inv (ml, abstract_mt) (ts_inv_lower_right1 (fun bq -> f_bdHoareF bq o_r bq FHeq f_r1) bq) in
 
-      [cond1; cond2; cond3]
+        [cond1; cond2; cond3]
+      else
+        let cond2 =
+          let concl = ts_inv_lower_left1 (fun bq -> (f_hoareF bq o_l (POE.lift bq))) invQ in
+          f_forall_mems_ss_inv (mr, abstract_mt)
+            (map_ss_inv2 f_imp bad concl) in
+        let cond3 =
+          let bq = map_ts_inv2 f_and bad2 invQ in
+            f_forall_mems_ss_inv (ml, abstract_mt) (ts_inv_lower_right1 (fun bq -> f_hoareF bq o_r (POE.lift bq)) bq) in
+
+        [cond1; cond2; cond3]
     in
 
     let sg = List.map2 ospec (OI.allowed oil) (OI.allowed oir) in
     let sg = List.flatten sg in
-    let lossless_a = lossless_hyps env topl fl.x_sub in
-    let sg = lossless_a :: sg in
+    let lossless_a = if not weakened_pre then
+       [ lossless_hyps env topl fl.x_sub ]
+    else
+      [ f_losslessF fl; f_losslessF fr ]
+    in
+    let sg = lossless_a @ sg in
 
     let eq_params =
       ts_inv_eqparams
@@ -362,17 +394,17 @@ module UpToLow = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_equivF_abs_upto_r bad invP invQ tc =
+let t_equivF_abs_upto_r weakened_pre bad invP invQ tc =
   let env = FApi.tc1_env tc in
   let ef = tc1_as_equivF tc in
   let pre, post, sg =
-    UpToLow.equivF_abs_upto !!tc env ef.ef_fl ef.ef_fr bad invP invQ
+    UpToLow.equivF_abs_upto !!tc env weakened_pre ef.ef_fl ef.ef_fr bad invP invQ
   in
 
   let tactic tc = FApi.xmutate1 tc `FunUpto sg in
   FApi.t_last tactic (EcPhlConseq.t_equivF_conseq pre post tc)
 
-let t_equivF_abs_upto = FApi.t_low3 "equiv-fun-abs-upto" t_equivF_abs_upto_r
+let t_equivF_abs_upto = t_equivF_abs_upto_r
 
 (* -------------------------------------------------------------------- *)
 module ToCodeLow = struct
@@ -425,8 +457,8 @@ let t_fun_to_code_hoare_r tc =
   let spr = ToCodeLow.add_var_tuple env pv_arg m a m PVM.empty in
   let spo = ToCodeLow.add_var env pv_res m r m PVM.empty in
   let pre  = PVM.subst env spr (hf_pr hf).inv in
-  let post = PVM.subst env spo (hf_po hf).inv in
-  let concl = f_hoareS mt {m;inv=pre} st {m;inv=post} in
+  let post = POE.map (PVM.subst env spo) (hf_po hf).hsi_inv in
+  let concl = f_hoareS mt {m;inv=pre} st {hsi_m=m;hsi_inv=post} in
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)
@@ -536,7 +568,7 @@ let t_fun_r (inv: inv) tc =
   let th tc =
     let inv = match inv with
       | Inv_ss inv -> inv
-      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
+      | _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.hf_f env
@@ -546,7 +578,7 @@ let t_fun_r (inv: inv) tc =
   and teh tc =
     let inv = match inv with
       | Inv_ss inv -> inv
-      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
+      |  _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_eHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.ehf_f env
@@ -556,7 +588,7 @@ let t_fun_r (inv: inv) tc =
   and tbh tc =
     let inv = match inv with
       | Inv_ss inv -> inv
-      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
+      |  _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_bdHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.bhf_f env
@@ -566,7 +598,7 @@ let t_fun_r (inv: inv) tc =
   and te tc =
     let inv = match inv with
       | Inv_ts inv -> inv
-      | Inv_ss _ -> tc_error !!tc "expected a two sided invariant" in
+      | _ -> tc_error !!tc "expected a two sided invariant" in
     let env = FApi.tc1_env tc in
     let e   = destr_equivF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun e.ef_fl env
@@ -577,9 +609,6 @@ let t_fun_r (inv: inv) tc =
     t_hF_or_bhF_or_eF ~th ~teh ~tbh ~te tc
 
 let t_fun = FApi.t_low1 "fun" t_fun_r
-
-(* -------------------------------------------------------------------- *)
-type p_upto_info = pformula * pformula * (pformula option)
 
 (* -------------------------------------------------------------------- *)
 let process_fun_def tc =
@@ -594,23 +623,24 @@ let process_fun_to_code tc =
   t_fun_to_code_r tc
 
 (* -------------------------------------------------------------------- *)
-let process_fun_upto_info (bad, p, q) tc =
+let process_fun_upto_info info tc =
+  let open EcParsetree in
   let hyps = FApi.tc1_hyps tc in
-  let ml, mr = EcIdent.create "&1", EcIdent.create "&2" in
+  let ml, mr = (EcIdent.create "&1", EcIdent.create "&2") in
   let env' = LDecl.inv_memenv ml mr hyps in
-  let p    = TTC.pf_process_form !!tc env' tbool p in
-  let q    = q |> omap (TTC.pf_process_form !!tc env' tbool) |> odfl f_true in
+  let p = TTC.pf_process_form !!tc env' tbool info.fui_pre in
+  let q = info.fui_pos |> omap (TTC.pf_process_form !!tc env' tbool) |> odfl f_true in
   let m = EcIdent.create "&hr" in
-  let bad  =
+  let bad =
     let env' = LDecl.push_active_ss (EcMemory.abstract m) hyps in
-    TTC.pf_process_form !!tc env' tbool bad
+    TTC.pf_process_form !!tc env' tbool info.fui_bad
   in
-    ({inv=bad;m}, {inv=p;ml;mr}, {inv=q;ml;mr})
+  (info.fui_is_ll_variant, { inv = bad; m }, { inv = p; ml; mr }, { inv = q; ml; mr })
 
 (* -------------------------------------------------------------------- *)
 let process_fun_upto info g =
-  let (bad, p, q) = process_fun_upto_info info g in
-    t_equivF_abs_upto bad p q g
+  let (weakened_pre, bad, p, q) = process_fun_upto_info info g in
+    t_equivF_abs_upto weakened_pre bad p q g
 
 (* -------------------------------------------------------------------- *)
 let process_fun_abs inv tc =

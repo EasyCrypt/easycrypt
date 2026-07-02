@@ -41,6 +41,10 @@ and proof_auc = {
   puc_jdg     : proof_state;
   puc_flags   : pucflags;
   puc_crt     : EcDecl.axiom;
+  puc_bullets : EcBullets.stack option;
+    (* [None] when bullets are decoration only (legacy mode).
+       [Some stack] when [+strict_bullets] was active at proof
+       open; see [EcBullets] for the stack semantics. *)
 }
 
 and proof_ctxt =
@@ -115,6 +119,11 @@ module Op : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Exception : sig
+  val add : scope -> pexception_decl located -> EcDecl.exception_ * scope
+end
+
+(* -------------------------------------------------------------------- *)
 module Pred : sig
   val add : ?src:string -> scope -> ppredicate located -> EcDecl.operator * scope
 end
@@ -123,11 +132,11 @@ end
 module Ax : sig
   type proofmode = [`WeakCheck | `Check | `Report]
 
-  val add     : ?src:string -> scope -> proofmode -> paxiom located -> symbol option * scope
+  val add     : ?src:string -> ?strict:bool -> scope -> proofmode -> paxiom located -> symbol option * scope
   val save    : ?src:string -> scope -> string option * scope
   val admit   : ?src:string -> scope -> string option * scope
   val abort   : ?src:string -> scope -> scope
-  val realize : scope -> proofmode -> prealize located -> symbol option * scope
+  val realize : ?strict:bool -> scope -> proofmode -> prealize located -> symbol option * scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -188,6 +197,22 @@ module Theory : sig
    * theory. *)
   val require : scope -> (required_info * thmode) -> (scope -> scope) -> scope
 
+  (* start/finish adding a new top-level required theory, not using loader
+   *
+   * [require_start] enters the theory, with the given name and theory mode,
+   * starting from the initial scope
+   *
+   * [require_finish old new_ ri] exits the top-level theory of [new_],
+   * resulting in a new scope, new', and a new loaded theory, th, and then
+   * forms a loaded theory map from the map of new', adding the binding of
+   * ri.rqd_name -> th
+   *   if old is supplied, it requires ri in the result of replacing
+       the loaded theories of old with the updated map
+   *   otherwise, it requires ri in the result of replacing the
+       the loaded theories of new' with the updated map *)
+  val require_start  : scope -> symbol -> thmode -> scope
+  val require_finish : ?old:scope option -> new_:scope -> required_info -> scope
+
   val add_clears : (pqsymbol option) list -> scope -> scope
 
   val required : scope -> required
@@ -210,7 +235,10 @@ module Tactics : sig
   type prinfos = proofenv * (handle * handle list)
   type proofmode = Ax.proofmode
 
-  val process : ?src:string -> scope -> proofmode -> ptactic list -> prinfos option * scope
+  val process :
+       ?src:string
+    -> ?bullet:bullet EcLocation.located
+    -> scope -> proofmode -> ptactic list -> prinfos option * scope
   val proof   : ?src:string -> scope -> scope
 end
 
@@ -225,7 +253,6 @@ module Prover : sig
     po_verbose    : int option;
     pl_all        : bool option;
     pl_max        : int option;
-    pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
     pl_dumpin     : string located option;
@@ -263,6 +290,14 @@ end
 (*-------------------------------------------------------------------- *)
 module Reduction : sig
   val add_reduction : scope -> puserred -> scope
+end
+
+(* -------------------------------------------------------------------- *)
+module Circuit : sig 
+  val add_bitstring  : scope -> EcTypes.is_local -> pbind_bitstring -> scope
+  val add_array      : scope -> EcTypes.is_local -> pbind_array -> scope
+  val add_bvoperator : scope -> EcTypes.is_local -> pbind_bvoperator -> scope
+  val add_circuits   : scope -> EcTypes.is_local -> pbind_circuit -> scope
 end
 
 (* -------------------------------------------------------------------- *)

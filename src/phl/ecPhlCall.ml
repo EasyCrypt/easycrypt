@@ -26,65 +26,187 @@ let wp_asgn_call ?mc env lv res post =
       let lets = lv_subst m lv res.inv in
       {m;inv=mk_let_of_lv_substs ?mc env ([lets], post.inv)}
 
+(* -------------------------------------------------------------------- *)
 let subst_args_call env m e s =
   PVM.add env pv_arg m (ss_inv_of_expr m e).inv s
 
 (* -------------------------------------------------------------------- *)
-let wp2_call
-  env fpre fpost (lpl,fl,argsl) modil (lpr,fr,argsr) modir post hyps
+let compute_hoare_call_post
+  (hyps     : LDecl.hyps)
+  (m        : memory)
+  (contract : form * exnpost)
+  (call     : lvalue option * EcPath.xpath * expr list)
+  (post     : exnpost)
 =
-  let ml, mr = post.ml, post.mr in
+  let env = LDecl.toenv hyps in
+
+  let (fpre, fpost) = contract in
+  let (lvalue, funname, funargs) = call in
+  let funsig = (Fun.by_xpath funname env).f_sig in
+  let modi  = f_write env funname in
+
+  let { main = fpost; exnmap = fepost; } = fpost in
+  let { main = post ; exnmap =  epost; } =  post in
+
+  let vres = LDecl.fresh_id hyps "result" in
+  let fres = f_local vres funsig.fs_ret in
+
+  let fpost = PVM.subst1 env pv_res m fres fpost in
+
+  let post = wp_asgn_call env lvalue { m = m; inv = fres; } { m = m; inv = post; } in
+  let post = (ss_inv_rebind post m).inv in
+  let post = f_imp_simpl fpost post in
+  let post = generalize_mod_ss_inv env modi { m = m; inv = post; } in
+  let post = (ss_inv_rebind post m).inv in
+  let post = f_forall_simpl [(vres, GTty funsig.fs_ret)] post in
+  let post =
+    let spre = subst_args_call env m (e_tuple funargs) PVM.empty in
+    f_anda_simpl (PVM.subst env spre fpre) post in
+
+  let poe = TTC.merge2_poe_list epost fepost in
+  let poe = List.map (fun inv -> { m; inv; }) poe in
+  let poe =
+    let penv_e = EcEnv.Fun.inv_memenv1 m env in
+    List.map (fun f ->
+      let genf = generalize_mod_ss_inv penv_e modi f in
+      (ss_inv_rebind genf m).inv
+    ) poe in
+
+  List.fold f_anda_simpl post poe
+
+(* -------------------------------------------------------------------- *)
+let compute_equiv_call_post
+   (hyps     : LDecl.hyps)
+   ((ml, mr) : memory * memory)
+   (contract : form * form)
+  ?(mods     : EcPV.PV.t * EcPV.PV.t = (EcPV.PV.empty, EcPV.PV.empty))
+   (call_l   : lvalue option * EcPath.xpath * expr list)
+   (call_r   : lvalue option * EcPath.xpath * expr list)
+   (post     : form)
+=
+  let env = LDecl.toenv hyps in
+
+  let (fpre, fpost) = contract in
+  let (lpl, fl, argsl) = call_l in
+  let (lpr, fr, argsr) = call_r in
+
+  let modil = EcPV.PV.union (fst mods) (f_write env fl) in
+  let modir = EcPV.PV.union (snd mods) (f_write env fr) in
+
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
-  (* The wp *)
-  let pvresl = pv_res and pvresr = pv_res in
+
   let vresl = LDecl.fresh_id hyps "result_L" in
   let vresr = LDecl.fresh_id hyps "result_R" in
-  let fresl = {ml;mr; inv=f_local vresl fsigl.fs_ret} in
-  let fresr = {ml;mr; inv=f_local vresr fsigr.fs_ret} in
-  let post = map_ts_inv_left2 (wp_asgn_call ~mc:(ml,mr) env lpl) fresl post in
-  let post = map_ts_inv_right2 (wp_asgn_call ~mc:(ml,mr) env lpr) fresr post in
-  let s    = PVM.empty in
-  let s    = PVM.add env pvresr mr fresr.inv s in
-  let s    = PVM.add env pvresl ml fresl.inv s in
-  let fpost = map_ts_inv1 (PVM.subst env s) fpost in
-  let post = generalize_mod_ts_inv env modil modir (map_ts_inv2 f_imp_simpl fpost post) in
-  let post = map_ts_inv1
+  let fresl = {ml; mr; inv = f_local vresl fsigl.fs_ret} in
+  let fresr = {ml; mr; inv = f_local vresr fsigr.fs_ret} in
+
+  let post =
+       {ml; mr; inv = post}
+    |> map_ts_inv_left2  (wp_asgn_call ~mc:(ml, mr) env lpl) fresl
+    |> map_ts_inv_right2 (wp_asgn_call ~mc:(ml, mr) env lpr) fresr in
+
+  let post = (ts_inv_rebind post ml mr).inv in
+
+  let fpost =
+    let s =
+      PVM.of_list env
+        [((pv_res, mr), fresr.inv); ((pv_res, ml), fresl.inv)] in
+    PVM.subst env s fpost in
+
+  let post =
+       {ml; mr; inv = (f_imp_simpl fpost post)}
+    |> generalize_mod_ts_inv env modil modir
+  in
+
+  let post = (ts_inv_rebind post ml mr).inv in
+
+  let post =
     (f_forall_simpl
       [(vresl, GTty fsigl.fs_ret);
        (vresr, GTty fsigr.fs_ret)])
       post in
+
   let spre = subst_args_call env ml (e_tuple argsl) PVM.empty in
   let spre = subst_args_call env mr (e_tuple argsr) spre in
-  map_ts_inv2 f_anda_simpl (map_ts_inv1 (PVM.subst env spre) fpre) post
+
+  f_anda_simpl (PVM.subst env spre fpre) post
+
+(* -------------------------------------------------------------------- *)
+let compute_equiv1_call_post
+   (hyps     : LDecl.hyps)
+   (side     : side)
+   ((ml, mr) : memory * memory)
+   (contract : form * form)
+   (call     : lvalue option * EcPath.xpath * expr list)
+   (post     : form)
+=
+  let env = LDecl.toenv hyps in
+
+  let (fpre, fpost) = contract in
+  let (lp, fname, args) = call in
+  let me = sideif side ml mr in
+
+  let wp_asgn_call_side env lv = sideif side
+    (map_ts_inv_left2  (wp_asgn_call ~mc:(ml,mr) env lv))
+    (map_ts_inv_right2 (wp_asgn_call ~mc:(ml,mr) env lv))
+  in
+  let generalize_mod_side = sideif side
+    generalize_mod_left generalize_mod_right in
+
+  let ss_inv_generalize_other_side inv = sideif side
+    (ss_inv_generalize_right inv mr) (ss_inv_generalize_left inv ml) in
+
+  let fsig  = (Fun.by_xpath fname env).f_sig in
+  let vres  = LDecl.fresh_id hyps "result" in
+  let fres  = { ml; mr; inv = f_local vres fsig.fs_ret; } in
+
+  let post  = wp_asgn_call_side env lp fres { ml; mr; inv = post; } in
+  let post  = (ts_inv_rebind post ml mr).inv in
+
+  let subst = PVM.add env pv_res me fres.inv PVM.empty in
+
+  let fpost = ss_inv_generalize_other_side { m = me; inv = fpost; } in
+  let fpost = (ts_inv_rebind fpost ml mr).inv in
+  let fpost = PVM.subst env subst fpost in
+
+  let fpre  = ss_inv_generalize_other_side { m = me; inv = fpre ; } in
+  let fpre  = (ts_inv_rebind fpre ml mr).inv in
+
+  let modi  = f_write env fname in
+  let post  = f_imp_simpl fpost post in
+  let post  = generalize_mod_side env modi { ml; mr; inv = post } in
+  let post  = (ts_inv_rebind post ml mr).inv in
+  let post  = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
+  let spre  = subst_args_call env me (e_tuple args) PVM.empty in
+
+  f_anda_simpl (PVM.subst env spre fpre) post
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_call fpre fpost tc =
-  let env = FApi.tc1_env tc in
-  let hs = tc1_as_hoareS tc in
-  let (lp,f,args),s = tc1_last_call tc hs.hs_s in
-  let m = EcMemory.memory hs.hs_m in
-  let fsig = (Fun.by_xpath f env).f_sig in
+  let hyps  = FApi.tc1_hyps tc in
+  let hs    = tc1_as_hoareS tc in
+  let m     = EcMemory.memory hs.hs_m in
+  let fpre  = (ss_inv_rebind fpre  m) in
+  let fpost = (hs_inv_rebind fpost m) in
+
+  let call, s = tc1_last_call tc hs.hs_s in
+
   (* The function satisfies the specification *)
-  let f_concl = f_hoareF fpre f fpost in
-  (* substitute memories *)
-  let fpre = (ss_inv_rebind fpre m) in
-  let fpost = (ss_inv_rebind fpost m) in
-  (* The wp *)
-  let pvres = pv_res in
-  let vres = EcIdent.create "result" in
-  let fres = {m;inv=f_local vres fsig.fs_ret} in
-  let post = wp_asgn_call env lp fres (hs_po hs) in
-  let fpost = map_ss_inv2 (PVM.subst1 env pvres m) fres fpost in
-  let modi = f_write env f in
-  let post = generalize_mod_ss_inv env modi (map_ss_inv2 f_imp_simpl fpost post) in
-  let post = map_ss_inv1 (f_forall_simpl [(vres, GTty fsig.fs_ret)]) post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = map_ss_inv2 f_anda_simpl (map_ss_inv1 (PVM.subst env spre) fpre) post in
+  let f_concl = f_hoareF fpre (proj3_2 call) fpost in
+
+  (* WP *)
+  let post  =
+    compute_hoare_call_post hyps m
+      (fpre.inv, fpost.hsi_inv) call (hs_po hs).hsi_inv in
+  let post = {
+    hsi_m   = m;
+    hsi_inv = { main = post; exnmap = (hs_po hs).hsi_inv.exnmap; };
+  } in
+
   let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
-
 
 (* -------------------------------------------------------------------- *)
 let ehoare_call_pre_post fpre fpost tc =
@@ -125,13 +247,13 @@ let t_ehoare_call_core fpre fpost tc =
   let hyps, env, hs, s, f, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   if not (List.is_empty s.s_node) then
     tc_error !!tc  "ehoare call core rule: only single call statements are accepted";
-  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs) wppost) then
+  if not (EcReduction.ss_inv_is_conv hyps (ehs_po hs) wppost) then
     (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong post-condition %a instead %a"
        (EcPrinting.pp_form ppe) (ehs_po hs).inv (EcPrinting.pp_form ppe) wppost.inv);
 
-  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_pr hs) wppre) then
+  if not (EcReduction.ss_inv_is_conv hyps (ehs_pr hs) wppre) then
     (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong pre-condition %a instead %a"
@@ -143,16 +265,16 @@ let t_ehoare_call_core fpre fpost tc =
 
 
 let t_ehoare_call fpre fpost tc =
-  let _, _, _, s, _, wppre, _ = ehoare_call_pre_post fpre fpost tc in
+  let _, _, _, _, _, wppre, _ = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) wppre tc in
+    EcPhlSeq.t_ehoare_seq (GapBefore (EcMatching.Position.cpos1_last)) wppre tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   FApi.t_sub [t_ehoare_call_core fpre fpost; t_id] tcenv
 
 let t_ehoare_call_concave f fpre fpost tc =
-  let _, _, _, s, _, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
+  let _, _, _, _, _, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node))
+    EcPhlSeq.t_ehoare_seq (GapBefore (EcMatching.Position.cpos1_last))
      (map_ss_inv2 (fun wppre f -> f_app_simpl f [wppre] txreal) wppre f) tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   let t_call =
@@ -223,6 +345,7 @@ let t_bdhoare_call fpre fpost opt_bd tc =
     let _,mt = bhs.bhs_m in
     match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
+        let post =empty_hs post in
         f_hoareS mt bhs_pr s post
     | FHeq, Some bd ->
         f_bdHoareS mt bhs_pr s post bhs.bhs_cmp (map_ss_inv2 f_real_div bhs_bd bd)
@@ -239,24 +362,25 @@ let t_bdhoare_call fpre fpost opt_bd tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_call fpre fpost tc =
-  let env, hyps, _ = FApi.tc1_eflat tc in
+  let hyps = FApi.tc1_hyps tc in
   let es = tc1_as_equivS tc in
   let ml, mr = fst es.es_ml, fst es.es_mr in
-  let fpre = ts_inv_rebind fpre ml mr in
+
+  let fpre  = ts_inv_rebind fpre  ml mr in
   let fpost = ts_inv_rebind fpost ml mr in
 
-  let (lpl,fl,argsl),sl = tc1_last_call tc es.es_sl in
-  let (lpr,fr,argsr),sr = tc1_last_call tc es.es_sr in
+  let ((_, fl, _) as call_l), sl = tc1_last_call tc es.es_sl in
+  let ((_, fr, _) as call_r), sr = tc1_last_call tc es.es_sr in
+
   (* The functions satisfy their specification *)
   let f_concl = f_equivF fpre fl fr fpost in
-  let modil = f_write env fl in
-  let modir = f_write env fr in
+
   (* The wp *)
   let post =
-    wp2_call env fpre fpost
-      (lpl,fl,argsl) modil (lpr,fr,argsr) modir
-      (es_po es) hyps
-  in
+    compute_equiv_call_post
+      hyps (ml, mr) (fpre.inv, fpost.inv) call_l call_r (es_po es).inv in
+  let post = { ml; mr; inv = post; } in
+
   let concl =
     f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr post in
 
@@ -264,52 +388,34 @@ let t_equiv_call fpre fpost tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_call1 side fpre fpost tc =
-  let env = FApi.tc1_env tc in
-  let equiv = tc1_as_equivS tc in
-  let ml, mr = fst equiv.es_ml, fst equiv.es_mr in
-  let mtl, mtr = snd equiv.es_ml, snd equiv.es_mr in
+  let hyps = FApi.tc1_hyps tc in
+  let es = tc1_as_equivS tc in
 
-  let (me, stmt) =
-    match side with
-    | `Left  -> (EcMemory.memory equiv.es_ml, equiv.es_sl)
-    | `Right -> (EcMemory.memory equiv.es_mr, equiv.es_sr)
-  in
-  let wp_asgn_call_side env lv = sideif side
-    (map_ts_inv_left2 (wp_asgn_call ~mc:(ml,mr) env lv))
-    (map_ts_inv_right2 (wp_asgn_call ~mc:(ml,mr) env lv))
-  in
-  let generalize_mod_side = sideif side
-    generalize_mod_left generalize_mod_right in
-  let ss_inv_generalize_other_side inv = sideif side
-    (ss_inv_generalize_right inv mr) (ss_inv_generalize_left inv ml) in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let me = sideif side ml mr in
 
-  let (lp, f, args), fstmt = tc1_last_call tc stmt in
-  let fsig = (Fun.by_xpath f env).f_sig in
+  let fpre  = ss_inv_rebind fpre  me in
+  let fpost = ss_inv_rebind fpost me in
+
+  let stmt = sideif side es.es_sl es.es_sr in
+  let ((_, fname, _) as call), fstmt = tc1_last_call tc stmt in
 
   (* The function satisfies its specification *)
-  let fconcl = f_bdHoareF fpre f fpost FHeq {m=fpost.m; inv=f_r1} in
+  let fconcl =
+    f_bdHoareF fpre fname fpost FHeq { m = fpost.m; inv = f_r1; } in
 
   (* WP *)
-  let pvres  = pv_res in
-  let vres   = LDecl.fresh_id (FApi.tc1_hyps tc) "result" in
-  let fres   = {ml;mr;inv=f_local vres fsig.fs_ret} in
-  let post   = wp_asgn_call_side env lp fres (es_po equiv) in
-  let subst  = PVM.add env pvres me fres.inv PVM.empty in
-  let fpost  = ss_inv_generalize_other_side (ss_inv_rebind fpost me) in
-  let fpre   = ss_inv_generalize_other_side (ss_inv_rebind fpre me) in
-  let fpost  = map_ts_inv1 (PVM.subst env subst) fpost in
-  let modi   = f_write env f in
-  let post   = map_ts_inv2 f_imp_simpl fpost post in
-  let post   = generalize_mod_side env modi post in
-  let post   = map_ts_inv1 (f_forall_simpl [(vres, GTty fsig.fs_ret)]) post in
-  let spre   = PVM.empty in
-  let spre   = subst_args_call env me (e_tuple args) spre in
-  let post   =
-    map_ts_inv2 f_anda_simpl (map_ts_inv1 (PVM.subst env spre) fpre) post in
+  let post =
+    compute_equiv1_call_post
+      hyps side (ml, mr) (fpre.inv, fpost.inv) call (es_po es).inv in
+  let post = { ml; mr; inv = post; } in
+
+  let mtl, mtr = snd es.es_ml, snd es.es_mr in
+
   let concl  =
     match side with
-    | `Left  -> f_equivS mtl mtr (es_pr equiv) fstmt equiv.es_sr post
-    | `Right -> f_equivS mtl mtr (es_pr equiv) equiv.es_sl fstmt post in
+    | `Left  -> f_equivS mtl mtr (es_pr es) fstmt es.es_sr post
+    | `Right -> f_equivS mtl mtr (es_pr es) es.es_sl fstmt post in
 
   FApi.xmutate1 tc `HlCall [fconcl; concl]
 
@@ -394,12 +500,25 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let defl = EcEnv.Fun.by_xpath fl env in
       let defr = EcEnv.Fun.by_xpath fr env in
       let sigl, sigr = defl.f_sig, defr.f_sig in
-      let testty =
-           EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
-        && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
+
+      let error s tl tr =
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        tc_error _pf "@[The procedures do not have the same %s types:@]@;<2 2>\
+          @[<v>Left side:  @[<h>%a@]@,\
+            Right side: @[<h>%a@]@]@;<2 0>\
+          A full contract cannot be inferred; consider providing a full contract using@;<2 2>\
+            call (: ...==> ...)@,"
+        s
+        (EcPrinting.pp_type ppe) tl
+        (EcPrinting.pp_type ppe) tr
       in
 
-      if not testty then raise EqObsInError;
+      if not (EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg)
+      then error "argument" sigl.fs_arg sigr.fs_arg;
+
+      if not (EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret)
+      then error "return" sigl.fs_ret sigr.fs_ret;
+
       let eq_params =
         ts_inv_eqparams
           sigl.fs_arg sigl.fs_anames ml
@@ -409,18 +528,13 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let post = map_ts_inv2 f_and eq_res inv in
         f_equivF pre fl fr post
 
-let process_call side info tc =
-  let process_spec tc side pre post =
+let ensure_none_poe tc poe =
+  if not (is_none poe) then tc_error !!tc "exception are not supported"
+
+let process_call (side, info) tc =
+  let process_spec_2 tc side pre post =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side with
-      | FhoareS hs, None ->
-          let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let m = (EcIdent.create "&hr") in
-          let penv, qenv = LDecl.hoareF m f hyps in
-          let pre  = TTC.pf_process_form !!tc penv tbool pre  in
-          let post = TTC.pf_process_form !!tc qenv tbool post in
-          f_hoareF {m;inv=pre} f {m;inv=post}
-
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
           let m = (EcIdent.create "&hr") in
@@ -462,20 +576,37 @@ let process_call side info tc =
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
-  let process_inv tc side inv =
+
+  let process_spec_1 tc side pre post poe =
+    let (hyps, concl) = FApi.tc1_flat tc in
+    match concl.f_node, side with
+    | FhoareS hs, None ->
+      let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+      let m = (EcIdent.create "&hr") in
+      let penv, qenv = LDecl.hoareF m f hyps in
+      let pre  = TTC.pf_process_form !!tc penv tbool pre  in
+      let post = TTC.pf_process_form !!tc qenv tbool post in
+      let env_e = LDecl.inv_memenv1 m hyps in
+      let poe = TTC.pf_process_poe env_e poe in
+      f_hoareF {m; inv = pre} f { hsi_m = m; hsi_inv = { main = post; exnmap = poe; } }
+
+    | _ -> tc_error !!tc "the conclusion is not a hoare" in
+
+  let process_inv_1 tc side inv =
     if not (is_none side) then
       tc_error !!tc "cannot specify side for call with invariants";
 
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
     | FhoareS hs ->
-        let m = fst hs.hs_m in
-        let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-        let me = EcMemory.abstract m in
-        let hyps = LDecl.push_active_ss me hyps in
-        let inv = TTC.pf_process_form !!tc hyps tbool inv in
-        let inv = {m; inv} in
-        (f_hoareF inv f inv, Inv_ss inv)
+      let m = fst hs.hs_m in
+      let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+      let me = EcMemory.abstract m in
+      let hyps = LDecl.push_active_ss me hyps in
+      let inv = TTC.pf_process_form !!tc hyps tbool inv in
+      let inv = {m; inv} in
+      let post = POE.lift inv in
+      (f_hoareF inv f post , Inv_ss inv)
 
     | FeHoareS hs ->
         let m = fst hs.ehs_m in
@@ -509,7 +640,7 @@ let process_call side info tc =
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
-  let process_upto tc side info =
+   let process_upto tc side info =
     if not (is_none side) then
       tc_error !!tc "cannot specify side for call with invariants";
     let env, _, concl = FApi.tc1_eflat tc in
@@ -518,7 +649,7 @@ let process_call side info tc =
         let ml, mr = fst es.es_ml, fst es.es_mr in
         let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
         let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-        let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
+        let weakened_pre,bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
         let bad2 = ss_inv_generalize_as_right bad ml mr in
         let invP = ts_inv_rebind invP ml mr in
         let invQ = ts_inv_rebind invQ ml mr in
@@ -533,7 +664,7 @@ let process_call side info tc =
         let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
         let pre    = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands (eq_params::lpre)) in
         let post   = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands [eq_res;eqglob;invP]) in
-        (bad,invP,invQ, f_equivF pre fl fr post)
+        (weakened_pre,bad,invP,invQ, f_equivF pre fl fr post)
 
     | _ -> tc_error !!tc "the conclusion is not an equiv" in
 
@@ -541,19 +672,29 @@ let process_call side info tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post) ->
-      process_spec tc side pre post
+    | CI_spec (pre, epost) ->
+      begin
+        let _, concl = FApi.tc1_flat tc in
+        match concl.f_node with
+        | FhoareS _ ->
+          process_spec_1 tc side pre epost.pnormal epost.pexcept
+        | _ ->
+           process_spec_2 tc side pre epost.pnormal
+      end
+
     | CI_inv inv ->
-      let f, inv = process_inv tc side inv in
-      subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
-      f
+      begin
+        let f, inv = process_inv_1 tc side inv in
+        subtactic := (fun tc ->
+            FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
+        f
+      end
 
     | CI_upto info ->
-      let bad, p, q, form = process_upto tc side info in
+      let weakened_pre, bad, p, q, form = process_upto tc side info in
       let t_tr = FApi.t_or (t_assumption `Conv) t_trivial in
       subtactic := (fun tc ->
-        FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto bad p q tc));
+        FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto weakened_pre bad p q tc));
       form
 
   in
@@ -614,10 +755,10 @@ let process_call_concave (fc, info) tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post) ->
+    | CI_spec (pre, epost) ->
       let ty,fmake = process_spec tc in
       let _, pre = TTC.tc1_process_Xhl_form tc ty pre in
-      let _, post = TTC.tc1_process_Xhl_form tc ty post in
+      let _, post = TTC.tc1_process_Xhl_form tc ty epost.pnormal in
       fmake pre post
 
     | CI_inv inv ->

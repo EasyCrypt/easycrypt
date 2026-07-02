@@ -136,12 +136,9 @@ proof.
     by rcondf{2} ^while; auto => /> /#.
   async while [ (fun r => i%r < r), (i{1}+k{2})%r ] 
               [ (fun r => i%r < r), (i{2} + 1)%r ]
-              ( (i < n){1}) 
-              (true) : 
+              ( !(i < n){1}) (!(i < n){2}) : 
               (={t, glob B} /\ (0 <= i <= n){2} /\ 0 < k{2} /\ n{1} = (k * n){2} /\ i{1} = k{2} * i{2}).
-  + smt(). + smt (). + done. 
-  + move=> &m2; exfalso; smt().
-  + move=> &m1; exfalso; smt().
+  + smt().
   + move=> v1 v2.
     rcondt{2} 1; 1: by auto => /> /#.
     rcondf{2} 4; 1: by auto; conseq (_: true);auto.
@@ -151,9 +148,11 @@ proof.
     + wp;call (_: true);skip => /> &2 h0i hin h0j hjk.
       rewrite !lt_fromint => h1 h2 h3.
       have := IntOrder.ler_wpmul2l k{2} _ i{2} (n{2} - 1); smt().
-    by wp;skip => /> /#.
-  + rcondf 1; skip => /#. 
-  + rcondf 1; skip => /#. 
+                by wp;skip => /> /#.
+  + move=> &m2; exfalso => /#.
+  + move=> &m1; exfalso => /#.
+  + rcondf 1 ; skip => /#.
+  + rcondf 1; skip => /#.
   auto => /> /#.
 qed.
 
@@ -188,17 +187,10 @@ proof.
   seq 2 2: (={glob B, t, n, i}); last by sim;wp;skip.
   async while [ (fun r => i%r < r), (i{1} + step * k{2})%r ] 
               [ (fun r => i%r < r), (i{2} + step * k{2})%r ]
-              ( (i < floor n (step * k0)){1}) 
-              (true) : 
+              (!(i < floor n (step * k0)){1}) 
+              (!(i + step * k <= n){2}) : 
               (={t, glob B, i, n} /\ k{2} = k0 /\ 0 < k{2} /\ (step * k0) %| i{1}).
   + move=> />;smt (lt_floorE floor_le step_gt0). 
-  + move=> /> &2 h1 h2 [[]// | h3].
-    have h4 := le_floorE (step * k0) (i{2} + step * k0) n{2} _ _.
-    + smt (step_gt0). + by apply dvdzD => //; apply dvdzz.
-    smt (step_gt0).
-  + done.
-  + by move=> &m2; exfalso => /#.
-  + by move=> &m1; exfalso => /#.
   + move=> v1 v2.
     rcondt{2} 1. 
     + move=> &1;skip => /> *; smt (step_gt0 lt_floorE floor_le).
@@ -216,10 +208,12 @@ proof.
       split. smt(). 
       have <- := IntOrder.ltr_pmul2l step step_gt0 (j{2} + 1) k0.
       smt (floor_le step_gt0).
-    wp; skip => &1 &2 [#] 6!->> h1 h2 h3 h4 2!->> /=.
+    wp; skip => &1 &2 [#] 6!->> h1 h2 h3 h4 ?????  2!->> /=.
     rewrite le_fromint lt_fromint h2 h1 -lt_floorE /= 2://; 1:smt (step_gt0).
     split; 1: smt(step_gt0).
-    by move=> /> j_R *; rewrite dvdzD 1:/# (_ : j_R = k0) 1:/# dvdzz.
+              by move=> /> j_R *; rewrite dvdzD 1:/# (_ : j_R = k0) 1:/# dvdzz.
+  + by move=> &m2; exfalso => /#.
+  + by move=> &m1; exfalso => /#.
   + rcondf 1; skip => /#.
   + rcondf 1; skip => /#.
   by auto.

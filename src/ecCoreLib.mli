@@ -36,11 +36,16 @@ module CI_Unit : sig
   val p_unit : path
   val p_tt   : path
 end
+
 (*-------------------------------------------------------------------- *)
 module CI_Witness : sig
   val p_witness : path
 end
 
+(*-------------------------------------------------------------------- *)
+module CI_Exn : sig
+  val p_exn : path
+end
 (* -------------------------------------------------------------------- *)
 module CI_Option : sig
   val p_option : path
@@ -48,6 +53,31 @@ module CI_Option : sig
   val p_some   : path
   val p_oget   : path
 end
+
+
+(*-------------------------------------------------------------------- *)
+module CI_List : sig
+  val i_List    : symbol
+  val p_List    : path
+  val p_list    : path
+  
+  val p_empty   : path
+  val p_cons    : path
+  val p_head    : path
+  val p_behead  : path
+  val p_tail    : path
+  val p_append  : path
+  val p_flatten : path
+  val p_map     : path
+  val p_mapi    : path
+  val p_chunk   : path
+  val p_all     : path
+  val p_size    : path
+  val p_nth     : path
+  val p_mkseq   : path
+  val p_mem     : path
+  val p_iota    : path
+  end
 
 (*-------------------------------------------------------------------- *)
 module CI_Bool : sig
@@ -84,6 +114,8 @@ module CI_Int : sig
   val p_int_pow   : path
   val p_int_edivz : path
   val p_iteri     : path
+  val p_iter      : path
+  val p_fold      : path
 end
 
 (* -------------------------------------------------------------------- *)

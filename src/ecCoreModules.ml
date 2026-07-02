@@ -21,7 +21,7 @@ let symbol_of_lv = function
       EcTypes.symbol_of_pv pv
 
   | LvTuple pvs ->
-      String.concat "" (List.map (EcTypes.symbol_of_pv |- fst) pvs)
+      String.concat "" (List.map (EcTypes.symbol_of_pv -| fst) pvs)
 
 let ty_of_lv = function
   | LvVar   (_, ty)       -> ty
@@ -45,7 +45,7 @@ let name_of_lv lv =
   | LvVar (pv, _) ->
      EcTypes.name_of_pvar pv
   | LvTuple pvs ->
-     String.concat "_" (List.map (EcTypes.name_of_pvar |- fst) pvs)
+     String.concat "_" (List.map (EcTypes.name_of_pvar -| fst) pvs)
 
 let lv_of_expr e =
   match e.e_node with
@@ -54,6 +54,16 @@ let lv_of_expr e =
   | Etuple pvs ->
      LvTuple (List.map (fun e -> EcTypes.destr_var e, e_ty e) pvs)
   | _ -> failwith "failed to construct lv from expr"
+
+let explode_assgn (lv : lvalue) (e : expr) : ((prog_var * ty) * expr) list =
+  match lv, e with
+  | LvVar lv, e ->
+    [(lv, e)]
+  | LvTuple lvs, { e_node = Etuple es } ->
+    List.combine lvs es
+  | LvTuple lvs, e ->
+    List.mapi (fun i (pv, ty) ->
+      ((pv, ty), e_proj_simpl e i ty)) lvs
 
 (* -------------------------------------------------------------------- *)
 type instr = EcAst.instr
@@ -93,7 +103,7 @@ let i_call     (lv, m, tys) = mk_instr (Scall (lv, m, tys))
 let i_if       (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
 let i_while    (c, s)       = mk_instr (Swhile (c, s))
 let i_match    (e, b)       = mk_instr (Smatch (e, b))
-let i_assert   e            = mk_instr (Sassert e)
+let i_raise    e            = mk_instr (Sraise e)
 let i_abstract id           = mk_instr (Sabstract id)
 
 let s_seq      s1 s2        = stmt (s1.s_node @ s2.s_node)
@@ -105,7 +115,7 @@ let s_call     arg = stmt [i_call arg]
 let s_if       arg = stmt [i_if arg]
 let s_while    arg = stmt [i_while arg]
 let s_match    arg = stmt [i_match arg]
-let s_assert   arg = stmt [i_assert arg]
+let s_raise    arg = stmt [i_raise arg]
 let s_abstract arg = stmt [i_abstract arg]
 
 (* -------------------------------------------------------------------- *)
@@ -133,8 +143,8 @@ let get_match = function
   | { i_node = Smatch (e, b) } -> Some (e, b)
   | _ -> None
 
-let get_assert = function
-  | { i_node = Sassert e } -> Some e
+let get_raise = function
+  | { i_node = Sraise e } -> Some e
   | _ -> raise Not_found
 
 (* -------------------------------------------------------------------- *)
@@ -147,7 +157,7 @@ let destr_call   = _destr_of_get get_call
 let destr_if     = _destr_of_get get_if
 let destr_while  = _destr_of_get get_while
 let destr_match  = _destr_of_get get_match
-let destr_assert = _destr_of_get get_assert
+let destr_raise = _destr_of_get get_raise
 
 (* -------------------------------------------------------------------- *)
 let _is_of_get (get : instr -> 'a option) (i : instr) =
@@ -159,7 +169,53 @@ let is_call   = _is_of_get get_call
 let is_if     = _is_of_get get_if
 let is_while  = _is_of_get get_while
 let is_match  = _is_of_get get_match
-let is_assert = _is_of_get get_assert
+let is_raise  = _is_of_get get_raise
+
+(* -------------------------------------------------------------------- *)
+let i_asgn_of_pve (pve : ((prog_var * ty) * expr) list) : instr option = 
+  let lvs, es = List.split pve in
+
+  lvs
+  |> lv_of_list
+  |> omap (fun lvs -> i_asgn (lvs, e_tuple es))
+
+(* -------------------------------------------------------------------- *)
+let i_iter (f : instr -> unit) =
+  let rec i_iter (i : instr) =
+    match i.i_node with
+    | Sasgn _ | Srnd _ | Scall _ | Sraise _ | Sabstract _ -> ()
+
+    | Sif (_, s1, s2) ->
+      List.iter fs [s1; s2] 
+
+    | Swhile (_, s) ->
+      fs s
+
+    | Smatch (_, bs) ->
+      List.iter (fun (_, s) -> fs s) bs
+
+  and fs (s : stmt) =
+    List.iter f s.s_node
+
+  in fun (i : instr) -> i_iter i
+
+(* -------------------------------------------------------------------- *)
+let i_map_expr (tx : expr -> expr) =
+  let rec doit (i : instr) =
+    match i.i_node with
+    | Sasgn (lv, e) -> i_asgn (lv, (tx e))
+    | Sif (c, t, f) -> i_if (tx c, doit_s t, doit_s f)
+    | Smatch (e, cs) -> i_match (tx e, List.map (snd_map doit_s) cs)
+    | Swhile (c, bd) -> i_while (tx c, doit_s bd)
+    | Srnd (lv, e) -> i_rnd (lv, tx e)
+    | Sraise e -> i_raise (tx e)
+    | Sabstract (_ : memory) -> i
+    | Scall (lv, f, args) -> i_call (lv, f, List.map tx args)
+
+  and doit_s (s : stmt) =
+    stmt (List.map doit s.s_node) in
+
+  fun i -> doit i
 
 (* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
@@ -184,7 +240,7 @@ let rec lv_get_uninit_read (w : Ssym.t) (lv : lvalue) =
       Ssym.union (sx_of_pv x) w
 
   | LvTuple xs ->
-      let w' = List.map (sx_of_pv |- fst) xs in
+      let w' = List.map (sx_of_pv -| fst) xs in
       Ssym.big_union (w :: w')
 
 and s_get_uninit_read (w : Ssym.t) (s : stmt) =
@@ -223,7 +279,7 @@ and i_get_uninit_read (w : Ssym.t) (i : instr) =
       let ws, rs = List.split wrs in
       (Ssym.union w (Ssym.big_inter ws), Ssym.big_union (r :: rs))
 
-  | Sassert e ->
+  | Sraise e ->
       (w, Ssym.diff (Uninit.e_pv e) w)
 
   | Sabstract (_ : EcIdent.t) ->

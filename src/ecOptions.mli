@@ -6,6 +6,7 @@ type command = [
   | `Runtest of run_option
   | `Why3Config
   | `DocGen of doc_option
+  | `Llm of llm_option
 ]
 
 and options = {
@@ -43,16 +44,23 @@ and doc_option = {
   doco_outdirp   : string option;
 }
 
+and llm_option = {
+  llmo_input     : string;
+  llmo_provers   : prv_options;
+  llmo_lastgoals : bool;
+  llmo_upto      : (int * int option) option;
+}
+
 and prv_options = {
   prvo_maxjobs    : int option;
   prvo_timeout    : int option;
   prvo_cpufactor  : int option;
   prvo_provers    : string list option;
+  prvo_quorum     : int option;
   prvo_pragmas    : string list;
   prvo_ppwidth    : int option;
   prvo_checkall   : bool;
   prvo_profile    : bool;
-  prvo_iterate    : bool;
   prvo_why3server : string option;
 }
 
@@ -74,6 +82,7 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
+  ini_quorum   : int option;
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;

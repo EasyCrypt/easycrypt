@@ -1,3 +1,0 @@
-# /bin/bash
-
-exec opam exec --switch="$(basename $0)" alt-ergo -- "$@"

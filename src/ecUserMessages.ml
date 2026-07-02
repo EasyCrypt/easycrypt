@@ -187,10 +187,26 @@ end = struct
     | MAE_AccesSubModFunctor ->
         msg "cannot access a sub-module of a partially applied functor"
 
-  let pp_fxerror _env fmt error =
+  let pp_fix_match env =
+     let ppe = EcPrinting.PPEnv.ofenv env in
+     let ppo fmt = function
+       | None -> Format.fprintf fmt "_"
+       | Some op -> EcPrinting.pp_opname ppe fmt op in
+     let pp1 fmt (id, op) =
+       Format.fprintf fmt "%a = %a"
+          (EcPrinting.pp_local ppe) id
+          ppo op in
+     EcPrinting.pp_list ",@ " pp1
+
+  let is_are n = if n = 1 then "is" else "are"
+
+  let pp_fxerror env fmt error =
     let msg x = Format.fprintf fmt x in
 
     match error with
+    | FXE_MatchWildcard ->
+        msg "pattern matching with wildcard not support"
+
     | FXE_EmptyMatch ->
         msg "this pattern matching has no branches"
 
@@ -209,8 +225,26 @@ end = struct
     | FXE_MatchDupBranches ->
         msg "this pattern matching contains duplicated branches"
 
-    | FXE_MatchPartial ->
-        msg "this pattern matching is non-exhaustive"
+    | FXE_MatchPartial ids ->
+        msg "this pattern matching is non-exhaustive, %a %s missing"
+          (EcPrinting.pp_list ",@ " pp_symbol) ids
+          (is_are (List.length ids))
+
+    | FXE_FixPartial ids ->
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        let pp_match fmt ids =
+          Format.fprintf fmt "[%a]"
+            (EcPrinting.pp_list ",@" (EcPrinting.pp_opname ppe)) ids in
+        msg "this pattern matching is non-exhaustive, %a %s missing"
+          (EcPrinting.pp_list ",@ " pp_match) ids
+          (is_are (List.length ids))
+
+    | FXE_FixRedundant fm ->
+        msg "this clause is useless: %a" (pp_fix_match env) fm
+
+    | FXE_FixDuplicate (previous, current) ->
+        msg "duplicate clause : %a, already covered by %a"
+          (pp_fix_match env) current (pp_fix_match env) previous
 
     | FXE_CtorUnk ->
         msg "unknown constructor name"
@@ -225,6 +259,12 @@ end = struct
 
     | FXE_SynCheckFailure ->
         msg "syntactic termination check failure"
+
+  let pp_gse_error _env fmt error =
+    let msg = Format.fprintf fmt in
+    match error with
+    | GSE_ExpectedTwoSided ->
+        msg "expected two sided goal"
 
   let pp_tyerror env1 fmt error =
     let env   = EcPrinting.PPEnv.ofenv env1 in
@@ -317,6 +357,9 @@ end = struct
     | DuplicatedField name ->
         msg "duplicated field name: `%s'" name
 
+    |DuplicatedException name ->
+        msg "duplicated exception: %a" pp_qsymbol name
+
     | NonLinearPattern ->
         msg "non-linear pattern matching"
 
@@ -361,6 +404,75 @@ end = struct
         msg "no matching operator, named `%a', " pp_qsymbol name;
         msg "for the following parameters' type:@\n";
         List.iteri (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) tys
+
+    | UnappliedOp (name, esig, _retty, failures) ->
+        let pp_reason fmt = function
+          | EcUnify.OF_result (got, expected) ->
+              Format.fprintf fmt
+                "it returns a value of type@\n  @[%a@]@\nbut a value of type@\n  @[%a@]@\nwas expected"
+                pp_type got pp_type expected
+          | EcUnify.OF_argument (i, expected, got) ->
+              Format.fprintf fmt
+                "its #%d argument is expected to have type@\n  @[%a@]@\nbut is applied to a value of type@\n  @[%a@]"
+                i pp_type expected pp_type got
+          | EcUnify.OF_arity (provided, atmost) ->
+              Format.fprintf fmt
+                "it is applied to %d argument(s) but takes at most %d"
+                provided atmost
+        in
+        let pp_instance fmt instance =
+          if not (List.is_empty instance) then begin
+            Format.fprintf fmt "where the type parameters were inferred as:@\n";
+            List.iter
+              (fun (tp, ty) ->
+                Format.fprintf fmt "  @[%a = %a@]@\n"
+                  pp_type (tvar tp) pp_type ty)
+              instance
+          end
+        in
+        let pp_kind fmt = function
+          | `Op (p, _, _) ->
+              Format.fprintf fmt "operator `%a'" EcPrinting.pp_path p
+          | `Pv (pv, _) ->
+              Format.fprintf fmt "program variable `%a'" (EcPrinting.pp_pv env) pv
+          | `Lc (id, _) ->
+              Format.fprintf fmt "local variable `%a'" (EcPrinting.pp_local env) id
+        in
+        let pp_details fmt (cand, fail) =
+          begin match cand with
+          | `Op (_, instance, declty) ->
+              if not (List.is_empty instance) then
+                Format.fprintf fmt "its type is@\n  @[%a@]@\n%a"
+                  pp_type declty pp_instance instance
+          | `Pv (_, ty) | `Lc (_, ty) ->
+              Format.fprintf fmt "it has type@\n  @[%a@]@\n" pp_type ty
+          end;
+          pp_reason fmt fail
+        in
+        let pp_args () =
+          if List.is_empty esig then
+            msg ":@\n"
+          else begin
+            msg " to arguments of type:@\n";
+            List.iteri
+              (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) esig
+          end
+        in
+        begin match failures with
+        | [(cand, fail)] ->
+            msg "%a cannot be applied" pp_kind cand;
+            pp_args ();
+            msg "@[<v>%a@]" pp_details (cand, fail)
+        | _ ->
+            msg "`%a' cannot be applied" pp_qsymbol name;
+            pp_args ();
+            msg "the candidates cannot be applied:@\n";
+            List.iter
+              (fun (cand, fail) ->
+                msg "  [%a]:@\n    @[<v>%a@]@\n"
+                  pp_kind cand pp_details (cand, fail))
+              failures
+        end
 
     | MultipleOpMatch (name, tys, matches) -> begin
         let uvars = List.map Tuni.univars tys in
@@ -439,7 +551,10 @@ end = struct
         msg "unknown type name: %a" pp_qsymbol name
 
     | UnknownFunName name ->
-        msg "unknown procedure: %a" pp_qsymbol name
+      msg "unknown procedure: %a" pp_qsymbol name
+
+    | UnknownExceptionName name ->
+      msg "unknown exception: %a" pp_qsymbol name
 
     | UnknownModVar x ->
         msg "unknown module-level variable: %a" pp_qsymbol x
@@ -566,6 +681,9 @@ end = struct
         | `MemSel -> "memory selector"
       end
     end
+
+    | UnexpectedGoalShape gse ->
+        msg "unexpected goal shape %a" (pp_gse_error env) gse
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
@@ -755,7 +873,7 @@ end = struct
           (string_of_ovkind kd) (string_of_qsymbol x)
 
     | CE_ThyOverride x ->
-        msg "Cannot override theory `%s`: contains module"
+        msg "Cannot override theory `%s`: contains module or exception"
           (string_of_qsymbol x)
 
     | CE_UnkAbbrev x ->
@@ -805,6 +923,9 @@ end = struct
         msg
           "cannot realized a (non-axiomatic) lemma: `%s'"
           (string_of_qsymbol x)
+    | CE_NoExceptions ->
+      msg
+        "Override of exceptions not allowed"
 end
 
 (* -------------------------------------------------------------------- *)

@@ -29,7 +29,7 @@ val predT: 'a -> bool
 
 val (^~) : ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
 val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
-val (|-) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+val (|-) : ('c -> 'a) -> ('a -> 'b) -> 'c -> 'b
 
 val (|>) : 'a -> ('a -> 'b) -> 'b
 val (<|) : ('a -> 'b) -> 'a -> 'b
@@ -254,6 +254,8 @@ module List : sig
     val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
   end
 
+  val of_pair : 'a * 'a -> 'a list
+
   (* Aliases to exception-less functions *)
   val ocons   : 'a option -> 'a list -> 'a list
   val ohead   : 'a list -> 'a option
@@ -300,6 +302,7 @@ module List : sig
   val reduce1    : ('a list -> 'a) -> 'a list -> 'a
   val find_dup   : ?cmp:('a -> 'a -> int) -> 'a list -> 'a option
   val has_dup    : ?cmp:('a -> 'a -> int) -> 'a list -> bool
+  val chunkify   : int -> 'a list -> 'a list list
 
   val takedrop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
 

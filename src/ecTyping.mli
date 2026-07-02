@@ -20,6 +20,13 @@ type opmatch = [
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg
 ]
 
+(* A failed application candidate, tagged by the kind of entity. *)
+type appcand = [
+  | `Op of EcPath.path * EcUnify.op_instance * EcTypes.ty
+  | `Pv of EcTypes.prog_var * EcTypes.ty
+  | `Lc of EcIdent.t * EcTypes.ty
+]
+
 type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 
 
@@ -91,14 +98,20 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type fix_match = (EcIdent.ident * EcPath.path option) list
+
 type fxerror =
+| FXE_MatchWildcard
 | FXE_EmptyMatch
 | FXE_MatchParamsMixed
 | FXE_MatchParamsDup
 | FXE_MatchParamsUnk
 | FXE_MatchNonLinear
 | FXE_MatchDupBranches
-| FXE_MatchPartial
+| FXE_MatchPartial of string list
+| FXE_FixPartial of EcPath.path list list
+| FXE_FixRedundant of fix_match
+| FXE_FixDuplicate of fix_match * fix_match
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
@@ -107,6 +120,10 @@ type fxerror =
 type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
+
+
+type goal_shape_error = 
+| GSE_ExpectedTwoSided
 
 type tyerror =
 | UniVarNotAllowed
@@ -135,6 +152,7 @@ type tyerror =
 | DuplicatedIndexVar     of symbol
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
+| DuplicatedException    of qsymbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -145,10 +163,13 @@ type tyerror =
 | NotAnInductive
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
+| UnappliedOp            of qsymbol * ty list * ty option
+                           * (appcand * EcUnify.op_failure) list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
@@ -176,6 +197,7 @@ type tyerror =
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
 | NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
+| UnexpectedGoalShape    of goal_shape_error
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -236,11 +258,18 @@ type ismap = (instr list) EcMaps.Mstr.t
 val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
-val trans_codepos_range : ?memory:EcMemory.memory -> env -> pcodepos_range -> codepos_range
+val trans_codepos_or_range : ?memory:EcMemory.memory -> env -> pcodepos_or_range -> codegap_range
 val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
 val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
 val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption
 val trans_codeoffset1 : ?memory:EcMemory.memory -> env -> pcodeoffset1 -> codeoffset1
+val trans_codegap1 : ?memory:EcMemory.memory -> env -> pcodegap1 -> codegap1
+val trans_codegap  : ?memory:EcMemory.memory -> env -> pcodegap  -> codegap
+val trans_codegap1_range : ?memory:EcMemory.memory -> env -> pcodegap1_range -> codegap1_range
+val trans_codegap_range  : ?memory:EcMemory.memory -> env -> pcodegap_range  -> codegap_range
+val trans_range1_or_insert : ?memory:EcMemory.memory -> env -> prange1_or_insert  -> codegap_range
+val trans_codegap_offset1 : ?memory:EcMemory.memory -> env -> pcodegap_offset1 -> codegap_offset1
+val trans_dcodegap1 : ?memory:EcMemory.memory -> env -> pcodegap1 doption -> codegap1 doption
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
@@ -259,6 +288,12 @@ val trans_prop     :
 
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
+val trans_poe :
+  EcEnv.env ->
+  EcUnify.unienv ->
+  EcParsetree.phoare_exception ->
+  EcFol.form EcPath.Mop.t
+
 (* -------------------------------------------------------------------- *)
 val trans_memtype :
   env -> EcUnify.unienv -> pmemtype -> EcMemory.memtype
@@ -274,6 +309,7 @@ val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
+val trans_exception  : env -> qsymbol located -> qsymbol * path
 val trans_oracle     : env -> psymbol * psymbol -> xpath
 val trans_restr_mem  : env -> pmod_restr_mem -> mod_restr
 

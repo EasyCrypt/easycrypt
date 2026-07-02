@@ -159,7 +159,11 @@ val t_right : ?reduce:lazyred -> FApi.backward
 val t_or_intro_prind : ?reduce:lazyred -> side -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+val t_duplicate_top_assumtion : FApi.backward
+
+(* -------------------------------------------------------------------- *)
 val t_split : ?i: int -> ?closeonly:bool -> ?reduce:lazyred -> FApi.backward
+val t_split_all : ?must:bool -> FApi.backward
 val t_split_prind : ?reduce:lazyred -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
@@ -330,6 +334,21 @@ val t_crush_fwd : ?delta:bool -> int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_congr : form pair -> form pair list * ty -> FApi.backward
+
+val t_congr_from_skeleton :
+     holes:(EcIdent.t * ty) list
+  -> skel:form
+  -> lvec:form list
+  -> rvec:form list
+  -> FApi.backward
+
+val t_congr_pattern :
+     pat:form
+  -> pvars:EcIdent.t list
+  -> ue:EcUnify.unienv
+  -> FApi.backward
+
+val t_congr_star : FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]

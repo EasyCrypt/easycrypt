@@ -12,6 +12,7 @@ module Sm    = EcPath.Sm
 module Sx    = EcPath.Sx
 module Mx    = EcPath.Mx
 module Mp    = EcPath.Mp
+module Mop   = EcPath.Mop
 module Mid   = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
@@ -264,6 +265,10 @@ let fresh_elocals_opt (s : subst) (locals : (EcIdent.t option * ty) list) =
   List.fold_left_map fresh_elocal_opt s locals
 
 let add_flocal (s : subst) (x : EcIdent.t) (f : EcCoreFol.form) =
+  let s =
+    match EcCoreFol.expr_of_form f with
+    | e -> add_elocal s x e
+    | exception EcCoreFol.CannotTranslate -> s in
   { s with sb_flocal = Mid.add x f s.sb_flocal }
 
 let add_flocals (s : subst) (xs : EcIdent.t list) (fs : EcCoreFol.form list) =
@@ -479,8 +484,7 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sassert e ->
-     i_assert (subst_expr s e)
+  | Sraise e -> i_raise (subst_expr s e)
 
   | Sabstract _ ->
      i
@@ -586,14 +590,14 @@ let rec subst_form (s : subst) (f : form) =
      let hf_f  = subst_xpath s hf.hf_f in
      let s = add_memory s hf.hf_m hf.hf_m in
      let hf_pr = map_ss_inv1 (subst_form s) (hf_pr hf) in
-     let hf_po = map_ss_inv1 (subst_form s) (hf_po hf) in
+     let hf_po = subst_hs_inv s (hf_po hf) in
      f_hoareF hf_pr hf_f hf_po
 
   | FhoareS hs ->
      let hs_s = subst_stmt s hs.hs_s in
      let s, (_,mt) = subst_memtype s hs.hs_m in
      let hs_pr = map_ss_inv1 (subst_form s) (hs_pr hs) in
-     let hs_po = map_ss_inv1 (subst_form s) (hs_po hs) in
+     let hs_po = subst_hs_inv s (hs_po hs) in
      f_hoareS mt hs_pr hs_s hs_po
 
   | FbdHoareF bhf ->
@@ -867,6 +871,18 @@ and subst_module (s : subst) (m : module_expr) =
   { me_name = m.me_name; me_params; me_body; me_comps; me_sig_body; me_oinfos; }
 
 (* -------------------------------------------------------------------- *)
+and subst_hs_inv (s : subst) (inv : hs_inv) =
+  let s = add_memory s inv.hsi_m inv.hsi_m in
+  let main = subst_form s inv.hsi_inv.main in
+  let exnmap =
+    Mop.fold (fun p f m ->
+      let p = omap (subst_path s) p in
+      let f = subst_form s f in
+      Mop.add p f m
+    ) inv.hsi_inv.exnmap Mop.empty in
+  { hsi_inv = { main; exnmap }; hsi_m = inv.hsi_m }
+
+(* -------------------------------------------------------------------- *)
 let subst_modsig ?params (s : subst) (comps : module_sig) =
   snd (subst_modsig ?params s comps)
 
@@ -922,10 +938,16 @@ let subst_tydecl_body (s : subst) (tyd : ty_body) =
 let subst_tydecl (s : subst) (tyd : tydecl) =
   let s, tparams = fresh_tparams s tyd.tyd_params in
   let body = subst_tydecl_body s tyd.tyd_type in
+  let subtype =
+    Option.map
+      (fun (carrier, pred) -> (subst_ty s carrier, subst_form s pred))
+      tyd.tyd_subtype in
 
-  { tyd_params  = tparams;
-    tyd_type    = body;
-    tyd_loca    = tyd.tyd_loca; }
+  { tyd_params   = tparams;
+    tyd_type     = body;
+    tyd_loca     = tyd.tyd_loca;
+    tyd_clinline = tyd.tyd_clinline;
+    tyd_subtype  = subtype; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =
@@ -965,7 +987,7 @@ and subst_op_body (s : subst) (bd : opbody) =
                opf_resty    = subst_ty s opfix.opf_resty;
                opf_struct   = opfix.opf_struct;
                opf_branches = subst_branches es opfix.opf_branches; }
-
+  | OP_Exn tys -> OP_Exn (List.map (subst_ty s) tys)
   | OP_TC -> OP_TC
 
 and subst_branches (s : subst) = function
@@ -1076,6 +1098,127 @@ let subst_tc (s : subst) tc =
     { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
 
 (* -------------------------------------------------------------------- *)
+let subst_binding_size ?(red: (form -> int option) option) (s: subst) (bsize: binding_size) = 
+  let fsize = subst_form s (fst bsize) in
+  let csize = match red with
+  | Some red when Option.is_none (snd bsize) -> red fsize
+  | _ -> (snd bsize) 
+  in (fsize, csize)
+
+let subst_bv_opkind ?(red: (form -> int option) option) (s: subst) (opk: bv_opkind) = 
+  let ssize = subst_binding_size ?red s in
+  match opk with
+  | `Extend (s1, s2, sgn) -> `Extend (ssize s1, ssize s2, sgn) 
+  | `Rem (s, sgn) -> `Rem (ssize s, sgn)  
+  | `Div (s, sgn) -> `Div (ssize s, sgn) 
+  | `Add (s) -> `Add (ssize s) 
+  | `Lt (s, sgn) -> `Lt (ssize s, sgn) 
+  | `Shl (s) -> `Shl (ssize s) 
+  | `Shls (s1, s2) -> `Shls (ssize s1, ssize s2) 
+  | `ASliceSet ((s1, s2), s3) -> `ASliceSet ((ssize s1, ssize s2), ssize s3) 
+  | `And s -> `And (ssize s) 
+  | `Extract (s1, s2, aligned) -> `Extract (ssize s1, ssize s2, aligned) 
+  | `Map (s1, s2, s3) -> `Map (ssize s1, ssize s2, ssize s3) 
+  | `AInit (s1, s2) -> `AInit (ssize s1, ssize s2) 
+  | `Sub s -> `Sub (ssize s) 
+  | `Get s -> `Get (ssize s) 
+  | `Ror s -> `Ror (ssize s) 
+  | `Le (s, sgn) -> `Le (ssize s, sgn) 
+  | `Concat (s1, s2, s3) -> `Concat (ssize s1, ssize s2, ssize s3) 
+  | `Truncate (s1, s2) -> `Truncate (ssize s1, ssize s2) 
+  | `Not (s) -> `Not (ssize s) 
+  | `Opp (s) -> `Opp (ssize s) 
+  | `Or (s) -> `Or (ssize s) 
+  | `Init (s) -> `Init (ssize s) 
+  | `Insert (s1, s2) -> `Insert (ssize s1, ssize s2) 
+  | `Xor (s) -> `Xor (ssize s) 
+  | `Shr (s, sgn) -> `Shr (ssize s, sgn) 
+  | `Shrs (s1, s2, sgn) -> `Shrs (ssize s1, ssize s2, sgn) 
+  | `Mul (s) -> `Mul (ssize s) 
+  | `Rol (s) -> `Rol (ssize s) 
+  | `A2B ((s1, s2), s3) -> `A2B ((ssize s1, ssize s2), ssize s3) 
+  | `ASliceGet ((s1, s2), s3) -> `ASliceGet ((ssize s1, ssize s2), ssize s3) 
+  | `B2A (s1, (s2, s3)) -> `B2A (ssize s1, (ssize s2, ssize s3)) 
+
+(* -------------------------------------------------------------------- *)
+let subst_crb_theory1_kind (s : subst) (kind : crb_theory1_kind) =
+  match kind with
+  | CRBT_Type p ->
+    assert (not (Mp.mem p s.sb_tydef));
+    CRBT_Type (subst_path s p)
+  | CRBT_Op (tparams, body) ->
+    let s, tparams = fresh_tparams s tparams in
+    let body = subst_expr s body in
+    CRBT_Op (tparams, body)
+  | CRBT_Lemma p ->
+    CRBT_Lemma (subst_path s p)
+
+(* -------------------------------------------------------------------- *)
+let subst_crb_theory1 (s : subst) (crbth1 : crb_theory1) =
+  { kind = subst_crb_theory1_kind s crbth1.kind
+  ; name = crbth1.name }
+
+(* -------------------------------------------------------------------- *)
+let subst_crb_theory (s : subst) (crbth : crb_theory) =
+  List.map (subst_crb_theory1 s) crbth
+
+(* -------------------------------------------------------------------- *)
+let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbinding) =
+  match crb with
+  | CRB_Bitstring bs ->
+    assert (not (Mp.mem bs.type_ s.sb_tydef));
+    assert (not (Mp.mem bs.from_ s.sb_def));
+    assert (not (Mp.mem bs.to_ s.sb_def));
+    assert (not (Mp.mem bs.touint s.sb_def));
+    assert (not (Mp.mem bs.tosint s.sb_def));
+    assert (not (Mp.mem bs.ofint s.sb_def));
+    CRB_Bitstring {
+      type_  = subst_path s bs.type_;
+      from_  = subst_path s bs.from_;
+      to_    = subst_path s bs.to_;
+      touint  = subst_path s bs.touint;
+      tosint  = subst_path s bs.tosint;
+      ofint  = subst_path s bs.ofint;
+      size   = subst_binding_size ?red s bs.size;
+      theory = subst_crb_theory s bs.theory; }
+
+  | CRB_Array ba ->
+    assert (not (Mp.mem ba.type_ s.sb_tydef));
+    assert (not (Mp.mem ba.get s.sb_def));
+    assert (not (Mp.mem ba.set s.sb_def));
+    assert (not (Mp.mem ba.tolist s.sb_def));
+    assert (not (Mp.mem ba.oflist s.sb_def));
+    CRB_Array {
+      type_  = subst_path s ba.type_;
+      get    = subst_path s ba.get;
+      set    = subst_path s ba.set;
+      tolist = subst_path s ba.tolist;
+      oflist = subst_path s ba.oflist;
+      size   = subst_binding_size ?red s ba.size;
+      theory = subst_crb_theory s ba.theory }
+
+  | CRB_BvOperator op ->
+    assert (List.for_all (fun ty -> not (Mp.mem ty s.sb_tydef)) op.types);
+    assert (not (Mp.mem op.operator s.sb_def));
+    CRB_BvOperator {
+      kind     = subst_bv_opkind ?red s op.kind;
+      types    = List.map (subst_path s) op.types;
+      operator = subst_path s op.operator; }
+
+  | CRB_Circuit cr ->
+      assert (not (Mp.mem cr.operator s.sb_def));
+      CRB_Circuit {
+        name     = cr.name;
+        circuit  = cr.circuit;
+        operator = subst_path s cr.operator; }
+  
+
+(* -------------------------------------------------------------------- *)
+let subst_exception (s : subst) (ex : exception_) =
+  { exn_loca = ex.exn_loca;
+    exn_dom = List.map (subst_ty s) ex.exn_dom }
+
+(* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   match item with
@@ -1118,6 +1261,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
       Th_auto { auto_rl with axioms =
         List.map (fst_map (subst_path s)) axioms }
 
+  | Th_crbinding (bd, lc) ->
+      Th_crbinding (subst_crbinding s bd, lc)
+
   | Th_alias (name, target) ->
       Th_alias (name, subst_path s target)
 
@@ -1154,6 +1300,7 @@ let subst_inv (s : subst) (inv : inv) =
   match inv with
   | Inv_ss inv -> Inv_ss (subst_ss_inv s inv)
   | Inv_ts inv -> Inv_ts (subst_ts_inv s inv)
+  | Inv_hs inv -> Inv_hs (subst_hs_inv s inv)
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (params : (EcIdent.t * ty) list) : subst =
@@ -1202,6 +1349,9 @@ let ss_inv_generalize_as_right ({inv;m}: ss_inv) (ml: memory) (mr: memory) : ts_
 let f_forall_mems_ss_inv menv inv =
   f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv
 
+let f_exists_mems_ss_inv menv inv =
+  f_exists_mems [menv] (ss_inv_rebind inv (fst menv)).inv
+
 let ts_inv_rebind_left ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
   if ml = m then
     { inv; ml; mr }
@@ -1223,15 +1373,18 @@ let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
   | true, true -> { inv; ml; mr }
   | false, true -> assert (mr <> ml'); ts_inv_rebind_left {inv;ml;mr} ml'
   | true, false -> assert (ml <> mr'); ts_inv_rebind_right {inv;ml;mr} mr'
-  | false, false -> begin 
+  | false, false -> begin
     let s = add_memory empty ml ml' in
     let s = add_memory s mr mr' in
     let inv = subst_form s inv in
     { inv; ml = ml'; mr = mr' }
   end
 
-let f_forall_mems_ts_inv menvl menvr inv = 
+let f_forall_mems_ts_inv menvl menvr inv =
   f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
+
+let f_exists_mems_ts_inv menvl menvr inv =
+  f_exists_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
 
 let ss_inv_forall_ml_ts_inv menvl inv =
   let inv' = f_forall_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
@@ -1240,3 +1393,27 @@ let ss_inv_forall_ml_ts_inv menvl inv =
 let ss_inv_forall_mr_ts_inv menvr inv =
   let inv' = f_forall_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
   { inv=inv'; m=inv.ml }
+
+let ss_inv_exists_ml_ts_inv menvl inv =
+  let inv' = f_exists_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
+  { inv=inv'; m=inv.mr}
+
+let ss_inv_exists_mr_ts_inv menvr inv =
+  let inv' = f_exists_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
+  { inv=inv'; m=inv.ml }
+
+(* -------------------------------------------------------------------- *)
+let hs_inv_rebind ({hsi_inv;hsi_m}: hs_inv) (m': memory) : hs_inv =
+  if m' = hsi_m then
+    { hsi_inv; hsi_m }
+  else
+    let hsi_inv = POE.map (subst_form (add_memory empty hsi_m m')) hsi_inv in
+    { hsi_inv; hsi_m = m' }
+
+(* -------------------------------------------------------------------- *)
+let inv_rebind (inv : inv) (ms : memory list) : inv =
+  match inv, ms with
+  | Inv_ss ss, [m] -> Inv_ss (ss_inv_rebind ss m)
+  | Inv_ts ts, [ml; mr] -> Inv_ts (ts_inv_rebind ts ml mr)
+  | Inv_hs hs, [m] -> Inv_hs (hs_inv_rebind hs m)
+  | _, _ -> assert false

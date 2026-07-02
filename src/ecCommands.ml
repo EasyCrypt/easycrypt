@@ -15,6 +15,7 @@ type pragma = {
   pm_g_prall : bool; (* true  => display all open goals *)
   pm_g_prpo  : EcPrinting.prpo_display;
   pm_check   : [`Check | `WeakCheck | `Report];
+  pm_strict_bullets : bool; (* true => bullets focus subgoals *)
 }
 
 let dpragma = {
@@ -22,6 +23,7 @@ let dpragma = {
   pm_g_prall = false ;
   pm_g_prpo  = EcPrinting.{ prpo_pr = false; prpo_po = false; };
   pm_check   = `Check;
+  pm_strict_bullets = false;
 }
 
 module Pragma : sig
@@ -61,9 +63,14 @@ let pragma_g_po_display (b : bool) =
 let pragma_check mode =
   Pragma.upd (fun pragma -> { pragma with pm_check = mode; })
 
+let pragma_strict_bullets (b : bool) =
+  Pragma.upd (fun pragma -> { pragma with pm_strict_bullets = b; })
+
 module Pragmas = struct
   let silent     = "silent"
   let verbose    = "verbose"
+
+  let strict_bullets = "strict_bullets"
 
   module Proofs = struct
     let check  = "Proofs:check"
@@ -84,6 +91,15 @@ module Pragmas = struct
   end
 
 end
+
+(* Boolean gstate flags settable in-script via [pragma +name.] / [pragma -name.]
+   and, from the CLI, via [-pragmas +name] (see [apply_pragma_option]). *)
+let gstate_bool_flags = [
+  EcGState.old_mem_restr;
+  EcGState.pp_showtvi;
+  EcGState.circuit_timing;
+  EcGState.circuit_debug_smt;
+]
 
 exception InvalidPragma of string
 
@@ -111,6 +127,7 @@ module Loader : sig
   type kind      = EcLoader.kind
   type idx_t     = EcLoader.idx_t
   type namespace = EcLoader.namespace
+  type context1  = { cpath : string; filename : string; }
 
   val create  : unit   -> loader
   val forsys  : loader -> loader
@@ -124,13 +141,20 @@ module Loader : sig
                   loader -> (namespace option * string * kind) option
 
   val push      : string -> loader -> unit
-  val pop       : loader -> string option
-  val context   : loader -> string list
+  val pop       : loader -> context1 option
+  val context   : loader -> context1 list
   val incontext : string -> loader -> bool
+
+  val set_current_path : string -> loader -> unit
+
+  val current_path : loader -> string
 end = struct
+  type context1  = { cpath : string; filename : string; }
+
   type loader = {
     (*---*) ld_core      : EcLoader.ecloader;
-    mutable ld_stack     : string list;
+    mutable ld_stack     : context1 list;
+    mutable ld_cpath     : string;
     (*---*) ld_namespace : EcLoader.namespace option;
   }
 
@@ -147,16 +171,19 @@ end = struct
   let create () =
     { ld_core      = EcLoader.create ();
       ld_stack     = [];
+      ld_cpath     = Unix.getcwd ();
       ld_namespace = None; }
 
   let forsys (ld : loader) =
     { ld_core      = EcLoader.forsys ld.ld_core;
       ld_stack     = ld.ld_stack;
+      ld_cpath     = ld.ld_cpath;
       ld_namespace = None; }
 
   let dup ?namespace (ld : loader) =
     { ld_core      = EcLoader.dup ld.ld_core;
       ld_stack     = ld.ld_stack;
+      ld_cpath     = ld.ld_cpath;
       ld_namespace =
         match namespace with
         | Some _ -> namespace
@@ -174,7 +201,8 @@ end = struct
     EcLoader.locate ?namespaces path ld.ld_core
 
   let push (p : string) (ld : loader) =
-    ld.ld_stack <- norm p :: ld.ld_stack
+    let ctxt1 = { cpath = ld.ld_cpath; filename = norm p; } in
+    ld.ld_stack <- ctxt1 :: ld.ld_stack
 
   let pop (ld : loader) =
     match ld.ld_stack with
@@ -185,7 +213,14 @@ end = struct
     ld.ld_stack
 
   let incontext (p : string) (ld : loader) =
-    List.mem (norm p) ld.ld_stack
+    let p = norm p in
+    List.exists (fun ctxt1 -> p = ctxt1.filename) ld.ld_stack
+
+  let set_current_path (cpath : string) (ld : loader) =
+    ld.ld_cpath <- cpath
+
+  let current_path (ld : loader) : string =
+    ld.ld_cpath
 end
 
 (* -------------------------------------------------------------------- *)
@@ -262,17 +297,17 @@ module HiPrinting = struct
   let pr_axioms (fmt : Format.formatter) (env : EcEnv.env) =
     let ax  = EcEnv.Ax.all ~check:(fun _ ax -> EcDecl.is_axiom ax.ax_kind) env in
     let ppe0 = EcPrinting.PPEnv.ofenv env in
-    EcPrinting.pp_by_theory ppe0 (EcPrinting.pp_axiom) fmt ax  
+    EcPrinting.pp_by_theory ppe0 (EcPrinting.pp_axiom) fmt ax
 
   let pr_hint_solve (fmt : Format.formatter) (env : EcEnv.env) =
     let hint_solve = EcEnv.Auto.all env in
     let hint_solve = List.map (fun (p, mode) ->
       let ax = EcEnv.Ax.by_path p env in
       (p, (ax, mode))
-    ) hint_solve in 
-    
+    ) hint_solve in
+
     let ppe = EcPrinting.PPEnv.ofenv env in
-  
+
     let pp_hint_solve ppe fmt = (fun (p, (ax, mode)) ->
       let mode =
         match mode with
@@ -281,8 +316,8 @@ module HiPrinting = struct
         Format.fprintf fmt "%a %s" (EcPrinting.pp_axiom ppe) (p, ax) mode
       )
     in
-    
-    EcPrinting.pp_by_theory ppe pp_hint_solve fmt hint_solve    
+
+    EcPrinting.pp_by_theory ppe pp_hint_solve fmt hint_solve
 
   (* ------------------------------------------------------------------ *)
   let pr_hint_rewrite (fmt : Format.formatter) (env : EcEnv.env) =
@@ -302,13 +337,13 @@ module HiPrinting = struct
       if List.is_empty elems then
         Format.fprintf fmt "%s (empty)@." (EcPath.basename p)
       else
-        Format.fprintf fmt "@[<b 2>%s = @\n%a@]@\n" (EcPath.basename p) 
-          (EcPrinting.pp_list "@\n" (fun fmt p -> 
+        Format.fprintf fmt "@[<b 2>%s = @\n%a@]@\n" (EcPath.basename p)
+          (EcPrinting.pp_list "@\n" (fun fmt p ->
             Format.fprintf fmt "%a" pp_path p))
           (EcPath.Sp.ntr_elements sp)
       )
     in
-    
+
     EcPrinting.pp_by_theory ppe pp_hint_rewrite fmt hint_rewrite
 
   (* ------------------------------------------------------------------ *)
@@ -317,17 +352,17 @@ module HiPrinting = struct
 
     let (hint_simplify: (EcEnv.Reduction.topsym * rule list) list) = EcEnv.Reduction.all env in
 
-    let hint_simplify = List.filter_map (fun (ts, rl) -> 
+    let hint_simplify = List.filter_map (fun (ts, rl) ->
       match ts with
-      | `Path p -> Some (p, rl) 
+      | `Path p -> Some (p, rl)
       | _ -> None
-    ) hint_simplify 
+    ) hint_simplify
     in
-    
+
     let ppe = EcPrinting.PPEnv.ofenv env in
-    
+
     let pp_hint_simplify ppe fmt = (fun (p,  (rls : rule list)) ->
-      Format.fprintf fmt "@[<b 2>%s:@\n%a@]" (EcPath.basename p) 
+      Format.fprintf fmt "@[<b 2>%s:@\n%a@]" (EcPath.basename p)
         (EcPrinting.pp_list "@\n" (fun fmt rl ->
           begin match rl.rl_cond with
           | [] -> Format.fprintf fmt "Conditions: None@\n"
@@ -340,7 +375,7 @@ module HiPrinting = struct
         rls
       )
     in
-    
+
     EcPrinting.pp_by_theory ppe pp_hint_simplify fmt hint_simplify
 end
 
@@ -398,6 +433,22 @@ let process_print scope p =
   process_pr Format.std_formatter scope p
 
 (* -------------------------------------------------------------------- *)
+let process_expect scope (expected, p) =
+  let buf = Buffer.create 256 in
+  let fmt = Format.formatter_of_buffer buf in
+  process_pr fmt scope p;
+  Format.pp_print_flush fmt ();
+  let actual = Buffer.contents buf in
+  if String.trim actual <> String.trim (unloc expected) then
+    EcScope.hierror ~loc:(loc expected)
+      "expect: output mismatch@\n\
+       --- expected ---@\n\
+       %s@\n\
+       --- actual ---@\n\
+       %s"
+      (unloc expected) actual
+
+(* -------------------------------------------------------------------- *)
 exception Pragma of [`Reset | `Restart]
 
 (* -------------------------------------------------------------------- *)
@@ -448,6 +499,14 @@ and process_operator ?(src : string option) (scope : EcScope.scope) (pop : poper
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_exception (scope :  EcScope.scope) (ed : pexception_decl located) =
+  EcScope.check_state `InTop "exception" scope;
+  let _, scope = EcScope.Exception.add scope ed in
+  EcScope.notify scope `Info "added exception %s"
+    (unloc ed.pl_desc.pe_name);
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process_procop ?(src : string option) (scope : EcScope.scope) (pop : pprocop located) =
   EcScope.check_state `InTop "operator" scope;
   EcScope.Op.add_opsem ?src scope pop
@@ -481,7 +540,9 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom ?(src : string option) (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  let (name, scope) = EcScope.Ax.add ?src scope (Pragma.get ()).pm_check ax in
+  let pragma = Pragma.get () in
+  let strict = pragma.pm_strict_bullets in
+  let (name, scope) = EcScope.Ax.add ?src ~strict scope pragma.pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
@@ -536,6 +597,8 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       Loader.push    filename subld;
       Loader.addidir ?namespace:fnm dirname subld;
 
+      Loader.set_current_path dirname subld;
+
       let name = EcScope.{
         rqd_name      = thname;
         rqd_kind      = kind;
@@ -557,7 +620,9 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         (fun () -> Pragma.set i_pragma)
       in
 
-      let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
+      let kind = match kind with 
+      | `Ec -> `Concrete | `EcA -> `Abstract 
+      in
 
       let scope = EcScope.Theory.require scope (name, kind) loader in
           match io with
@@ -611,8 +676,9 @@ and process_sct_close (scope : EcScope.scope) name =
 and process_tactics ?(src : string option) (scope : EcScope.scope) t =
   let mode = (Pragma.get ()).pm_check in
   match t with
-  | `Actual t -> snd (EcScope.Tactics.process ?src scope mode t)
-  | `Proof    -> EcScope.Tactics.proof ?src scope
+  | `Actual (b, t) ->
+      snd (EcScope.Tactics.process ?src ?bullet:b scope mode t)
+  | `Proof -> EcScope.Tactics.proof ?src scope
 
 (* -------------------------------------------------------------------- *)
 (* Add and store src for proofs *)
@@ -629,8 +695,9 @@ and process_save ?(src : string option) (scope : EcScope.scope) ed =
 
 (* -------------------------------------------------------------------- *)
 and process_realize (scope : EcScope.scope) pr =
-  let mode = (Pragma.get ()).pm_check in
-  let (name, scope) = EcScope.Ax.realize scope mode pr in
+  let pragma = Pragma.get () in
+  let strict = pragma.pm_strict_bullets in
+  let (name, scope) = EcScope.Ax.realize ~strict scope pragma.pm_check pr in
     name |> EcUtils.oiter
       (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
@@ -660,9 +727,12 @@ and process_pragma (scope : EcScope.scope) opt =
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
   match value with
-  | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr ->
+  | `Bool value when List.mem (EcLocation.unloc name) gstate_bool_flags ->
     let gs = EcEnv.gstate (EcScope.env scope) in
     EcGState.setflag (unloc name) value gs; scope
+
+  | `Bool value when EcLocation.unloc name = Pragmas.strict_bullets ->
+      pragma_strict_bullets value; scope
 
   | (`Int _) as value ->
       let gs = EcEnv.gstate (EcScope.env scope) in
@@ -691,14 +761,14 @@ and process_dump_why3 scope filename =
   EcScope.dump_why3 scope filename; scope
 
 (* -------------------------------------------------------------------- *)
-and process_dump scope (source, tc) =
+and process_dump scope (source, (bullet, tc)) =
   let open EcCoreGoal in
 
   let input, (p1, p2) = source.tcd_source in
 
   let goals, scope  =
     let mode = (Pragma.get ()).pm_check in
-     EcScope.Tactics.process scope mode tc
+    EcScope.Tactics.process ?bullet scope mode tc
   in
 
   let wrerror fname =
@@ -743,6 +813,26 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_crbind (scope : EcScope.scope) (ld : Loader.loader) (binding : pcrbinding) =
+  match binding.binding with
+  | CRB_Bitstring  bs -> EcScope.Circuit.add_bitstring  scope binding.locality bs
+  | CRB_Array      ba -> EcScope.Circuit.add_array      scope binding.locality ba
+  | CRB_BvOperator op -> EcScope.Circuit.add_bvoperator scope binding.locality op
+  | CRB_Circuit    cr ->
+
+    let file =
+      if Filename.is_relative (unloc cr.file) then
+        Filename.concat (Loader.current_path ld) (unloc cr.file)
+      else unloc cr.file in
+    let file = mk_loc (loc cr.file) file in
+
+    if not (Sys.file_exists (unloc file)) then
+      EcScope.hierror ~loc:(loc file)
+        "cannot find spec file: %s" (unloc file);
+
+    EcScope.Circuit.add_circuits scope binding.locality {cr with file}
+
+(* -------------------------------------------------------------------- *)
 and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -755,6 +845,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | Gmodule      m    -> `Fct   (fun scope -> process_module     ?src scope m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  ?src scope i)
       | Goperator    o    -> `Fct   (fun scope -> process_operator   ?src scope (mk_loc loc o))
+      | Gexception   e    -> `Fct   (fun scope -> process_exception  scope  (mk_loc loc e))
       | Gprocop      o    -> `Fct   (fun scope -> process_procop     ?src scope (mk_loc loc o))
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  ?src scope (mk_loc loc p))
       | Gnotation    n    -> `Fct   (fun scope -> process_notation   scope  (mk_loc loc n))
@@ -772,6 +863,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
+      | Gexpect      x    -> `Fct   (fun scope -> process_expect     scope  x; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    ?src scope  t)
@@ -785,6 +877,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
+      | Gcrbinding   bind -> `Fct   (fun scope -> process_crbind     scope ld bind)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
@@ -810,6 +903,9 @@ let addidir ?namespace ?recursive (idir : string) =
 let loadpath () =
   List.map fst (Loader.aslist loader)
 
+let set_current_path (path : string) =
+  Loader.set_current_path path loader
+
 (* -------------------------------------------------------------------- *)
 type checkmode = {
   cm_checkall  : bool;
@@ -817,8 +913,8 @@ type checkmode = {
   cm_cpufactor : int;
   cm_nprovers  : int;
   cm_provers   : string list option;
+  cm_quorum    : int option;
   cm_profile   : bool;
-  cm_iterate   : bool;
 }
 
 let initial ~checkmode ~boot ~checkproof =
@@ -829,7 +925,7 @@ let initial ~checkmode ~boot ~checkproof =
     EcScope.Prover.po_cpufactor = Some checkmode.cm_cpufactor;
     EcScope.Prover.po_nprovers  = Some checkmode.cm_nprovers;
     EcScope.Prover.po_provers   = (checkmode.cm_provers, []);
-    EcScope.Prover.pl_iterate   = Some (checkmode.cm_iterate);
+    EcScope.Prover.po_quorum    = checkmode.cm_quorum;
   } in
 
   let perv    = (None, (mk_loc _dummy EcCoreLib.i_Pervasive, None), Some `Export) in
@@ -912,6 +1008,21 @@ let notify (level : EcGState.loglevel) fmt =
 (* -------------------------------------------------------------------- *)
 let current () =
   (oget !context).ct_current
+
+(* Like [apply_pragma], but also accepts the [+name]/[-name] option form (as on
+   the [pragma +name.] command) for the boolean gstate flags, so they can be set
+   from the CLI via [-pragmas +name]. *)
+let apply_pragma_option (x : string) =
+  let setflag (name : string) (value : bool) =
+    if List.mem name gstate_bool_flags then
+      EcGState.setflag name value (EcScope.gstate (current ()))
+    else
+      raise (InvalidPragma x)
+  in
+  let n = String.length x in
+  if   n > 1 && x.[0] = '+' then setflag (String.sub x 1 (n - 1)) true
+  else if n > 1 && x.[0] = '-' then setflag (String.sub x 1 (n - 1)) false
+  else apply_pragma x
 
 (* -------------------------------------------------------------------- *)
 let uuid () : int =
@@ -1013,6 +1124,13 @@ let pp_current_goal ?(all = false) stream =
                   stream (get_hc g, `One n)
       end
   end
+
+(* -------------------------------------------------------------------- *)
+let pp_current_goal_or_noproof ?(all = false) stream =
+  if Option.is_some (S.xgoal (current ())) then
+    pp_current_goal ~all stream
+  else
+    Format.fprintf stream "No active proof.@\n%!"
 
 (* -------------------------------------------------------------------- *)
 let pp_maybe_current_goal stream =

@@ -57,7 +57,7 @@ let predT (_ : 'a) = true
 let (^~) f = fun x y -> f y x
 
 let (-|) f g = fun x -> f (g x)
-let (|-) g f = fun x -> g (f x)
+let (|-) g f = fun x -> f (g x)
 
 let (|>) x f = f x
 let (<|) f x = f x
@@ -399,6 +399,10 @@ module List = struct
   end
 
   (* ------------------------------------------------------------------ *)
+  let of_pair ((x, y) : 'a * 'a) : 'a list =
+    [x; y]
+
+  (* ------------------------------------------------------------------ *)
   let ohead = Exceptionless.hd
   let otail = Exceptionless.tl
   let olast = Exceptionless.last
@@ -599,6 +603,16 @@ module List = struct
 
   let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
+
+  (* List of size n*w into list of n lists of size w *)
+  let chunkify (w : int) =
+    let rec doit (acc : 'a list list) (xs : 'a list) =
+      if is_empty xs then
+        rev acc
+      else
+        let hd, tl = takedrop w xs in
+        doit (hd :: acc) tl
+    in fun (xs : 'a list) -> doit [] xs
 
   (* Separate list into a prefix for which p is true and the rest *)
   let takedrop_while (p: 'a -> bool) (xs : 'a list) = 

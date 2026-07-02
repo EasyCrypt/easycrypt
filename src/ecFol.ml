@@ -211,9 +211,7 @@ let f_mu_x (f1 : form) (f2 : form) =
 
 let proj_distr_ty (env : EcEnv.env) (ty : ty) =
    match (EcEnv.Ty.hnorm ty env).ty_node with
-  | Tconstr(p, { indices = []; types = [dom] })
-      when EcPath.p_equal p EcCoreLib.CI_Distr.p_Distr ->
-    dom
+  | Tconstr(_, { types = [dom]; _ }) -> dom
   | _ -> assert false
 
 let f_mu (env : EcEnv.env) (f1 : form) (f2 : form) =
@@ -1125,6 +1123,25 @@ let rec one_sided_vs mem fp =
   | Fapp (f, args) -> one_sided_vs mem f @ List.concat_map (one_sided_vs mem) args
   | _ -> []
 
+(* -------------------------------------------------------------------- *)
+let filter_topand_form (test : form -> bool) =
+  let rec doit (f : form) =
+    match sform_of_form f with
+    | SFand (mode, (f1, f2)) -> begin
+      match doit f1, doit f2 with
+      | None, None -> None
+      | Some f, None | None, Some f -> Some f
+      | Some f1, Some f2 -> begin
+        match mode with
+        | `Sym -> Some (f_and f1 f2)
+        | `Asym -> Some (f_anda f1 f2)
+      end
+    end
+    | _ ->
+      if test f then Some f else None
+  in fun f -> doit f
+
+(* -------------------------------------------------------------------- *)
 let rec dump_f f =
   let dump_quant q =
     match q with

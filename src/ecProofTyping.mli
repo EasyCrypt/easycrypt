@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcIdent
+open EcPath
 open EcDecl
 open EcEnv
 open EcCoreGoal
@@ -20,6 +21,8 @@ val pf_check_tvi   : proofenv -> ty_params -> EcUnify.tvi -> unit
 val process_form_opt : ?mv:metavs -> LDecl.hyps -> pformula -> ty option -> form
 val process_form     : ?mv:metavs -> LDecl.hyps -> pformula -> ty -> form
 val process_formula  : ?mv:metavs -> LDecl.hyps -> pformula -> form
+val process_type     : LDecl.hyps -> pty -> ty
+val process_stmt     : LDecl.hyps -> pstmt -> EcAst.stmt
 val process_exp      : LDecl.hyps -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val process_pattern  : LDecl.hyps -> pformula -> ptnenv * form
 
@@ -32,6 +35,7 @@ val pf_process_xreal    : proofenv -> ?mv:metavs -> LDecl.hyps -> pformula -> fo
 
 val pf_process_exp      : proofenv -> LDecl.hyps -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val pf_process_pattern  : proofenv -> LDecl.hyps -> pformula -> ptnenv * form
+val pf_process_poe      : LDecl.hyps -> phoare_exception -> form Mop.t
 
 (* Typing in the [proofenv] implies for the [tcenv].
  * Typing exceptions are recasted in the proof env. context *)
@@ -79,3 +83,6 @@ type dexists = [
 
 val destruct_product: ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dproduct option
 val destruct_exists : ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dexists  option
+
+(* -------------------------------------------------------------------- *)
+val merge2_poe_list : form Mop.t -> form Mop.t  -> form list

@@ -22,6 +22,7 @@ type cbarg = [
   | `ModuleType of path
   | `Typeclass  of path
   | `Instance   of tcinstance
+  | `Crbind     of crbinding * is_local
 ]
 
 type cb = cbarg -> unit
@@ -37,7 +38,14 @@ let pp_cbarg env fmt (who : cbarg) =
   let ppe = EcPrinting.PPEnv.ofenv env in
   match who with
   | `Type p -> Format.fprintf fmt "type %a" (EcPrinting.pp_tyname ppe) p
-  | `Op   p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
+  | `Op   p ->
+    begin
+      let op = EcEnv.Op.by_path p env in
+      match op.op_kind with
+      | OB_oper (Some (OP_Exn _)) ->
+        Format.fprintf fmt "exception %a" (EcPrinting.pp_opname ppe) p
+      | _ -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
+    end
   | `Ax   p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
   | `Module mp ->
     let ppe =
@@ -53,11 +61,20 @@ let pp_cbarg env fmt (who : cbarg) =
     Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
   | `Typeclass p ->
     Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tcname ppe) p
-  | `Instance tci ->
+  | `Instance tci -> begin
     match tci with
     | `Ring _ -> Format.fprintf fmt "ring instance"
     | `Field _ -> Format.fprintf fmt "field instance"
     | `General _ -> Format.fprintf fmt "instance"
+  end
+  | `Crbind (CRB_Bitstring  _, _) ->
+    Format.fprintf fmt "bitstring binding"
+  | `Crbind (CRB_Array      _, _) ->
+    Format.fprintf fmt "array binding"
+  | `Crbind (CRB_BvOperator _, _) ->
+    Format.fprintf fmt "bitstring operator binding"
+  | `Crbind (CRB_Circuit    _, _) ->
+    Format.fprintf fmt "circuit binding"
 
 let pp_locality fmt = function
   | `Local -> Format.fprintf fmt "local"
@@ -141,7 +158,7 @@ and on_lp (aenv : aenv) (lp : lpattern) =
   match lp with
   | LSymbol (_, ty) -> on_ty aenv ty
   | LTuple  xs      -> List.iter (fun (_, ty) -> on_ty aenv ty) xs
-  | LRecord (_, xs) -> List.iter (on_ty aenv |- snd) xs
+  | LRecord (_, xs) -> List.iter (on_ty aenv -| snd) xs
 
 (* -------------------------------------------------------------------- *)
 and on_binding (aenv : aenv) ((_, ty) : (EcIdent.t * ty)) =
@@ -218,7 +235,7 @@ and on_instr (aenv : aenv) (i : instr)=
       on_lv aenv lv;
       on_expr aenv e
 
-  | Sassert e ->
+  | Sraise e ->
       on_expr aenv e
 
   | Scall (lv, f, args) ->
@@ -236,7 +253,7 @@ and on_instr (aenv : aenv) (i : instr)=
 
   | Smatch (e, b) ->
       let forb (bs, s) =
-        List.iter (on_ty aenv |- snd) bs;
+        List.iter (on_ty aenv -| snd) bs;
         on_stmt aenv s
       in on_expr aenv e; List.iter forb b
 
@@ -273,7 +290,6 @@ and on_form (aenv : aenv) (f : EcFol.form) =
     | EcAst.FbdHoareS bhs          -> on_bhs  aenv bhs
     | EcAst.FbdHoareF bhf          -> on_bhf  aenv bhf
     | EcAst.Fpr       pr           -> on_pr   aenv pr
-
     | EcAst.Fop (p, tys) -> begin
       on_opname aenv p;
       List.iter (on_ty aenv) tys.types;
@@ -281,12 +297,12 @@ and on_form (aenv : aenv) (f : EcFol.form) =
 
   and on_hf (aenv : aenv) hf =
     on_form aenv (hf_pr hf).inv;
-    on_form aenv (hf_po hf).inv;
+    POE.iter (on_form aenv) (hf_po hf).hsi_inv;
     on_xp aenv hf.EcAst.hf_f
 
   and on_hs (aenv : aenv) hs =
     on_form aenv (hs_pr hs).inv;
-    on_form aenv (hs_po hs).inv;
+    POE.iter (on_form aenv) (hs_po hs).hsi_inv;
     on_stmt aenv hs.EcAst.hs_s;
     on_memenv aenv hs.EcAst.hs_m
 
@@ -438,9 +454,9 @@ and on_tydecl (aenv : aenv) (tyd : tydecl) =
   | Abstract    -> ()
   | Record (f, fds) ->
       on_form aenv f;
-      List.iter (on_ty aenv |- snd) fds
+      List.iter (on_ty aenv -| snd) fds
   | Datatype dt ->
-     List.iter (List.iter (on_ty aenv) |- snd) dt.tydt_ctors;
+     List.iter (List.iter (on_ty aenv) -| snd) dt.tydt_ctors;
      List.iter (on_form aenv) [dt.tydt_schelim; dt.tydt_schcase]
 
 and on_typeclass (aenv : aenv) tc =
@@ -466,13 +482,14 @@ and on_opdecl (aenv : aenv) (opdecl : operator) =
        pri.pri_ctors
 
    | OB_nott nott ->
-     List.iter (on_ty aenv |- snd) nott.ont_args;
+     List.iter (on_ty aenv -| snd) nott.ont_args;
      on_ty aenv nott.ont_resty;
      on_expr aenv nott.ont_body
 
    | OB_oper None   -> ()
    | OB_oper Some b ->
      match b with
+     | OP_Exn ty -> List.iter (on_ty aenv) ty
      | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> ()
      | OP_Plain  f -> on_form aenv f
      | OP_Fix    f ->
@@ -590,6 +607,7 @@ let locality (env : EcEnv.env) (who : cbarg) =
       if EcEnv.Mod.is_declared id env then `Declare else `Global
     end
   | `ModuleType p -> ((EcEnv.ModTy.by_path p env).tms_loca :> locality)
+  | `Crbind (_, lc) -> (lc :> locality)
   | `Instance _ -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -724,13 +742,20 @@ let tydecl_fv tyd =
     | Record (_f, l) ->
       List.fold_left (fun fv (_, ty) ->
           EcIdent.fv_union fv (ty_fv_and_tvar ty)) Mid.empty l in
+  let fv =
+    match tyd.tyd_subtype with
+    | None -> fv
+    | Some (carrier, pred) ->
+      EcIdent.fv_union
+        (EcIdent.fv_union fv (ty_fv_and_tvar carrier))
+        (fv_and_tvar_f pred) in
   List.fold_left (fun fv id -> Mid.remove id fv) fv tyd.tyd_params.tyvars
 
 let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
   | OP_Plain f -> EcIdent.fv_union fv (fv_and_tvar_f f)
-  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> fv
+  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC | OP_Exn _ -> fv
   | OP_Fix opfix ->
     let fv =
       List.fold_left (fun fv (_, ty) -> EcIdent.fv_union fv (ty_fv_and_tvar ty))
@@ -860,7 +885,9 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let to_gen = { to_gen with tg_subst} in
     let tydecl = {
         tyd_params; tyd_type;
-        tyd_loca = `Global; } in
+        tyd_loca     = `Global;
+        tyd_clinline = tydecl.tyd_clinline;
+        tyd_subtype  = tydecl.tyd_subtype; } in
     to_gen, Some (Th_type (name, tydecl))
 
   | `Declare ->
@@ -919,7 +946,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         let body =
           match body with
-          | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
+          | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_Exn _ -> assert false
           | OP_TC -> assert false (* ??? *)
           | OP_Plain f ->
             OP_Plain (f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) extra_a) f)
@@ -1109,6 +1136,13 @@ let generalize_auto to_gen auto_rl =
     else
       to_gen, Some (Th_auto {auto_rl with axioms})
 
+let generalize_crbinding (to_gen : to_gen) ((bd, lc) : crbinding * is_local) =
+  (* FIXME PY: not complete? *)
+  let bd = EcSubst.subst_crbinding to_gen.tg_subst bd in
+  let item =
+    if lc = `Local then None else Some (Th_crbinding (bd, lc))
+  in to_gen, item
+
 (* --------------------------------------------------------------- *)
 let get_locality scenv = scenv.sc_loca
 
@@ -1134,6 +1168,7 @@ let rec set_lc_item lc_override item =
     | Th_baserw       (s,lc) -> Th_baserw    (s, set_lc lc_override lc)
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_lc lc_override lc)
     | Th_reduction       r   -> Th_reduction r
+    | Th_crbinding (bd, lc)  -> Th_crbinding (bd, set_lc lc_override lc)
     | Th_auto       auto_rl  -> Th_auto      {auto_rl with locality=set_lc lc_override auto_rl.locality}
     | Th_alias         alias -> Th_alias     alias
 
@@ -1146,7 +1181,6 @@ and set_local_th lc_override th =
 let sc_decl_mod (id,mt) = SC_decl_mod (id,mt)
 
 (* ---------------------------------------------------------------- *)
-
 let is_abstract_ty = function
   | Abstract -> true
   | _        -> false
@@ -1199,16 +1233,16 @@ let cd_glob =
     d_tc    = [`Global];
   }
 
-let can_depend (cd : can_depend) = function
+let can_depend (cd : can_depend) (who : cbarg) =
+  match who with
   | `Type       _ -> cd.d_ty
   | `Op         _ -> cd.d_op
   | `Ax         _ -> cd.d_ax
-  | `Sc         _ -> cd.d_sc
   | `Module     _ -> cd.d_mod
   | `ModuleType _ -> cd.d_modty
   | `Typeclass  _ -> cd.d_tc
   | `Instance   _ -> assert false
-
+  | `Crbind     _ -> assert false (* FIXME PY *)
 
 let cb scenv from cd who =
   let env = scenv.sc_env in
@@ -1374,6 +1408,47 @@ let check_instance scenv ty tci lc =
         let cd = { cd_glob with d_ty = [`Declare; `Global]; } in
         on_instance (mkaenv scenv.sc_env (cb scenv from cd)) ty tci
 
+let check_crb_bitstring (scenv : scenv) ((bs, lc) : crb_bitstring * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_Bitstring bs, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [bs.from_; bs.to_];
+    cb scenv from cd_glob (`Type bs.type_)
+  end
+
+let check_crb_array (scenv : scenv) ((ba, lc) : crb_array * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_Array ba, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [ba.get; ba.set; ba.tolist; ba.oflist];
+    cb scenv from cd_glob (`Type ba.type_)
+  end
+  
+let check_crb_bvoperator (scenv : scenv) ((op, lc) : crb_bvoperator * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_BvOperator op, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    cb scenv from cd_glob (`Op op.operator);
+    List.iter (fun ty -> cb scenv from cd_glob (`Type ty)) op.types
+  end
+
+let check_crb_circuit (scenv : scenv) ((cr, lc) : crb_circuit * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_Circuit cr, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then
+    cb scenv from cd_glob (`Op cr.operator)
+
+let check_crbinding (scenv : scenv) ((crb, lc) : crbinding * is_local) =
+  match crb with
+  | CRB_Bitstring  bs -> check_crb_bitstring  scenv (bs, lc)
+  | CRB_Array      ba -> check_crb_array      scenv (ba, lc)
+  | CRB_BvOperator op -> check_crb_bvoperator scenv (op, lc)
+  | CRB_Circuit    cr -> check_crb_circuit    scenv (cr, lc)
+
 (* -----------------------------------------------------------*)
 let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
   if not scenv.sc_insec && lc = `Local then
@@ -1411,6 +1486,8 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
     | Th_modtype (s, ms)     -> EcEnv.ModTy.bind ~import s ms env
     | Th_module       me     -> EcEnv.Mod.bind ~import me.tme_expr.me_name me env
     | Th_export  (p, lc)     -> EcEnv.Theory.export p lc env
+    | Th_crbinding (bd, lc)  -> EcEnv.Circuit.bind_crbinding lc bd env
+    | Th_theory _            -> assert false
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance ~import tys i lc env (*FIXME: import? *)
     | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add ~import s lc env
     | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto ~import p ps lc env
@@ -1419,7 +1496,6 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
                                   auto.axioms auto.locality env
     | Th_alias     (n,p)     -> EcEnv.Theory.alias ~import n p env
     | Th_reduction r         -> EcEnv.Reduction.add ~import r env
-    | _                      -> assert false
   in
   (item, { scenv with
     sc_env = env;
@@ -1433,6 +1509,7 @@ let add_th ~import (cth : EcEnv.Theory.compiled_theory) scenv =
 let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_item) =
   let to_gen, item =
     match th_item.ti_item with
+    | Th_crbinding (bd, lc) -> generalize_crbinding to_gen (bd, lc)
     | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
     | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
     | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
@@ -1446,7 +1523,6 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_reduction rl    -> generalize_reduction to_gen rl
     | Th_auto hints      -> generalize_auto to_gen hints
     | Th_alias _         -> (to_gen, None) (* FIXME:ALIAS *)
-
   in
 
   let scenv =
@@ -1470,20 +1546,20 @@ and generalize_ctheory
     add_clear genenv (`Th path)
   else
     let scenv = enter_theory name `Global cth.cth_mode genenv.tg_env in
-    let genenv_tmp = List.fold_left
+    let genenv_thy = List.fold_left
       (fun x -> generalize_th_item x path)
       { genenv with tg_env = scenv } cth.cth_items in
 
-    let _, compiled, _ = exit_theory genenv_tmp.tg_env in
+    let _, compiled, _ = exit_theory genenv_thy.tg_env in
 
     match compiled with
     | None ->
-      genenv
+      { genenv_thy with tg_env = genenv.tg_env }
     | Some compiled when List.is_empty compiled.ctheory.cth_items ->
-      genenv
+      { genenv_thy with tg_env = genenv.tg_env }
     | Some compiled ->
       let scenv = add_th ~import:true compiled genenv.tg_env in
-      { genenv with tg_env = scenv; }
+      { genenv_thy with tg_env = scenv; }
 
 and generalize_lc_item (genenv : to_gen) (prefix : path) (item : sc_item) =
   match item with
@@ -1552,7 +1628,8 @@ let check_item scenv item =
   | Th_auto { locality } ->
     if (locality = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
-  | Th_reduction _ -> ()
+  | Th_reduction _ -> () (* FIXME PY *)
+  | Th_crbinding (crb, lc) -> check_crbinding scenv (crb, lc)
   | Th_theory  _   -> assert false
   | Th_alias _     -> () (* FIXME:ALIAS *)
 

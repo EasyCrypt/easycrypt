@@ -184,6 +184,15 @@ proof. by elim: s1 x => [|y s1 ih] x //=; rewrite ih. qed.
 lemma belast_rcons x s z : belast<:'a> x (rcons s z) = x :: s.
 proof. by rewrite lastI -!cats1 belast_cat. qed.
 
+lemma cat_eq0I (xs ys : 'a list) : xs ++ ys = [] => xs = [] /\ ys = [].
+proof. by case: xs. qed.
+
+lemma cat_eq0IL (xs ys : 'a list) : xs ++ ys = [] => xs = [].
+proof. by case: xs. qed.
+
+lemma cat_eq0IR (xs ys : 'a list) : xs ++ ys = [] => ys = [].
+proof. by case: xs. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                   rcons / induction principle                        *)
 (* -------------------------------------------------------------------- *)
@@ -1890,6 +1899,13 @@ lemma map_comp (f1 : 'b -> 'c) (f2 : 'a -> 'b) s:
   map (f1 \o f2) s = map f1 (map f2 s).
 proof. by elim: s => //= x s ->. qed.
 
+lemma map_nseq ['a 'b] (x : 'b) (s : 'a list) :
+  map (fun _ => x) s = nseq (size s) x.
+proof.
+elim: s => /= [|s ih]; first by rewrite nseq0.
+by rewrite addzC nseqS 1:size_ge0 ih.
+qed.
+
 lemma map_id (s : 'a list): map idfun s = s.
 proof. by elim: s => //= x s ->. qed.
 
@@ -2691,6 +2707,9 @@ proof.
 move=> ge0_n ge0_m; rewrite /mkseq iota_add ?map_cat //=.
 by rewrite -{2}(addz0 n) iota_addl -map_comp.
 qed.
+
+lemma mkseq2 ['a] (f : int -> 'a) : mkseq f 2 = [f 0; f 1].
+proof. by rewrite (mkseq_add _ 1 1) // !mkseq1. qed.
 
 lemma mkseqP f n (x:'a) :
   mem (mkseq f n) x <=> exists i, 0 <= i < n /\ x = f i.

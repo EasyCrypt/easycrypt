@@ -96,7 +96,7 @@ let pf_first_call   pe st = pf_first_gen  "call"   destr_call   pe st
 let pf_first_if     pe st = pf_first_gen  "if"     destr_if     pe st
 let pf_first_match  pe st = pf_first_gen  "match"  destr_match  pe st
 let pf_first_while  pe st = pf_first_gen  "while"  destr_while  pe st
-let pf_first_assert pe st = pf_first_gen  "assert" destr_assert pe st
+let pf_first_raise  pe st = pf_first_gen  "raise"  destr_raise  pe st
 
 (* -------------------------------------------------------------------- *)
 let pf_last_asgn   pe st = pf_last_gen  "asgn"   destr_asgn   pe st
@@ -105,7 +105,7 @@ let pf_last_call   pe st = pf_last_gen  "call"   destr_call   pe st
 let pf_last_if     pe st = pf_last_gen  "if"     destr_if     pe st
 let pf_last_match  pe st = pf_last_gen  "match"  destr_match  pe st
 let pf_last_while  pe st = pf_last_gen  "while"  destr_while  pe st
-let pf_last_assert pe st = pf_last_gen  "assert" destr_assert pe st
+let pf_last_raise  pe st = pf_last_gen  "raise"  destr_raise  pe st
 
 (* -------------------------------------------------------------------- *)
 let tc1_first_asgn   tc st = pf_first_asgn   !!tc st
@@ -114,7 +114,7 @@ let tc1_first_call   tc st = pf_first_call   !!tc st
 let tc1_first_if     tc st = pf_first_if     !!tc st
 let tc1_first_match  tc st = pf_first_match  !!tc st
 let tc1_first_while  tc st = pf_first_while  !!tc st
-let tc1_first_assert tc st = pf_first_assert !!tc st
+let tc1_first_raise  tc st = pf_first_raise  !!tc st
 
 (* -------------------------------------------------------------------- *)
 let tc1_last_asgn   tc st = pf_last_asgn   !!tc st
@@ -123,7 +123,7 @@ let tc1_last_call   tc st = pf_last_call   !!tc st
 let tc1_last_if     tc st = pf_last_if     !!tc st
 let tc1_last_match  tc st = pf_last_match  !!tc st
 let tc1_last_while  tc st = pf_last_while  !!tc st
-let tc1_last_assert tc st = pf_last_assert !!tc st
+let tc1_last_raise  tc st = pf_last_raise  !!tc st
 
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)
@@ -139,7 +139,7 @@ let pf_pos_last_call   pe s = pf_pos_last_gen "call"   is_call   pe s
 let pf_pos_last_if     pe s = pf_pos_last_gen "if"     is_if     pe s
 let pf_pos_last_match  pe s = pf_pos_last_gen "match"  is_match  pe s
 let pf_pos_last_while  pe s = pf_pos_last_gen "while"  is_while  pe s
-let pf_pos_last_assert pe s = pf_pos_last_gen "assert" is_assert pe s
+let pf_pos_last_raise pe s = pf_pos_last_gen "raise"  is_raise pe s
 
 
 let tc1_pos_last_asgn   tc s = pf_pos_last_asgn   !!tc s
@@ -148,7 +148,7 @@ let tc1_pos_last_call   tc s = pf_pos_last_call   !!tc s
 let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s
 let tc1_pos_last_match  tc s = pf_pos_last_match  !!tc s
 let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s
-let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
+let tc1_pos_last_raise  tc s = pf_pos_last_raise  !!tc s
 
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
@@ -207,11 +207,18 @@ let tc1_get_stmt side tc =
       tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_codepos_range tc (side, cpr) =
+let tc1_process_codepos_or_range tc (side, cpor) =
   let me, _ = tc1_get_stmt side tc in
   let env = FApi.tc1_env tc in
   let env = EcEnv.Memory.push_active_ss me env in
-  EcTyping.trans_codepos_range env cpr
+  EcTyping.trans_codepos_or_range env cpor
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_codegap_range tc (side, cgr) =
+  let me, _ = tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active_ss me env in
+  EcTyping.trans_codegap_range env cgr
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_codepos tc (side, cpos) =
@@ -228,13 +235,18 @@ let tc1_process_codepos1 tc (side, cpos) =
   EcTyping.trans_codepos1 env cpos
 
 (* -------------------------------------------------------------------- *)
-let hl_set_stmt (side : side option) (f : form) (s : stmt) =
+(* [mt] overrides the memtype of the active side (the one whose statement is
+   being replaced), e.g. when the new statement [s] mentions fresh locals.
+   The memory identifier is untouched, so the pre/post-conditions keep
+   referring to it. *)
+let hl_set_stmt ?(mt : memtype option) (side : side option) (f : form) (s : stmt) =
+  let mtof (dfl : memenv) = odfl (snd dfl) mt in
   match side, f.f_node with
-  | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs)
-  | None       , FeHoareS  hs -> f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
-  | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
-  | Some `Left , FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
-  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) es.es_sl s (es_po es)
+  | None       , FhoareS   hs -> f_hoareS (mtof hs.hs_m) (hs_pr hs) s (hs_po hs)
+  | None       , FeHoareS  hs -> f_eHoareS (mtof hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
+  | None       , FbdHoareS hs -> f_bdHoareS (mtof hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
+  | Some `Left , FequivS   es -> f_equivS (mtof es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
+  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (mtof es.es_mr) (es_pr es) es.es_sl s (es_po es)
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -258,8 +270,8 @@ let tc1_get_pre tc =
 (* -------------------------------------------------------------------- *)
 let get_post f =
   match f.f_node with
-  | FhoareF hf   -> Some (Inv_ss (hf_po hf))
-  | FhoareS hs   -> Some (Inv_ss (hs_po hs))
+  | FhoareF hf   -> Some (Inv_hs (hf_po hf))
+  | FhoareS hs   -> Some (Inv_hs (hs_po hs))
   | FeHoareF hf  -> Some (Inv_ss (ehf_po hf))
   | FeHoareS hs  -> Some (Inv_ss (ehs_po hs))
   | FbdHoareF hf -> Some (Inv_ss (bhf_po hf))
@@ -268,11 +280,11 @@ let get_post f =
   | FequivS es   -> Some (Inv_ts (es_po es))
   | _            -> None
 
-
 let tc1_get_post tc =
   match get_post (FApi.tc1_goal tc) with
   | None   -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   | Some f -> f
+
 
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
@@ -304,22 +316,115 @@ let set_pre ~pre f =
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)
-exception InvalidSplit of codepos1
+let get_memenvs_pre (env : env) (f : form) =
+  match f.f_node with
+  | FhoareF hf   -> Some [fst (EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f env)]
+  | FhoareS hs   -> Some [hs.hs_m]
+  | FeHoareF hf  -> Some [fst (EcEnv.Fun.hoareF_memenv hf.ehf_m hf.ehf_f env)]
+  | FeHoareS hs  -> Some [hs.ehs_m]
+  | FbdHoareF hf -> Some [fst (EcEnv.Fun.hoareF_memenv hf.bhf_m hf.bhf_f env)]
+  | FbdHoareS hs -> Some [hs.bhs_m]
+  | FequivF ef   -> Some (List.of_pair (fst (EcEnv.Fun.equivF_memenv ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr env)))
+  | FequivS es   -> Some [es.es_ml; es.es_mr]
+  | _            -> None
 
+(* -------------------------------------------------------------------- *)
+let push_memenvs_pre (hyps : LDecl.hyps) (f : form) =
+  match get_memenvs_pre (LDecl.toenv hyps) f with
+  | Some [m] ->
+    let m = (EcIdent.create "&hr", snd m) in
+    let hyps = EcEnv.LDecl.push_active_ss m hyps in
+    ([m], hyps)
+  | Some [ml; mr] ->
+    let ml = (EcIdent.create "&1", snd ml) in
+    let mr = (EcIdent.create "&2", snd mr) in
+    let hyps = EcEnv.LDecl.push_active_ts ml mr hyps in
+    ([ml; mr], hyps)
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+type logicS = [
+  | `Hoare   of sHoareS
+  | `BdHoare of bdHoareS
+  | `Equiv   of equivS
+  | `EHoare  of eHoareS
+]
+
+let get_logicS (f : form) : logicS =
+  match f.f_node with
+  | FhoareS   hs -> `Hoare   hs
+  | FbdHoareS hs -> `BdHoare hs
+  | FequivS   hs -> `Equiv   hs
+  | FeHoareS  hs -> `EHoare  hs
+  | _ -> destr_error "<program logic> (S)"
+
+let hoareS_read (env : env) (hs : sHoareS) : EcPV.pmvs =
+  EcPV.form_read env PMVS.empty (f_hoareS_r hs)
+
+let bdHoareS_read (env : env) (hs : bdHoareS) : pmvs =
+  form_read env PMVS.empty (f_bdHoareS_r hs)
+
+let equivS_read (env : env) (hs : equivS) : pmvs =
+  form_read env PMVS.empty (f_equivS_r hs)
+
+let eHoareS_read (env : env) (hs : eHoareS) : pmvs =
+  form_read env PMVS.empty (f_eHoareS_r hs)
+
+let logicS_read (env : env) (f : logicS) =
+  match f with
+  | `Hoare   hs -> hoareS_read   env hs
+  | `BdHoare hs -> bdHoareS_read env hs
+  | `Equiv   hs -> equivS_read   env hs
+  | `EHoare  hs -> eHoareS_read  env hs
+
+let logicS_post_read (env : env) (f : logicS) =
+  let add pvs inv = EcPV.form_read env pvs inv in
+
+  match f with
+  | `Hoare hs ->
+      POE.fold add EcPV.PMVS.empty (hs_po hs).hsi_inv
+  | `EHoare hs ->
+      add EcPV.PMVS.empty (ehs_po hs).inv
+  | `BdHoare hs ->
+      add (add EcPV.PMVS.empty (bhs_po hs).inv) (bhs_bd hs).inv
+  | `Equiv es ->
+      add EcPV.PMVS.empty (es_po es).inv
+
+(* -------------------------------------------------------------------- *)
+exception InvalidSplit of [ `Instr of codepos1 | `Gap of codegap1 ]
+
+(* -------------------------------------------------------------------- *)
 let s_split env i s =
-  let module Zpr = EcMatching.Zipper in
-  try  Zpr.split_at_cpos1 env i s
-  with Zpr.InvalidCPos -> raise (InvalidSplit i)
+  let module Pos = EcMatching.Position in
+  try  Pos.split_at_cgap1 env i s
+  with Pos.InvalidCPos -> raise (InvalidSplit (`Gap i))
 
+(* -------------------------------------------------------------------- *)
 let s_split_i env i s =
-  let module Zpr = EcMatching.Zipper in
-  try  Zpr.find_by_cpos1 ~rev:false env i s
-  with Zpr.InvalidCPos -> raise (InvalidSplit i)
+  let module Pos = EcMatching.Position in
+  try  Pos.find_by_cpos1 ~rev:false env i s
+  with Pos.InvalidCPos -> raise (InvalidSplit (`Instr i))
 
+(* -------------------------------------------------------------------- *)
 let o_split ?rev env i s =
-  let module Zpr = EcMatching.Zipper in
-  try  Zpr.may_split_at_cpos1 ?rev env i s
-  with Zpr.InvalidCPos -> raise (InvalidSplit (oget i))
+  let module Pos = EcMatching.Position in
+  try  Pos.may_split_at_cgap1 ?rev env i s
+  with Pos.InvalidCPos -> raise (InvalidSplit (`Gap(oget i)))
+
+(* -------------------------------------------------------------------- *)
+(* Gap processing functions *)
+let tc1_process_codegap1 tc (side, g) =
+  let me, _ = tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active_ss me env in
+  EcTyping.trans_codegap1 env g
+
+(* -------------------------------------------------------------------- *)
+let tc1_process_codegap tc (side, g) =
+  let me, _ = tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active_ss me env in
+  EcTyping.trans_codegap env g
 
 (* -------------------------------------------------------------------- *)
 let t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te tc =
@@ -606,6 +711,21 @@ let generalize_mod_ts_inv env modil modir f =
   let res = generalize_mod_right env modir f in
   generalize_mod_left env modil res
 
+(* -------------------------------------------------------------------- *)
+(* Build (ident * form) bindings from generalize_mod_ output:            *)
+(* map quantifier-bound names back to concrete pvar/glob expressions.    *)
+
+let mk_bind_pvar (m : memory) (id : EcIdent.t) ((x, ty) : prog_var * ty) : EcIdent.t * ss_inv =
+  id, f_pvar x ty m
+
+let mk_bind_glob (env : env) (m : memory) (id : EcIdent.t) (x : EcPath.mpath) : EcIdent.t * ss_inv =
+  id, NormMp.norm_glob env m x
+
+let mk_bind_pvars (m : memory) ((bd, pvs) : (EcIdent.t * gty) list * (prog_var * ty) list) : (EcIdent.t * ss_inv) list =
+  List.map2 (fun (id, _) pv -> mk_bind_pvar m id pv) bd pvs
+
+let mk_bind_globs (env : env) (m : memory) ((bd, mps) : (EcIdent.t * gty) list * EcPath.mpath list) : (EcIdent.t * ss_inv) list =
+  List.map2 (fun (id, _) mp -> mk_bind_glob env m id mp) bd mps
 
 (* -------------------------------------------------------------------- *)
 let abstract_info env f1 =
@@ -665,16 +785,16 @@ let t_fold f (cenv : code_txenv) (cpos : codepos) (_ : form * form) (state, s) =
     let env = EcEnv.LDecl.toenv (snd cenv) in
     let (me, f) = Zpr.fold env cenv cpos (fun _ -> f) state s in
       ((me, f, []) : memenv * _ * form list)
-  with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
+  with InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
 let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s) =
   try
     let env = EcEnv.LDecl.toenv (snd cenv) in
     let (me, zpr, gs) = f cenv prpo state (Zpr.zipper_of_cpos env cpos s) in
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
-  with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
+  with InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
-let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
+let t_code_transform (side : oside) cpos tr tx tc =
   let pf = FApi.tc1_penv tc in
 
   match side with
@@ -684,24 +804,32 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
       match concl.f_node with
       | FhoareS hs ->
           let pr, po = hs_pr hs, hs_po hs in
+          (* FIXME: This is very suspicious why only main is provided ? *)
+          let po = po.hsi_inv.main in
           let (me, stmt, cs) =
-            tx (pf, hyps) cpos (pr.inv, po.inv) (hs.hs_m, hs.hs_s) in
-          let concl = f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs) in
+            tx (pf, hyps) cpos (pr.inv, po) (hs.hs_m, hs.hs_s) in
+          let concl =
+            f_hoareS (snd me) pr stmt (hs_po hs)
+          in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
-      | FbdHoareS bhs when bdhoare ->
+      | FbdHoareS bhs ->
           let pr, po = bhs_pr bhs, bhs_po bhs in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po.inv) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs)
-                      bhs.bhs_cmp (bhs_bd bhs) in
+          let concl = f_bdHoareS (snd me) pr stmt po bhs.bhs_cmp (bhs_bd bhs) in
+          FApi.xmutate1 tc (tr None) (cs @ [concl])
+
+      | FeHoareS ehs ->
+          let pr, po = ehs_pr ehs, ehs_po ehs in
+          let (me, stmt, cs) =
+            tx (pf, hyps) cpos (pr.inv, po.inv) (ehs.ehs_m, ehs.ehs_s) in
+          let concl = f_eHoareS (snd me) pr stmt po in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->
         let kinds =
-            (if bdhoare then [`PHoare `Stmt] else [])
-          @ [`Hoare `Stmt] in
-
+            [`PHoare `Stmt; `Hoare `Stmt; `EHoare `Stmt ] in
         tc_error_noXhl ~kinds:kinds pf
   end
 

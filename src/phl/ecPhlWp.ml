@@ -1,43 +1,85 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
+open EcPath
 open EcAst
 open EcModules
 open EcFol
 
 open EcCoreGoal
 open EcLowPhlGoal
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
   exception No_wp
+
+  let find_poe hyps memenv epost (e:EcTypes.expr) =
+    let m = EcMemory.memory memenv in
+    let f = form_of_expr ~m e in
+    let f = EcReduction.h_red_until EcReduction.full_red hyps f in
+    let (ex, tyargs), args = destr_op_app f in
+
+    assert (List.is_empty tyargs.types && List.is_empty tyargs.indices);
+
+    let default_exn () =
+      match Mop.find_opt None epost with
+      | Some body -> body
+      | None ->
+        tacuerror
+          "missing postcondition for exception %a"
+          EcPrinting.pp_path ex in
+
+    let body =
+      Mop.find_opt (Some ex) epost
+      |> ofdfl (fun () -> default_exn ()) in
+
+    f_app_simpl body args EcTypes.tbool
 
   let wp_asgn_aux c_pre memenv lv e (lets, f) =
     let m = EcMemory.memory memenv in
     let let1 = lv_subst ?c_pre m lv (ss_inv_of_expr m e).inv in
       (let1::lets, f)
 
-  let rec wp_stmt ?mc
-      onesided c_pre env memenv (stmt: EcModules.instr list) letsf
+  let rec wp_stmt
+    ?(mc       : (memory * memory) option)
+     (onesided : bool)
+     (c_pre    : form option)
+     (hyps     : EcEnv.LDecl.hyps)
+     (memenv   : memenv)
+     (stmt     : instr list)
+     (letsf    : _)
+     (epost    : form Mop.t)
   =
     match stmt with
     | [] -> (stmt, letsf)
     | i :: stmt' ->
         try
-          let letsf = wp_instr ?mc onesided c_pre env memenv i letsf in
-          wp_stmt ?mc onesided c_pre env memenv stmt' letsf
+          let letsf = wp_instr ?mc onesided c_pre hyps memenv i letsf epost in
+          wp_stmt ?mc onesided c_pre hyps memenv stmt' letsf epost
         with No_wp -> (stmt, letsf)
 
-  and wp_instr ?mc onesided c_pre env memenv i letsf =
+  and wp_instr
+      ?(mc       : (memory * memory) option)
+     (onesided : bool)
+     (c_pre    : form option)
+     (hyps     : EcEnv.LDecl.hyps)
+     (memenv   : memenv)
+     (i        : instr)
+     (letsf    : _)
+     (epost    : form Mop.t)
+  =
     match i.i_node with
     | Sasgn (lv,e) ->
       wp_asgn_aux c_pre memenv lv e letsf
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1) =
-          wp_stmt ?mc onesided c_pre env memenv (List.rev s1.s_node) letsf in
+          wp_stmt ?mc onesided c_pre hyps memenv (List.rev s1.s_node) letsf epost in
         let (r2,letsf2) =
-          wp_stmt ?mc onesided c_pre env memenv (List.rev s2.s_node) letsf in
+          wp_stmt ?mc onesided c_pre hyps memenv (List.rev s2.s_node) letsf epost in
         if List.is_empty r1 && List.is_empty r2 then begin
+          let env = EcEnv.LDecl.toenv hyps in
           let post1 = mk_let_of_lv_substs ?mc:mc env letsf1 in
           let post2 = mk_let_of_lv_substs ?mc:mc env letsf2 in
           let m = EcMemory.memory memenv in
@@ -49,7 +91,7 @@ module LowInternal = struct
     | Smatch (e, bs) -> begin
         let wps =
           let do1 (_, s) =
-            wp_stmt ?mc onesided c_pre env memenv (List.rev s.s_node) letsf in
+            wp_stmt ?mc onesided c_pre hyps memenv (List.rev s.s_node) letsf epost in
           List.map do1 bs
         in
 
@@ -58,7 +100,7 @@ module LowInternal = struct
         let pbs =
           List.map2
             (fun (bds, _) (_, letsf) ->
-              let post = mk_let_of_lv_substs env letsf in
+              let post = mk_let_of_lv_substs (EcEnv.LDecl.toenv hyps) letsf in
               f_lambda (List.map (snd_map gtty) bds) post)
             bs wps
         in
@@ -70,10 +112,8 @@ module LowInternal = struct
         ([],post)
       end
 
-    | Sassert e when onesided ->
-        let phi = ss_inv_of_expr (EcMemory.memory memenv) e in
-        let lets, f = letsf in
-        (lets, EcFol.f_and_simpl phi.inv f)
+    | Sraise e when onesided ->
+      ([], find_poe hyps memenv epost e)
 
     | _ -> raise No_wp
 
@@ -120,13 +160,23 @@ module LowInternal = struct
 
 end
 
-let wp ?mc ?(uselet=true) ?(onesided=false) ?c_pre env m s post =
+let wp
+  ?(mc       : (memory * memory) option)
+  ?(uselet   : bool = true)
+  ?(onesided : bool = false)
+  ?(c_pre    : form option)
+   (hyps     : EcEnv.LDecl.hyps)
+   (m        : memenv)
+   (s        : stmt)
+   (poe      : exnpost)
+=
+  let post, epost = POE.destruct poe in
   let (r, letsf) =
     LowInternal.wp_stmt ?mc
-      onesided c_pre env m (List.rev s.s_node) ([], post)
+      onesided c_pre hyps m (List.rev s.s_node) ([], post) epost
   in
-  let pre = mk_let_of_lv_substs ?mc ~uselet env letsf in
-  List.rev r, pre
+  let pre = mk_let_of_lv_substs ?mc ~uselet (EcEnv.LDecl.toenv hyps) letsf in
+  (List.rev r, pre)
 
 let ewp ?(uselet=true) env m s post =
   let r,(lets,f) = LowInternal.ewp_stmt env m (List.rev s.s_node) ([],post) in
@@ -139,20 +189,24 @@ module TacInternal = struct
     if EcUtils.is_some i && not (List.is_empty rm) then
       tc_error !!tc "remaining %i instruction(s)" (List.length rm)
 
-  let t_hoare_wp ?(uselet=true) i tc =
-    let env = FApi.tc1_env tc in
+  (* [t_hoare_wp gap]: splits the statement at [gap]; instructions before the
+     gap are kept, wp is applied to instructions after the gap. *)
+  let t_hoare_wp ?(uselet=true) (i : codegap1 option) tc =
+    let hyps = FApi.tc1_hyps tc in
+    let env = EcEnv.LDecl.toenv hyps in
     let hs = tc1_as_hoareS tc in
     let (s_hd, s_wp) = o_split env i hs.hs_s in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp, post =
-      wp ~uselet ~onesided:true env hs.hs_m s_wp (hs_po hs).inv in
+    let { exnmap = eposts } as post = (hs_po hs).hsi_inv in
+    let s_wp, post = wp ~uselet ~onesided:true hyps hs.hs_m s_wp post in
     check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let m = fst hs.hs_m in
-    let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s {m;inv=post} in
+    let post = { hsi_m = m; hsi_inv = { main = post; exnmap = eposts} } in
+    let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_ehoare_wp ?(uselet=true) i tc =
+  let t_ehoare_wp ?(uselet=true) (i : codegap1 option) tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_ehoareS tc in
     let (s_hd, s_wp) = o_split env i hs.ehs_s in
@@ -164,20 +218,24 @@ module TacInternal = struct
     let concl = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s {m;inv=post} in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_bdhoare_wp ?(uselet=true) i tc =
-    let env = FApi.tc1_env tc in
+  let t_bdhoare_wp ?(uselet=true) (i : codegap1 option) tc =
+    let hyps = FApi.tc1_hyps tc in
+    let env = EcEnv.LDecl.toenv hyps in
     let bhs = tc1_as_bdhoareS tc in
     let (s_hd, s_wp) = o_split env i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp,post = wp ~uselet env bhs.bhs_m s_wp (bhs_po bhs).inv in
+    let s_wp, post =
+      wp ~uselet hyps bhs.bhs_m s_wp (POE.empty (bhs_po bhs).inv)
+    in
     check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let m = fst bhs.bhs_m in
     let concl = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s {m;inv=post} bhs.bhs_cmp (bhs_bd bhs) in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_equiv_wp ?(uselet=true) ij tc =
-    let env = FApi.tc1_env tc in
+  let t_equiv_wp ?(uselet=true) (ij : (codegap1 * codegap1) option) tc =
+    let hyps = FApi.tc1_hyps tc in
+    let env = EcEnv.LDecl.toenv hyps in
     let es = tc1_as_equivS tc in
     let ml, mr = (fst es.es_ml), (fst es.es_mr) in
     let i = omap fst ij and j = omap snd ij in
@@ -186,8 +244,12 @@ module TacInternal = struct
     let meml, s_wpl = es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
     let post = es_po es in
-    let s_wpl, post = wp ~mc:(ml,mr) ~uselet env meml s_wpl post.inv in
-    let s_wpr, post = wp ~mc:(ml,mr) ~uselet env memr s_wpr post in
+    let s_wpl, post =
+      wp ~mc:(ml,mr) ~uselet hyps meml s_wpl (POE.empty post.inv)
+    in
+    let s_wpr, post =
+      wp ~mc:(ml,mr) ~uselet hyps memr s_wpr (POE.empty post)
+    in
     check_wp_progress tc i es.es_sl s_wpl;
     check_wp_progress tc j es.es_sr s_wpr;
     let sl = EcModules.stmt (s_hdl @ s_wpl) in
@@ -220,7 +282,9 @@ let t_wp_r ?(uselet=true) k g =
 let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)
 
 (* -------------------------------------------------------------------- *)
-let process_wp pos tc =
-  let pos =
-    Option.map (EcTyping.trans_dcodepos1 (FApi.tc1_env tc)) pos
-  in t_wp pos tc
+(* [process_wp gap]: splits the statement at [gap]; instructions before the
+   gap are kept, wp is applied to instructions after the gap. *)
+let process_wp (cpos : pcodegap1 doption option) tc =
+  let env = (FApi.tc1_env tc) in
+  let cpos = Option.map (EcTyping.trans_dcodegap1 env) cpos in
+  t_wp cpos tc

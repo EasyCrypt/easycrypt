@@ -19,7 +19,7 @@ module TTC = EcProofTyping
 type bhl_infos_t = (ss_inv, ty -> ss_inv option, ty -> ss_inv) rnd_tac_info
 type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
 type mkbij_t     = EcTypes.ty -> EcTypes.ty -> ts_inv
-type semrndpos   = (bool * codepos1) doption
+type semrndpos   = (bool * codegap1) doption
 
 (* -------------------------------------------------------------------- *)
 module Core = struct
@@ -34,9 +34,14 @@ module Core = struct
     let x_id = EcIdent.create (symbol_of_lv lv) in
     let x = {m; inv=f_local x_id ty_distr} in
     let distr = EcFol.ss_inv_of_expr m distr in
-    let post = subst_form_lv env lv x (hs_po hs) in
+    if (not (POE.is_empty (hs_po hs).hsi_inv)) then
+      tc_error !!tc "exceptions are not supported";
+    let post = (hs_po hs).hsi_inv.main  in
+    let post = { m = (hs_po hs).hsi_m; inv = post} in
+    let post = subst_form_lv env lv x post in
     let post = map_ss_inv2 f_imp (map_ss_inv2 f_in_supp x distr) post in
     let post = map_ss_inv1 (f_forall_simpl [(x_id,GTty ty_distr)]) post in
+    let post = POE.lift post in
     let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -219,6 +224,7 @@ module Core = struct
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
           let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let post = POE.lift post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
@@ -244,6 +250,7 @@ module Core = struct
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
           let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let post = POE.lift post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
@@ -400,12 +407,17 @@ module Core = struct
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
     let s1, s2 = o_split env (Some pos) hs.hs_s in
+    if (not (POE.is_empty (hs_po hs).hsi_inv)) then
+      tc_error !!tc "exceptions are not supported";
+    let post = POE.lower (hs_po hs) in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) (hs_po hs).inv)
+        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) post.inv)
       else None in
     let (_, mt), s2 = semrnd tc hs.hs_m fv s2 in
-    let concl = f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs) in
+    let concl =
+      f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs)
+    in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
@@ -586,7 +598,7 @@ let wp_equiv_rnd_r bij tc =
       subtc)
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_rnd_r side pos bij_info tc =
+let t_equiv_rnd_r side (pos: semrndpos option) bij_info tc =
   match side, pos, bij_info with
   | Some side, None, (None, None) ->
     wp_equiv_disj_rnd_r side tc
@@ -634,7 +646,12 @@ let t_equiv_rnd ?pos side bij_info =
   (FApi.t_low3 "equiv-rnd" t_equiv_rnd_r) side pos bij_info
 
 (* -------------------------------------------------------------------- *)
-let process_rnd side pos tac_info tc =
+let process_rnd
+  (side     : side option)
+  (pos      : psemrndpos option)
+  (tac_info : _)
+  (tc       : tcenv1)
+=
   let concl = FApi.tc1_goal tc in
 
   match side, pos, tac_info with
@@ -683,12 +700,12 @@ let process_rnd side pos tac_info tc =
       | Single (b, p) ->
           let p =
             if Option.is_some side then
-              EcLowPhlGoal.tc1_process_codepos1 tc (side, p)
-            else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
+              EcLowPhlGoal.tc1_process_codegap1 tc (side, p)
+            else EcTyping.trans_codegap1 (FApi.tc1_env tc) p
           in Single (b, p)
       | Double ((b1, p1), (b2, p2)) ->
-          let p1 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left , p1) in
-          let p2 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Right, p2) in
+          let p1 = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left , p1) in
+          let p2 = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Right, p2) in
           Double ((b1, p1), (b2, p2))
     )
     in
@@ -705,7 +722,7 @@ let t_equiv_rndsem   = FApi.t_low3 "equiv-rndsem"   Core.t_equiv_rndsem_r
 (* -------------------------------------------------------------------- *)
 let process_rndsem ~reduce side pos tc =
   let concl = FApi.tc1_goal tc in
-  let pos = EcLowPhlGoal.tc1_process_codepos1 tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codegap1 tc (side, pos) in
 
   match side with
   | None when is_hoareS concl ->

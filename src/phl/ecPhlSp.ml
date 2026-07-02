@@ -65,7 +65,7 @@ module LowInternal = struct
           | LvTuple vs, _ -> begin
               let aux = List.map2 (fun x y -> (fst x, fst y)) vs new_ids in
               try
-                let new_id = snd (List.find (NormMp.pv_equal env pv' |- fst) aux) in
+                let new_id = snd (List.find (NormMp.pv_equal env pv' -| fst) aux) in
                 ALocal (new_id, ty)
               with Not_found -> var
             end
@@ -96,7 +96,7 @@ module LowInternal = struct
               let subst = EcFol.Fsubst.f_subst_id in
               let subst = EcFol.Fsubst.f_bind_local subst id f in
               (List.map (snd_map (EcFol.Fsubst.f_subst subst)) assoc,
-               List.filter ((<>) id |- fst) bds,
+               List.filter ((<>) id -| fst) bds,
                EcFol.Fsubst.f_subst subst pre)
 
           | _ -> ((a, f) :: assoc, bds, pre)
@@ -246,7 +246,13 @@ let t_sp_side pos tc =
       let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 (hs_pr hs).inv in
       check_sp_progress pos stmt1;
       let m = fst hs.hs_m in
-      let subgoal = f_hoareS (snd hs.hs_m) {m;inv=hs_pr} (stmt (stmt1@stmt2)) (hs_po hs) in
+      let subgoal =
+        f_hoareS
+          (snd hs.hs_m)
+          {m;inv=hs_pr}
+          (stmt (stmt1@stmt2))
+          (hs_po hs)
+      in
       FApi.xmutate1 tc `Sp [subgoal]
 
 
@@ -295,7 +301,9 @@ let t_sp_side pos tc =
 let t_sp = FApi.t_low1 "sp" t_sp_side
 
 (* -------------------------------------------------------------------- *)
-let process_sp (cpos : pcodepos1 doption option) (tc : tcenv1) =
+(* [process_sp gap]: splits the statement at [gap]; instructions after the
+   gap are kept, sp is applied to instructions before the gap. *)
+let process_sp (cpos : pcodegap1 doption option) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
-  let cpos = Option.map (EcTyping.trans_dcodepos1 env) cpos in
+  let cpos = Option.map (EcTyping.trans_dcodegap1 env) cpos in
   t_sp cpos tc

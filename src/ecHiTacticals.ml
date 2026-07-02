@@ -54,6 +54,11 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   FApi.t_try (process1_core ttenv t) tc
 
 (* -------------------------------------------------------------------- *)
+and process1_extens (ttenv : ttenv) ((t, v) : ptactic_core * psymbol option) (tc : tcenv1) =
+  let v = Option.map unloc v in
+  EcPhlBDep.t_extens v (process1_core ttenv t) tc
+
+(* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
   EcLowGoal.t_admit tc
 
@@ -130,14 +135,16 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Preflexivity        -> process_reflexivity
     | Passumption         -> process_assumption
     | Psmt pi             -> process_smt ~loc:(loc t) ttenv (Some pi)
-    | Psplit i            -> process_split ?i
+    | Psplit (`Default i) -> process_split ?i
+    | Psplit (`All `Maybe)-> process_split_all ~must:false
+    | Psplit (`All `One)  -> process_split_all ~must:true
     | Pfield st           -> process_algebra `Solve `Field st
     | Pring st            -> process_algebra `Solve `Ring  st
     | Palg_norm           -> EcStrongRing.t_alg_eq
     | Pexists fs          -> process_exists fs
     | Pleft               -> process_left
     | Pright              -> process_right
-    | Pcongr              -> process_congr
+    | Pcongr mode         -> process_congr mode
     | Ptrivial            -> process_trivial
     | Pelim pe            -> process_elim pe
     | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
@@ -173,7 +180,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
-    | Papp info                 -> EcPhlApp.process_app info
+    | Pseq info                 -> EcPhlSeq.process_seq info
     | Pwp wp                    -> EcPhlWp.process_wp wp
     | Psp sp                    -> EcPhlSp.process_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.process_rcond side b i
@@ -186,7 +193,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
     | Punroll info              -> EcPhlLoopTx.process_unroll info
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
-    | Pcall (side, info)        -> EcPhlCall.process_call side info
+    | Pcall info                -> EcPhlCall.process_call info
     | Pcallconcave info         -> EcPhlCall.process_call_concave info
     | Pswap sw                  -> EcPhlSwap.process_swap sw
     | Pinline info              -> EcPhlInline.process_inline info
@@ -194,6 +201,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pinterleave info          -> EcPhlSwap.process_interleave info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
+    | PsimplifyIf info          -> EcPhlCodeTx.process_transform_if info
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
@@ -206,7 +214,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pconcave info             -> EcPhlConseq.process_concave info
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
     | Phrex_intro (fs, b)       -> EcPhlExists.process_exists_intro ~elim:b fs
-    | Phecall (oside, x)        -> EcPhlExists.process_ecall oside x
+    | Phecall (d, s, data)      -> EcPhlExists.process_ecall d s data
     | Pexfalso                  -> EcPhlAuto.t_exfalso
     | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
     | Pbyupto                   -> EcPhlUpto.process_uptobad
@@ -230,17 +238,25 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
-    | Pchangestmt (s, p, c)     -> EcPhlRewrite.process_change_stmt s p c
+    | Pprocrewriteat (x, f)     -> EcPhlRewrite.process_rewrite_at x f
+    | Pchangestmt (s, b, p, c)  -> EcPhlRewrite.process_change_stmt s b p c 
+    | Pcircuit `Solve           -> EcPhlBDep.t_bdep_solve
+    | Pcircuit `Simplify        -> EcPhlBDep.t_bdep_simplify
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
+    | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in
 
   try  tx tc
   with (* PHL Specific low errors *)
-  | EcLowPhlGoal.InvalidSplit cpos1 ->
+  | EcLowPhlGoal.InvalidSplit is ->
       tc_error_lazy !!tc (fun fmt ->
         let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
         Format.fprintf fmt "invalid split index: %a"
-          (EcPrinting.pp_codepos1 ppe) cpos1)
+        (fun fmt is -> match is with
+        | `Gap gap -> Format.fprintf fmt "%a" EcPrinting.(pp_codegap1 ppe) gap
+        | `Instr i -> Format.fprintf fmt "%a" EcPrinting.(pp_codepos1 ppe) i
+        ) is)
+          
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =
@@ -317,6 +333,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Psolve    t           -> `One (process1_solve    ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)
+    | Pextens   (t, v)      -> `One (process1_extens   ttenv (t, v))
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
     | Pcase     es          -> `One (process1_case     ttenv es)

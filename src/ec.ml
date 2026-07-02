@@ -249,6 +249,11 @@ let main () =
             |> List.map (fun prover -> ["-p"; prover])
             |> List.flatten in
 
+          let quorum =
+            input.runo_provers.prvo_quorum
+            |> omap (fun i -> ["-quorum"; string_of_int i])
+            |> odfl [] in
+
           let pragmas =
             input.runo_provers.prvo_pragmas
             |> List.map (fun pragmas -> ["-pragmas"; pragmas])
@@ -262,11 +267,6 @@ let main () =
           let profile =
             if input.runo_provers.prvo_profile then
               ["-profile"]
-            else [] in
-
-          let iterate =
-            if input.runo_provers.prvo_iterate then
-              ["-iterate"]
             else [] in
 
           let why3srv =
@@ -305,9 +305,9 @@ let main () =
 
           List.flatten [
             maxjobs; timeout; cpufactor; ppwidth;
-            provers; pragmas; checkall ; profile;
-            iterate; why3srv; why3     ; reloc  ;
-            noevict; boot   ; idirs    ;
+            provers; quorum ; pragmas  ; checkall;
+            profile; why3srv  ; why3    ;
+            reloc  ; noevict; boot     ; idirs   ;
           ]
         in
 
@@ -415,6 +415,7 @@ let main () =
       (*---*) gccompact   : int option;
       (*---*) docgen      : bool;
       (*---*) outdirp     : string option;
+      (*---*) upto        : (int * int option) option;
       mutable trace       : trace1 list option;
     }
 
@@ -493,6 +494,7 @@ let main () =
         ; gccompact   = None
         ; docgen      = false
         ; outdirp     = None
+        ; upto        = None
         ; trace       = None }
 
     end
@@ -520,7 +522,7 @@ let main () =
             Some [State.{ position = 0; goals = None; messages = [] }]
           else None in
 
-        { prvopts     = {cmpopts.cmpo_provers with prvo_iterate = true}
+        { prvopts     = cmpopts.cmpo_provers
         ; input       = Some name
         ; terminal    = terminal
         ; interactive = false
@@ -528,7 +530,37 @@ let main () =
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
         ; outdirp     = None
+        ; upto        = None
         ; trace       = trace0 }
+
+      end
+
+    | `Llm llmopts -> begin
+        let name = llmopts.llmo_input in
+
+        begin try
+          let ext = Filename.extension name in
+          ignore (EcLoader.getkind ext : EcLoader.kind)
+        with EcLoader.BadExtension ext ->
+          Format.eprintf "do not know what to do with %s@." ext;
+          exit 1
+        end;
+
+        let lastgoals = llmopts.llmo_lastgoals in
+        let terminal =
+          lazy (T.from_channel ~name ~progress:`Silent ~lastgoals (open_in name))
+        in
+
+        { prvopts     = llmopts.llmo_provers
+        ; input       = Some name
+        ; terminal    = terminal
+        ; interactive = false
+        ; eco         = true
+        ; gccompact   = None
+        ; docgen      = false
+        ; outdirp     = None
+        ; upto        = llmopts.llmo_upto
+        ; trace       = None }
 
       end
 
@@ -552,11 +584,11 @@ let main () =
           prvo_timeout = None;
           prvo_cpufactor = None;
           prvo_provers = None;
+          prvo_quorum = None;
           prvo_pragmas = [];
           prvo_ppwidth = None;
           prvo_checkall = false;
           prvo_profile = false;
-          prvo_iterate = false;
           prvo_why3server = None; }
         in
 
@@ -572,20 +604,27 @@ let main () =
         ; gccompact   = None
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
+        ; upto        = None
         ; trace       = None }
       end
 
   in
 
   (match state.input with
-   | Some input -> EcCommands.addidir (Filename.dirname input)
+   | Some input ->
+      EcCommands.addidir (Filename.dirname input);
+      EcCommands.set_current_path (Filename.dirname input)
    | None ->
-       match relocdir with
-       | None     -> EcCommands.addidir Filename.current_dir_name
-       | Some pwd -> EcCommands.addidir pwd);
+      let current_path =
+        match relocdir with
+        | None     -> Filename.current_dir_name
+        | Some pwd -> pwd
+      in
+        EcCommands.addidir current_path;
+        EcCommands.set_current_path current_path);
 
   (* Check if the .eco is up-to-date and exit if so *)
-  (if not state.docgen then
+  (if not state.docgen && state.upto = None then
     oiter
       (fun input -> if EcCommands.check_eco input then exit 0)
       state.input);
@@ -669,6 +708,16 @@ let main () =
   if T.interactive terminal then
     T.notice ~immediate:true `Warning copyright terminal;
 
+  (* Check if a location is past the -upto point *)
+  let past_upto (loc : EcLocation.t) =
+    match state.upto with
+    | None -> false
+    | Some (line, col) ->
+        let (sl, sc) = loc.loc_start in
+        sl > line || (sl = line && match col with
+          | None -> true
+          | Some c -> sc >= c) in
+
   try
     if T.interactive terminal then Sys.catch_break true;
 
@@ -691,8 +740,8 @@ let main () =
               EcCommands.cm_cpufactor = odfl 1 (state.prvopts.prvo_cpufactor);
               EcCommands.cm_nprovers  = odfl 4 (state.prvopts.prvo_maxjobs);
               EcCommands.cm_provers   = state.prvopts.prvo_provers;
+              EcCommands.cm_quorum    = state.prvopts.prvo_quorum;
               EcCommands.cm_profile   = state.prvopts.prvo_profile;
-              EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
             } in
 
             let checkproof = not state.docgen in
@@ -703,7 +752,7 @@ let main () =
               ~checkmode
               ~checkproof;
             (try
-               List.iter EcCommands.apply_pragma state.prvopts.prvo_pragmas
+               List.iter EcCommands.apply_pragma_option state.prvopts.prvo_pragmas
              with EcCommands.InvalidPragma x ->
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 
@@ -737,6 +786,14 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+
+                   (* -upto: if this command starts past the target, print goals and exit *)
+                   if past_upto loc then begin
+                     T.finalize terminal;
+                     EcCommands.pp_current_goal_or_noproof ~all:true Format.std_formatter;
+                     exit 0
+                   end;
+
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
                    let ignore_fail = ref false in
@@ -775,6 +832,17 @@ let main () =
                          end;
                          raise (EcScope.toperror_of_exn ~gloc:loc e)
                        end;
+                       p.EP.gl_expect |> oiter (fun expected ->
+                         let actual =
+                           Format.asprintf "%a" EcPException.exn_printer e in
+                         if String.trim actual <> String.trim (EcLocation.unloc expected) then
+                           EcScope.hierror ~loc:(EcLocation.loc expected)
+                             "expect fail: error message mismatch@\n\
+                              --- expected ---@\n\
+                              %s@\n\
+                              --- actual ---@\n\
+                              %s"
+                             (EcLocation.unloc expected) actual);
                        if T.interactive terminal then begin
                         let error =
                           Format.asprintf
