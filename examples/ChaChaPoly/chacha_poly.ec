@@ -2383,7 +2383,6 @@ section PROOFS.
   move=> n lenc Hrec [#] log lc c [] H1 H2.
   have/=:=Hrec log lc c H2.
   rewrite !size_flatten /= !sumzE /= !BIA.big_cons /=.
-  pose p1 := predT _; have->/={p1}:p1=true by done. 
   case: (c.`1 \in lenc) => ? H0 * /=.
   + rewrite H0 //=. 
     have-> /= :c.`1 <> n by smt().
@@ -2431,7 +2430,6 @@ section PROOFS.
   proof.
   move=> huniq hnin.
   rewrite !size_flatten /= !sumzE /= !BIA.big_cons /=.
-  pose p1 := predT _; have->/={p1}:p1=true by done. 
   rewrite !size_map; congr.
   rewrite !BIA.big_map /= !predTofV/(\o) /=.
   apply BIA.congr_big_seq  => />; rewrite {1}/predT /= => *.

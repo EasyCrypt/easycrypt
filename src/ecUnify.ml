@@ -583,7 +583,7 @@ type op_instance = (EcIdent.t * ty) list
 
 type select_outcome =
   | OK of select_result
-  | KO of EcPath.path * op_instance * ty * op_failure
+  | KO of (EcPath.path * op_instance * ty * op_failure) Lazy.t
     (* operator path, partial instantiation, declared operator type, reason *)
 
 (* -------------------------------------------------------------------- *)
@@ -676,40 +676,53 @@ let select_op_outcomes
       filter oppath op && filter_on_tvi op
   in
 
+  let mk_ok (path, op) tip ixs tvs top subue =
+    let bd =
+      match op.D.op_kind with
+      | OB_nott nt ->
+         let substnt () =
+           let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
+           let es = e_subst tip in
+           let bd = es nt.D.ont_body in
+           (xs, bd)
+         in Some (Lazy.from_fun substnt)
+
+      | _ -> None
+
+    in OK ((path, ixs, tvs), top, subue, bd)
+  in
+
+  let classify (path, op) =
+    let subue = UniEnv.copy ue in
+
+    let (tip, _ixs, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
+    let top = ty_subst tip op.D.op_ty in
+
+    let resolve ty = ty_subst (Tuni.subst (UniEnv.assubst subue)) ty in
+
+    (* [select] builds a [KO] only after unification rejected the candidate. *)
+    let f = oget (classify_application env subue top psig retty) in
+    let instance =
+      List.combine op.D.op_tparams.tyvars tvs
+      |> List.filter_map (fun (tp, tv) ->
+           match (resolve tv).ty_node with
+           | Tunivar _ -> None
+           | _         -> Some (tp, resolve tv))
+    in
+    (path, instance, op.D.op_ty, f)
+  in
+
   let select (path, op) =
     let subue = UniEnv.copy ue in
 
     let (tip, ixs, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
     let top = ty_subst tip op.D.op_ty in
 
-    let resolve ty = ty_subst (Tuni.subst (UniEnv.assubst subue)) ty in
+    let texpected = tfun_expected subue ?retty psig in
 
-    let failure = classify_application env subue top psig retty in
-
-    match failure with
-    | Some f ->
-        let instance =
-          List.combine op.D.op_tparams.tyvars tvs
-          |> List.filter_map (fun (tp, tv) ->
-               match (resolve tv).ty_node with
-               | Tunivar _ -> None
-               | _         -> Some (tp, resolve tv))
-        in
-        KO (path, instance, op.D.op_ty, f)
-    | None ->
-        let bd =
-          match op.D.op_kind with
-          | OB_nott nt ->
-             let substnt () =
-               let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
-               let es = e_subst tip in
-               let bd = es nt.D.ont_body in
-               (xs, bd)
-             in Some (Lazy.from_fun substnt)
-
-          | _ -> None
-
-        in OK ((path, ixs, tvs), top, subue, bd)
+    match unify env subue top texpected with
+    | () -> mk_ok (path, op) tip ixs tvs top subue
+    | exception UnificationFailure _ -> KO (lazy (classify (path, op)))
 
   in
     List.map select (EcEnv.Op.all ~check:filter ~name env)
@@ -723,4 +736,16 @@ let select_op
 =
   List.filter_map
     (function OK r -> Some r | KO _ -> None)
+    (select_op_outcomes ?hidden ?filter tvi env name ue sig_)
+
+(* -------------------------------------------------------------------- *)
+(* The candidates of that name that fail to apply, with the reason why. *)
+let select_op_failures
+  ?hidden ?filter (tvi : tvar_inst option)
+  (env : EcEnv.env) (name : qsymbol) (ue : unienv)
+  (sig_ : ty list * ty option)
+  : (EcPath.path * op_instance * ty * op_failure) list
+=
+  List.filter_map
+    (function KO lz -> Some (Lazy.force lz) | OK _ -> None)
     (select_op_outcomes ?hidden ?filter tvi env name ue sig_)

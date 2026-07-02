@@ -53,7 +53,7 @@ op unwrap (w : 'a wrapped) =
   with w = Wrap x => x.
 
 (* -------------------------------------------------------------------- *)
-op idfun ['a] (x:'a) = x.
+op idfun ['a] (x:'a) / = x.
 
 (* -------------------------------------------------------------------- *)
 pred (== ) (f g : 'a -> 'b) = forall x, f x = g x.
@@ -98,11 +98,10 @@ op [opaque] eta_ (f : 'a -> 'b) = fun x => f x.
 lemma etaE (f : 'a -> 'b): eta_ f = fun x => f x by rewrite/eta_.
 
 (* -------------------------------------------------------------------- *)
-op (\o) ['a 'b 'c] (g : 'b -> 'c) (f : 'a -> 'b) =
-  fun x => g (f x).
+op (\o) ['a 'b 'c] (g : 'b -> 'c) (f : 'a -> 'b) (x : 'a) / = g (f x).
 
-op (\o2) ['a 'b 'c 'd] (f : 'c -> 'd) (g : 'a -> 'b -> 'c) =
-  fun a b => f (g a b).
+op (\o2) ['a 'b 'c 'd] (f : 'c -> 'd) (g : 'a -> 'b -> 'c) (a : 'a) (b : 'b) / =
+  f (g a b).
 
 (* -------------------------------------------------------------------- *)
 pred morphism_1 (f : 'a -> 'b) aF rF =
@@ -242,26 +241,26 @@ lemma bij_pswap ['a 'b] : bijective pswap<:'a, 'b>.
 proof. by exists pswap; rewrite !pswapK. qed.
 
 (* -------------------------------------------------------------------- *)
-op pred0  ['a] = fun (x : 'a) => false.
-op predT  ['a] = fun (x : 'a) => true.
+op pred0  ['a] (x : 'a) / = false.
+op predT  ['a] (x : 'a) / = true.
 op predI  ['a] = fun (p1 p2 : 'a -> bool) x => p1 x /\ p2 x.
 op predU  ['a] = fun (p1 p2 : 'a -> bool) x => p1 x \/ p2 x.
-op predC  ['a] = fun (p : 'a -> bool) x => ! (p x).
+op predC  ['a] (p : 'a -> bool) x / = ! (p x).
 op predD  ['a] = fun (p1 p2 : 'a -> bool) x => !p2 x /\ p1 x.
 
-op pred1  ['a] = fun (c x : 'a) => x = c.
+op pred1  ['a] (c x : 'a) / = x = c.
 op predU1 ['a] = fun (c : 'a) (p : 'a -> bool) (x : 'a) => x = c \/ p x.
-op predC1 ['a] = fun (c : 'a) (x : 'a) => x <> c.
+op predC1 ['a] (c : 'a) (x : 'a) / = x <> c.
 op predD1 ['a] = fun (p : 'a -> bool) (c : 'a) (x : 'a) => x <> c /\ p x.
 
 (* -------------------------------------------------------------------- *)
 type 'a rel = 'a -> 'a -> bool.
 
-op rel0  ['a 'b] = fun (x : 'a) (y : 'b) => false.
-op relT  ['a 'b] = fun (x : 'a) (y : 'b) => true.
+op rel0  ['a 'b] (x : 'a) (y : 'b) / = false.
+op relT  ['a 'b] (x : 'a) (y : 'b) / = true.
 op relI  ['a 'b] = fun (p1 p2 : 'a -> 'b -> bool) a b => p1 a b /\ p2 a b.
 op relU  ['a 'b] = fun (p1 p2 : 'a -> 'b -> bool) a b => p1 a b \/ p2 a b.
-op relC  ['a 'b] = fun (p : 'a -> 'b -> bool) a b => ! (p a b).
+op relC  ['a 'b] (p : 'a -> 'b -> bool) a b / = ! (p a b).
 op relD  ['a 'b] = fun (p1 p2 : 'a -> 'b -> bool) a b => !p2 a b /\ p1 a b.
 
 op rel1  ['a 'b] = fun (ca : 'a) (cb : 'b) a b => ca = a /\ cb = b.
@@ -513,18 +512,18 @@ by smt().
 (* -------------------------------------------------------------------- *)
 lemma addFb : left_id false (^)               by [].
 lemma addbF : right_id false (^)              by [].
-lemma addbb : self_inverse false (^)          by smt().
-lemma addbC : commutative (^)                 by smt().
-lemma addbA : associative (^)                 by smt().
-lemma addbCA : left_commutative (^)           by smt().
-lemma addbAC : right_commutative (^)          by smt().
-lemma addbACA : interchange (^) (^)           by smt().
-lemma andb_addl : left_distributive (/\) (^)  by smt().
-lemma andb_addr : right_distributive (/\) (^) by smt().
-lemma addKb : left_loop idfun (^)             by smt().
-lemma addbK : right_loop idfun (^)            by smt().
-lemma addIb : left_injective (^)              by smt().
-lemma addbI : right_injective (^)             by smt().
+lemma addbb : self_inverse false (^)          by case.
+lemma addbC : commutative (^)                 by case.
+lemma addbA : associative (^)                 by case; case.
+lemma addbCA : left_commutative (^)           by case; case.
+lemma addbAC : right_commutative (^)          by case; case.
+lemma addbACA : interchange (^) (^)           by case; case; case.
+lemma andb_addl : left_distributive (/\) (^)  by case; case; case.
+lemma andb_addr : right_distributive (/\) (^) by case; case; case.
+lemma addKb : left_loop idfun (^)             by case.
+lemma addbK : right_loop idfun (^)            by case.
+lemma addIb : left_injective (^)              by case; case; case.
+lemma addbI : right_injective (^)             by case; case; case.
 
 lemma addTb b : true ^ b <=> !b by [].
 lemma addbT b : b ^ true <=> !b by [].

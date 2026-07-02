@@ -78,11 +78,6 @@ type op_failure =
 (* Constrained type parameters of an operator (those bound while applying it). *)
 type op_instance = (EcIdent.t * ty) list
 
-type select_outcome =
-  | OK of select_result
-  | KO of EcPath.path * op_instance * ty * op_failure
-    (* operator path, partial instantiation, declared operator type, reason *)
-
 (* [None] if [top] applies to [psig] (and [retty]), updating [ue]; otherwise
    [Some] of the first argument/result/arity failure. *)
 val classify_application :
@@ -98,7 +93,7 @@ val select_op :
   -> dom * ty option
   -> select_result list
 
-val select_op_outcomes :
+val select_op_failures :
      ?hidden:bool
   -> ?filter:(path -> operator -> bool)
   -> tvi
@@ -106,4 +101,4 @@ val select_op_outcomes :
   -> qsymbol
   -> unienv
   -> dom * ty option
-  -> select_outcome list
+  -> (path * op_instance * ty * op_failure) list
