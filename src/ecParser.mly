@@ -3067,7 +3067,7 @@ direction:
    { Pfun `Code }
 
 | SEQ s=side? pos=s_codegap1_0before COLON p=form_or_double_form f=app_bd_info
-   { Pseq (s, pos, p, f) }
+   { Pseq { seqi_side = s; seqi_at = pos; seqi_mid = p; seqi_bd = f; } }
 
 | WP n=s_codegap1_0before?
    { Pwp n }

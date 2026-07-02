@@ -14,19 +14,13 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-(* [t_hoare_seq_r gap phi]: splits the statement at [gap]; the first
-   subgoal covers instructions before the gap, the second after. *)
-let t_hoare_seq_r i phi tc =
-  let env = FApi.tc1_env tc in
-  let hs = tc1_as_hoareS tc in
-  let phi = ss_inv_rebind phi (fst hs.hs_m) in
-  let s1, s2 = s_split env i hs.hs_s in
-  let post = update_hs_ss phi (hs_po hs) in
-  let a = f_hoareS (snd hs.hs_m) (hs_pr hs) (stmt s1) post in
-  let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs)  in
-  FApi.xmutate1 tc `HlApp [a; b]
-
-let t_hoare_seq = FApi.t_low2 "hoare-seq" t_hoare_seq_r
+(* The hoare [seq] rule (split + intermediate assertion) now lives in
+   [EcHoareSeq], which owns its parameter record, pure subgoal-builder, the
+   recheckable proof-node and the matching checker. The canonical rule there
+   takes a record; this legacy positional entry adapts onto it, so existing
+   callers and this module's interface are unchanged. *)
+let t_hoare_seq i phi =
+  EcHoareSeq.(t_hoare_seq { hsr_at = i; hsr_mid = phi })
 
 (* -------------------------------------------------------------------- *)
 let t_ehoare_seq_r i phi tc =
@@ -215,8 +209,13 @@ let process_phl_bd_info bd_info tc =
       (phi, f1, f2, g1, g2)
 
 (* -------------------------------------------------------------------- *)
-let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
+let process_seq (info : seq_info) (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
+
+  let side    = info.seqi_side in
+  let k       = info.seqi_at   in
+  let phi     = info.seqi_mid  in
+  let bd_info = info.seqi_bd   in
 
   let get_single phi =
     match phi with
@@ -227,51 +226,62 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
     if EcUtils.is_some side then
       tc_error !!tc "seq: no side information expected" in
 
-  match k, bd_info with
-  | Single i, PSeqNone when is_hoareS concl ->
-    check_side side;
-    let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-    let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
-    t_hoare_seq i phi tc
+  let bad_params () =
+    match bd_info with
+    | PSeqNone -> tc_error !!tc "invalid `position' parameter"
+    | _        -> tc_error !!tc "optional bound parameter not supported" in
 
-  | Single i, PSeqNone when is_eHoareS concl ->
-    check_side side;
-    let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
-    let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
-    t_ehoare_seq i phi tc
+  (* Dispatch on the goal kind only; each logic owns its surface-syntax
+     handling. Migrated logics take the whole [seq_info] record; the others are
+     still inlined here pending migration. *)
+  match concl.f_node with
+  | FhoareS _ ->
+      EcHoareSeq.process_hoare_seq info tc
 
-  | Single i, PSeqNone when is_equivS concl ->
-    let pre, post =
-      match phi with
-      | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected"
-      | Double (pre, post) ->
-        let _, pre  = TTC.tc1_process_Xhl_formula ?side tc pre in
-        let _, post = TTC.tc1_process_Xhl_formula ?side tc post in
-        (pre, post) in
-    let side =
-      match side with
-      | None -> tc_error !!tc "seq onsided: side information expected"
-      | Some side -> side in
-    let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some side, i) in
-    t_equiv_seq_onesided side i pre post tc
+  | FeHoareS _ -> begin
+      match k, bd_info with
+      | Single i, PSeqNone ->
+          check_side side;
+          let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
+          let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
+          t_ehoare_seq i phi tc
+      | _ -> bad_params ()
+    end
 
-  | Single i, _ when is_bdHoareS concl ->
-      check_side side;
-      let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-      let (ra, f1, f2, f3, f4) = process_phl_bd_info bd_info tc in
-      let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
-      t_bdhoare_seq i (ra, pia, f1, f2, f3, f4) tc
+  | FbdHoareS _ -> begin
+      match k with
+      | Single i ->
+          check_side side;
+          let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+          let (ra, f1, f2, f3, f4) = process_phl_bd_info bd_info tc in
+          let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
+          t_bdhoare_seq i (ra, pia, f1, f2, f3, f4) tc
+      | Double _ -> bad_params ()
+    end
 
-  | Double (i, j), PSeqNone when is_equivS concl ->
-      check_side side;
-      let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
-      let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, i) in
-      let j = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, j) in
-      t_equiv_seq (i, j) phi tc
+  | FequivS _ -> begin
+      match k, bd_info with
+      | Single i, PSeqNone ->
+          let pre, post =
+            match phi with
+            | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected"
+            | Double (pre, post) ->
+              let _, pre  = TTC.tc1_process_Xhl_formula ?side tc pre in
+              let _, post = TTC.tc1_process_Xhl_formula ?side tc post in
+              (pre, post) in
+          let side =
+            match side with
+            | None -> tc_error !!tc "seq onsided: side information expected"
+            | Some side -> side in
+          let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some side, i) in
+          t_equiv_seq_onesided side i pre post tc
+      | Double (i, j), PSeqNone ->
+          check_side side;
+          let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
+          let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, i) in
+          let j = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, j) in
+          t_equiv_seq (i, j) phi tc
+      | _ -> bad_params ()
+    end
 
-  | Single _, PSeqNone
-  | Double _, PSeqNone ->
-      tc_error !!tc "invalid `position' parameter"
-
-  | _, _ ->
-      tc_error !!tc "optional bound parameter not supported"
+  | _ -> bad_params ()
