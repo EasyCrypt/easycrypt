@@ -378,3 +378,11 @@ proof. by smt(). qed.
 
 lemma maxzz : idempotent max by smt().
 lemma minzz : idempotent min by smt().
+
+lemma lez_minP (w a b : int) :
+  w <= min a b <=> (w <= a /\ w <= b).
+proof. by smt(). qed.
+
+lemma gez_maxP (w a b : int) :
+  max a b <= w <=> (a <= w /\ b <= w).
+proof. by smt(). qed.
