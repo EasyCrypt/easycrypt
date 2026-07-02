@@ -61,6 +61,9 @@ apply/(mulfI _ (exp_neq0 x)); rewrite -expD addrN exp0.
 by rewrite mulrV // exp_neq0.
 qed.
 
+lemma expB (x y : real) : exp (x - y) = exp x / exp y.
+proof. by rewrite expD expN. qed.
+
 lemma exp_mono_ltr (x y : real): (exp x < exp y) <=> (x < y).
 proof. by apply/lerW_mono/exp_mono. qed.
 
@@ -158,6 +161,9 @@ proof. by move=> gt0x; rewrite !(rpowN, rpowD) // ltrW. qed.
 
 lemma rpowM (x n m : real) : 0%r < x => x^(n * m) = (x ^ n) ^ m.
 proof. by move=> gt0x; rewrite !rpowE ?exp_gt0 // lnK mulrCA mulrA. qed.
+
+lemma expM (x y : real) : exp (x * y) = (exp x) ^ y.
+proof. by rewrite rpowE 1:exp_gt0 lnK RField.mulrC. qed.
 
 lemma rpowMr (x y n : real) :
   0%r < x => 0%r < y => (x * y)^n = x^n * y^n.
@@ -285,18 +291,34 @@ move=> gt0_x ne1_x; rewrite !rpowE // => /inj_exp.
 by apply: mulIf; rewrite ln_eq0.
 qed.
 
-lemma rexpr_hmono (x n m : real) :
+lemma rexpr_ge0_hmono_ltr (x n m : real) :
   1%r <= x => 0%r <= n <= m => x^n <= x^m.
 proof.
-move=> ge1x [ge0n lenm]; have ge0m: 0%r <= m by apply/(ler_trans n).
+move=> ge1x [ge0n lenm];
+  have ge0m: 0%r <= m by apply/(ler_trans n).
 rewrite !rpowE 1,2:(ltr_le_trans 1%r) // exp_mono.
 by apply/ler_wpmul2r=> //; apply/ln_ge0.
 qed.
 
-lemma rexpr_hmono_ltr (x n m : real) :
-  1%r < x => 0%r <= n < m => x^n < x^m.
+lemma rexprn_ege1 (x : real) (n : real) :
+  0%r <= n => 1%r <= x => 1%r <= x^n.
 proof.
-move=> gt0_x [gt0_n lt_nm]; rewrite ltr_neqAle.
+move=> ge0_n ge1_x; rewrite -[1%r](rpow0 x).
+by apply: rexpr_ge0_hmono_ltr.
+qed.
+
+lemma rexpr_hmono (x n m : real) :
+  1%r <= x => n <= m => x^n <= x^m.
+proof.
+move=> ge1_x le_nm; rewrite (_ : m = (m - n) + n) 1:#ring.
+rewrite rpowD 1:/# ler_pemull 1:rpow_ge0 1:/#.
+by rewrite (rexprn_ege1 x (m - n)) //#.
+qed.
+
+lemma rexpr_hmono_ltr (x n m : real) :
+  1%r < x => n < m => x^n < x^m.
+proof.
+move=> gt0_x lt_nm; rewrite ltr_neqAle.
 rewrite rexpr_hmono ~-1://# /=; apply: contraL lt_nm.
 move=> eq; rewrite ltrNge /= ler_eqVlt; left.
 by apply/eq_sym; apply: inj_rexpr eq => /#.
@@ -331,7 +353,7 @@ rewrite -!(lt_fromint, le_fromint) => gt1_b ge1_x;
 - move=> @/ilog; rewrite -{1}(@rpowK b%r x%r) // 1:/#.
   rewrite -!fromintXn 1?(lez_trans (0+1)) //.
   - by rewrite ler_add2r ?ilog_ge0 /#.
-  rewrite -rpow_int // &(rexpr_hmono_ltr) // log_ge0 //= 1:/#.
+  rewrite -rpow_int // &(rexpr_hmono_ltr) //.
   by rewrite fromintD -ltr_subl_addr &(floor_gt).
 qed.
 
