@@ -17,7 +17,6 @@ lemma oget_some (x : 'a): oget (Some x) = x.
 proof. by done. qed.
 hint simplify oget_some, oget_none.
 
-
 lemma some_oget (x : 'a option): x <> None => x = Some (oget x).
 proof. by case: x. qed.
 
@@ -31,6 +30,13 @@ proof. by case: ox. qed.
 lemma oget_omap_some ['a 'b] (f : 'a -> 'b) ox :
   ox <> None => oget (omap f ox) = f (oget ox).
 proof. by case: ox. qed.
+
+lemma ogetI ['a] (x y : 'a option) :
+     x <> None
+  => y <> None
+  => oget x = oget y
+  => x = y.
+proof. by case x; case y. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma frefl  (f     : 'a -> 'b): f == f by [].

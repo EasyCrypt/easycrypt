@@ -2,7 +2,7 @@
 (* Run easycrypt via the commandline with a `-boot` flag instead        *)
 
 (* -------------------------------------------------------------------- *)
-require import Tactics.
+require import Tactics Pervasive.
 
 (* -------------------------------------------------------------------- *)
 abbrev [-printing] fst (p : 'a * 'b): 'a = p.`1.
@@ -365,11 +365,21 @@ lemma contraNneq (b : bool) (x y : 'a):
   (x = y => b) => !b => x <> y
 by smt().
 
+lemma contra_congr ['a 'b] (f : 'a -> 'b) (x y : 'a) :
+  f x <> f y => x <> y.
+proof. by rewrite &(contra) &(congr1). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma case_elim p q: ((p => q) /\ (!p => q)) <=> q.
+proof. by smt(). qed.
+
 (* -------------------------------------------------------------------- *)
 lemma iffLR (a b : bool) : (a <=> b) => a => b by [].
 lemma iffRL (a b : bool) : (a <=> b) => b => a by [].
 
 lemma iff_negb : forall b1 b2, (!b1 <=> !b2) <=> (b1 <=> b2) by [].
+
+lemma iff_trans : transitive (<=>) by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma if_congr ['a] (e e' : bool) (c1 c2 c1' c2': 'a) :
