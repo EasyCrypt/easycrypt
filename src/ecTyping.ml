@@ -1168,7 +1168,12 @@ and transtindex (env : EcEnv.env) (ue : EcUnify.unienv) (pi : pindex) : tindex =
   | PIvar { pl_desc = name; pl_loc = loc } ->
       begin match EcUnify.UniEnv.getnamed_idx ue name with
       | Some id -> TIVar id
-      | None    -> tyerror loc env (UnboundIndexVariable name)
+      | None    ->
+          (* Fall back to a section-declared index (rigid, never a univar). *)
+          begin match EcEnv.lookup_declared_index name env with
+          | Some id -> TIVar id
+          | None    -> tyerror loc env (UnboundIndexVariable name)
+          end
       end
   | PIint n ->
       (* Lexer only produces non-negative UINTs, but defensively. *)

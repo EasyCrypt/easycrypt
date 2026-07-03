@@ -956,17 +956,31 @@ module Ax = struct
       match check with
       | false -> PSNoCheck
       | true  ->
-          let hyps  = EcEnv.LDecl.init (env scope) axd.ax_tparams in
-          (* For each idxvar marked with `+` in the lemma binder, inject
-             a [0 <= n =>] hypothesis INSIDE the outermost foralls of
-             the goal (so [pa_vars] auto-intro still fires). Unmarked
-             idxvars get no such hypothesis. The implications never
-             leak into the saved [ax_spec]. *)
+          (* Section-declared indices are natural numbers.  Those actually
+             used by this lemma are registered as int-typed idxvars in the
+             proof hypotheses (so tactics/SMT resolve them), and [0 <= n] is
+             injected as a top-assumption of the goal — the proof intros it
+             itself.  The implications never leak into the saved [ax_spec];
+             generalization re-adds a [{n}] binder on close.  Indices the
+             lemma does not mention are left out entirely. *)
+          let used_idxs =
+            let fv = EcSection.form_idx_fv axd.ax_spec in
+            List.filter (fun id -> Mid.mem id fv)
+              (EcEnv.declared_indices (env scope)) in
+          let proof_tparams : ty_params =
+            { axd.ax_tparams with
+              idxvars = axd.ax_tparams.idxvars @ used_idxs } in
+          let hyps  = EcEnv.LDecl.init (env scope) proof_tparams in
+          (* For each idxvar marked with `+` in the lemma binder, and each
+             section-declared index used by the lemma, inject a [0 <= n =>]
+             hypothesis INSIDE the outermost foralls of the goal (so
+             [pa_vars] auto-intro still fires). The implications never leak
+             into the saved [ax_spec]. *)
           let mk_imps body =
             List.fold_right (fun id acc ->
               let h = f_int_le f_i0 (f_local id tint) in
               f_imp h acc)
-              nneg_idxs body
+              (nneg_idxs @ used_idxs) body
           in
           let rec push f =
             match f.f_node with
@@ -1837,6 +1851,18 @@ module Mod = struct
     let m, _ = EcTyping.trans_msymbol (env scope) m in
     { scope with sc_env = EcSection.import_vars m scope.sc_env }
 
+end
+
+(* -------------------------------------------------------------------- *)
+(* Section-declared indices: [declare {n m}] introduces natural-number
+   index parameters, in scope for the rest of the section and generalized
+   back to [{n}] binders on section close. *)
+module Index = struct
+  let declare (scope : scope) (ns : psymbol list) : scope =
+    List.fold_left (fun scope n ->
+      let id = EcIdent.create (unloc n) in
+      { scope with sc_env = EcSection.add_decl_index id scope.sc_env })
+      scope ns
 end
 
 (* -------------------------------------------------------------------- *)

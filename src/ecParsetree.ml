@@ -1474,6 +1474,7 @@ type global_action =
   | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
+  | Gdeclidx     of psymbol list
   | Gsubtype     of psubtype
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)

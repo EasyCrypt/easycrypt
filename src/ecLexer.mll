@@ -190,6 +190,7 @@
     "local"       , LOCAL      ;        (* KW: global *)
     "global"      , GLOBAL     ;        (* KW: global *)
     "declare"     , DECLARE    ;        (* KW: global *)
+    "index"       , INDEX      ;        (* KW: global *)
     "hint"        , HINT       ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)

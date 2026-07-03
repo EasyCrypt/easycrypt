@@ -569,6 +569,7 @@ and sc_item =
   | SC_th_item  of EcTheory.theory_item
   | SC_th       of EcEnv.Theory.compiled_theory
   | SC_decl_mod of EcIdent.t * mty_mr
+  | SC_decl_idx of EcIdent.t
 
 and sc_items =
   sc_item list
@@ -662,6 +663,14 @@ let add_declared_mod to_gen id modty =
     tg_binds  = add_bind to_gen.tg_binds (id, gtmodty modty);
     tg_subst  = EcSubst.add_module to_gen.tg_subst id (mpath_abs id [])
   }
+
+(* A section-declared index [n] is a natural-number parameter.  Typing
+   resolved [word<:n>] against the very ident [id], so generalization only
+   needs to make [id] available as an on-demand [{n}] binder — no subst. *)
+let add_declared_idx to_gen id =
+  { to_gen with
+    tg_params = { to_gen.tg_params with
+                  idxvars = to_gen.tg_params.idxvars @ [id] }; }
 
 let add_declared_ty to_gen path tydecl =
   assert (tydecl.tyd_params.tyvars = [] && tydecl.tyd_params.idxvars = []);
@@ -795,6 +804,41 @@ let notation_fv nota =
 
 let generalize_extra_ty to_gen fv =
   List.filter (fun id -> Mid.mem id fv) to_gen.tg_params.tyvars
+
+let generalize_extra_idx to_gen fv =
+  List.filter (fun id -> Mid.mem id fv) to_gen.tg_params.idxvars
+
+(* Free index variables: idents used as [TIVar] inside index arguments,
+   plus idxvars used as int-typed formula locals (already in [f_fv]). *)
+let rec tindex_fv acc (ti : tindex) =
+  match ti with
+  | TIVar id -> Mid.add id 1 acc
+  | TIConst _ | TIUnivar _ -> acc
+  | TIAdd (a, b) | TIMul (a, b) -> tindex_fv (tindex_fv acc a) b
+
+let rec ty_idx_fv acc (ty : ty) =
+  match ty.ty_node with
+  | Tconstr (_, ta) ->
+    let acc = List.fold_left tindex_fv acc ta.indices in
+    List.fold_left ty_idx_fv acc ta.types
+  | Tfun (t1, t2) -> ty_idx_fv (ty_idx_fv acc t1) t2
+  | Ttuple ts -> List.fold_left ty_idx_fv acc ts
+  | Tvar _ | Tunivar _ | Tglob _ -> acc
+
+let form_idx_fv (f : form) : int Mid.t =
+  let acc = ref f.f_fv in
+  let rec aux f =
+    acc := ty_idx_fv !acc f.f_ty;
+    (match f.f_node with
+     | Fop (_, ta) ->
+       acc := List.fold_left tindex_fv !acc ta.indices;
+       acc := List.fold_left ty_idx_fv !acc ta.types
+     | Fquant (_, d, _) ->
+       List.iter (fun (_, gty) ->
+         match gty with GTty ty -> acc := ty_idx_fv !acc ty | _ -> ()) d
+     | _ -> ());
+    EcFol.f_iter aux f
+  in aux f; !acc
 
 let rec generalize_extra_args binds fv =
   match binds with
@@ -931,13 +975,19 @@ let generalize_opdecl to_gen prefix (name, operator) =
       | OB_oper (Some body) ->
         let fv = op_body_fv body operator.op_ty in
         let extra_t = generalize_extra_ty to_gen fv in
+        let idxfv =
+          ty_idx_fv
+            (match body with OP_Plain f -> form_idx_fv f | _ -> Mid.empty)
+            operator.op_ty in
+        let extra_i = generalize_extra_idx to_gen idxfv in
         let tparams : ty_params =
-          { idxvars = operator.op_tparams.idxvars;
+          { idxvars = extra_i @ operator.op_tparams.idxvars;
             tyvars  = extra_t @ operator.op_tparams.tyvars; } in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let opty = toarrow (List.map snd extra_a) operator.op_ty in
         let t_args = List.map tvar tparams.tyvars in
-        let eop = e_op path ~tyargs:t_args opty in
+        let i_args = List.map (fun id -> TIVar id) tparams.idxvars in
+        let eop = e_op path ~indices:i_args ~tyargs:t_args opty in
         let e   =
           e_app eop (List.map (fun (id,ty) -> e_local id ty) extra_a)
             operator.op_ty in
@@ -1041,8 +1091,9 @@ let generalize_axiom to_gen prefix (name, ax) =
         generalize_extra_forall ~imply:true to_gen.tg_binds ax.ax_spec
     in
     let extra_t = generalize_extra_ty to_gen (fv_and_tvar_f ax_spec) in
+    let extra_i = generalize_extra_idx to_gen (form_idx_fv ax_spec) in
     let ax_tparams : ty_params =
-      { idxvars = ax.ax_tparams.idxvars;
+      { idxvars = extra_i @ ax.ax_tparams.idxvars;
         tyvars  = extra_t @ ax.ax_tparams.tyvars; } in
     to_gen, Some (Th_axiom (name, {ax with ax_tparams; ax_spec}))
   | `Declare ->
@@ -1565,6 +1616,8 @@ and generalize_lc_item (genenv : to_gen) (prefix : path) (item : sc_item) =
   match item with
   | SC_decl_mod (id, modty) ->
     add_declared_mod genenv id modty
+  | SC_decl_idx id ->
+    add_declared_idx genenv id
   | SC_th_item th_item ->
     generalize_th_item genenv prefix th_item
   | SC_th cth ->
@@ -1669,6 +1722,17 @@ let add_decl_mod id mt scenv =
     { scenv with
       sc_env = EcEnv.Mod.declare_local id mt scenv.sc_env;
       sc_items = SC_decl_mod (id, mt) :: scenv.sc_items }
+
+let add_decl_index id scenv =
+  match scenv.sc_name with
+  | Th _ | Top ->
+    hierror "declare index is only allowed inside a section"
+  | Sc _ ->
+    let env = EcEnv.push_declared_index id scenv.sc_env in
+    let env = EcEnv.Var.bind_local id EcTypes.tint env in
+    { scenv with
+      sc_env   = env;
+      sc_items = SC_decl_idx id :: scenv.sc_items }
 
 (* -----------------------------------------------------------*)
 let enter_section (name : symbol option) (scenv : scenv) =

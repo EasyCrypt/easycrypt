@@ -54,6 +54,12 @@ val gstate : env -> EcGState.gstate
 val copy   : env -> env
 
 (* -------------------------------------------------------------------- *)
+(* Section-declared indices (natural-number parameters). *)
+val declared_indices     : env -> EcIdent.t list
+val lookup_declared_index : symbol -> env -> EcIdent.t option
+val push_declared_index  : EcIdent.t -> env -> env
+
+(* -------------------------------------------------------------------- *)
 val notify :
      ?immediate:bool -> env -> EcGState.loglevel
   -> ('a, Format.formatter, unit, unit) format4 -> 'a

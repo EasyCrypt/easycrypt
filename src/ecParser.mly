@@ -450,6 +450,7 @@
 %token FIX
 %token DEBUG
 %token DECLARE
+%token INDEX
 %token DELTA
 %token DLBRACKET
 %token LBRACKETCOLON
@@ -691,6 +692,7 @@
 _lident:
 | x=LIDENT   { x }
 | ABORT      { "abort"      }
+| INDEX      { "index"      }
 | ADMITTED   { "admitted"   }
 | ARRAY      { "array"      }
 | ASYNC      { "async"      }
@@ -4165,6 +4167,10 @@ global_action:
 | mod_def_or_decl  { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
+| DECLARE INDEX idx=idxvars_decl
+    { let nonneg = idx |> List.filter snd |> List.map fst in
+      reject_nonneg_marker "declared index" nonneg;
+      Gdeclidx (List.map fst idx) }
 | subtype          { Gsubtype     $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }

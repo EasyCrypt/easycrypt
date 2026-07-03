@@ -219,6 +219,7 @@ type preenv = {
   env_ntbase   : ntbase Mop.t;
   env_albase   : path Mp.t;             (* theory aliases   *)
   env_modlcs   : Sid.t;                 (* declared modules *)
+  env_idxdecl  : EcIdent.t list;        (* section-declared indices (ℕ) *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
   env_crbds    : crbindings;
@@ -352,6 +353,7 @@ let empty gstate =
     env_ntbase   = Mop.empty;
     env_albase   = Mp.empty;
     env_modlcs   = Sid.empty;
+    env_idxdecl  = [];
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
     env_crbds    = empty_crbindings;
@@ -360,6 +362,20 @@ let empty gstate =
 (* -------------------------------------------------------------------- *)
 let copy (env : env) =
   { env with env_gstate = EcGState.copy env.env_gstate }
+
+(* -------------------------------------------------------------------- *)
+(* Section-declared indices (natural-number parameters).  They live in
+   the environment so that [word<:n>] resolves without an explicit [{n}]
+   binder; they are generalized back to [{n}] index binders on section
+   close. *)
+let declared_indices (env : env) : EcIdent.t list =
+  env.env_idxdecl
+
+let lookup_declared_index (name : symbol) (env : env) : EcIdent.t option =
+  List.find_opt (fun id -> EcIdent.name id = name) env.env_idxdecl
+
+let push_declared_index (id : EcIdent.t) (env : env) : env =
+  { env with env_idxdecl = id :: env.env_idxdecl }
 
 (* -------------------------------------------------------------------- *)
 type lookup_error = [
