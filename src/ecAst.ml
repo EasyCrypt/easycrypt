@@ -1418,6 +1418,12 @@ let tindex_of_canonical (c : tindex_canonical) : tindex =
       if EcBigInt.equal c.cn_konst EcBigInt.zero then sum
       else TIAdd (TIConst c.cn_konst, sum)
 
+(* Canonical (normal) form of an index: e.g. [4 + 1] becomes [5],
+   [n + n] becomes [2 * n]. Two indices are [tindex_equal] iff their
+   normal forms coincide. *)
+let tindex_normalize (ti : tindex) : tindex =
+  tindex_of_canonical (tindex_canonicalize ti)
+
 (* Try to solve [lhs = rhs] for a single TIUnivar. Succeeds when, in
    the difference [lhs - rhs] computed as a signed polynomial, exactly
    one TIUnivar [?u] has non-zero net coefficient, that coefficient

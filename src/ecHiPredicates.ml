@@ -20,8 +20,7 @@ exception TransPredError of EcLocation.t * EcEnv.env * tperror
 let tperror loc env e = raise (TransPredError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-let close_pr_body (uni : ty EcUid.Muid.t) (body : prbody) =
-  let fsubst = EcFol.Fsubst.f_subst_init ~tu:uni () in
+let close_pr_body (fsubst : EcFol.f_subst) (body : prbody) =
   let tsubst = ty_subst fsubst in
 
   match body with
@@ -79,11 +78,15 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
   if not (EcUnify.UniEnv.closed ue) then
     tperror loc env TPE_TyNotClosed;
 
-  let uidmap     = EcUnify.UniEnv.assubst ue in
+  (* Resolve BOTH type- and index-univars: a predicate body may carry
+     index univars (e.g. a nullary indexed op [onew<:?u>] whose index is
+     fixed by the parameter types), which must be concretised before the
+     body is stored — otherwise the univar leaks into the saved AST. *)
+  let fsubst  = EcUnify.UniEnv.close_subst ue in
   let tparams = EcUnify.UniEnv.tparams ue in
-  let body    = body |> omap (close_pr_body uidmap) in
+  let body    = body |> omap (close_pr_body fsubst) in
 
-  let dom     = Tuni.subst_dom uidmap dom in
+  let dom     = List.map (ty_subst fsubst) dom in
 
   let tags    = Ssym.of_list (List.map unloc pr.pp_tags) in
   let opaque  = {

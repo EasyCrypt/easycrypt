@@ -2577,6 +2577,10 @@ module Ty = struct
   (* ------------------------------------------------------------------ *)
   let ring_of_symmap env ty kind symbols =
     { r_type  = ty;
+      r_indices =
+        (match ty.ty_node with
+         | Tconstr (_, targs) -> targs.indices
+         | _ -> []);
       r_zero  = oget (Mstr.find_opt "rzero" symbols);
       r_one   = oget (Mstr.find_opt "rone"  symbols);
       r_add   = oget (Mstr.find_opt "add"   symbols);

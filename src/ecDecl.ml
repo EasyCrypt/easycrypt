@@ -343,6 +343,7 @@ type rkind = [
 
 type ring = {
   r_type  : EcTypes.ty;
+  r_indices : tindex list;
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
   r_add   : EcPath.path;
@@ -367,6 +368,7 @@ let kind_equal k1 k2 =
 
 let ring_equal r1 r2 =
      EcTypes.ty_equal r1.r_type r2.r_type
+  && List.all2 tindex_equal r1.r_indices r2.r_indices
   && EcPath.p_equal r1.r_zero r2.r_zero
   && EcPath.p_equal r1.r_one  r2.r_one
   && EcPath.p_equal r1.r_add  r2.r_add

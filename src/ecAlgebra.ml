@@ -75,7 +75,8 @@ type eq = form * form
 (* -------------------------------------------------------------------- *)
 let rapp r op args =
   let opty = toarrow (List.map f_ty args) r.r_type in
-    f_app (f_op op opty) args r.r_type
+  let indices = if r.r_indices = [] then None else Some r.r_indices in
+    f_app (f_op op ?indices opty) args r.r_type
 
 let rzero r = rapp r r.r_zero []
 let rone  r = rapp r r.r_one  []

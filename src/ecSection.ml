@@ -546,8 +546,12 @@ and on_instance (aenv : aenv) ty tci =
   | `Ring r    -> on_ring  aenv r
   | `Field f   -> on_field aenv f
   | `General p ->
-    (* FIXME section: ring/field use type class that do not exists *)
-    aenv.cb (`Typeclass p)
+    (* The [`General] cross-links a [`Ring]/[`Field] instance registers
+       (zmodule/ring/idomain markers) point at synthetic type-class paths
+       that do not exist as real declarations. They carry no section
+       dependency, so only check the ones that resolve. *)
+    if EcEnv.TypeClass.by_path_opt p aenv.env <> None then
+      aenv.cb (`Typeclass p)
 
 (* -------------------------------------------------------------------- *)
 type sc_name =
@@ -1159,7 +1163,16 @@ let generalize_instance to_gen (ty,tci, lc) =
   if lc = `Local then to_gen, None
   (* FIXME: be sure that we have no dep to declare or local,
      or fix this code *)
-  else to_gen, Some (Th_instance (ty,tci,lc))
+  else
+    (* Generalize the instance over the section's declared indices that its
+       carrier depends on, e.g. a ring registered in-section over
+       [word<:n+1>] becomes an [{n}]-parametric instance. (Type-variable
+       polymorphism of instances stays forbidden; only indices generalize.) *)
+    let idxfv = ty_idx_fv Mid.empty (snd ty) in
+    let extra_i = generalize_extra_idx to_gen idxfv in
+    let params = fst ty in
+    let ty = ({ params with idxvars = params.idxvars @ extra_i }, snd ty) in
+    to_gen, Some (Th_instance (ty,tci,lc))
 
 let generalize_baserw to_gen prefix (s,lc) =
   if lc = `Local then

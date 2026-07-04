@@ -4009,18 +4009,31 @@ let get_instances (tvi, bty) env =
     let (gty, _typ) = EcUnify.UniEnv.openty ue typ None gty in
       try
         EcUnify.unify env ue bty gty;
-        let ts = Tuni.subst (UE.close ue) in
+        (* [close_subst] resolves both type- and index-univars, so the
+           carrier of a parametric (e.g. index-parametric) instance comes
+           back fully concrete: [word<:?i + 1>] matched against [word<:5>]
+           yields [word<:5>], not [word<:?i + 1>]. *)
+        let ts = EcUnify.UniEnv.close_subst ue in
         Some (inst, ty_subst ts gty, cr)
       with EcUnify.UnificationFailure _ -> None)
     inst
+
+(* The index arguments shared by every op of an instance over [cty]:
+   the carrier's own index list, canonicalised ([4 + 1] -> [5]). *)
+let instance_indices (cty : ty) : tindex list =
+  match cty.ty_node with
+  | Tconstr (_, ta) -> List.map tindex_normalize ta.indices
+  | _ -> []
 
 let get_ring (typ, ty) env =
   let module E = struct exception Found of ring end in
     try
       List.iter
-        (fun (_, _, cr) ->
+        (fun (_, cty, cr) ->
           match cr with
-          | `Ring cr -> raise (E.Found cr)
+          | `Ring cr ->
+              raise (E.Found { cr with r_type = cty;
+                                       r_indices = instance_indices cty })
           | _ -> ())
         (get_instances (typ, ty) env);
       None
@@ -4030,9 +4043,12 @@ let get_field (typ, ty) env =
   let module E = struct exception Found of field end in
     try
       List.iter
-        (fun (_, _, cr) ->
+        (fun (_, cty, cr) ->
           match cr with
-          | `Field cr -> raise (E.Found cr)
+          | `Field cr ->
+              let f_ring = { cr.f_ring with r_type = cty;
+                                            r_indices = instance_indices cty } in
+              raise (E.Found { cr with f_ring })
           | _ -> ())
         (get_instances (typ, ty) env);
       None

@@ -203,6 +203,7 @@ type rkind = [
 
 type ring = {
   r_type  : EcTypes.ty;
+  r_indices : tindex list;
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
   r_add   : EcPath.path;

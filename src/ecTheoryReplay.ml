@@ -1047,6 +1047,7 @@ and replay_instance
     let tc =
       let rec doring cr =
         { r_type  = EcSubst.subst_ty subst cr.r_type;
+          r_indices = List.map (EcSubst.subst_tindex subst) cr.r_indices;
           r_zero  = forpath cr.r_zero;
           r_one   = forpath cr.r_one;
           r_add   = forpath cr.r_add;

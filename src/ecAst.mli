@@ -498,6 +498,9 @@ val tindex_solve_for_univar :
    pipeline to monomorphise indexed types. *)
 val tindex_to_int : tindex -> EcBigInt.zint option
 
+(* Canonical (normal) form of an index; [tindex_equal] on normal forms. *)
+val tindex_normalize : tindex -> tindex
+
 val ty_equal : ty equality
 val ty_hash  : ty hash
 val ty_fv    : ty fv

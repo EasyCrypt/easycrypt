@@ -113,6 +113,32 @@ module Axioms = struct
     let subst = odfl subst (cr.f_div |> omap (fun p -> add subst div p)) in
       subst
 
+  (* The op paths of an instance carry the index arguments implicitly (all
+     the ring/field ops share the carrier's indices). The template axioms
+     reference the ops without indices, and [subst_of_ring] swaps paths but
+     cannot re-introduce them; so we patch the substituted axiom, tagging
+     every instance-op occurrence with [r_indices]. A no-op ([indices = []])
+     for non-indexed carriers. *)
+  let ring_op_paths (cr : ring) : EcPath.Sp.t =
+    let ps = [cr.r_zero; cr.r_one; cr.r_add; cr.r_mul] in
+    let ps = ps @ List.filter_map (fun x -> x) [cr.r_opp; cr.r_sub; cr.r_exp] in
+    let ps = match cr.r_embed with `Embed p -> p :: ps | _ -> ps in
+    EcPath.Sp.of_list ps
+
+  let field_op_paths (cr : field) : EcPath.Sp.t =
+    let ps = cr.f_inv :: List.filter_map (fun x -> x) [cr.f_div] in
+    List.fold_left (fun s p -> EcPath.Sp.add p s) (ring_op_paths cr.f_ring) ps
+
+  let inject_indices (opset : EcPath.Sp.t) (indices : tindex list) (f : form) =
+    let open EcAst in
+    if indices = [] then f else
+    let rec doit f =
+      match f.f_node with
+      | Fop (p, ta) when EcPath.Sp.mem p opset && ta.indices = [] ->
+          f_op_r p { ta with indices } (f_ty f)
+      | _ -> f_map (fun ty -> ty) doit f
+    in doit f
+
   (* FIXME: should use operators inlining when available *)
   let get cr env axs =
     let subst  =
@@ -121,10 +147,16 @@ module Axioms = struct
       | `Field cr -> subst_of_field cr
     in
 
+    let (opset, indices) =
+      match cr with
+      | `Ring  cr -> ring_op_paths  cr, cr.r_indices
+      | `Field cr -> field_op_paths cr, cr.f_ring.r_indices
+    in
+
     let for1 axname =
       let ax = EcEnv.Ax.by_path (EcPath.pqname tmod axname) env in
         assert (ax.ax_tparams.tyvars = [] && ax.ax_tparams.idxvars = [] && is_axiom ax.ax_kind);
-        (axname, EcSubst.subst_form subst ax.ax_spec)
+        (axname, inject_indices opset indices (EcSubst.subst_form subst ax.ax_spec))
     in
       List.map for1 axs
 
