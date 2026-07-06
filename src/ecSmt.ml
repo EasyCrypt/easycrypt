@@ -81,8 +81,6 @@ type tenv = {
   (* Per-index monomorphisation caches (Gap F). The key encodes the
      path and the canonical integer values of the indices, so that
      [vec<:3>] and [vec<:5>] map to distinct fresh Why3 symbols. *)
-  (*---*) te_ty_idx     : (string, w3ty) Hashtbl.t;
-  (*---*) te_op_idx     : (string, w3op) Hashtbl.t;
   (*---*) te_lc         : w3op Hid.t;
   mutable te_lam        : WTerm.term Mta.t;
   (*---*) te_gen        : WTerm.term Hf.t;
@@ -98,8 +96,6 @@ let empty_tenv env task (kwty, kw, kwk) =
     tk_known_w3   = kwk;
     te_ty         = Hp.create 0;
     te_op         = Hp.create 0;
-    te_ty_idx     = Hashtbl.create 0;
-    te_op_idx     = Hashtbl.create 0;
     te_lc         = Hid.create 0;
     te_lam        = Mta.empty;
     te_gen        = Hf.create 0;
@@ -395,29 +391,6 @@ let mk_tglob genv m =
    to skip the goal cleanly rather than crash. *)
 exception CanNotTranslate
 
-(* Try to reduce an index list to a list of native ints. Returns
-   [None] if any index has free variables, leftover univars, or a
-   value too large for [int]. The Gap-F monomorphisation requires
-   closed indices to key the cache. *)
-let tindices_to_ints (tis : tindex list) : int list option =
-  let rec go acc = function
-    | [] -> Some (List.rev acc)
-    | ti :: rest ->
-        match tindex_to_int ti with
-        | None -> None
-        | Some z ->
-            try go (BI.to_int z :: acc) rest
-            with _ -> None
-  in go [] tis
-
-let idx_key (p : path) (idxs : int list) : string =
-  Printf.sprintf "%s<:%s>"
-    (EcPath.tostring p)
-    (String.concat "," (List.map string_of_int idxs))
-
-let idx_suffix (idxs : int list) : string =
-  String.concat "_" (List.map string_of_int idxs)
-
 (* -------------------------------------------------------------------- *)
 let rec trans_ty ((genv, lenv) as env) ty =
   match ty.ty_node with
@@ -429,17 +402,12 @@ let rec trans_ty ((genv, lenv) as env) ty =
   | Ttuple  ts-> wty_tuple genv (trans_tys env ts)
 
   | Tconstr (p, tys) ->
-      let id =
-        if List.is_empty tys.indices then trans_pty genv p
-        else
-          (* Gap F — monomorphise per concrete index. If any index has
-             free variables or unresolved univars, we still cannot
-             translate this goal. *)
-          match tindices_to_ints tys.indices with
-          | None      -> raise CanNotTranslate
-          | Some idxs -> trans_pty_idx genv p idxs
-      in
-      WTy.ty_app id (trans_tys env tys.types)
+      (* Indices are carried at the term level (as explicit int arguments
+         on the indexed operators), not at the sort level: [word<:n>] and
+         [word<:m>] share the single sort [word]. Sound because a
+         cross-width equation is ill-typed in EC and never reaches Why3,
+         while every width-dependent operator threads its index. *)
+      WTy.ty_app (trans_pty genv p) (trans_tys env tys.types)
 
   | Tfun (t1, t2) ->
       WTy.ty_func (trans_ty env t1) (trans_ty env t2)
@@ -456,14 +424,6 @@ and trans_pty genv p =
       Hp.add genv.te_ty p ts;
       ts
     | None -> trans_tydecl genv (p, EcEnv.Ty.by_path p genv.te_env)
-
-and trans_pty_idx genv p idxs =
-  let key = idx_key p idxs in
-  match Hashtbl.find_opt genv.te_ty_idx key with
-  | Some ts -> ts
-  | None    ->
-      let tydecl = EcEnv.Ty.by_path p genv.te_env in
-      trans_tydecl_idx genv (p, tydecl, idxs, key)
 
 and trans_tydecl genv (p, tydecl) =
   let pid = preid_p p in
@@ -533,113 +493,6 @@ and trans_tydecl genv (p, tydecl) =
   List.iter (fun (p, wop) -> Hp.add genv.te_op p wop) opts;
   ts
 
-(* Gap F — translate an indexed instance of a type declaration. The
-   call site has already canonicalised the indices to a list of native
-   ints; we substitute every idxvar in the body by the corresponding
-   integer constant and then create fresh Why3 sort/op symbols, all
-   memoised under [(p, idxs)]. *)
-and trans_tydecl_idx genv (p, tydecl, idxs, key) =
-  if List.compare_lengths tydecl.tyd_params.idxvars idxs <> 0 then
-    raise CanNotTranslate;
-  let idx_subst =
-    let mapping =
-      List.fold_left2
-        (fun m id v -> Mid.add id (TIConst (BI.of_int v)) m)
-        Mid.empty tydecl.tyd_params.idxvars idxs
-    in
-    EcCoreSubst.f_subst_init ~idx:mapping ()
-  in
-  let subst_ty = EcCoreSubst.ty_subst idx_subst in
-
-  (* Idxvars are erased at the Why3 level — they have been replaced by
-     concrete integers. The new sort is parametrised only by tyvars. *)
-  let pid =
-    str_p (Printf.sprintf "%s_%s"
-             (EcPath.tostring p) (idx_suffix idxs)) in
-  let lenv, tparams =
-    lenv_of_tparams { tydecl.tyd_params with idxvars = [] } in
-  ignore key;
-
-  let mangle q = pqoname (prefix q)
-    (Printf.sprintf "%s_%s" (basename q) (idx_suffix idxs)) in
-
-  let ts, opts, decl =
-    match tydecl.tyd_type with
-    | Abstract ->
-        let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
-        (ts, [], WDecl.create_ty_decl ts)
-
-    | Concrete ty ->
-        let ty = trans_ty (genv, lenv) (subst_ty ty) in
-        let ts = WTy.create_tysymbol pid tparams (WTy.Alias ty) in
-        (ts, [], WDecl.create_ty_decl ts)
-
-    | Datatype dt ->
-        let ncs  = List.length dt.tydt_ctors in
-        let ts   = WTy.create_tysymbol pid tparams WTy.NoDef in
-
-        Hashtbl.add genv.te_ty_idx key ts;
-
-        let wdom =
-          tconstr p
-            ~indices:(List.map (fun id -> TIVar id) [])
-            ~tyargs:(List.map tvar tydecl.tyd_params.tyvars)
-        in
-        (* Use the just-created [ts] directly rather than recursing
-           through [trans_ty], which would not find this entry yet
-           in the cache (the entry uses the original path's idx_key
-           but [wdom] above carries no indices). *)
-        let _ = wdom in
-        let wdom = WTy.ty_app ts (List.map (trans_ty (genv, lenv))
-                                    (List.map tvar tydecl.tyd_params.tyvars)) in
-
-        let for_ctor (c, ctys) =
-          let wcid  = mangle (pqoname (prefix p) c) in
-          let wctys = List.map (fun t -> trans_ty (genv, lenv) (subst_ty t)) ctys in
-          let wcls  = WTerm.create_lsymbol ~constr:ncs (preid_p wcid) wctys (Some wdom) in
-          let w3op  = plain_w3op ~name:(basename wcid) tparams wcls in
-          ((c, w3op), (wcls, List.make (List.length ctys) None))
-        in
-
-        let opts, wdtype = List.split (List.map for_ctor dt.tydt_ctors) in
-        (ts, opts, WDecl.create_data_decl [ts, wdtype])
-
-    | Record (_, rc) ->
-        let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
-
-        Hashtbl.add genv.te_ty_idx key ts;
-
-        let wdom = WTy.ty_app ts (List.map (trans_ty (genv, lenv))
-                                    (List.map tvar tydecl.tyd_params.tyvars)) in
-
-        let for_field (fname, fty) =
-          let wfid  = mangle (pqoname (prefix p) fname) in
-          let wfty  = trans_ty (genv, lenv) (subst_ty fty) in
-          let wcls  = WTerm.create_lsymbol ~proj:true (preid_p wfid) [wdom] (Some wfty) in
-          let w3op  = plain_w3op ~name:(basename wfid) tparams wcls in
-          ((fname, w3op), wcls)
-        in
-
-        let wcid  = mangle (EI.record_ctor_path p) in
-        let wctys = List.map (fun t -> trans_ty (genv, lenv) (subst_ty t))
-                      (List.map snd rc) in
-        let wcls  = WTerm.create_lsymbol ~constr:1 (preid_p wcid) wctys (Some wdom) in
-        let w3op  = plain_w3op ~name:(basename wcid) tparams wcls in
-
-        let opts, wproj = List.split (List.map for_field rc) in
-        let wproj = List.map some wproj in
-
-        (ts, (basename wcid, w3op) :: opts, WDecl.create_data_decl [ts, [wcls, wproj]])
-  in
-
-  genv.te_task <- WTask.add_decl genv.te_task decl;
-  Hashtbl.replace genv.te_ty_idx key ts;
-  List.iter (fun (cname, wop) ->
-    let cpath = pqoname (prefix p) cname in
-    Hashtbl.add genv.te_op_idx (idx_key cpath idxs) wop) opts;
-  ts
-
-(* -------------------------------------------------------------------- *)
 let trans_memtype ((genv, _) as env) mt =
   match EcMemory.local_type mt with
   | None -> ty_mem
@@ -718,14 +571,18 @@ let rec highorder_type targs tres =
 let apply_highorder f args =
   List.fold_left (fun f a -> WTerm.t_func_app f (Cast.force_bool a)) f args
 
-let apply_wop genv wop tys args =
+let apply_wop genv ?(idx = []) wop tys args =
   let (textra, targs, tres) = wop.w3op_ta tys in
+  (* Index arguments (concrete int terms) are prepended ahead of the
+     phantom type-dictionary witnesses and the value arguments, matching
+     the [widx @ textra @ wdom] order of the operator's Why3 symbol. *)
+  let idx_targs = List.map (fun t -> t.WTerm.t_ty) idx in
   let eargs =
-    List.map w_witness textra in
+    idx @ List.map w_witness textra in
   let arity = List.length targs in
   let nargs = List.length args in
 
-  let targs = List.map some textra @ targs in
+  let targs = idx_targs @ List.map some textra @ targs in
   if nargs = arity then Cast.app (w3op_fo wop) (eargs @ args) targs tres
   else if nargs < arity then
     let fty = highorder_type targs tres in
@@ -914,17 +771,14 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       trans_fun env bds body args
 
   | Fop (p, ts) ->
-      let wop =
-        if List.is_empty ts.indices then trans_op genv p
-        else
-          (* Gap F — monomorphise per concrete index, just like the
-             type path does for [Tconstr] above. *)
-          match tindices_to_ints ts.indices with
-          | None      -> raise CanNotTranslate
-          | Some idxs -> trans_op_idx genv p idxs
-      in
+      let wop = trans_op genv p in
+      (* Each index becomes an explicit leading [int] argument. Reuse the
+         form translator on the index-as-int form so that idxvars resolve
+         through the same [te_lc]/[le_lv] machinery as any int local. *)
+      let widx =
+        List.map (fun ti -> trans_form env (EcCoreFol.f_of_tindex ti)) ts.indices in
       let tys = List.map (trans_ty (genv,lenv)) ts.types in
-      apply_wop genv wop tys args
+      apply_wop genv ~idx:widx wop tys args
 
   | Flocal x when Hid.mem genv.te_lc x ->
       apply_wop genv (Hid.find genv.te_lc x) [] args
@@ -1033,84 +887,6 @@ and trans_letbinding (genv, lenv) (lp, f1, f2) args =
 and trans_op (genv:tenv) p =
   try Hp.find genv.te_op p with Not_found -> create_op ~body:true genv p
 
-(* Gap F — translate an indexed instance of an operator. Constructors
-   and projectors are populated as a side-effect of [trans_tydecl_idx],
-   so we trigger the carrying type's monomorphisation first. Plain
-   indexed operators get a fresh abstract Why3 symbol with idxvars
-   substituted by their concrete integer values; the body is dropped
-   in this MVP (treat the op as opaque to SMT, which is sound). *)
-and trans_op_idx (genv : tenv) p idxs =
-  let key = idx_key p idxs in
-  match Hashtbl.find_opt genv.te_op_idx key with
-  | Some wop -> wop
-  | None ->
-      let op = EcEnv.Op.by_path p genv.te_env in
-      (* For constructors / projectors / record-makers, force the
-         carrying type's monomorphisation: it will populate
-         [te_op_idx] with all the per-index ctor/proj symbols. *)
-      let owner =
-        match op.op_kind with
-        | OB_oper (Some (OP_Constr (q, _)))
-        | OB_oper (Some (OP_Proj   (q, _, _)))
-        | OB_oper (Some (OP_Record  q)) -> Some q
-        | _ -> None
-      in
-      (match owner with
-       | None -> ()
-       | Some q -> ignore (trans_pty_idx genv q idxs));
-      (match Hashtbl.find_opt genv.te_op_idx key with
-       | Some wop -> wop
-       | None -> create_op_idx genv p idxs key)
-
-and create_op_idx (genv : tenv) p idxs key =
-  let op = EcEnv.Op.by_path p genv.te_env in
-  if List.compare_lengths op.op_tparams.idxvars idxs <> 0 then
-    raise CanNotTranslate;
-
-  let idx_subst =
-    let mapping =
-      List.fold_left2
-        (fun m id v -> Mid.add id (TIConst (BI.of_int v)) m)
-        Mid.empty op.op_tparams.idxvars idxs
-    in
-    EcCoreSubst.f_subst_init ~idx:mapping ()
-  in
-  let op_ty' = EcCoreSubst.ty_subst idx_subst op.op_ty in
-
-  let op_tparams' = { op.op_tparams with idxvars = [] } in
-  let lenv, wparams = lenv_of_tparams op_tparams' in
-  let dom, codom = EcEnv.Ty.signature genv.te_env op_ty' in
-  let textra =
-    List.filter
-      (fun tv -> not (Mid.mem tv (EcTypes.Tvar.fv op_ty')))
-      op_tparams'.tyvars in
-  let textra =
-    List.map (fun tv -> trans_ty (genv,lenv) (tvar tv)) textra in
-  let wdom = trans_tys (genv, lenv) dom in
-  let wcodom =
-    if   ER.EqTest.is_bool genv.te_env codom
-    then None
-    else Some (trans_ty (genv, lenv) codom)
-  in
-
-  match Hashtbl.find_opt genv.te_op_idx key with
-  | Some wop -> wop
-  | None ->
-      let pid = str_p (Printf.sprintf "%s_%s"
-                         (EcPath.tostring p) (idx_suffix idxs)) in
-      let ls  = WTerm.create_lsymbol pid (textra@wdom) wcodom in
-      let name = ls.WTerm.ls_name.WIdent.id_string in
-      let w3op = {
-        w3op_fo = `LDecl ls;
-        w3op_ta = instantiate wparams ~textra wdom wcodom;
-        w3op_ho = `HO_TODO (name, textra@wdom, wcodom);
-      } in
-      Hashtbl.add genv.te_op_idx key w3op;
-      let decl = WDecl.create_param_decl ls in
-      genv.te_task <- WTask.add_decl genv.te_task decl;
-      w3op
-
-(* -------------------------------------------------------------------- *)
 and trans_pvar ((genv, lenv) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
   let mt = get_memtype lenv mem in
@@ -1319,6 +1095,12 @@ and trans_fix (genv, lenv) (wdom, o) =
 (* -------------------------------------------------------------------- *)
 and create_op ?(body = false) (genv : tenv) p =
   let op = EcEnv.Op.by_path p genv.te_env in
+  (* Indexed operators take their indices as explicit leading [int]
+     arguments (one per idxvar). Applications supply the concrete index
+     terms; the symbol itself is index-agnostic, so [zerow<:5>] and
+     [zerow<:n>] share the symbol [zerow : int -> word] applied at [5]
+     resp. [n]. Such operators are kept opaque (no body) — sound. *)
+  let widx = List.map (fun _ -> WTy.ty_int) op.op_tparams.idxvars in
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
   let textra =
@@ -1342,7 +1124,7 @@ and create_op ?(body = false) (genv : tenv) p =
       load_wtheory genv th; (true, ls)
 
     | None ->
-        let ls = WTerm.create_lsymbol (preid_p p) (textra@wdom) wcodom in
+        let ls = WTerm.create_lsymbol (preid_p p) (widx@textra@wdom) wcodom in
         (false, ls)
   in
 
@@ -1351,11 +1133,11 @@ and create_op ?(body = false) (genv : tenv) p =
     let w3op_ho =
       if EcDecl.is_fix op then
         let ls, decl, decl_s =
-          mk_highorder_func name (textra@wdom) wcodom (WTerm.t_app ls)
+          mk_highorder_func name (widx@textra@wdom) wcodom (WTerm.t_app ls)
         in
           `HO_FIX (ls, decl, decl_s, ref false)
       else
-        `HO_TODO (name, textra@wdom, wcodom) in
+        `HO_TODO (name, widx@textra@wdom, wcodom) in
 
     { w3op_fo = `LDecl ls;
       w3op_ta = instantiate wparams ~textra wdom wcodom;
@@ -1370,7 +1152,7 @@ and create_op ?(body = false) (genv : tenv) p =
     let decl =
       let default () = WDecl.create_param_decl ls in
 
-      if op.op_opaque.smt then
+      if op.op_opaque.smt || not (List.is_empty widx) then
         default ()
       else
         match body, op.op_kind with
@@ -1415,10 +1197,11 @@ and create_op ?(body = false) (genv : tenv) p =
   w3op
 
 (* -------------------------------------------------------------------- *)
-let add_axiom ((genv, _) as env) preid form =
+let add_axiom ?(qvars = []) ((genv, _) as env) preid form =
   let w    = trans_form env form in
+  let w    = WTerm.t_forall_close qvars [] (Cast.force_prop w) in
   let pr   = WDecl.create_prsymbol preid in
-  let decl = WDecl.create_prop_decl WDecl.Paxiom pr (Cast.force_prop w) in
+  let decl = WDecl.create_prop_decl WDecl.Paxiom pr w in
   genv.te_task <- WTask.add_decl genv.te_task decl
 
 (* -------------------------------------------------------------------- *)
@@ -1485,7 +1268,18 @@ let lenv_of_hyps genv (hyps : hyps) : lenv =
 let trans_axiom genv (p, ax) =
 (*  if not ax.ax_nosmt then *)
     let lenv = fst (lenv_of_tparams ax.ax_tparams) in
-    add_axiom (genv, lenv) (preid_p p) ax.ax_spec
+    (* A polymorphic lemma's idxvars are int-valued: bind each to a fresh
+       Why3 int variable and universally quantify the emitted axiom over
+       them (type variables are handled by Why3's own type polymorphism;
+       int indices need explicit quantification). *)
+    let idx_vs =
+      List.map (fun id -> WTerm.create_vsymbol (preid id) WTy.ty_int)
+        ax.ax_tparams.idxvars in
+    let lenv =
+      { lenv with le_lv =
+          List.fold_left2 (fun m id vs -> Mid.add id vs m)
+            lenv.le_lv ax.ax_tparams.idxvars idx_vs } in
+    add_axiom ~qvars:idx_vs (genv, lenv) (preid_p p) ax.ax_spec
 
 (* -------------------------------------------------------------------- *)
 let mk_predb1 f l _ = f (Cast.force_prop (as_seq1 l))
