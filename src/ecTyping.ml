@@ -3911,25 +3911,33 @@ let get_instances (tvi, bty) env =
       with EcUnify.UnificationFailure _ -> None)
     inst
 
-let get_ring (typ, ty) env =
+(* When [name] is given, only the instance registered under that name is
+   selected; otherwise the first matching instance (registration order) is
+   used, preserving the single-structure behaviour. *)
+let name_selects name iname =
+  match name with None -> true | Some _ -> name = iname
+
+let get_ring ?name (typ, ty) env =
   let module E = struct exception Found of ring end in
     try
       List.iter
         (fun (_, _, cr) ->
           match cr with
-          | `Ring cr -> raise (E.Found cr)
+          | `Ring cr when name_selects name cr.EcDecl.r_name ->
+              raise (E.Found cr)
           | _ -> ())
         (get_instances (typ, ty) env);
       None
     with E.Found cr -> Some cr
 
-let get_field (typ, ty) env =
+let get_field ?name (typ, ty) env =
   let module E = struct exception Found of field end in
     try
       List.iter
         (fun (_, _, cr) ->
           match cr with
-          | `Field cr -> raise (E.Found cr)
+          | `Field cr when name_selects name cr.EcDecl.f_ring.EcDecl.r_name ->
+              raise (E.Found cr)
           | _ -> ())
         (get_instances (typ, ty) env);
       None

@@ -320,5 +320,5 @@ val check_modtype :
   env -> mpath -> module_sig -> mty_mr -> unit
 
 (* -------------------------------------------------------------------- *)
-val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option
-val get_field : (ty_params * ty) -> env -> EcDecl.field option
+val get_ring  : ?name:symbol -> (ty_params * ty) -> env -> EcDecl.ring  option
+val get_field : ?name:symbol -> (ty_params * ty) -> env -> EcDecl.field option

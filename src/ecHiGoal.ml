@@ -181,7 +181,7 @@ let process_clear (info : clear_info) tc =
     t_clears ~leniant:true clear_list tc
 
 (* -------------------------------------------------------------------- *)
-let process_algebra mode kind eqs (tc : tcenv1) =
+let process_algebra mode kind ?name eqs (tc : tcenv1) =
   let (env, hyps, concl) = FApi.tc1_eflat tc in
 
   if not (EcAlgTactic.is_module_loaded env) then
@@ -210,6 +210,10 @@ let process_algebra mode kind eqs (tc : tcenv1) =
 
   let tparams = (LDecl.tohyps hyps).h_tvar in
 
+  let named = omap unloc name in
+  let named_suffix =
+    match named with None -> "" | Some n -> Printf.sprintf " named `%s'" n in
+
   let tactic =
     match
       match mode, kind with
@@ -220,14 +224,14 @@ let process_algebra mode kind eqs (tc : tcenv1) =
     with
     | `Ring t ->
         let r =
-          match TT.get_ring (tparams, ty) env with
-          | None   -> tacuerror "cannot find a ring structure"
+          match TT.get_ring ?name:named (tparams, ty) env with
+          | None   -> tacuerror "cannot find a ring structure%s" named_suffix
           | Some r -> r
         in t r eqs (f1, f2)
     | `Field t ->
         let r =
-          match TT.get_field (tparams, ty) env with
-          | None   -> tacuerror "cannot find a field structure"
+          match TT.get_field ?name:named (tparams, ty) env with
+          | None   -> tacuerror "cannot find a field structure%s" named_suffix
           | Some r -> r
         in t r eqs (f1, f2)
   in

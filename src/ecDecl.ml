@@ -336,6 +336,7 @@ type rkind = [
 ]
 
 type ring = {
+  r_name  : EcSymbols.symbol option;
   r_type  : EcTypes.ty;
   r_zero  : EcPath.path;
   r_one   : EcPath.path;

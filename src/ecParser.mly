@@ -1732,10 +1732,11 @@ subtype_rename:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| loca=is_local INSTANCE x=qident
+| loca=is_local INSTANCE x=qident nm=bracket(ident)?
     WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
     { pti_name = x;
+      pti_as   = nm;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;
@@ -1744,10 +1745,11 @@ tycinstance:
     }
   }
 
-| loca=is_local INSTANCE x=qident c=uoption(UINT) p=uoption(UINT)
+| loca=is_local INSTANCE x=qident nm=bracket(ident)? c=uoption(UINT) p=uoption(UINT)
     WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
     { pti_name = x;
+      pti_as   = nm;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;
@@ -2868,11 +2870,11 @@ logtactic:
 | SPLIT PLUS
     { Psplit (`All `One) }
 
-| FIELD eqs=ident*
-    { Pfield eqs }
+| FIELD nm=bracket(ident)? eqs=ident*
+    { Pfield (nm, eqs) }
 
-| RING eqs=ident*
-    { Pring eqs }
+| RING nm=bracket(ident)? eqs=ident*
+    { Pring (nm, eqs) }
 
 | ALGNORM
    { Palg_norm }

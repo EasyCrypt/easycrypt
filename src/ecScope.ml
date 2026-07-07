@@ -2509,8 +2509,9 @@ module Ty = struct
   let p_field   = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "Field"  ], "field"  )
 
   (* ------------------------------------------------------------------ *)
-  let ring_of_symmap env ty kind symbols =
-    { r_type  = ty;
+  let ring_of_symmap ?name env ty kind symbols =
+    { r_name  = name;
+      r_type  = ty;
       r_zero  = oget (Mstr.find_opt "rzero" symbols);
       r_one   = oget (Mstr.find_opt "rone"  symbols);
       r_add   = oget (Mstr.find_opt "add"   symbols);
@@ -2541,7 +2542,7 @@ module Ty = struct
 
     let symbols = EcAlgTactic.ring_symbols env kind (snd ty) in
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
-    let cr      = ring_of_symmap env (snd ty) kind symbols in
+    let cr      = ring_of_symmap ?name:(omap unloc tci.pti_as) env (snd ty) kind symbols in
     let axioms  = EcAlgTactic.ring_axioms env cr in
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
@@ -2562,8 +2563,8 @@ module Ty = struct
     in Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
-  let field_of_symmap env ty symbols =
-    { f_ring = ring_of_symmap env ty `Integer symbols;
+  let field_of_symmap ?name env ty symbols =
+    { f_ring = ring_of_symmap ?name env ty `Integer symbols;
       f_inv  = oget (Mstr.find_opt "inv" symbols);
       f_div  = Mstr.find_opt "div" symbols; }
 
@@ -2583,7 +2584,7 @@ module Ty = struct
       hierror "field instances cannot be polymorphic";
     let symbols = EcAlgTactic.field_symbols env (snd ty) in
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
-    let cr      = field_of_symmap env (snd ty) symbols in
+    let cr      = field_of_symmap ?name:(omap unloc tci.pti_as) env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms env cr in
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in

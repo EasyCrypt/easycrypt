@@ -138,8 +138,8 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Psplit (`Default i) -> process_split ?i
     | Psplit (`All `Maybe)-> process_split_all ~must:false
     | Psplit (`All `One)  -> process_split_all ~must:true
-    | Pfield st           -> process_algebra `Solve `Field st
-    | Pring st            -> process_algebra `Solve `Ring  st
+    | Pfield (nm, st)     -> process_algebra `Solve `Field ?name:nm st
+    | Pring  (nm, st)     -> process_algebra `Solve `Ring  ?name:nm st
     | Palg_norm           -> EcStrongRing.t_alg_eq
     | Pexists fs          -> process_exists fs
     | Pleft               -> process_left

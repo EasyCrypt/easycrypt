@@ -1108,8 +1108,8 @@ type logtactic =
   | Passumption
   | Psmt        of pprover_infos
   | Psplit      of [ `Default of int option | `All of [ `Maybe | `One ] ]
-  | Pfield      of psymbol list
-  | Pring       of psymbol list
+  | Pfield      of psymbol option * psymbol list
+  | Pring       of psymbol option * psymbol list
   | Palg_norm
   | Pexists     of ppt_arg located list
   | Pleft
@@ -1212,6 +1212,7 @@ type prealize = {
 (* -------------------------------------------------------------------- *)
 type ptycinstance = {
   pti_name : pqsymbol;
+  pti_as   : psymbol option;
   pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
