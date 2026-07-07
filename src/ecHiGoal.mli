@@ -104,7 +104,7 @@ val process_wlog        : suff:bool -> psymbol list -> pformula -> backward
 val process_genhave     : ttenv -> pgenhave -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_algebra : [`Solve] -> [`Ring|`Field] -> psymbol list -> backward
+val process_algebra : [`Solve] -> [`Ring|`Field] -> ?name:psymbol -> psymbol list -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_crushmode : crushmode -> bool * backward option

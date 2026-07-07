@@ -994,7 +994,8 @@ let fresh_scparams (s : subst) (xtys : (EcIdent.t * ty) list) =
 
 (* -------------------------------------------------------------------- *)
 let subst_ring (s : subst) cr =
-  { r_type  = subst_ty s cr.r_type;
+  { r_name  = cr.r_name;
+    r_type  = subst_ty s cr.r_type;
     r_zero  = subst_path s cr.r_zero;
     r_one   = subst_path s cr.r_one;
     r_add   = subst_path s cr.r_add;

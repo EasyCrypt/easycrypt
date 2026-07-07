@@ -1040,7 +1040,8 @@ and replay_instance
     let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
     let tc =
       let rec doring cr =
-        { r_type  = EcSubst.subst_ty subst cr.r_type;
+        { r_name  = cr.r_name;
+          r_type  = EcSubst.subst_ty subst cr.r_type;
           r_zero  = forpath cr.r_zero;
           r_one   = forpath cr.r_one;
           r_add   = forpath cr.r_add;
