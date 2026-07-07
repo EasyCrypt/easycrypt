@@ -55,19 +55,27 @@ import QSub.
 
 (* NOTE: The `canon` in `repr` might look like it does nothing,         *)
 (*       but it can make `iscanon_repr` trivial when `iscanon_canon` is *)
+(* [smt_opaque]: keep the representative/canonical pair uninterpreted   *)
+(* for SMT so consumers see the clean quotient interface (reprK, piK,   *)
+(* …) rather than the underlying subtype encoding (val/insubd) and the  *)
+(* function-valued `canon`, which otherwise bloat the emitted problem   *)
+(* and defeat downstream solvers.                                       *)
+op [smt_opaque] repr (x : qT) : T = canon (QSub.val x).
+op [smt_opaque] pi   (x : T)  : qT = QSub.insubd (canon x).
+
 clone include CoreQuotient with
   type T     <- T,
   type qT    <- qT,
-  op   pi    =  fun x => QSub.insubd (canon x),
-  op   repr  =  fun x => canon (QSub.val x)
+  op   pi    <- pi,
+  op   repr  <- repr
 
   proof *.
 realize reprK by move => q; rewrite /pi /repr canonK valP valKd.
 
-lemma iscanon_repr v : iscanon (repr v) by rewrite iscanon_canon. 
+lemma iscanon_repr v : iscanon (repr v) by rewrite /repr iscanon_canon.
 
 lemma piK x : repr (pi x) = canon x.
-proof. by rewrite /repr insubdK // iscanon_canon. qed.
+proof. by rewrite /repr /pi insubdK // iscanon_canon. qed.
 
 end CanonQuotient.
 
