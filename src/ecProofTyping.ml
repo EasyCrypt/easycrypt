@@ -233,11 +233,12 @@ let tc1_process_Xhl_formula_xreal tc pf =
 (* FIXME: TC HOOK - check parameter constraints                       *)
 (* ------------------------------------------------------------------ *)
 let pf_check_tvi (pe : proofenv) (typ : EcDecl.ty_params) (tvi : tvar_inst option) =
+  let typ = typ.tyvars in
   match tvi with
   | None -> ()
 
-  | Some (EcUnify.TVIunamed tyargs) ->
-      if List.length tyargs <> List.length typ then
+  | Some (EcUnify.TVIunamed (_ix, tyargs)) ->
+      if tyargs <> [] && List.length tyargs <> List.length typ then
         tc_error pe
           "wrong number of type parameters (%d, expecting %d)"
           (List.length tyargs) (List.length typ)

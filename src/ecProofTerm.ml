@@ -19,6 +19,16 @@ type pt_env = {
   pte_hy : LDecl.hyps;
   pte_ue : EcUnify.unienv;
   pte_ev : EcMatching.mevmap ref;
+  (* Idxvars opened by [pt_of_uglobal_r] live in two namespaces
+     simultaneously: the lemma's body references them in tindex
+     positions (substituted via [fs_idx] to a fresh [TIUnivar]) and
+     in formula positions as int-typed [Flocal]. The tindex side
+     resolves through the unifier; the formula side does not, so
+     [concretize] would leave dangling [Flocal n_lem] nodes. We
+     record the (lemma idxvar ident, fresh tindex univar) pairs
+     here so [concretize_env] can synthesise the missing form
+     bindings once the tindex univar is resolved. *)
+  pte_idx_link : (EcIdent.t * EcUid.uid) list ref;
 }
 
 type pt_ev = {
@@ -82,18 +92,22 @@ let ptenv pe hyps (ue, ev) =
   { pte_pe = pe;
     pte_hy = hyps;
     pte_ue = EcUnify.UniEnv.copy ue;
-    pte_ev = ref ev; }
+    pte_ev = ref ev;
+    pte_idx_link = ref []; }
 
 (* -------------------------------------------------------------------- *)
 let copy pe =
-  ptenv pe.pte_pe pe.pte_hy (pe.pte_ue, !(pe.pte_ev))
+  let cp = ptenv pe.pte_pe pe.pte_hy (pe.pte_ue, !(pe.pte_ev)) in
+  cp.pte_idx_link := !(pe.pte_idx_link);
+  cp
 
 (* -------------------------------------------------------------------- *)
 let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
   { pte_pe = pe;
     pte_hy = hyps;
     pte_ue = PT.unienv_of_hyps hyps;
-    pte_ev = ref EcMatching.MEV.empty; }
+    pte_ev = ref EcMatching.MEV.empty;
+    pte_idx_link = ref []; }
 
 (* -------------------------------------------------------------------- *)
 let rec get_head_symbol (pt : pt_env) (f : form) =
@@ -106,12 +120,76 @@ let rec get_head_symbol (pt : pt_env) (f : form) =
   | _ -> f
 
 (* -------------------------------------------------------------------- *)
+(* Bridge bound form-evars and tindex univars in [pte_idx_link]:
+
+   - If the form-evar [fresh] got bound to a form that projects into a
+     [tindex] (e.g. [Flocal m_lem]), resolve the tindex univar [u]
+     accordingly so [closed ue] succeeds.
+   - If the tindex univar [u] got resolved to a [TIVar tid] / [TIConst k]
+     by index unification (e.g. via [word<:?u> = word<:m_lem>] in a
+     bound-var type), set the form-evar [fresh] to the matching form
+     so [MEV.filled] succeeds.
+
+   The matcher binds either side independently; this bridge keeps the
+   two namespaces in sync prior to the [can_concretize] check. *)
+let propagate_idx_link (pt : pt_env) : unit =
+  let iu = EcUnify.UniEnv.iu_assubst pt.pte_ue in
+  List.iter (fun (fresh, u) ->
+    let fresh_set =
+      match EcMatching.MEV.get fresh `Form !(pt.pte_ev) with
+      | Some (`Set (`Form _)) -> true
+      | _ -> false
+    in
+    let u_resolved =
+      match EcUid.Muid.find_opt u iu with
+      | Some (EcAst.TIUnivar v) when EcUid.uid_equal v u -> None
+      | x -> x
+    in
+    match fresh_set, u_resolved with
+    | true, _ ->
+        (match EcMatching.MEV.get fresh `Form !(pt.pte_ev) with
+         | Some (`Set (`Form f)) ->
+             (match EcCoreFol.tindex_of_form f with
+              | Some ti ->
+                  (try EcUnify.unify_idx (LDecl.toenv pt.pte_hy)
+                         pt.pte_ue (EcAst.TIUnivar u) ti
+                   with EcUnify.UnificationFailure _ -> ())
+              | None -> ())
+         | _ -> ())
+    | false, Some ti ->
+        (match EcCoreFol.f_of_tindex_opt ti with
+         | Some f when EcMatching.MEV.mem fresh `Form !(pt.pte_ev)
+                    && not (EcMatching.MEV.isset fresh `Form !(pt.pte_ev)) ->
+             pt.pte_ev := EcMatching.MEV.set fresh (`Form f) !(pt.pte_ev)
+         | _ -> ())
+    | false, None -> ())
+    !(pt.pte_idx_link)
+
 let can_concretize (pt : pt_env) =
+  propagate_idx_link pt;
   EcMatching.can_concretize !(pt.pte_ev) pt.pte_ue
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) (LDecl.toenv pe.pte_hy))
+  let subst = EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev)
+                (LDecl.toenv pe.pte_hy) in
+  (* For each (idxvar ident, tindex univar) link recorded by
+     [pt_of_uglobal_r]: if the tindex univar resolved to a [TIVar
+     concrete] in the unifier, add a form-level binding
+     [n_lem -> Flocal concrete] (typed int) so dangling references
+     in the lemma's body get resolved alongside the tindex side. *)
+  let iu = EcUnify.UniEnv.iu_assubst pe.pte_ue in
+  let subst =
+    List.fold_left (fun s (id, u) ->
+      match EcUid.Muid.find_opt u iu with
+      | Some (EcAst.TIVar tid) ->
+          EcCoreSubst.Fsubst.f_bind_local s id (f_local tid tint)
+      | Some (EcAst.TIConst k) ->
+          EcCoreSubst.Fsubst.f_bind_local s id (f_int k)
+      | _ -> s)
+      subst !(pe.pte_idx_link)
+  in
+  CPTEnv subst
 
 (* -------------------------------------------------------------------- *)
 let concretize_e_form_gen (CPTEnv subst) ids f =
@@ -137,7 +215,10 @@ and concretize_e_head ((CPTEnv subst) as cptenv) head =
   | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
+  | PTGlobal (p, idxs, tys) ->
+      PTGlobal (p,
+                List.map (EcCoreSubst.tindex_subst subst) idxs,
+                List.map (ty_subst subst) tys)
   | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
 and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
@@ -223,12 +304,45 @@ let pt_of_uglobal_r ptenv p =
   let typ, ax = (ax.EcDecl.ax_tparams, ax.EcDecl.ax_spec) in
 
   (* FIXME: TC HOOK *)
-  let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
-  let ax  = Fsubst.f_subst_tvar ~freshen:true fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  let tv  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
+  let ix  = EcUnify.UniEnv.openidx ptenv.pte_ue typ None in
+  (* Idxvars also appear as int-typed [Flocal] in the body
+     (Phase 2). For each idxvar that is REFERENCED as a [Flocal]
+     in the body, substitute it to a fresh int evar registered in
+     [pte_ev], so the matcher can bind it via term matching against
+     the goal's idxvar Flocal. The fresh evar is linked (via
+     [pte_idx_link]) to the corresponding tindex univar so
+     [concretize_env] keeps the two sides consistent. Idxvars NOT
+     referenced as Flocal don't need an evar — leaving one would
+     block [can_concretize] with an orphan binding. *)
+  let body_fv = EcAst.f_fv ax in
+  let loc_subst = ref EcIdent.Mid.empty in
+  List.iter (fun id ->
+    if EcIdent.Mid.mem id body_fv then
+      match EcIdent.Mid.find_opt id ix with
+      | Some (EcAst.TIUnivar u) ->
+          let fresh = EcIdent.fresh id in
+          ptenv.pte_ev :=
+            EcMatching.MEV.add fresh `Form !(ptenv.pte_ev);
+          ptenv.pte_idx_link := (fresh, u) :: !(ptenv.pte_idx_link);
+          loc_subst :=
+            EcIdent.Mid.add id (f_local fresh tint) !loc_subst
+      | _ -> ())
+    typ.idxvars;
+  let ax  =
+    let fs =
+      EcCoreSubst.Fsubst.f_subst_init ~freshen:true ~tv ~idx:ix () in
+    let fs =
+      EcIdent.Mid.fold
+        (fun id f s -> EcCoreSubst.Fsubst.f_bind_local s id f)
+        !loc_subst fs in
+    EcCoreSubst.Fsubst.f_subst fs ax
+  in
+  let idxs = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
+  let typ  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
 
   { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys:typ p;
+    ptev_pt  = ptglobal ~idxs ~tys:typ p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -452,7 +566,7 @@ let lookup_named_psymbol (hyps : LDecl.hyps) ~hastyp fp =
   match fp with
   | ([], x) when LDecl.hyp_exists x hyps && not hastyp ->
       let (x, fp) = LDecl.hyp_by_name x hyps in
-        Some (`Local x, ([], fp))
+        Some (`Local x, ({ EcDecl.idxvars = []; tyvars = [] }, fp))
 
   | _ ->
     match EcEnv.Ax.lookup_opt fp (LDecl.toenv hyps) with
@@ -517,11 +631,44 @@ let process_named_pterm pe (tvi, fp) =
   PT.pf_check_tvi pe.pte_pe typ tvi;
 
   (* FIXME: TC HOOK *)
-  let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
-  let ax  = Fsubst.f_subst_tvar ~freshen:false fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  let tv = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
+  let ix = EcUnify.UniEnv.openidx pe.pte_ue typ tvi in
+  (* Idxvars are also int-typed formula locals (Phase 2). Three cases:
+     - [f_of_tindex_opt ti] succeeds (user-provided concrete index):
+       substitute [Flocal id -> f] directly.
+     - [TIUnivar u] AND [id] appears in [f_fv ax]: substitute
+       [Flocal id] to a fresh form-evar registered in [pte_ev], and
+       link the evar to [u] so [can_concretize] can bridge the two
+       namespaces on either binding direction.
+     - otherwise: no substitution needed. *)
+  let body_fv = EcAst.f_fv ax in
+  let loc_subst = ref EcIdent.Mid.empty in
+  EcIdent.Mid.iter (fun id ti ->
+    match EcCoreFol.f_of_tindex_opt ti with
+    | Some f ->
+        loc_subst := EcIdent.Mid.add id f !loc_subst
+    | None ->
+        match ti with
+        | EcAst.TIUnivar u when EcIdent.Mid.mem id body_fv ->
+            let fresh = EcIdent.fresh id in
+            pe.pte_ev := EcMatching.MEV.add fresh `Form !(pe.pte_ev);
+            pe.pte_idx_link := (fresh, u) :: !(pe.pte_idx_link);
+            loc_subst := EcIdent.Mid.add id (f_local fresh tint) !loc_subst
+        | _ -> ())
+    ix;
+  let ax =
+    let fs =
+      EcCoreSubst.Fsubst.f_subst_init ~freshen:false ~tv ~idx:ix () in
+    let fs =
+      EcIdent.Mid.fold
+        (fun id f s -> EcCoreSubst.Fsubst.f_bind_local s id f)
+        !loc_subst fs in
+    EcCoreSubst.Fsubst.f_subst fs ax
+  in
+  let typ_out  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
+  let idxs_out = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
 
-  (p, (typ, ax))
+  (p, (idxs_out, typ_out, ax))
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =
@@ -529,8 +676,8 @@ let process_pterm_cut ~prcut pe pt =
     match pt with
     | FPNamed (fp, tyargs) -> begin
         match process_named_pterm pe (tyargs, fp) with
-        | (`Local  x, ([] , ax)) -> (PTLocal  x, ax)
-        | (`Global p, (typ, ax)) -> (PTGlobal (p, typ), ax)
+        | (`Local  x, ([], [] , ax)) -> (PTLocal  x, ax)
+        | (`Global p, (idxs, typ, ax)) -> (PTGlobal (p, idxs, typ), ax)
 
         | _ -> assert false
     end

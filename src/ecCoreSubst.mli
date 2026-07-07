@@ -28,6 +28,8 @@ val f_subst_init :
        ?freshen:bool
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
+    -> ?idx:tindex Mid.t
+    -> ?iu:tindex Muid.t
     -> ?esloc:expr Mid.t
     -> unit
     -> f_subst
@@ -55,8 +57,10 @@ val add_elocal  : (EcIdent.t * ty) subst_binder
 val add_elocals : (EcIdent.t * ty) list subst_binder
 val bind_elocal : f_subst -> EcIdent.t -> expr -> f_subst
 
-
 (* -------------------------------------------------------------------- *)
+val targs_subst  : targs  substitute
+val tindex_subst : tindex substitute
+
 val ty_subst : ty substitute
 val e_subst  : expr substitute
 val s_subst  : stmt substitute
@@ -70,6 +74,8 @@ module Fsubst : sig
        ?freshen:bool
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
+    -> ?idx:tindex Mid.t
+    -> ?iu:tindex Muid.t
     -> ?esloc:expr Mid.t
     -> unit -> f_subst
 

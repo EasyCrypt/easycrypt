@@ -25,7 +25,7 @@ val is_empty : subst -> bool
 (* -------------------------------------------------------------------- *)
 val add_module   : subst -> EcIdent.t -> mpath -> subst
 val add_path     : subst -> src:path -> dst:path -> subst
-val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
+val add_tydef    : subst -> path -> (EcIdent.t list * EcIdent.t list * ty) -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst
 val add_pddef    : subst -> path -> (EcIdent.t list * form) -> subst
 val add_moddef   : subst -> src:path -> dst:mpath -> subst (* Only concrete modules *)
@@ -68,8 +68,9 @@ val subst_oracle_infos : subst -> oracle_infos -> oracle_infos
 (* -------------------------------------------------------------------- *)
 val subst_gty   : subst -> gty -> gty
 val subst_genty : subst -> (ty_params * ty) -> (ty_params * ty)
-val subst_ty    : subst -> ty   -> ty
-val subst_form  : subst -> form -> form
+val subst_ty     : subst -> ty     -> ty
+val subst_tindex : subst -> tindex -> tindex
+val subst_form   : subst -> form   -> form
 val subst_expr  : subst -> expr -> expr
 val subst_stmt  : subst -> stmt -> stmt
 

@@ -332,8 +332,24 @@ end = struct
     | InvalidTypeAppl (name, _, _) ->
         msg "invalid type application: %a" pp_qsymbol name
 
+    | InvalidIndexAppl (name, expected, got) ->
+        msg "invalid index application for `%a': %d index argument(s) expected, %d given"
+          pp_qsymbol name expected got
+
+    | UnboundIndexVariable name ->
+        msg "unbound index variable: `%s'" name
+
+    | IndexMismatch (i1, i2) ->
+        msg "cannot unify indices `%s' and `%s' (only naked-univar \
+             assignment is supported; full polynomial unification \
+             is out of scope)"
+          (EcTypes.dump_tindex i1) (EcTypes.dump_tindex i2)
+
     | DuplicatedTyVar ->
         msg "a type variable appear at least twice"
+
+    | DuplicatedIndexVar name ->
+        msg "an index variable appears at least twice: `%s'" name
 
     | DuplicatedLocal name ->
         msg "duplicated local/parameters name: `%s'" name
@@ -523,8 +539,8 @@ end = struct
                ("local variable", Cb (id, EcPrinting.pp_local env))
             | `Proj (pv, _) ->
                ("variable proj.", Cb (pv, EcPrinting.pp_pv env))
-            | `Op op ->
-               ("operator", Cb ((op, ue), pp_op))
+            | `Op (p, _idxs, tys) ->
+               ("operator", Cb (((p, tys), ue), pp_op))
           in msg "  [%s]: %a@\n" title pp x) matches
     end
 
@@ -865,6 +881,14 @@ end = struct
 
     | CE_TypeArgMism (kd, x) ->
         msg "type argument mismatch for %s `%s'"
+          (string_of_ovkind kd) (string_of_qsymbol x)
+
+    | CE_IdxArgMism (kd, x) ->
+        msg "index argument mismatch for %s `%s'"
+          (string_of_ovkind kd) (string_of_qsymbol x)
+
+    | CE_IndexedNotYetSupported (kd, x) ->
+        msg "cloning of indexed %s `%s' is not yet supported"
           (string_of_ovkind kd) (string_of_qsymbol x)
 
     | CE_OpIncompatible (x, err) ->

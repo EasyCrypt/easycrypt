@@ -175,7 +175,7 @@ and on_ty (aenv : aenv) (ty : ty) =
   | Tvar    _        -> ()
   | Tglob   m        -> aenv.cb (`Module (mident m))
   | Ttuple tys       -> List.iter (on_ty aenv) tys
-  | Tconstr (p, tys) -> on_tyname aenv p; List.iter (on_ty aenv) tys
+  | Tconstr (p, tys) -> on_tyname aenv p; List.iter (on_ty aenv) tys.types
   | Tfun (ty1, ty2)  -> List.iter (on_ty aenv) [ty1; ty2]
 
 (* -------------------------------------------------------------------- *)
@@ -215,7 +215,7 @@ and on_expr (aenv : aenv) (e : expr) =
 
     | Eop (p, tys) -> begin
       on_opname aenv p;
-      List.iter (on_ty aenv) tys;
+      List.iter (on_ty aenv) tys.types;
     end
 
   in on_ty aenv e.e_ty; fornode ()
@@ -292,7 +292,7 @@ and on_form (aenv : aenv) (f : EcFol.form) =
     | EcAst.Fpr       pr           -> on_pr   aenv pr
     | EcAst.Fop (p, tys) -> begin
       on_opname aenv p;
-      List.iter (on_ty aenv) tys;
+      List.iter (on_ty aenv) tys.types;
     end
 
   and on_hf (aenv : aenv) hf =
@@ -546,8 +546,12 @@ and on_instance (aenv : aenv) ty tci =
   | `Ring r    -> on_ring  aenv r
   | `Field f   -> on_field aenv f
   | `General p ->
-    (* FIXME section: ring/field use type class that do not exists *)
-    aenv.cb (`Typeclass p)
+    (* The [`General] cross-links a [`Ring]/[`Field] instance registers
+       (zmodule/ring/idomain markers) point at synthetic type-class paths
+       that do not exist as real declarations. They carry no section
+       dependency, so only check the ones that resolve. *)
+    if EcEnv.TypeClass.by_path_opt p aenv.env <> None then
+      aenv.cb (`Typeclass p)
 
 (* -------------------------------------------------------------------- *)
 type sc_name =
@@ -569,6 +573,7 @@ and sc_item =
   | SC_th_item  of EcTheory.theory_item
   | SC_th       of EcEnv.Theory.compiled_theory
   | SC_decl_mod of EcIdent.t * mty_mr
+  | SC_decl_idx of EcIdent.t
 
 and sc_items =
   sc_item list
@@ -663,18 +668,27 @@ let add_declared_mod to_gen id modty =
     tg_subst  = EcSubst.add_module to_gen.tg_subst id (mpath_abs id [])
   }
 
+(* A section-declared index [n] is a natural-number parameter.  Typing
+   resolved [word<:n>] against the very ident [id], so generalization only
+   needs to make [id] available as an on-demand [{n}] binder — no subst. *)
+let add_declared_idx to_gen id =
+  { to_gen with
+    tg_params = { to_gen.tg_params with
+                  idxvars = to_gen.tg_params.idxvars @ [id] }; }
+
 let add_declared_ty to_gen path tydecl =
-  assert (tydecl.tyd_params = []);
+  assert (tydecl.tyd_params.tyvars = [] && tydecl.tyd_params.idxvars = []);
   let name = "'" ^ basename path in
   let id = EcIdent.create name in
   { to_gen with
-    tg_params = to_gen.tg_params @ [id];
-    tg_subst  = EcSubst.add_tydef to_gen.tg_subst path ([], tvar id);
+    tg_params = { to_gen.tg_params with
+                  tyvars = to_gen.tg_params.tyvars @ [id] };
+    tg_subst  = EcSubst.add_tydef to_gen.tg_subst path ([], [], tvar id);
   }
 
 let add_declared_op to_gen path opdecl =
   assert (
-      opdecl.op_tparams = [] &&
+      opdecl.op_tparams.tyvars = [] && opdecl.op_tparams.idxvars = [] &&
       match opdecl.op_kind with
       | OB_oper None | OB_pred None -> true
       | _ -> false);
@@ -695,7 +709,7 @@ let add_declared_op to_gen path opdecl =
     let rec aux fv e =
       let fv = EcIdent.fv_union fv (tvar_fv e.e_ty) in
       match e.e_node with
-      | Eop(_, tys) -> List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) fv tys
+      | Eop(_, tys) -> List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) fv tys.types
       | Equant(_,d,e) ->
         let fv = List.fold_left (fun fv (_,ty) -> EcIdent.fv_union fv (tvar_fv ty)) fv d in
         aux fv e
@@ -717,7 +731,7 @@ and fv_and_tvar_f f =
   let rec aux f =
     fv := EcIdent.fv_union !fv (tvar_fv f.f_ty);
     match f.f_node with
-    | Fop(_, tys) -> fv := List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) !fv tys
+    | Fop(_, tys) -> fv := List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) !fv tys.types
     | Fquant(_, d, f) ->
       fv := List.fold_left (fun fv (_,gty) -> EcIdent.fv_union fv (gty_fv_and_tvar gty)) !fv d;
       aux f
@@ -748,7 +762,7 @@ let tydecl_fv tyd =
       EcIdent.fv_union
         (EcIdent.fv_union fv (ty_fv_and_tvar carrier))
         (fv_and_tvar_f pred) in
-  List.fold_left (fun fv id -> Mid.remove id fv) fv tyd.tyd_params
+  List.fold_left (fun fv id -> Mid.remove id fv) fv tyd.tyd_params.tyvars
 
 let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
@@ -793,7 +807,42 @@ let notation_fv nota =
       EcIdent.fv_union (Mid.remove id fv) (ty_fv_and_tvar ty)) fv nota.ont_args
 
 let generalize_extra_ty to_gen fv =
-  List.filter (fun id -> Mid.mem id fv) to_gen.tg_params
+  List.filter (fun id -> Mid.mem id fv) to_gen.tg_params.tyvars
+
+let generalize_extra_idx to_gen fv =
+  List.filter (fun id -> Mid.mem id fv) to_gen.tg_params.idxvars
+
+(* Free index variables: idents used as [TIVar] inside index arguments,
+   plus idxvars used as int-typed formula locals (already in [f_fv]). *)
+let rec tindex_fv acc (ti : tindex) =
+  match ti with
+  | TIVar id -> Mid.add id 1 acc
+  | TIConst _ | TIUnivar _ -> acc
+  | TIAdd (a, b) | TIMul (a, b) -> tindex_fv (tindex_fv acc a) b
+
+let rec ty_idx_fv acc (ty : ty) =
+  match ty.ty_node with
+  | Tconstr (_, ta) ->
+    let acc = List.fold_left tindex_fv acc ta.indices in
+    List.fold_left ty_idx_fv acc ta.types
+  | Tfun (t1, t2) -> ty_idx_fv (ty_idx_fv acc t1) t2
+  | Ttuple ts -> List.fold_left ty_idx_fv acc ts
+  | Tvar _ | Tunivar _ | Tglob _ -> acc
+
+let form_idx_fv (f : form) : int Mid.t =
+  let acc = ref f.f_fv in
+  let rec aux f =
+    acc := ty_idx_fv !acc f.f_ty;
+    (match f.f_node with
+     | Fop (_, ta) ->
+       acc := List.fold_left tindex_fv !acc ta.indices;
+       acc := List.fold_left ty_idx_fv !acc ta.types
+     | Fquant (_, d, _) ->
+       List.iter (fun (_, gty) ->
+         match gty with GTty ty -> acc := ty_idx_fv !acc ty | _ -> ()) d
+     | _ -> ());
+    EcFol.f_iter aux f
+  in aux f; !acc
 
 let rec generalize_extra_args binds fv =
   match binds with
@@ -828,10 +877,13 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let tydecl = EcSubst.subst_tydecl to_gen.tg_subst tydecl in
     let fv = tydecl_fv tydecl in
     let extra = generalize_extra_ty to_gen fv in
-    let tyd_params = extra @ tydecl.tyd_params in
-    let args = List.map tvar tyd_params in
-    let params = tydecl.tyd_params in
-    let tosubst = params, tconstr path args in
+    let tyd_params : ty_params =
+      { idxvars = tydecl.tyd_params.idxvars;
+        tyvars  = extra @ tydecl.tyd_params.tyvars; } in
+    let args = List.map tvar tyd_params.tyvars in
+    let params = tydecl.tyd_params.tyvars in
+    let idxparams = tydecl.tyd_params.idxvars in
+    let tosubst = (idxparams, params, tconstr ~tyargs:args path) in
     let tg_subst, tyd_type =
       match tydecl.tyd_type with
       | Concrete _ | Abstract ->
@@ -843,10 +895,10 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
         let tg_subst = EcSubst.add_tydef tg_subst path tosubst in
         let rsubst   = ref subst in
         let rtg_subst = ref tg_subst in
-        let tin = tconstr path args in
+        let tin = tconstr ~tyargs:args path in
         let add_op (s, ty) =
           let p = pqname prefix s in
-          let tosubst = params, e_op p args (tfun tin ty) in
+          let tosubst = params, e_op p ~tyargs:args (tfun tin ty) in
           rsubst := EcSubst.add_opdef !rsubst p tosubst;
           rtg_subst := EcSubst.add_opdef !rtg_subst p tosubst;
           s, ty
@@ -862,12 +914,12 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
         let subst_ty = EcSubst.subst_ty subst in
         let rsubst   = ref subst in
         let rtg_subst = ref tg_subst in
-        let tout = tconstr path args in
+        let tout = tconstr ~tyargs:args path in
         let add_op (s,tys) =
           let tys = List.map subst_ty tys in
           let p = pqname prefix s in
           let pty = toarrow tys tout in
-          let tosubst = params, e_op p args pty in
+          let tosubst = params, e_op p ~tyargs:args pty in
           rsubst := EcSubst.add_opdef !rsubst p tosubst;
           rtg_subst := EcSubst.add_opdef !rtg_subst p tosubst ;
           s, tys in
@@ -901,10 +953,12 @@ let generalize_opdecl to_gen prefix (name, operator) =
       | OB_oper None ->
         let fv = ty_fv_and_tvar operator.op_ty in
         let extra = generalize_extra_ty to_gen fv in
-        let tparams = extra @ operator.op_tparams in
+        let tparams : ty_params =
+          { idxvars = operator.op_tparams.idxvars;
+            tyvars  = extra @ operator.op_tparams.tyvars; } in
         let opty = operator.op_ty in
-        let args = List.map tvar tparams in
-        let tosubst = (operator.op_tparams, e_op path args opty) in
+        let args = List.map tvar tparams.tyvars in
+        let tosubst = (operator.op_tparams.tyvars, e_op path ~tyargs:args opty) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
@@ -912,10 +966,12 @@ let generalize_opdecl to_gen prefix (name, operator) =
       | OB_pred None ->
         let fv = ty_fv_and_tvar operator.op_ty in
         let extra = generalize_extra_ty to_gen fv in
-        let tparams = extra @ operator.op_tparams in
+        let tparams : ty_params =
+          { idxvars = operator.op_tparams.idxvars;
+            tyvars  = extra @ operator.op_tparams.tyvars; } in
         let opty = operator.op_ty in
-        let args = List.map tvar tparams in
-        let tosubst = (operator.op_tparams, f_op path args opty) in
+        let args = List.map tvar tparams.tyvars in
+        let tosubst = (operator.op_tparams.tyvars, f_op path ~tyargs:args opty) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
         tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
@@ -923,15 +979,23 @@ let generalize_opdecl to_gen prefix (name, operator) =
       | OB_oper (Some body) ->
         let fv = op_body_fv body operator.op_ty in
         let extra_t = generalize_extra_ty to_gen fv in
-        let tparams = extra_t @ operator.op_tparams in
+        let idxfv =
+          ty_idx_fv
+            (match body with OP_Plain f -> form_idx_fv f | _ -> Mid.empty)
+            operator.op_ty in
+        let extra_i = generalize_extra_idx to_gen idxfv in
+        let tparams : ty_params =
+          { idxvars = extra_i @ operator.op_tparams.idxvars;
+            tyvars  = extra_t @ operator.op_tparams.tyvars; } in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let opty = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args = List.map tvar tparams in
-        let eop = e_op path t_args opty in
+        let t_args = List.map tvar tparams.tyvars in
+        let i_args = List.map (fun id -> TIVar id) tparams.idxvars in
+        let eop = e_op path ~indices:i_args ~tyargs:t_args opty in
         let e   =
           e_app eop (List.map (fun (id,ty) -> e_local id ty) extra_a)
             operator.op_ty in
-        let tosubst = (operator.op_tparams, e) in
+        let tosubst = (operator.op_tparams.tyvars, e) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         let body =
@@ -961,15 +1025,17 @@ let generalize_opdecl to_gen prefix (name, operator) =
       | OB_pred (Some body) ->
         let fv = pr_body_fv body operator.op_ty in
         let extra_t = generalize_extra_ty to_gen fv in
-        let op_tparams = extra_t @ operator.op_tparams in
+        let op_tparams : ty_params =
+          { idxvars = operator.op_tparams.idxvars;
+            tyvars  = extra_t @ operator.op_tparams.tyvars; } in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let op_ty   = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args  = List.map tvar op_tparams in
-        let fop = f_op path t_args op_ty in
+        let t_args  = List.map tvar op_tparams.tyvars in
+        let fop = f_op path ~tyargs:t_args op_ty in
         let f   =
           f_app fop (List.map (fun (id,ty) -> f_local id ty) extra_a)
             operator.op_ty in
-        let tosubst = (operator.op_tparams, f) in
+        let tosubst = (operator.op_tparams.tyvars, f) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
         let body =
@@ -992,7 +1058,9 @@ let generalize_opdecl to_gen prefix (name, operator) =
       | OB_nott nott ->
         let fv = notation_fv nott in
         let extra_t = generalize_extra_ty to_gen fv in
-        let op_tparams = extra_t @ operator.op_tparams in
+        let op_tparams : ty_params =
+          { idxvars = operator.op_tparams.idxvars;
+            tyvars  = extra_t @ operator.op_tparams.tyvars; } in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let op_ty   = toarrow (List.map snd extra_a) operator.op_ty in
         let nott = { nott with ont_args = extra_a @ nott.ont_args; } in
@@ -1027,11 +1095,14 @@ let generalize_axiom to_gen prefix (name, ax) =
         generalize_extra_forall ~imply:true to_gen.tg_binds ax.ax_spec
     in
     let extra_t = generalize_extra_ty to_gen (fv_and_tvar_f ax_spec) in
-    let ax_tparams = extra_t @ ax.ax_tparams in
+    let extra_i = generalize_extra_idx to_gen (form_idx_fv ax_spec) in
+    let ax_tparams : ty_params =
+      { idxvars = extra_i @ ax.ax_tparams.idxvars;
+        tyvars  = extra_t @ ax.ax_tparams.tyvars; } in
     to_gen, Some (Th_axiom (name, {ax with ax_tparams; ax_spec}))
   | `Declare ->
     assert (is_axiom ax.ax_kind);
-    assert (ax.ax_tparams = []);
+    assert (ax.ax_tparams.tyvars = [] && ax.ax_tparams.idxvars = []);
     let to_gen = add_clear to_gen (`Ax path) in
     let to_gen =
       { to_gen with tg_binds = add_imp to_gen.tg_binds ax.ax_spec } in
@@ -1092,7 +1163,16 @@ let generalize_instance to_gen (ty,tci, lc) =
   if lc = `Local then to_gen, None
   (* FIXME: be sure that we have no dep to declare or local,
      or fix this code *)
-  else to_gen, Some (Th_instance (ty,tci,lc))
+  else
+    (* Generalize the instance over the section's declared indices that its
+       carrier depends on, e.g. a ring registered in-section over
+       [word<:n+1>] becomes an [{n}]-parametric instance. (Type-variable
+       polymorphism of instances stays forbidden; only indices generalize.) *)
+    let idxfv = ty_idx_fv Mid.empty (snd ty) in
+    let extra_i = generalize_extra_idx to_gen idxfv in
+    let params = fst ty in
+    let ty = ({ params with idxvars = params.idxvars @ extra_i }, snd ty) in
+    to_gen, Some (Th_instance (ty,tci,lc))
 
 let generalize_baserw to_gen prefix (s,lc) =
   if lc = `Local then
@@ -1192,8 +1272,8 @@ let check s scenv who b =
 let check_section scenv who =
   check "is only allowed in section" scenv who (scenv.sc_insec)
 
-let check_polymorph scenv who typarams =
-  check "cannot be polymorphic" scenv who (typarams = [])
+let check_polymorph scenv who (typarams : ty_params) =
+  check "cannot be polymorphic" scenv who (typarams.tyvars = [] && typarams.idxvars = [])
 
 let check_abstract = check "should be abstract"
 
@@ -1549,6 +1629,8 @@ and generalize_lc_item (genenv : to_gen) (prefix : path) (item : sc_item) =
   match item with
   | SC_decl_mod (id, modty) ->
     add_declared_mod genenv id modty
+  | SC_decl_idx id ->
+    add_declared_idx genenv id
   | SC_th_item th_item ->
     generalize_th_item genenv prefix th_item
   | SC_th cth ->
@@ -1562,7 +1644,7 @@ and generalize_lc_items (genenv : to_gen) (prefix : path) (items : sc_item list)
 
 let genenv_of_scenv (scenv : scenv) : to_gen =
   { tg_env    = Option.get (scenv.sc_top)
-  ; tg_params = []
+  ; tg_params = { idxvars = []; tyvars = [] }
   ; tg_binds  = []
   ; tg_subst  = EcSubst.empty
   ; tg_clear  = empty_locals }
@@ -1653,6 +1735,17 @@ let add_decl_mod id mt scenv =
     { scenv with
       sc_env = EcEnv.Mod.declare_local id mt scenv.sc_env;
       sc_items = SC_decl_mod (id, mt) :: scenv.sc_items }
+
+let add_decl_index id scenv =
+  match scenv.sc_name with
+  | Th _ | Top ->
+    hierror "declare index is only allowed inside a section"
+  | Sc _ ->
+    let env = EcEnv.push_declared_index id scenv.sc_env in
+    let env = EcEnv.Var.bind_local id EcTypes.tint env in
+    { scenv with
+      sc_env   = env;
+      sc_items = SC_decl_idx id :: scenv.sc_items }
 
 (* -----------------------------------------------------------*)
 let enter_section (name : symbol option) (scenv : scenv) =

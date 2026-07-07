@@ -20,7 +20,7 @@ module LowInternal = struct
     let f = EcReduction.h_red_until EcReduction.full_red hyps f in
     let (ex, tyargs), args = destr_op_app f in
 
-    assert (List.is_empty tyargs);
+    assert (List.is_empty tyargs.types && List.is_empty tyargs.indices);
 
     let default_exn () =
       match Mop.find_opt None epost with

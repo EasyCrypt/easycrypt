@@ -54,6 +54,12 @@ val gstate : env -> EcGState.gstate
 val copy   : env -> env
 
 (* -------------------------------------------------------------------- *)
+(* Section-declared indices (natural-number parameters). *)
+val declared_indices     : env -> EcIdent.t list
+val lookup_declared_index : symbol -> env -> EcIdent.t option
+val push_declared_index  : EcIdent.t -> env -> env
+
+(* -------------------------------------------------------------------- *)
 val notify :
      ?immediate:bool -> env -> EcGState.loglevel
   -> ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -198,7 +204,8 @@ module Ax : sig
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
-  val instantiate : path -> EcTypes.ty list -> env -> form
+  val instantiate :
+    ?idxs:EcAst.tindex list -> path -> EcTypes.ty list -> env -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -346,7 +353,7 @@ module Op : sig
   val bind : ?import:bool -> symbol -> operator -> env -> env
 
   val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
-  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> ty list -> form
+  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> targs -> form
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
@@ -380,7 +387,7 @@ module Ty : sig
   val bind : ?import:bool -> symbol -> t -> env -> env
 
   val defined : path -> env -> bool
-  val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
+  val unfold  : path -> targs -> env -> EcTypes.ty
   val hnorm   : EcTypes.ty -> env -> EcTypes.ty
   val decompose_fun : EcTypes.ty -> env -> EcTypes.dom * EcTypes.ty
 

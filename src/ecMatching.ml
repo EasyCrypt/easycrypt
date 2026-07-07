@@ -828,7 +828,11 @@ module MEV = struct
     v
 
   let assubst ue ev env =
-    let subst = f_subst_init ~tu:(EcUnify.UniEnv.assubst ue) () in
+    let subst =
+      f_subst_init
+        ~tu:(EcUnify.UniEnv.assubst    ue)
+        ~iu:(EcUnify.UniEnv.iu_assubst ue)
+        () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
     let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
     let seen  = ref Sid.empty in
@@ -1048,7 +1052,25 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
             failure ();
-          try  List.iter2 (EcUnify.unify env ue) tys1 tys2
+          if List.compare_lengths tys1.indices tys2.indices <> 0 then
+            failure ();
+          if List.compare_lengths tys1.types tys2.types <> 0 then
+            failure ();
+          (* Index unification on Fop heads is best-effort: a single
+             naked TIUnivar (e.g. [mk[:?u]] vs [mk[:m+n]]) binds via
+             my Gap-B path, but a polynomial-against-polynomial with
+             multiple univars (e.g. [bits[:?u_m + ?u_n]] vs
+             [bits[:m + n]]) is genuinely ambiguous in isolation —
+             defer to arg matching, which typically constrains the
+             individual univars first. So we try, but tolerate
+             failures here. Type unification of [tys1.types] is
+             still mandatory. *)
+          List.iter2 (fun i1 i2 ->
+            try  EcUnify.unify_idx env ue i1 i2
+            with EcUnify.UnificationFailure _ -> ())
+            tys1.indices tys2.indices;
+          try
+            List.iter2 (EcUnify.unify env ue) tys1.types tys2.types
           with EcUnify.UnificationFailure _ -> failure ()
       end
 

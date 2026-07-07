@@ -109,13 +109,29 @@ type pty_r =
   | PTtuple  of pty list
   | PTnamed  of pqsymbol
   | PTvar    of psymbol
-  | PTapp    of pqsymbol * pty list
+  | PTapp    of pqsymbol * pty list * pindex list
   | PTfun    of pty * pty
   | PTglob   of pmsymbol located
 and pty = pty_r located
 
+(* Polynomial-fragment index expressions appearing inside `[ ... ]`
+   on type-constructor applications. The typechecker validates the
+   sub-grammar (only +, *, non-negative literals, and identifiers
+   bound as indices). *)
+and pindex_r =
+  | PIvar  of psymbol
+  | PIint  of zint
+  | PIadd  of pindex * pindex
+  | PImul  of pindex * pindex
+  (* `_` placeholder — let the system infer this index by
+     allocating a fresh [TIUnivar] at typecheck time. *)
+  | PIhole
+and pindex = pindex_r located
+
 type ptyannot_r =
-  | TVIunamed of pty list
+  (* Explicit indices first, then explicit types. Either may be empty;
+     when both are empty, no instantiation was provided. *)
+  | TVIunamed of pindex list * pty list
   | TVInamed  of (psymbol * pty) list
 
 and ptyannot  = ptyannot_r  located
@@ -148,9 +164,10 @@ type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
-  pty_name   : psymbol;
-  pty_tyvars : ptyparams;
-  pty_body   : ptydbody;
+  pty_name     : psymbol;
+  pty_idxvars  : psymbol list;
+  pty_tyvars   : ptyparams;
+  pty_body     : ptydbody;
   pty_locality : locality;
 }
 
@@ -472,6 +489,7 @@ type poperator = {
   po_name   : psymbol;
   po_aliases: psymbol list;
   po_tags   : psymbol list;
+  po_idxvars: psymbol list;
   po_tyvars : ptyvardecls option;
   po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
@@ -506,6 +524,7 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
+  pp_idxvars : psymbol list;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
   pp_tags   : psymbol list;
@@ -515,6 +534,7 @@ type ppredicate = {
 (* -------------------------------------------------------------------- *)
 type pnotation = {
   nt_name  : psymbol;
+  nt_idx   : psymbol list;
   nt_tv    : ptyvardecls option;
   nt_bd    : (psymbol * pty) list;
   nt_args  : (psymbol * (psymbol list * pty option)) list;
@@ -529,6 +549,7 @@ type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
   ab_name  : psymbol;
+  ab_idx   : psymbol list;
   ab_tv    : ptyvardecls option;
   ab_args  : ptybindings;
   ab_def   : pty * pexpr;
@@ -1194,13 +1215,18 @@ type paxiom_kind =
 type mempred_binding = PT_MemPred of psymbol list
 
 type paxiom = {
-  pa_name     : psymbol;
-  pa_pvars    : mempred_binding option;
-  pa_tyvars   : ptyparams option;
-  pa_vars     : pgtybindings option;
-  pa_formula  : pformula;
-  pa_kind     : paxiom_kind;
-  pa_locality : locality;
+  pa_name         : psymbol;
+  pa_pvars        : mempred_binding option;
+  pa_idxvars      : psymbol list;
+  (* Subset of [pa_idxvars] tagged with a trailing `+` in the binder
+     (e.g. [{n+ m}] marks [n]). For each such idxvar, [start_lemma]
+     wraps the proof goal with a [0 <= n =>] hypothesis. *)
+  pa_idxvars_nneg : psymbol list;
+  pa_tyvars       : ptyparams option;
+  pa_vars         : pgtybindings option;
+  pa_formula      : pformula;
+  pa_kind         : paxiom_kind;
+  pa_locality     : locality;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1341,7 +1367,8 @@ and 'a genoverride = [
 | `BySyntax of 'a
 ]
 
-and ty_override_def = psymbol list * pty
+(* (idxvars, tyvars, body) — both binder lists may be empty. *)
+and ty_override_def = psymbol list * psymbol list * pty
 
 and op_override_def = {
   opov_tyvars : psymbol list option;
@@ -1448,6 +1475,7 @@ type global_action =
   | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
+  | Gdeclidx     of psymbol list
   | Gsubtype     of psubtype
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)

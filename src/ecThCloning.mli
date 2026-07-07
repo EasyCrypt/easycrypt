@@ -34,6 +34,8 @@ type clone_error =
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
+| CE_IdxArgMism        of ovkind * qsymbol
+| CE_IndexedNotYetSupported of ovkind * qsymbol
 | CE_NoExceptions
 
 exception CloneError of EcEnv.env * clone_error
@@ -47,7 +49,7 @@ type xty_override =
 (* ------------------------------------------------------------------ *)
 type xop_override = [
   | op_override_def genoverride
-  | `Direct of EcDecl.ty_params * EcAst.form
+  | `Direct of EcIdent.t list * EcAst.form
 ] * clmode
 
 (* ------------------------------------------------------------------ *)

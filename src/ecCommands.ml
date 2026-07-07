@@ -841,6 +841,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
     match
       match g.pl_desc with
       | Gtype        t    -> `Fct   (fun scope -> process_types      ?src scope  (List.map (mk_loc loc) t))
+      | Gdeclidx     ns   -> `Fct   (fun scope -> EcScope.Index.declare scope ns)
       | Gsubtype     t    -> `Fct   (fun scope -> process_subtype    scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
       | Gmodule      m    -> `Fct   (fun scope -> process_module     ?src scope m)

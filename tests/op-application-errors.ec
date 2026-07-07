@@ -41,8 +41,12 @@ op bad_result : int = h 0.
 expect fail "operator `Top.List.filter' cannot be applied to arguments of type:
   [1]: int -> int
   [2]: int list
+its type is
+  ('a -> bool) -> 'a list -> 'a list
+where the type parameters were inferred as:
+  'a = int
 its #1 argument is expected to have type
-  #a -> bool
+  int -> bool
 but is applied to a value of type
   int -> int"
 op bad_arg (s : int list) : int list =

@@ -153,7 +153,16 @@ let mk_form = EcAst.mk_form
 let f_node { f_node = form } = form
 
 (* -------------------------------------------------------------------- *)
-let f_op x tys ty = mk_form (Fop (x, tys)) ty
+let f_op_r (p : EcPath.path) (ta : targs) (resty : ty) =
+  mk_form (Fop (p, ta)) resty
+
+let f_op
+   (p : EcPath.path)
+  ?(indices : tindex list option)
+  ?(tyargs  : ty list option)
+   (resty : ty)
+=
+  f_op_r p (mk_targs ?indices ?types:tyargs ()) resty
 
 let f_app f args ty =
   let f, args' =
@@ -167,19 +176,28 @@ let f_app f args ty =
   end else mk_form (Fapp (f, args')) ty
 
 (* -------------------------------------------------------------------- *)
-let f_local  x ty   = mk_form (Flocal x) ty
-let f_pvar   x ty m = {m;inv=mk_form (Fpvar(x, m)) ty}
-let f_pvloc  v  m = f_pvar (pv_loc v.v_name) v.v_type m
+let f_local (x : EcIdent.t) (ty : ty) =
+  mk_form (Flocal x) ty
 
-let f_pvarg  ty m = f_pvar pv_arg ty m
+let f_pvar (pv : prog_var) (ty : ty) (m : memory) : ss_inv =
+  { m; inv = mk_form (Fpvar (pv, m)) ty}
 
-let f_pvlocs vs menv = List.map (fun v -> f_pvloc v menv) vs
-let f_glob   m mem   = {m=mem;inv=mk_form (Fglob (m, mem)) (tglob m)}
+let f_pvloc (v : variable) (m : memory) : ss_inv =
+  f_pvar (pv_loc v.v_name) v.v_type m
+
+let f_pvarg (ty : ty) (m : memory) : ss_inv =
+  f_pvar pv_arg ty m
+
+let f_pvlocs (vs : variable list) (m : memory) =
+  List.map (fun v -> f_pvloc v m) vs
+
+let f_glob (mid : EcIdent.t) (mem : memory) =
+  { m = mem; inv = mk_form (Fglob (mid, mem)) (tglob mid) }
 
 (* -------------------------------------------------------------------- *)
-let f_tt     = f_op EcCoreLib.CI_Unit.p_tt    [] tunit
-let f_true   = f_op EcCoreLib.CI_Bool.p_true  [] tbool
-let f_false  = f_op EcCoreLib.CI_Bool.p_false [] tbool
+let f_tt     = f_op EcCoreLib.CI_Unit.p_tt    tunit
+let f_true   = f_op EcCoreLib.CI_Bool.p_true  tbool
+let f_false  = f_op EcCoreLib.CI_Bool.p_false tbool
 let f_bool   = fun b -> if b then f_true else f_false
 
 (* -------------------------------------------------------------------- *)
@@ -221,13 +239,13 @@ let f_exists_mems bds f =
 let ty_fbool1 = toarrow (List.make 1 tbool) tbool
 let ty_fbool2 = toarrow (List.make 2 tbool) tbool
 
-let fop_not  = f_op EcCoreLib.CI_Bool.p_not  [] ty_fbool1
-let fop_and  = f_op EcCoreLib.CI_Bool.p_and  [] ty_fbool2
-let fop_anda = f_op EcCoreLib.CI_Bool.p_anda [] ty_fbool2
-let fop_or   = f_op EcCoreLib.CI_Bool.p_or   [] ty_fbool2
-let fop_ora  = f_op EcCoreLib.CI_Bool.p_ora  [] ty_fbool2
-let fop_imp  = f_op EcCoreLib.CI_Bool.p_imp  [] ty_fbool2
-let fop_iff  = f_op EcCoreLib.CI_Bool.p_iff  [] ty_fbool2
+let fop_not  = f_op EcCoreLib.CI_Bool.p_not  ty_fbool1
+let fop_and  = f_op EcCoreLib.CI_Bool.p_and  ty_fbool2
+let fop_anda = f_op EcCoreLib.CI_Bool.p_anda ty_fbool2
+let fop_or   = f_op EcCoreLib.CI_Bool.p_or   ty_fbool2
+let fop_ora  = f_op EcCoreLib.CI_Bool.p_ora  ty_fbool2
+let fop_imp  = f_op EcCoreLib.CI_Bool.p_imp  ty_fbool2
+let fop_iff  = f_op EcCoreLib.CI_Bool.p_iff  ty_fbool2
 
 let f_not  f     = f_app fop_not  [f]      tbool
 let f_and  f1 f2 = f_app fop_and  [f1; f2] tbool
@@ -260,7 +278,9 @@ let f_oras fs =
 let f_imps = List.fold_right f_imp
 
 (* -------------------------------------------------------------------- *)
-let fop_eq ty = f_op EcCoreLib.CI_Bool.p_eq [ty] (toarrow [ty; ty] tbool)
+let fop_eq ty =
+  f_op EcCoreLib.CI_Bool.p_eq ~tyargs:[ty]
+    (toarrow [ty; ty] tbool)
 
 let f_eq f1 f2 = f_app (fop_eq f1.f_ty) [f1; f2] tbool
 
@@ -355,13 +375,13 @@ let f_pr pr_mem pr_fun pr_args (pr_event: ss_inv) =
   f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
 
 (* -------------------------------------------------------------------- *)
-let fop_int_opp   = f_op EcCoreLib.CI_Int.p_int_opp [] (toarrow [tint]       tint)
-let fop_int_add   = f_op EcCoreLib.CI_Int.p_int_add [] (toarrow [tint; tint] tint)
-let fop_int_mul   = f_op EcCoreLib.CI_Int.p_int_mul [] (toarrow [tint; tint] tint)
-let fop_int_pow   = f_op EcCoreLib.CI_Int.p_int_pow [] (toarrow [tint; tint] tint)
+let fop_int_opp   = f_op EcCoreLib.CI_Int.p_int_opp (toarrow [tint]       tint)
+let fop_int_add   = f_op EcCoreLib.CI_Int.p_int_add (toarrow [tint; tint] tint)
+let fop_int_mul   = f_op EcCoreLib.CI_Int.p_int_mul (toarrow [tint; tint] tint)
+let fop_int_pow   = f_op EcCoreLib.CI_Int.p_int_pow (toarrow [tint; tint] tint)
 
 let fop_int_edivz =
-  f_op EcCoreLib.CI_Int.p_int_edivz []
+  f_op EcCoreLib.CI_Int.p_int_edivz
        (toarrow [tint; tint] (ttuple [tint; tint]))
 
 let f_int_opp   f     = f_app fop_int_opp [f]      tint
@@ -378,20 +398,46 @@ let rec f_int (n : BI.zint) =
   | s when 0 <= s -> mk_form (Fint n) tint
   | _             -> f_int_opp (f_int (~^ n))
 
+(* Project a tindex into the int-formula world. Idxvars share the
+   formula-locals namespace (Phase 2): a [TIVar id] becomes a
+   [Flocal id : int]. Returns [None] if [ti] still contains any
+   [TIUnivar] (the projection cannot represent them); callers can
+   then decide to skip the form-side binding rather than crash. *)
+let rec f_of_tindex_opt (ti : tindex) : form option =
+  match ti with
+  | TIVar id     -> Some (f_local id tint)
+  | TIConst k    -> Some (f_int k)
+  | TIAdd (l, r) -> begin
+      match f_of_tindex_opt l, f_of_tindex_opt r with
+      | Some l, Some r -> Some (f_int_add l r)
+      | _              -> None
+    end
+  | TIMul (l, r) -> begin
+      match f_of_tindex_opt l, f_of_tindex_opt r with
+      | Some l, Some r -> Some (f_int_mul l r)
+      | _              -> None
+    end
+  | TIUnivar _   -> None
+
+let f_of_tindex (ti : tindex) : form =
+  match f_of_tindex_opt ti with
+  | Some f -> f
+  | None   -> assert false
+
 (* -------------------------------------------------------------------- *)
 let f_i0  = f_int BI.zero
 let f_i1  = f_int BI.one
 let f_im1 = f_int_opp f_i1
 
 (* -------------------------------------------------------------------- *)
-let f_op_xopp   = f_op EcCoreLib.CI_xint.p_xopp  [] (toarrow [txint        ] txint)
-let f_op_xadd   = f_op EcCoreLib.CI_xint.p_xadd  [] (toarrow [txint; txint ] txint)
-let f_op_xmul   = f_op EcCoreLib.CI_xint.p_xmul  [] (toarrow [txint; txint ] txint)
+let f_op_xopp   = f_op EcCoreLib.CI_xint.p_xopp  (toarrow [txint        ] txint)
+let f_op_xadd   = f_op EcCoreLib.CI_xint.p_xadd  (toarrow [txint; txint ] txint)
+let f_op_xmul   = f_op EcCoreLib.CI_xint.p_xmul  (toarrow [txint; txint ] txint)
 
-let f_op_inf    = f_op EcCoreLib.CI_xint.p_inf    [] txint
-let f_op_N      = f_op EcCoreLib.CI_xint.p_N      [] (toarrow [tint ] txint)
-let f_op_is_inf = f_op EcCoreLib.CI_xint.p_is_inf [] (toarrow [txint] tbool)
-let f_op_is_int = f_op EcCoreLib.CI_xint.p_is_int [] (toarrow [txint] tbool)
+let f_op_inf    = f_op EcCoreLib.CI_xint.p_inf    txint
+let f_op_N      = f_op EcCoreLib.CI_xint.p_N      (toarrow [tint ] txint)
+let f_op_is_inf = f_op EcCoreLib.CI_xint.p_is_inf (toarrow [txint] tbool)
+let f_op_is_int = f_op EcCoreLib.CI_xint.p_is_int (toarrow [txint] tbool)
 
 let f_is_inf f  = f_app f_op_is_inf [f] tbool
 let f_is_int f  = f_app f_op_is_int [f] tbool
@@ -420,11 +466,14 @@ let f_xmuli_simpl f1 f2 =
 
 (* -------------------------------------------------------------------- *)
 let f_none (ty : ty) : form =
-  f_op EcCoreLib.CI_Option.p_none [ty] (toption ty)
+  f_op EcCoreLib.CI_Option.p_none ~tyargs:[ty] (toption ty)
 
 let f_some ({ f_ty = ty } as f : form) : form =
-  let op = f_op EcCoreLib.CI_Option.p_some [ty] (tfun ty (toption ty)) in
-  f_app op [f] (toption ty)
+  let op =
+    f_op EcCoreLib.CI_Option.p_some ~tyargs:[ty]
+      (tfun ty (toption ty))
+  in
+    f_app op [f] (toption ty)
 
 (* -------------------------------------------------------------------- *)
 let f_map gt g fp =
@@ -465,10 +514,12 @@ let f_map gt g fp =
       let ty' = gt fp.f_ty in
         (f_pvar id ty' s).inv
 
-  | Fop (p, tys) ->
-      let tys' = List.Smart.map gt tys in
-      let ty'  = gt fp.f_ty in
-        f_op p tys' ty'
+  | Fop (p, ta) ->
+      let ta' =
+        { indices = ta.indices
+        ; types   = List.Smart.map gt ta.types } in
+      let ty' = gt fp.f_ty in
+        f_op_r p ta' ty'
 
   | Fapp (f, fs) ->
       let f'  = g f in
@@ -959,8 +1010,8 @@ let rec form_of_expr_r ?m (e : expr) =
      | Some m -> (f_pvar pv e.e_ty m).inv
     end
 
-  | Eop (op, tys) ->
-     f_op op tys e.e_ty
+  | Eop (op, ta) ->
+     f_op_r op ta e.e_ty
 
   | Eapp (ef, es) ->
      f_app (form_of_expr_r ?m ef) (List.map (form_of_expr_r ?m) es) e.e_ty
@@ -1005,7 +1056,7 @@ let expr_of_ss_inv f =
     | Fint   z -> e_int z
     | Flocal x -> e_local x fp.f_ty
 
-    | Fop  (p, tys) -> e_op p tys fp.f_ty
+    | Fop  (p, ta)  -> e_op_r p ta fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
@@ -1047,7 +1098,7 @@ let expr_of_form f =
     | Fint   z -> e_int z
     | Flocal x -> e_local x fp.f_ty
 
-    | Fop  (p, tys) -> e_op p tys fp.f_ty
+    | Fop  (p, ta)  -> e_op_r p ta fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
@@ -1077,6 +1128,29 @@ let expr_of_form f =
     | _ -> raise CannotTranslate
 
   in aux f
+
+(* -------------------------------------------------------------------- *)
+(* Recognise a formula as a tindex polynomial. Returns Some ti when
+   [f] is built only from non-negative integer literals, int-typed
+   Flocal occurrences, p_int_add and p_int_mul applications. Returns
+   None otherwise. *)
+let rec tindex_of_form (f : form) : tindex option =
+  match f.f_node with
+  | Fint n when EcBigInt.sign n >= 0 ->
+      Some (TIConst n)
+  | Flocal id when ty_equal f.f_ty tint ->
+      Some (TIVar id)
+  | Fapp ({ f_node = Fop (p, _) }, [a; b])
+      when EcPath.p_equal p EcCoreLib.CI_Int.p_int_add ->
+      Option.bind (tindex_of_form a) (fun ta ->
+      Option.bind (tindex_of_form b) (fun tb ->
+      Some (TIAdd (ta, tb))))
+  | Fapp ({ f_node = Fop (p, _) }, [a; b])
+      when EcPath.p_equal p EcCoreLib.CI_Int.p_int_mul ->
+      Option.bind (tindex_of_form a) (fun ta ->
+      Option.bind (tindex_of_form b) (fun tb ->
+      Some (TIMul (ta, tb))))
+  | _ -> None
 
 (* -------------------------------------------------------------------- *)
 (* A predicate on memory: λ mem. -> pred *)

@@ -54,8 +54,20 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
+  | Tconstr of EcPath.path * targs
   | Tfun    of ty * ty
+
+and tindex =
+  | TIVar    of EcIdent.t
+  | TIUnivar of EcUid.uid
+  | TIConst  of EcBigInt.zint
+  | TIAdd    of tindex * tindex
+  | TIMul    of tindex * tindex
+
+and targs = {
+  indices : tindex list;
+  types   : ty list;
+}
 
 (* -------------------------------------------------------------------- *)
 and ovariable = {
@@ -84,7 +96,7 @@ and expr_node =
   | Eint   of BI.zint                      (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eop    of EcPath.path * targs          (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
@@ -185,7 +197,7 @@ and f_node =
   | Flocal  of EcIdent.t
   | Fpvar   of prog_var * memory
   | Fglob   of EcIdent.t * memory
-  | Fop     of EcPath.path * ty list
+  | Fop     of EcPath.path * targs
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
@@ -1202,10 +1214,356 @@ let pr_hash pr =
     (f_hash          pr.pr_args)
     (Why3.Hashcons.combine (f_hash pr.pr_event.inv) (mem_hash pr.pr_event.m))
 
+(* ----------------------------------------------------------------- *)
+(* tindex polynomial normal form                                     *)
+(*                                                                   *)
+(* A `tindex` is a polynomial expression over the natural numbers,   *)
+(* with grammar `TIVar | TIConst | TIAdd | TIMul`. We decide         *)
+(* equality up to commutativity / associativity / distributivity by  *)
+(* normalising to a canonical sum-of-monomials.                      *)
+(* ----------------------------------------------------------------- *)
+
+(* A polynomial "variable" is either a user-bound index identifier or
+   a unification univar; both are opaque atoms inside the polynomial.
+   A monomial is a sorted association list (variable, exponent) with
+   each exponent >= 1. The empty list represents the constant 1. *)
+type tindex_var =
+  | TVVar of EcIdent.t
+  | TVUni of EcUid.uid
+
+let tindex_var_compare (a : tindex_var) (b : tindex_var) : int =
+  match a, b with
+  | TVVar x, TVVar y -> EcIdent.id_compare x y
+  | TVUni u, TVUni v -> EcUid.uid_compare u v
+  | TVVar _, TVUni _ -> -1
+  | TVUni _, TVVar _ ->  1
+
+let tindex_var_hash (a : tindex_var) : int =
+  match a with
+  | TVVar x -> EcIdent.id_hash x
+  | TVUni u -> Why3.Hashcons.combine 1 u
+
+type tindex_mono = (tindex_var * int) list
+
+(* A polynomial in canonical form over the non-negative integers.
+   Invariants:
+   - cn_konst >= 0
+   - cn_mons sorted strictly ascending by mono_compare
+   - every coefficient >= 1
+   - the empty monomial [] does not appear in cn_mons (folded into cn_konst) *)
+type tindex_canonical = {
+  cn_konst : EcBigInt.zint;
+  cn_mons  : (tindex_mono * EcBigInt.zint) list;
+}
+
+let mono_compare : tindex_mono -> tindex_mono -> int =
+  let rec cmp m1 m2 =
+    match m1, m2 with
+    | [], [] -> 0
+    | [], _  -> -1
+    | _ , [] -> 1
+    | (x1, e1) :: t1, (x2, e2) :: t2 ->
+        let c = tindex_var_compare x1 x2 in
+        if c <> 0 then c else
+        let c = Stdlib.compare (e1 : int) e2 in
+        if c <> 0 then c else cmp t1 t2
+  in cmp
+
+(* Multiply two monomials: merge by variable, sum exponents. *)
+let rec mono_mul (m1 : tindex_mono) (m2 : tindex_mono) : tindex_mono =
+  match m1, m2 with
+  | [], _ -> m2
+  | _, [] -> m1
+  | (x1, e1) :: t1, (x2, e2) :: t2 ->
+      let c = tindex_var_compare x1 x2 in
+      if c < 0 then (x1, e1) :: mono_mul t1 m2
+      else if c > 0 then (x2, e2) :: mono_mul m1 t2
+      else (x1, e1 + e2) :: mono_mul t1 t2
+
+(* Normalise a list of (mono, coef) pairs: drop zero coefficients,
+   sort by monomial, merge duplicates by summing coefficients. *)
+let mons_normalize (pairs : (tindex_mono * EcBigInt.zint) list) =
+  let pairs =
+    List.filter
+      (fun (_, c) -> not (EcBigInt.equal c EcBigInt.zero))
+      pairs in
+  let pairs =
+    List.sort (fun (m1, _) (m2, _) -> mono_compare m1 m2) pairs in
+  let rec merge = function
+    | [] -> []
+    | [x] -> [x]
+    | (m1, c1) :: ((m2, c2) :: t as rest) ->
+        if mono_compare m1 m2 = 0 then
+          merge ((m1, EcBigInt.add c1 c2) :: t)
+        else
+          (m1, c1) :: merge rest
+  in merge pairs
+
+let canonical_const (n : EcBigInt.zint) =
+  if EcBigInt.sign n < 0 then
+    invalid_arg "tindex: negative integer constant";
+  { cn_konst = n; cn_mons = [] }
+
+let canonical_var (id : EcIdent.t) =
+  { cn_konst = EcBigInt.zero;
+    cn_mons  = [([(TVVar id, 1)], EcBigInt.one)] }
+
+let canonical_univar (u : EcUid.uid) =
+  { cn_konst = EcBigInt.zero;
+    cn_mons  = [([(TVUni u, 1)], EcBigInt.one)] }
+
+let canonical_add (p : tindex_canonical) (q : tindex_canonical) =
+  { cn_konst = EcBigInt.add p.cn_konst q.cn_konst;
+    cn_mons  = mons_normalize (p.cn_mons @ q.cn_mons); }
+
+let canonical_mul (p : tindex_canonical) (q : tindex_canonical) =
+  let pk = p.cn_konst and qk = q.cn_konst in
+  let kp_qm =
+    if EcBigInt.equal pk EcBigInt.zero then []
+    else List.map (fun (m, c) -> (m, EcBigInt.mul pk c)) q.cn_mons in
+  let kq_pm =
+    if EcBigInt.equal qk EcBigInt.zero then []
+    else List.map (fun (m, c) -> (m, EcBigInt.mul qk c)) p.cn_mons in
+  let pm_qm =
+    List.concat_map
+      (fun (m1, c1) ->
+        List.map
+          (fun (m2, c2) -> (mono_mul m1 m2, EcBigInt.mul c1 c2))
+          q.cn_mons)
+      p.cn_mons in
+  { cn_konst = EcBigInt.mul pk qk;
+    cn_mons  = mons_normalize (kp_qm @ kq_pm @ pm_qm); }
+
+let rec tindex_canonicalize (ti : tindex) : tindex_canonical =
+  match ti with
+  | TIVar id     -> canonical_var id
+  | TIUnivar u   -> canonical_univar u
+  | TIConst n    -> canonical_const n
+  | TIAdd (l, r) -> canonical_add (tindex_canonicalize l) (tindex_canonicalize r)
+  | TIMul (l, r) -> canonical_mul (tindex_canonicalize l) (tindex_canonicalize r)
+
+let canonical_equal (p : tindex_canonical) (q : tindex_canonical) =
+  EcBigInt.equal p.cn_konst q.cn_konst &&
+  let rec eq m1 m2 =
+    match m1, m2 with
+    | [], [] -> true
+    | [], _ | _, [] -> false
+    | (k1, c1) :: t1, (k2, c2) :: t2 ->
+        mono_compare k1 k2 = 0
+        && EcBigInt.equal c1 c2
+        && eq t1 t2
+  in eq p.cn_mons q.cn_mons
+
+(* Whether the canonical polynomial is a single naked TIUnivar.
+   Returns [Some u] when so; otherwise [None]. Used by the unifier
+   to detect index-equations that reduce to a univar assignment. *)
+let tindex_naked_univar (ti : tindex) : EcUid.uid option =
+  let c = tindex_canonicalize ti in
+  if not (EcBigInt.equal c.cn_konst EcBigInt.zero) then None else
+  match c.cn_mons with
+  | [(mono, coef)] when EcBigInt.equal coef EcBigInt.one -> begin
+      match mono with
+      | [(TVUni u, 1)] -> Some u
+      | _ -> None
+    end
+  | _ -> None
+
+(* Occurs check: does univar [u] appear anywhere in [ti]? *)
+let tindex_occurs_univar (u : EcUid.uid) (t : tindex) : bool =
+  let rec walk = function
+    | TIUnivar v -> EcUid.uid_equal u v
+    | TIVar _ | TIConst _ -> false
+    | TIAdd (l, r) | TIMul (l, r) -> walk l || walk r
+  in walk t
+
+(* If [ti] reduces to a closed non-negative integer (no [TIVar] or
+   [TIUnivar] anywhere), return that integer. Otherwise [None]. Used
+   by the SMT translation to decide whether an indexed type can be
+   monomorphised to a fresh Why3 sort. *)
+let tindex_to_int (ti : tindex) : EcBigInt.zint option =
+  let c = tindex_canonicalize ti in
+  match c.cn_mons with
+  | [] -> Some c.cn_konst
+  | _  -> None
+
+(* Reconstruct a [tindex] AST from a canonical polynomial. The
+   canonical form's invariants (non-negative coefficients and constant)
+   are required; behaviour is undefined for signed inputs. The
+   resulting tree canonicalises back to [c] up to monomial ordering. *)
+let tindex_of_canonical (c : tindex_canonical) : tindex =
+  let var_to_tindex = function
+    | TVVar id -> TIVar id
+    | TVUni u  -> TIUnivar u
+  in
+  let pow v e =
+    let base = var_to_tindex v in
+    let rec go k = if k <= 1 then base else TIMul (base, go (k - 1)) in
+    go e
+  in
+  let mono_to_tindex (m : tindex_mono) (coef : EcBigInt.zint) : tindex =
+    let factors = List.map (fun (v, e) -> pow v e) m in
+    let body =
+      match factors with
+      | []     -> TIConst EcBigInt.one
+      | f :: r -> List.fold_left (fun acc f -> TIMul (acc, f)) f r
+    in
+    if EcBigInt.equal coef EcBigInt.one then body
+    else TIMul (TIConst coef, body)
+  in
+  let mons = List.map (fun (m, c) -> mono_to_tindex m c) c.cn_mons in
+  match mons with
+  | [] -> TIConst c.cn_konst
+  | first :: rest ->
+      let sum = List.fold_left (fun acc m -> TIAdd (acc, m)) first rest in
+      if EcBigInt.equal c.cn_konst EcBigInt.zero then sum
+      else TIAdd (TIConst c.cn_konst, sum)
+
+(* Canonical (normal) form of an index: e.g. [4 + 1] becomes [5],
+   [n + n] becomes [2 * n]. Two indices are [tindex_equal] iff their
+   normal forms coincide. *)
+let tindex_normalize (ti : tindex) : tindex =
+  tindex_of_canonical (tindex_canonicalize ti)
+
+(* Try to solve [lhs = rhs] for a single TIUnivar. Succeeds when, in
+   the difference [lhs - rhs] computed as a signed polynomial, exactly
+   one TIUnivar [?u] has non-zero net coefficient, that coefficient
+   is +1 or -1, every monomial whose factors mix univars and other
+   variables (or contain a univar with degree > 1) has zero net
+   coefficient, and the resulting value of [?u] (= -(rest)/coef) has
+   non-negative coefficient on every remaining monomial and on the
+   constant term. Returns [Some (u, value)] in that case.
+
+   The MVP scope deliberately excludes:
+   - multi-univar Diophantine equations (e.g. [?u + ?v = 5]); and
+   - cases where [?u]'s value would carry a negative coefficient
+     (e.g. [?u + 1 = n] when [n] is a free index variable, since we
+     have no symbolic guarantee that [n >= 1]). *)
+let tindex_solve_for_univar (lhs : tindex) (rhs : tindex)
+    : (EcUid.uid * tindex) option
+=
+  let cl = tindex_canonicalize lhs in
+  let cr = tindex_canonicalize rhs in
+
+  (* Walk the two sorted (mono, coef) lists in lock-step, yielding
+     triples (mono, lhs_coef, rhs_coef) for each monomial appearing
+     in either side. *)
+  let rec merge l r =
+    match l, r with
+    | [], _ -> List.map (fun (m, c) -> (m, EcBigInt.zero, c)) r
+    | _, [] -> List.map (fun (m, c) -> (m, c, EcBigInt.zero)) l
+    | (m1, c1) :: t1, (m2, c2) :: t2 ->
+        let cmp = mono_compare m1 m2 in
+        if cmp < 0 then (m1, c1, EcBigInt.zero) :: merge t1 r
+        else if cmp > 0 then (m2, EcBigInt.zero, c2) :: merge l t2
+        else (m1, c1, c2) :: merge t1 t2
+  in
+  let merged = merge cl.cn_mons cr.cn_mons in
+
+  let exception Bail in
+  try
+    let univar = ref None in
+    let rev_purevar = ref [] in
+    List.iter (fun (m, lc, rc) ->
+      let net = EcBigInt.sub lc rc in
+      let net_zero = EcBigInt.equal net EcBigInt.zero in
+      let is_naked_uni =
+        match m with [(TVUni _, 1)] -> true | _ -> false in
+      let has_uni =
+        List.exists (fun (v, _) ->
+          match v with TVUni _ -> true | _ -> false) m
+      in
+      if is_naked_uni then begin
+        if not net_zero then begin
+          let u = match m with [(TVUni u, _)] -> u | _ -> assert false in
+          match !univar with
+          | None -> univar := Some (u, net)
+          | Some _ -> raise Bail
+        end
+      end else if has_uni then begin
+        if not net_zero then raise Bail
+      end else begin
+        if not net_zero then rev_purevar := (m, net) :: !rev_purevar
+      end
+    ) merged;
+    match !univar with
+    | None -> None
+    | Some (u, c) ->
+        if not (EcBigInt.equal (EcBigInt.abs c) EcBigInt.one) then None
+        else
+          let positive = EcBigInt.sign c > 0 in
+          let flip x = if positive then EcBigInt.neg x else x in
+          let net_konst = EcBigInt.sub cl.cn_konst cr.cn_konst in
+          let target_konst = flip net_konst in
+          if EcBigInt.sign target_konst < 0 then None
+          else
+            let target_mons =
+              List.rev_map (fun (m, net) ->
+                let target = flip net in
+                if EcBigInt.sign target < 0 then raise Bail;
+                (m, target)
+              ) !rev_purevar
+            in
+            let target_mons =
+              List.filter (fun (_, c) ->
+                not (EcBigInt.equal c EcBigInt.zero)) target_mons
+            in
+            let value = {
+              cn_konst = target_konst;
+              cn_mons  = target_mons;
+            } in
+            Some (u, tindex_of_canonical value)
+  with Bail -> None
+
+let canonical_hash (p : tindex_canonical) =
+  let mono_hash (m : tindex_mono) =
+    Why3.Hashcons.combine_list
+      (fun (v, e) -> Why3.Hashcons.combine (tindex_var_hash v) e)
+      0 m in
+  let pair_hash (m, c) =
+    Why3.Hashcons.combine (mono_hash m) (EcBigInt.hash c) in
+  Why3.Hashcons.combine_list pair_hash (EcBigInt.hash p.cn_konst) p.cn_mons
 
 (* ----------------------------------------------------------------- *)
 (* Hashconsing                                                       *)
 (* ----------------------------------------------------------------- *)
+let tindex_equal (ti1 : tindex) (ti2 : tindex) : bool =
+  ti1 == ti2
+  || canonical_equal (tindex_canonicalize ti1) (tindex_canonicalize ti2)
+
+let targs_equal (ta1 : targs) (ta2 : targs) : bool =
+  List.compare_lengths ta1.indices ta2.indices = 0
+  && List.compare_lengths ta1.types ta2.types = 0
+  && List.all2 tindex_equal ta1.indices ta2.indices
+  && List.all2 ty_equal ta1.types ta2.types
+
+(* Free variables of a tindex: every TIVar contributes its identifier
+   (with multiplicity 1, like other fv counters in this module). *)
+let rec tindex_fv_acc (acc : int Mid.t) (ti : tindex) : int Mid.t =
+  match ti with
+  | TIVar id     -> fv_add id acc
+  | TIUnivar _   -> acc
+  | TIConst _    -> acc
+  | TIAdd (l, r)
+  | TIMul (l, r) -> tindex_fv_acc (tindex_fv_acc acc l) r
+
+let tindex_fv (ti : tindex) : int Mid.t =
+  tindex_fv_acc Mid.empty ti
+
+let targs_fv (ta : targs) =
+  let acc =
+    List.fold_left
+      (fun ids ty -> fv_union ids (ty_fv ty))
+      Mid.empty ta.types in
+  List.fold_left tindex_fv_acc acc ta.indices
+
+let tindex_hash (ti : tindex) =
+  canonical_hash (tindex_canonicalize ti)
+
+let targ_hash (init : int) (ta : targs) =
+  let aout = init in
+  let aout = Why3.Hashcons.combine_list ty_hash aout ta.types in
+  let aout = Why3.Hashcons.combine_list tindex_hash aout ta.indices in
+  aout
 
 module Hsty = Why3.Hashcons.Make (struct
   type t = ty
@@ -1224,8 +1582,8 @@ module Hsty = Why3.Hashcons.Make (struct
     | Ttuple lt1, Ttuple lt2 ->
         List.all2 ty_equal lt1 lt2
 
-    | Tconstr (p1, lt1), Tconstr (p2, lt2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
+    | Tconstr (p1, ta1), Tconstr (p2, ta2) ->
+        EcPath.p_equal p1 p2 && targs_equal ta1 ta2
 
     | Tfun (d1, c1), Tfun (d2, c2)->
         ty_equal d1 d2 && ty_equal c1 c2
@@ -1238,7 +1596,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar u        -> u
     | Tvar    id       -> EcIdent.tag id
     | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
-    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
+    | Tconstr (p, ta)  -> targ_hash p.p_tag ta
     | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
 
   let fv ty =
@@ -1250,7 +1608,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar _        -> Mid.empty
     | Tvar    _        -> Mid.empty (* FIXME: section *)
     | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
-    | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
+    | Tconstr (_, tas) -> targs_fv tas
     | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
 
   let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node; }
@@ -1275,9 +1633,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Elocal x1, Elocal x2 -> EcIdent.id_equal x1 x2
     | Evar   x1, Evar   x2 -> pv_equal x1 x2
 
-    | Eop (p1, tys1), Eop (p2, tys2) ->
-           (EcPath.p_equal p1 p2)
-        && (List.all2 ty_equal tys1 tys2)
+    | Eop (p1, ta1), Eop (p2, ta2) ->
+        (EcPath.p_equal p1 p2) && targs_equal ta1 ta2
 
     | Eapp (e1, es1), Eapp (e2, es2) ->
            (e_equal e1 e2)
@@ -1320,9 +1677,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
 
-    | Eop (p, tys) ->
-        Why3.Hashcons.combine_list ty_hash
-          (EcPath.p_hash p) tys
+    | Eop (p, ta) ->
+        targ_hash (EcPath.p_hash p) ta
 
     | Eapp (e, es) ->
         Why3.Hashcons.combine_list e_hash (e_hash e) es
@@ -1359,7 +1715,7 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     match e with
     | Eint _            -> Mid.empty
-    | Eop (_, tys)      -> union (fun a -> a.ty_fv) tys
+    | Eop (_, ta)       -> targs_fv ta
     | Evar v            -> pv_fv v
     | Elocal id         -> fv_singleton id
     | Eapp (e, es)      -> union e_fv (e :: es)
@@ -1410,8 +1766,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fglob(mp1,m1), Fglob(mp2,m2) ->
       EcIdent.id_equal mp1 mp2 && EcIdent.id_equal m1 m2
 
-    | Fop(p1,lty1), Fop(p2,lty2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
+    | Fop(p1,ta1), Fop(p2,ta2) ->
+        EcPath.p_equal p1 p2 && targs_equal ta1 ta2
 
     | Fapp(f1,args1), Fapp(f2,args2) ->
         f_equal f1 f2 && List.all2 f_equal args1 args2
@@ -1465,8 +1821,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fglob(mp, m) ->
         Why3.Hashcons.combine (EcIdent.id_hash mp) (EcIdent.id_hash m)
 
-    | Fop(p, lty) ->
-        Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
+    | Fop(p, ta) ->
+      targ_hash (EcPath.p_hash p) ta
 
     | Fapp(f, args) ->
         Why3.Hashcons.combine_list f_hash (f_hash f) args
@@ -1505,7 +1861,7 @@ module Hsform = Why3.Hashcons.Make (struct
 
     match f with
     | Fint _              -> Mid.empty
-    | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
+    | Fop (_, ta)         -> targs_fv ta
     | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
     | Fpvar (PVloc _,m)   -> fv_add m Mid.empty
     | Fglob (mp,m)        -> fv_add mp (fv_add m Mid.empty)

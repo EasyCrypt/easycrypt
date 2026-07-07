@@ -34,10 +34,12 @@ val dterror : EcLocation.t -> EcEnv.env -> dterror -> 'a
 val fxerror : EcLocation.t -> EcEnv.env -> EcTyping.fxerror -> 'a
 
 (* -------------------------------------------------------------------- *)
-val trans_record : env -> ptydname -> precord -> record
+val trans_record :
+  ?idxparams:psymbol list -> env -> ptydname -> precord -> record
 
 (* -------------------------------------------------------------------- *)
-val trans_datatype : env -> ptydname -> pdatatype -> datatype
+val trans_datatype :
+  ?idxparams:psymbol list -> env -> ptydname -> pdatatype -> datatype
 
 (* -------------------------------------------------------------------- *)
 type matchfix_t =  {

@@ -226,7 +226,7 @@ type sform =
   | SFimp   of form * form
   | SFiff   of form * form
   | SFeq    of form * form
-  | SFop    of (path * ty list) * (form list)
+  | SFop    of (path * targs) * (form list)
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS

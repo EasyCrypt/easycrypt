@@ -562,6 +562,25 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
     tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
+let process_exacttype qs (tc : tcenv1) =
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let p =
+    try EcEnv.Ax.lookup_path (EcLocation.unloc qs) env
+    with LookupFailure cause ->
+      tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
+  in
+  let tys =
+    List.map (fun a -> EcTypes.tvar a)
+      (EcEnv.LDecl.tohyps hyps).h_tvar.tyvars in
+  let pt = ptglobal ~tys p in
+
+  try
+    EcLowGoal.t_apply pt tc
+  with InvalidGoalShape ->
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    tc_error !!tc "cannot apply %a@." (EcPrinting.pp_axname ppe) p
+
+(* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
   let module E = struct exception NoInstance end in
 
@@ -713,9 +732,9 @@ let process_delta ?target ((s :rwside), o, p) tc =
 
         match op.EcDecl.op_kind with
         | EcDecl.OB_oper (Some (EcDecl.OP_Plain f)) ->
-            (snd p, op.EcDecl.op_tparams, f, args, Some (fst p))
+            ((snd p).types, op.EcDecl.op_tparams.tyvars, f, args, Some (fst p))
         | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
-            (snd p, op.EcDecl.op_tparams, f, args, Some (fst p))
+            ((snd p).types, op.EcDecl.op_tparams.tyvars, f, args, Some (fst p))
         | _ ->
             tc_error !!tc "the operator cannot be unfolded"
     end
@@ -770,7 +789,7 @@ let process_delta ?target ((s :rwside), o, p) tc =
             match sform_of_form fp with
             | SFop ((_, tvi), []) -> begin
               (* FIXME: TC HOOK *)
-              let body  = Tvar.f_subst ~freshen:true tparams tvi body in
+              let body  = Tvar.f_subst ~freshen:true tparams tvi.types body in
               let body  = f_app body args topfp.f_ty in
                 try  EcReduction.h_red EcReduction.beta_red hyps body
                 with EcEnv.NotReducible -> body

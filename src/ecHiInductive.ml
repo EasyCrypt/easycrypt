@@ -41,11 +41,13 @@ let dterror loc env e = raise (DtError (loc, env, e))
 let fxerror loc env e = raise (FxError (loc, env, FXError e))
 
 (* -------------------------------------------------------------------- *)
-let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
+let trans_record ?(idxparams : psymbol list = [])
+    (env : EcEnv.env) (name : ptydname) (rc : precord)
+=
   let { pl_loc = loc; pl_desc = (tyvars, name); } = name in
 
   (* Check type-parameters *)
-  let ue    = TT.transtyvars env (loc, Some tyvars) in
+  let ue    = TT.transtyvars ~idxparams env (loc, Some tyvars) in
   let tpath = EcPath.pqname (EcEnv.root env) (unloc name) in
 
   (* Check for duplicated field names *)
@@ -73,13 +75,15 @@ let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
   { EI.rc_path = tpath; EI.rc_tparams = tparams; EI.rc_fields = fields; }
 
 (* -------------------------------------------------------------------- *)
-let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
+let trans_datatype ?(idxparams : psymbol list = [])
+    (env : EcEnv.env) (name : ptydname) (dt : pdatatype)
+=
   let lc = `Global in
   let { pl_loc = loc; pl_desc = (tyvars, name); } = name in
 
   (* Check type-parameters / env0 is the env. augmented with an
    * abstract type representing the currently processed datatype. *)
-  let ue    = TT.transtyvars env (loc, Some tyvars) in
+  let ue    = TT.transtyvars ~idxparams env (loc, Some tyvars) in
   let tpath = EcPath.pqname (EcEnv.root env) (unloc name) in
   let env0  =
     let myself = {
@@ -133,11 +137,11 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
       let tdecl = EcEnv.Ty.by_path_opt tname env0
         |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
-      let tyinst = ty_instantiate tdecl.tyd_params targs in
+      let tyinst = ty_instantiate tdecl.tyd_params targs.types in
 
       match tdecl.tyd_type with
       | Abstract ->
-          List.exists isempty targs
+          List.exists isempty targs.types
 
       | Concrete ty ->
           isempty_1 [ tyinst ty ]
@@ -343,7 +347,7 @@ let trans_matchfix
             | _ :: _ :: _ ->
               fxerror cname.pl_loc env TT.FXE_CtorAmbiguous
 
-            | [(cp, _tvi), _opty, _subue, _] ->
+            | [(cp, _ixs, _tvi), _opty, _subue, _] ->
               let ctor = EcEnv.Op.by_path cp env in
               let (indp, _ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = EcEnv.Ty.by_path indp env in
@@ -370,7 +374,7 @@ let trans_matchfix
           let indp, _ = Msym.find x indtbl in
           let indty = oget (EcEnv.Ty.by_path_opt indp env) in
           let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
-          let codom = tconstr indp (List.map tvar indty.tyd_params) in
+          let codom = tconstr ~tyargs:(List.map tvar indty.tyd_params.tyvars) indp in
           let tys = List.map (fun (_, dom) -> toarrow dom codom) ind in
           let tys, _ = EcUnify.UniEnv.opentys ue indty.tyd_params None tys in
           let doargs cty =
@@ -391,7 +395,7 @@ let trans_matchfix
           | _ :: _ :: _ ->
               fxerror cname.pl_loc env TT.FXE_CtorAmbiguous
 
-          | [(cp, tvi), opty, subue, _] ->
+          | [(cp, _idxs, tvi), opty, subue, _] ->
               let ctor = oget (EcEnv.Op.by_path_opt cp env) in
               let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = oget (EcEnv.Ty.by_path_opt indp env) in
@@ -412,10 +416,22 @@ let trans_matchfix
 
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
-              let ctorty =
-                let tvi = Some (EcUnify.TVIunamed tvi) in
-                  fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
-              let pty = EcUnify.UniEnv.fresh ue in
+              (* See [trans_branch] in ecTyping for the rationale: open
+                 field types and a hand-built result type together so
+                 the constructor's index univars stay anchored. *)
+              let result_ty =
+                EcTypes.tconstr indp
+                  ~indices:(List.map (fun id -> EcAst.TIVar id) indty.tyd_params.idxvars)
+                  ~tyargs:(List.map tvar indty.tyd_params.tyvars) in
+              let ctorty, pty =
+                let tvi = Some (EcUnify.TVIunamed ([], tvi)) in
+                let opened, _ =
+                  EcUnify.UniEnv.opentys ue indty.tyd_params tvi
+                    (result_ty :: ctorty) in
+                match opened with
+                | r :: rest -> rest, r
+                | []        -> assert false
+              in
 
               (try  EcUnify.unify env ue (toarrow ctorty pty) opty
                with EcUnify.UnificationFailure _ -> assert false);
@@ -485,7 +501,7 @@ let trans_matchfix
       let codom    = ty_subst ts codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
       let args     = List.map (snd_map (ty_subst ts)) args in
-      let opexpr   = e_op opexpr (List.map tvar tparams)
+      let opexpr   = e_op opexpr ~tyargs:(List.map tvar tparams.tyvars)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
         bind_elocal ts opname opexpr
