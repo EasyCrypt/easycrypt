@@ -463,15 +463,11 @@ end PolyReduce.
 abstract theory PolyReduceZp.
 type coeff.
 
-op p : { int | 2 <= p } as ge2_p.
-
-clone import ZModRing as Zp with
-    op    p     <= p
-    proof ge2_p by exact/ge2_p.
+clone import ZModRing as Zp.
 
 clone import PolyReduce with
-    type coeff <- Zp.zmod,
-  theory Coeff <- ZModpRing.
+    type coeff <= Zp.zmod,
+  theory Coeff <= ZModpRing.
 
 (* ==================================================================== *)
 (* We already know that polyXnD1 is finite. However, we prove here that *)
