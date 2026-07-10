@@ -284,6 +284,7 @@ type bv_opkind = [
   | `Init     of binding_size (* size_out *)
   | `Get      of binding_size (* size_in *)
   | `AInit    of binding_size * binding_size (* arr_len + size_out *)
+  | `PAInit   of binding_size (* arr_len; element size resolved at use (polymorphic) *)
   | `Map      of binding_size * binding_size * binding_size (* size_in + size_out + arr_size *)
   | `A2B      of (binding_size * binding_size) * binding_size (* (arr_len, elem_sz), out_size *)
   | `B2A      of binding_size * (binding_size * binding_size) (* size in, (arr_len, elem_sz)  *)
