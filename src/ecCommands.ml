@@ -99,6 +99,8 @@ let gstate_bool_flags = [
   EcGState.pp_showtvi;
   EcGState.circuit_timing;
   EcGState.circuit_debug_smt;
+  EcGState.warn_uninit;
+  EcGState.warn_unused_unfold;
 ]
 
 exception InvalidPragma of string

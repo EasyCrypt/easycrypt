@@ -818,7 +818,8 @@ let process_delta ?target ((s :rwside), o, p) tc =
           EcReduction.delta_h = check_id; } in
     let redform = EcReduction.simplify ri hyps target in
 
-    if EcFol.f_equal target redform then
+    if EcGState.get_warn_unused_unfold (EcEnv.gstate env)
+       && EcFol.f_equal target redform then
       EcEnv.notify env `Warning "unused unfold: /%s" x;
 
     t_change ~ri:{ ri with eta = true; beta = true; } ?target:idtg redform tc

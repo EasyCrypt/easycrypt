@@ -83,6 +83,18 @@ let get_circuit_debug_smt (g : gstate) : bool =
   getflag ~default:false circuit_debug_smt g
 
 (* -------------------------------------------------------------------- *)
+let warn_uninit = "Warn:uninit"
+
+let get_warn_uninit (g : gstate) : bool =
+  getflag ~default:true warn_uninit g
+
+(* -------------------------------------------------------------------- *)
+let warn_unused_unfold = "Warn:unused_unfold"
+
+let get_warn_unused_unfold (g : gstate) : bool =
+  getflag ~default:true warn_unused_unfold g
+
+(* -------------------------------------------------------------------- *)
 let add_notifier (notifier : loglevel -> string Lazy.t -> unit) (gs : gstate) =
   let notifier = { nt_id = EcUid.unique (); nt_cb = notifier; } in
   gs.gs_notifiers <- notifier :: gs.gs_notifiers; notifier.nt_id

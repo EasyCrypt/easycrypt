@@ -90,6 +90,7 @@ type ini_options = {
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
+  ini_pragmas  : string list;
 }
 
 type ini_context = {
@@ -116,6 +117,8 @@ module Ini : sig
 
   val get_rdirs : ini_context -> (string option * string) list
 
+  val get_pragmas : ini_context -> string list
+
   (* ------------------------------------------------------------------ *)
   val get_all_ppwidth : ini_context list -> int option
 
@@ -132,6 +135,8 @@ module Ini : sig
   val get_all_idirs : ini_context list -> (string option * string) list
 
   val get_all_rdirs : ini_context list -> (string option * string) list
+
+  val get_all_pragmas : ini_context list -> string list
 end = struct
   (* ------------------------------------------------------------------ *)
   let absolute ?(root : string option) (filename : string) =
@@ -174,6 +179,9 @@ end = struct
       (snd_map (absolute ?root:ini.inic_root))
       ini.inic_ini.ini_rdirs
 
+  let get_pragmas (ini : ini_context) =
+    ini.inic_ini.ini_pragmas
+
   (* ------------------------------------------------------------------ *)
   let get_all_ppwidth (ini : ini_context list) =
     List.find_map_opt get_ppwidth ini
@@ -198,6 +206,9 @@ end = struct
 
   let get_all_rdirs (ini : ini_context list) =
     List.flatten (List.map get_rdirs ini)
+
+  let get_all_pragmas (ini : ini_context list) =
+    List.flatten (List.map get_pragmas ini)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -525,7 +536,8 @@ let prv_options_of_values ini values =
         | None -> Ini.get_all_quorum ini
         | Some _ as i -> i
       end;
-      prvo_pragmas   = get_string_list "pragmas" values;
+      prvo_pragmas   =
+        (Ini.get_all_pragmas ini) @ (get_string_list "pragmas" values);
       prvo_ppwidth   = begin
         match get_int "pp-width" values with
         | None -> Ini.get_all_ppwidth ini
@@ -747,7 +759,8 @@ let read_ini_file (filename : string) =
       ini_quorum   = tryint  "quorum"  ;
       ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
-      ini_rdirs    = List.map parse_idir (trylist "rdirs"); } in
+      ini_rdirs    = List.map parse_idir (trylist "rdirs");
+      ini_pragmas  = trylist "pragmas"; } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
     ini_why3     = omap expand ini.ini_why3;
@@ -756,4 +769,5 @@ let read_ini_file (filename : string) =
     ini_quorum   = ini.ini_quorum;
     ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
-    ini_rdirs    = ini.ini_rdirs; }
+    ini_rdirs    = ini.ini_rdirs;
+    ini_pragmas  = ini.ini_pragmas; }
