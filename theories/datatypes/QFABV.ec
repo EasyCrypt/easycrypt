@@ -516,9 +516,19 @@ theory BVOperators.
 
     op bvainit : (int -> BV.bv) -> BV.bv A.t.
 
-    axiom bvainitP (f : int -> BV.bv) : 
+    axiom bvainitP (f : int -> BV.bv) :
       A.to_list (bvainit f) = List.mkseq (fun i => (f i)) A.size.
   end BVAInit.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVPAInit.
+    clone A.
+
+    op bvpainit ['a] : (int -> 'a) -> 'a A.t.
+
+    axiom bvpainitP ['a] (f : int -> 'a) :
+      A.to_list (bvpainit f) = List.mkseq (fun i => (f i)) A.size.
+  end BVPAInit.
 
   (* ------------------------------------------------------------------ *)
   abstract theory BVMap.

@@ -3923,6 +3923,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Init     _            -> "init"
         | `Get      _            -> "get"
         | `AInit    _            -> "ainit"
+        | `PAInit   _            -> "painit"
         | `Extend  (_, _, false) -> "zextend"
         | `Extend  (_, _, true ) -> "sextend"
         | `Extract  _            -> "extract"

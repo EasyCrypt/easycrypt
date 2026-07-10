@@ -2961,6 +2961,11 @@ module Circuit = struct
 
       | "ainit" -> (fun sz -> `AInit (as_seq2 (sz |> List.rev))), [`BV None; `A], "AInit"
 
+      (* Polymorphic array [init]: only the array is bound; the element
+         width is left free and resolved when translated at a concrete
+         element type. *)
+      | "painit" -> (fun sz -> `PAInit (as_seq1 sz)), [`A], "PAInit"
+
       | "shls"  -> 
           let mk sz = let sz1, sz2 = as_seq2 sz in `Shls (sz1, sz2) in
           mk, [`BV None; `BV None], "SHLS"

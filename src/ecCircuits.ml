@@ -383,7 +383,7 @@ open CircuitSpec
 let bvop_is_parametric (op : EcDecl.crb_bvoperator) : bool =
   match op.kind with
   | `ASliceGet _ | `ASliceSet _ | `Extract _ | `Insert _ | `Map _ | `Get _
-  | `AInit _ | `Init _ ->
+  | `AInit _ | `PAInit _ | `Init _ ->
     true
   | _ -> false
 

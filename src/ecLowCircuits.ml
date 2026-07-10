@@ -1224,6 +1224,40 @@ module BVOps = struct
       (* Should be caught by EC typechecking + binding correctness *)
       | _ -> assert false
     end
+    | `PAInit (_, Some n) -> begin
+      match args with
+      | [`Init init_f] ->
+        let cs = List.init n init_f in
+        let cinputs = List.map (fun (c : circuit) -> c.inputs) cs in
+        let regs =
+          List.map
+            (fun (c : circuit) ->
+              match c.cval with
+              | {type_ = CBitstring _; reg = r} -> r
+              (* Should be caught by EC typechecking + binding correctness *)
+              | _ -> assert false)
+            cs
+        in
+        (* The element width is not fixed by the binding (this init is
+           polymorphic in the element type): read it off the components,
+           which are concrete at the use site. *)
+        let w_o =
+          match regs with r :: _ -> C.Reg.length r | [] -> assert false
+        in
+        if not (List.for_all (fun r -> C.Reg.length r = w_o) regs) then
+          assert false;
+        (* Inputs should be uniform across components after mapping *)
+        if not (List.for_all (( = ) (List.hd cinputs)) cinputs) then
+          assert false;
+        let inputs = List.hd cinputs in
+        {
+          cval =
+            {type_ = CArray {width = w_o; count = n}; reg = C.Reg.concat regs};
+          inputs;
+        }
+      (* Should be caught by EC typechecking + binding correctness *)
+      | _ -> assert false
+    end
     | `Init (_, Some w) -> begin
       match args with
       | [`Init init_f] ->
@@ -1323,7 +1357,7 @@ module BVOps = struct
     | {
         kind =
           ( `ASliceGet _ | `ASliceSet _ | `Extract _ | `Insert _ | `Map _
-          | `AInit _ | `Get _ | `Init _ );
+          | `AInit _ | `PAInit _ | `Get _ | `Init _ );
       }
     | _ ->
       assert false (* Should be guarded by call to op_is_bvop *)
