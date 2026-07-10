@@ -86,6 +86,7 @@ type ini_options = {
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
+  ini_pragmas  : string list;
 }
 
 type ini_context = {

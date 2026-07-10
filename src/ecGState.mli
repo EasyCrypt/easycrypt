@@ -41,6 +41,14 @@ val circuit_debug_smt : string
 val get_circuit_debug_smt : gstate -> bool
 
 (* --------------------------------------------------------------------- *)
+val warn_uninit : string
+val get_warn_uninit : gstate -> bool
+
+(* --------------------------------------------------------------------- *)
+val warn_unused_unfold : string
+val get_warn_unused_unfold : gstate -> bool
+
+(* --------------------------------------------------------------------- *)
 type nid_t
 type loglevel = [`Debug | `Info | `Warning | `Critical]
 

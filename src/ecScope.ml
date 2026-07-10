@@ -1761,7 +1761,10 @@ module Mod = struct
     in
 
     let m = TT.transmod (env scope) ~attop:true ptm in
-    let ur = EcModules.get_uninit_read_of_module (path scope) m in
+    let ur =
+      if EcGState.get_warn_uninit (EcEnv.gstate (env scope)) then
+        EcModules.get_uninit_read_of_module (path scope) m
+      else [] in
 
     if not (List.is_empty ur) then begin
       let ppe = EcPrinting.PPEnv.ofenv (env scope) in
