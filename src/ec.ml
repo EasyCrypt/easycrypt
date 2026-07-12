@@ -7,6 +7,36 @@ module EP = EcParsetree
 module T  = EcTerminal
 
 (* -------------------------------------------------------------------- *)
+(* OCaml runtime version as (major, minor), parsed from [Sys.ocaml_version]. *)
+let ocaml_version : int * int =
+  try Scanf.sscanf Sys.ocaml_version "%d.%d" (fun a b -> (a, b))
+  with _ -> (0, 0)
+
+(* EasyCrypt hash-conses its AST and leans heavily on zarith/GMP custom blocks.
+   On OCaml 5.x the default [custom_major_ratio] paces the major GC far too
+   aggressively over that external memory (OCaml issue #14533, pronounced on
+   5.5), which costs a large amount of CPU for no memory benefit. Relaxing the
+   ratio restores 4.14-class performance. *)
+let tune_gc () =
+  if fst ocaml_version >= 5 then
+    Gc.set { (Gc.get ()) with Gc.custom_major_ratio = 250 }
+
+(* OCaml 5.0-5.3's minor GC over-promotes values reachable from ephemeron /
+   weak-table keys (OCaml issue #13643), causing severe memory blowup with
+   EasyCrypt's weak-table hash-consing. Fixed in OCaml 5.4. *)
+let warn_ocaml_version (terminal : T.terminal) =
+  match ocaml_version with
+  | (5, minor) when minor <= 3 ->
+      T.notice ~immediate:true `Warning
+        (Printf.sprintf
+           "running on OCaml %s: OCaml 5.0-5.3 have a garbage-collector \
+            regression (OCaml issue #13643) that can cause severe memory blowup \
+            in EasyCrypt; please upgrade to OCaml >= 5.4"
+           Sys.ocaml_version)
+        terminal
+  | _ -> ()
+
+(* -------------------------------------------------------------------- *)
 let copyright =
   let sentences =
     List.flatten
@@ -117,6 +147,10 @@ let print_config config =
 
 (* -------------------------------------------------------------------- *)
 let main () =
+  (* On OCaml 5.x, relax the major-GC pacing over zarith/GMP custom blocks
+     (see [tune_gc]). *)
+  tune_gc ();
+
   (* When started from Emacs28 on Apple M1, the set of blocks signals *
    * disallows Why3 server to detect external provers completion      *)
   let _ : int list = Unix.sigprocmask Unix.SIG_SETMASK [] in
@@ -707,6 +741,9 @@ let main () =
   (* Display Copyright *)
   if T.interactive terminal then
     T.notice ~immediate:true `Warning copyright terminal;
+
+  (* Warn about GC-regressed OCaml versions (5.0-5.3) *)
+  warn_ocaml_version terminal;
 
   (* Check if a location is past the -upto point *)
   let past_upto (loc : EcLocation.t) =
