@@ -1,24 +1,78 @@
+(*^
+
+# Pseudo-Random Functions: Syntax and Security
+
+Given a domain type `D` and a codomain type `R`, this abstract theory
+defines:
+- the syntax of oracles ([`module type PRF`](#PRF), [`module type
+  PRF_Oracles`](#PRF_Oracles)) and distinguishers ([`module type
+  Distinguisher`](#Distinguisher)) for PRFs, as well as
+  a general indistinguishability experiment ([`module IND`](#IND));
+- lazily-sampled random functions from `D` to `R`, given a family `dR`
+  of lossless distributions over `R`, indexed by `D`; ([`abstract
+  theory RF`](#RF) and
+- given an additional type `K` of keys, the syntax of PRFs from `D` to
+  `R` indexed by `K`, and the standard way to wrap them as oracles to
+  be distinguished from the random function. ([`abstract theory PseudoRF`](#PseudoRF)
+
+We do not assume that the PRF `keygen` can be reduced to sampling in
+`K`.  We do not assume that the PRF itself can be computed by a
+deterministic function. Proofs that require such assumptions should
+make them explicit locally, and can then reason about a concrete
+instance of the pseudorandom function.
+^*)
+
 require import AllCore Distr FSet.
 
 pragma +implicits.
 
-(** A PRF is a family of functions F from domain D to finite range R
-    indexed by a keyspace K equipped with a (lossless) distribution dK. *)
+(*^
+
+## Parameters and syntax
+
+This abstract theory *must* be instantiated with a domain type `D` and
+a codomain type `R`, and defines oracle and adversary syntax, as well
+as a somewhat generic indsitinguishability experiment.
+
+^*)
+
+(*&
+Parameters: Types `D` and `R` for the domain and codomain,
+respectively. They are not constrained any further at the top-level.
+&*)
 type D, R.
 
+(*&
+In order to make the experiment generic, we consider it as
+parameterized by an oracle with an initialization procedure.
+&*)
 module type PRF = {
   proc init(): unit
   proc f(_ : D): R
 }.
 
+(*&
+Only the PRF oracle itself is presented to the adversary. This module
+type captures this.
+&*)
 module type PRF_Oracles = {
   proc f(_: D): R
 }.
 
+(*&
+A distinguisher, given an oracle `f(_: D): R`, is an algorithm taking
+no further input and outputting a boolean.
+&*)
 module type Distinguisher (F : PRF_Oracles) = {
   proc distinguish(): bool
 }.
 
+(*&
+Our indistinguishability experiment pits a distinguisher `D` against a
+PRF oracle with initialization `F`. It simply calls `F`'s
+initialization, then runs `D` with access to the PRF oracle and
+outputs its result.
+&*)
 module IND (F : PRF) (D : Distinguisher) = {
   proc main(): bool = {
     var b;
@@ -29,10 +83,31 @@ module IND (F : PRF) (D : Distinguisher) = {
   }
 }.
 
-(* -------------------------------------------------------------------- *)
+(*^
+## Lazily-Sampled Random Function
+
+This abstract sub-theory defines the "random function" instantiation
+of the PRF oracles with initialization, which is often used as an
+"ideal" functionality.
+
+In typical settings, outputs are lazily sampled uniformly at random
+from the codomain. However, it is useful to generalize to any family
+of lossless distributions that can be parameterized by the oracle's
+input. In particular, this allows us to use this type to capture any
+operation whose semantics is purely probabilistic in our model.
+^*)
 abstract theory RF.
 require import FMap.
 
+(*^
+Parameter: a family `dR` of lossless distributions over `R`, indexed
+by `D`.
+^*)
+(*^ A typical instantiation will consider the uniform distribution
+`uD` over `D`, and instantiate `dR` as `fun _=> uD` - making the
+distribution each output is sampled from independent of the input that
+was queried.
+^*)
 op dR: { D -> R distr | forall x, is_lossless (dR x) } as dR_ll.
 
 module RF = {
@@ -53,34 +128,55 @@ module RF = {
 }.
 end RF.
 
-(* -------------------------------------------------------------------- *)
+(*^
+## Pseudorandom Function
+
+This abstract sub-theory defines an abstract "pseudorandom function"
+instantiation of the PRF oracles with initialization.
+^*)
 abstract theory PseudoRF.
+
+(*^
+Parameter: A type `K` of keys.
+^*)
 type K.
 
-op dK: { K distr | is_lossless dK } as dK_ll.
+(*^
+The syntax of pseudorandom functions:
+- a `keygen` algorithm that outputs a key; and
+- an `f` algorithm that, on input a key and an element from the
+  domain, output an element from the codomain.
 
-op F : K -> D -> R.
+We *do not* assume that `keygen` is simply sampling from a distribution.
+We *do not* assume that `f` is a mathematical function.
 
+In practice, this means that this *could be* instantiated using
+complex stateful constructions.
+^*)
 module type PseudoRF = {
   proc keygen(): K
-  proc f(_ : K * D): R
+  proc f(_: K * D): R
 }.
 
-module PseudoRF = {
-  proc keygen() = {
-    var k;
+(*^
+A wrapper, which wraps any given concrete PRF as a PRF oracle with
+initialization, as expected by the indistinguishability experiment.
 
-    k <$ dK;
-    return k;
-  }
-
-  proc f(k, x) = { return F k x; }
-}.
-
-module PRF = {
+Initialization generates a key, which is then used with the `f`
+algorithm to answer PRF oracle queries.
+^*)
+module PRF (P : PseudoRF) = {
   var k : K
 
-  proc init() = { k <$ dK; }
-  proc f(x: D) = { return F k x; }
+  proc init() = {
+    k <@ P.keygen();
+  }
+
+  proc f(x: D) = {
+    var r;
+
+    r <@ P.f(k, x);
+    return r;
+  }
 }.
 end PseudoRF.
