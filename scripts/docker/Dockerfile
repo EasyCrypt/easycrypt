@@ -31,7 +31,7 @@ WORKDIR /home/$user
 
 ENV OPAMYES=true OPAMVERBOSE=0 OPAMJOBS=4
 
-ARG OCAML_VERSION=4.14.2
+ARG OCAML_VERSION=5.4.0
 
 RUN \
 	opam init --disable-sandboxing --compiler=ocaml-base-compiler.${OCAML_VERSION}
