@@ -986,15 +986,17 @@ let process_rewrite1_r ttenv ?target ri tc =
         let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
         let hyps   = FApi.tc1_hyps ?target tc in
 
+        let simpl = FApi.tc1_simplify_context tc in
+
         let ptenv, prw =
           match rwopt.match_ with
           | None ->
-              PT.ptenv_of_penv hyps !!tc, None
+              PT.ptenv_of_penv ~simpl hyps !!tc, None
 
           | Some (RWM_Plain p) ->
               let (ps, ue), p = TTC.tc1_process_pattern tc p in
               let ev = MEV.of_idents (Mid.keys ps) `Form in
-              (PT.ptenv !!tc hyps (ue, ev), Some (p, None))
+              (PT.ptenv ~simpl !!tc hyps (ue, ev), Some (p, None))
 
           | Some (RWM_Context (x, p)) ->
               let ps   = ref Mid.empty in
@@ -1005,7 +1007,7 @@ let process_rewrite1_r ttenv ?target ri tc =
               let hyps = LDecl.add_local x (LD_var (xty, None)) hyps in
               let p    = EcTyping.trans_pattern (LDecl.toenv hyps) ps ue p in
               let ev   = MEV.of_idents (x :: Mid.keys !ps) `Form in
-              (PT.ptenv !!tc hyps (ue, ev), Some (p, Some (x, xty))) in
+              (PT.ptenv ~simpl !!tc hyps (ue, ev), Some (p, Some (x, xty))) in
 
         let theside =
           match rwopt.side, subs with

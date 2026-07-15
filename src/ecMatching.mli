@@ -371,7 +371,8 @@ val fmdelta    : fmoptions
 val fmnotation : fmoptions
 
 val f_match_core :
-     fmoptions
+     ?conv_ri:EcReduction.reduction_info
+  -> fmoptions
   -> EcEnv.LDecl.hyps
   -> unienv * mevmap
   -> form
@@ -379,7 +380,8 @@ val f_match_core :
   -> unienv * mevmap
 
 val f_match :
-     fmoptions
+     ?conv_ri:EcReduction.reduction_info
+  -> fmoptions
   -> EcEnv.LDecl.hyps
   -> unienv * mevmap
   -> form

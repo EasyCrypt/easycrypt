@@ -880,7 +880,7 @@ let fmnotation = {
 
 (* -------------------------------------------------------------------- *)
 (* Rigid unification *)
-let f_match_core opts hyps (ue, ev) f1 f2 =
+let f_match_core ?(conv_ri = EcReduction.full_compat) opts hyps (ue, ev) f1 f2 =
   let ue  = EcUnify.UniEnv.copy ue in
   let ev  = ref ev in
 
@@ -891,7 +891,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
 
   let conv =
     match opts.fm_conv with
-    | true  -> EcReduction.is_conv ~ri:EcReduction.full_compat hyps
+    | true  -> EcReduction.is_conv ~ri:conv_ri hyps
     | false -> EcReduction.is_alpha_eq hyps
   in
 
@@ -1286,8 +1286,8 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
     doit (EcEnv.LDecl.toenv hyps) (Fsubst.f_subst_id, Mid.empty) f1 f2;
     (ue, !ev)
 
-let f_match opts hyps (ue, ev) f1 f2 =
-  let (ue, ev) = f_match_core opts hyps (ue, ev) f1 f2 in
+let f_match ?conv_ri opts hyps (ue, ev) f1 f2 =
+  let (ue, ev) = f_match_core ?conv_ri opts hyps (ue, ev) f1 f2 in
     if not (MEV.filled ev) then
       raise MatchFailure;
     let clue =

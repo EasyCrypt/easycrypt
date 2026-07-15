@@ -420,6 +420,8 @@ module FApi = struct
   let tc_goal   (tc : tcenv) = tc1_goal   tc.tce_tcenv
   let tc_env    (tc : tcenv) = tc1_env    tc.tce_tcenv
 
+  let tc_simplify_context (tc : tcenv) = tc1_simplify_context tc.tce_tcenv
+
   let tc_flat   ?target (tc : tcenv) = tc1_flat  ?target tc.tce_tcenv
   let tc_eflat  ?target (tc : tcenv) = tc1_eflat ?target tc.tce_tcenv
   let tc_hyps   ?target (tc : tcenv) = tc1_hyps  ?target tc.tce_tcenv
