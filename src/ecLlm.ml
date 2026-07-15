@@ -1091,8 +1091,23 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
 
   Printf.printf "READY [uuid:%d]\n<END>\n%!" (EcCommands.uuid ());
 
+  (* Input source: stdin by default, or the -eval string when given.
+     For -eval, we split on newlines up front (no lazy channel), which
+     keeps the driver simple and avoids ever touching stdin. *)
+  let read_line : unit -> string =
+    match llmopts.llmo_eval with
+    | None ->
+      fun () -> input_line stdin
+    | Some script ->
+      let lines = ref (String.split_on_char '\n' script) in
+      fun () ->
+        match !lines with
+        | []      -> raise End_of_file
+        | l :: tl -> lines := tl; l
+  in
+
   begin try while true do
-    let line = input_line stdin in
+    let line = read_line () in
     (try
        let cmd = Parse.of_line ~multi_active:!in_multi line in
        Dispatch.run cmd
