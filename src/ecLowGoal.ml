@@ -387,6 +387,9 @@ let t_cbv_with_info ?target (ri : reduction_info) (tc : tcenv1) =
 let t_cbv ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
+  (* thread the proof-local simplify overlay (hint +db, local rules) so
+     that tactics built on [t_cbv] (done, progress, ...) see it *)
+  let ri = { ri with user_local = FApi.tc1_simplify_context tc } in
   t_cbv_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)
@@ -398,6 +401,9 @@ let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =
 let t_cbn ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
+  (* thread the proof-local simplify overlay (hint +db, local rules) so
+     that tactics built on [t_cbn] (done, progress, ...) see it *)
+  let ri = { ri with user_local = FApi.tc1_simplify_context tc } in
   t_cbn_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)
@@ -676,7 +682,12 @@ let tt_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv) =
   let tc, (pt, ax, subgoals)  =
     RApi.to_pure (fun tc -> LowApply.check_with_cutsolve `Elim pt (`Tc (tc, None))) tc in
 
-  if not (EcReduction.is_conv hyps ax concl) then begin
+  (* conversion sees the proof-local simplify context (hint +db) *)
+  let conv_ri =
+    { EcReduction.full_red with
+        EcReduction.user_local = FApi.tc_simplify_context tc } in
+
+  if not (EcReduction.is_conv ~ri:conv_ri hyps ax concl) then begin
     (*
     let env = FApi.tc_env tc in
     let ppe = EcPrinting.PPEnv.ofenv env in
@@ -757,7 +768,11 @@ module Apply = struct
 
   exception NoInstance of (bool * reason * PT.pt_env * (form * form))
 
-  let t_apply_bwd_r ?(ri = EcReduction.full_compat) ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
+  let t_apply_bwd_r ?ri ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
+    (* by default, conversion sees the proof-local simplify context *)
+    let ri = ri |> odfl
+      { EcReduction.full_compat with
+          EcReduction.user_local = pt.PT.ptev_env.PT.pte_lc } in
     let ((hyps, concl), pterr) = (FApi.tc1_flat tc, PT.copy pt.ptev_env) in
 
     let noinstance ?(dpe = false) reason =
@@ -834,7 +849,7 @@ module Apply = struct
   let t_apply_bwd ?(ri : EcReduction.reduction_info option) ?mode ?canview pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps tc in
     let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
-    let ptenv  = ptenv_of_penv hyps !!tc in
+    let ptenv  = ptenv_of_penv ~simpl:(FApi.tc1_simplify_context tc) hyps !!tc in
     let pt     = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } in
     t_apply_bwd_r ?ri ?mode ?canview pt tc
 
@@ -1728,6 +1743,10 @@ let t_rewrite
    ?xconv ?keyed ?target ?(mode : rwmode option) ?(donot=false)
    (pt : proofterm) (s, pos) (tc : tcenv1)
 =
+  (* conversion checks below see the proof-local simplify context *)
+  let conv_ri =
+    { EcReduction.full_compat with
+        EcReduction.user_local = FApi.tc1_simplify_context tc } in
   let tc           = RApi.rtcenv_of_tcenv1 tc in
   let (hyps, tgfp) = RApi.tc_flat ?target tc in
   let env          = LDecl.toenv hyps in
@@ -1763,7 +1782,7 @@ let t_rewrite
   in
 
   let change f =
-    if not (EcReduction.is_conv hyps f left) then
+    if not (EcReduction.is_conv ~ri:conv_ri hyps f left) then
       raise InvalidGoalShape;
     right in
 

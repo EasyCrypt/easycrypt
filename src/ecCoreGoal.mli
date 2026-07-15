@@ -315,6 +315,7 @@ module FApi : sig
   val tc_flat    : ?target:ident -> tcenv -> LDecl.hyps * form
   val tc_eflat   : ?target:ident -> tcenv -> env * LDecl.hyps * form
   val tc_hyps    : ?target:ident -> tcenv -> LDecl.hyps
+  val tc_simplify_context : tcenv -> EcEnv.simplify_context
 
   (* Accessors for focused goal parts (tcenv1) *)
   val tc1_handle : tcenv1 -> handle

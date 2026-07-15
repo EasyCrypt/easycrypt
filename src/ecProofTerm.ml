@@ -19,6 +19,7 @@ type pt_env = {
   pte_hy : LDecl.hyps;
   pte_ue : EcUnify.unienv;
   pte_ev : EcMatching.mevmap ref;
+  pte_lc : EcEnv.simplify_context;  (* proof-local simplify context *)
 }
 
 type pt_ev = {
@@ -78,22 +79,24 @@ let argkind_of_ptarg arg : argkind =
   | PVASub     _ -> `PTerm
 
 (* -------------------------------------------------------------------- *)
-let ptenv pe hyps (ue, ev) =
+let ptenv ?(simpl = EcEnv.SimplifyContext.empty) pe hyps (ue, ev) =
   { pte_pe = pe;
     pte_hy = hyps;
     pte_ue = EcUnify.UniEnv.copy ue;
-    pte_ev = ref ev; }
+    pte_ev = ref ev;
+    pte_lc = simpl; }
 
 (* -------------------------------------------------------------------- *)
 let copy pe =
-  ptenv pe.pte_pe pe.pte_hy (pe.pte_ue, !(pe.pte_ev))
+  ptenv ~simpl:pe.pte_lc pe.pte_pe pe.pte_hy (pe.pte_ue, !(pe.pte_ev))
 
 (* -------------------------------------------------------------------- *)
-let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
+let ptenv_of_penv ?(simpl = EcEnv.SimplifyContext.empty) (hyps : LDecl.hyps) (pe : proofenv) =
   { pte_pe = pe;
     pte_hy = hyps;
     pte_ue = PT.unienv_of_hyps hyps;
-    pte_ev = ref EcMatching.MEV.empty; }
+    pte_ev = ref EcMatching.MEV.empty;
+    pte_lc = simpl; }
 
 (* -------------------------------------------------------------------- *)
 let rec get_head_symbol (pt : pt_env) (f : form) =
@@ -272,9 +275,13 @@ let pattern_form ?name hyps ~ptn subject =
 let pf_form_match (pt : pt_env) ?mode ~ptn subject =
   let mode = mode |> odfl EcMatching.fmrigid in
 
+  (* conversion during matching sees the proof-local simplify context *)
+  let conv_ri =
+    { EcReduction.full_compat with EcReduction.user_local = pt.pte_lc } in
+
   try
     let (ue, ev) =
-      EcMatching.f_match_core mode pt.pte_hy
+      EcMatching.f_match_core ~conv_ri mode pt.pte_hy
         (pt.pte_ue, !(pt.pte_ev)) ptn subject
     in
       EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue;
@@ -282,7 +289,7 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
   with EcMatching.MatchFailure as exn ->
     (* FIXME: should we check for empty inters. with ecmap? *)
     if not mode.fm_conv ||
-       not (EcReduction.is_conv ~ri:EcReduction.full_compat pt.pte_hy ptn subject) then
+       not (EcReduction.is_conv ~ri:conv_ri pt.pte_hy ptn subject) then
       raise exn
 
 (* -------------------------------------------------------------------- *)
@@ -883,37 +890,37 @@ let process_full_closed_pterm pe pf =
 let tc1_process_pterm_cut ~prcut tc ff =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  process_pterm_cut ~prcut (ptenv_of_penv hyps pe) ff
+  process_pterm_cut ~prcut (ptenv_of_penv ~simpl:(FApi.tc1_simplify_context tc) hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_pterm tc ff =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  process_pterm (ptenv_of_penv hyps pe) ff
+  process_pterm (ptenv_of_penv ~simpl:(FApi.tc1_simplify_context tc) hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_full_pterm_cut ~prcut (tc : tcenv1) (ff : 'a gppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  process_full_pterm_cut ~prcut (ptenv_of_penv hyps pe) ff
+  process_full_pterm_cut ~prcut (ptenv_of_penv ~simpl:(FApi.tc1_simplify_context tc) hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_full_pterm ?implicits (tc : tcenv1) (ff : ppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  process_full_pterm ?implicits (ptenv_of_penv hyps pe) ff
+  process_full_pterm ?implicits (ptenv_of_penv ~simpl:(FApi.tc1_simplify_context tc) hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_full_closed_pterm_cut ~prcut (tc : tcenv1) (ff : 'a gppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  process_full_closed_pterm_cut ~prcut (ptenv_of_penv hyps pe) ff
+  process_full_closed_pterm_cut ~prcut (ptenv_of_penv ~simpl:(FApi.tc1_simplify_context tc) hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  process_full_closed_pterm (ptenv_of_penv hyps pe) ff
+  process_full_closed_pterm (ptenv_of_penv ~simpl:(FApi.tc1_simplify_context tc) hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 type prept = [
