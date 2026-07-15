@@ -23,6 +23,16 @@ available. Use `-help` to print this guide and exit:
 easycrypt llm -help
 ```
 
+Use `-eval STR` to feed a newline-separated script instead of reading
+stdin. Useful for scripted callers and CI: the REPL runs the given
+commands and exits (implicit end-of-input, no `QUIT` required):
+
+```
+easycrypt llm -eval 'LOAD "myfile.ec" 42
+GOALS
+COMMIT'
+```
+
 ### Protocol
 
 **Startup.** EasyCrypt prints a `READY` message and waits for input:

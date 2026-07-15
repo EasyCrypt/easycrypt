@@ -47,6 +47,7 @@ and doc_option = {
 and llm_option = {
   llmo_provers   : prv_options;
   llmo_help      : bool;
+  llmo_eval      : string option;
 }
 
 and prv_options = {
