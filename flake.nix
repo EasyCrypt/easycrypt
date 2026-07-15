@@ -4,24 +4,9 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    nixpkgs.url = "github:nixos/nixpkgs/24.05";
     stable.url = "github:nixos/nixpkgs/24.05";
     nixpkgs.follows = "opam-nix/nixpkgs";
 
-    prover_cvc4_1_8 = {
-      url = "github:CVC4/CVC4-archived/1.8";
-      flake = false;
-    };
-
-    prover_cvc5_1_0_9 = {
-      url = "github:cvc5/cvc5/cvc5-1.0.9";
-      flake = false;
-    };
-
-    prover_z3_4_12_6 = {
-      url = "github:z3prover/z3/z3-4.12.6";
-      flake = false;
-    };
   };
 
   outputs = { self, flake-utils, opam-nix, nixpkgs, ... }@inputs:
@@ -40,7 +25,7 @@
         };
 
         query = devPackagesQuery // {
-          ocaml-base-compiler = "4.14.2";
+          ocaml-base-compiler = "5.4.1";
         };
 
         scope = on.buildOpamProject' { } ./. query;
@@ -57,6 +42,13 @@
           conf-pkg-config = prev.conf-pkg-config.overrideAttrs (oa: {
             nativeBuildInputs = oa.nativeBuildInputs ++ [pkgs.pkg-config];
           });
+          conf-git = prev.conf-git.overrideAttrs (oa: {
+            nativeBuildInputs = oa.nativeBuildInputs ++ [pkgs.git];
+          });
+          alt-ergo = prev.alt-ergo.overrideAttrs (oa: {
+            nativeBuildInputs = oa.nativeBuildInputs
+              ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ pkgs.darwin.sigtool ];
+          });
         };
 
         scope' = scope.overrideScope overlay;
@@ -71,27 +63,19 @@
           paths = [ scope'.${package} scope'.why3 ];
         };
 
-        # Create provers packages
-        mkProverPackage = pkg: version:
-          pkgs.${pkg}.overrideAttrs (_: {
-            inherit version;
-            src = inputs."${"prover_" + pkg + "_" + builtins.replaceStrings ["."] ["_"] version}";
-          });
-
         mkAltErgo = version:
           ((on.queryToScope { } (query // { alt-ergo = version; })).overrideScope overlay).alt-ergo;
       in rec {
         legacyPackages = scope';
 
         packages = rec {
-          z3 = mkProverPackage "z3" "4.12.6";
-          cvc4 = mkProverPackage "cvc4" "1.8";
-          cvc5 = mkProverPackage "cvc5" "1.0.9";
-          altErgo = mkAltErgo "2.4.3";
+          z3 = pkgs.z3;
+          cvc5 = pkgs.cvc5;
+          altErgo = mkAltErgo "2.6.3";
 
           provers = pkgs.symlinkJoin {
             name = "provers";
-            paths = [ altErgo z3 cvc4 cvc5 ];
+            paths = [ altErgo z3 cvc5 ];
           };
 
           with_provers = pkgs.symlinkJoin {
