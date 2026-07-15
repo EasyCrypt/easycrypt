@@ -113,7 +113,7 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
       ~boot ~checkmode ~checkproof:true;
     initialized := true;
     (try
-       List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
+       List.iter EcCommands.apply_pragma_option prvopts.prvo_pragmas
      with EcCommands.InvalidPragma x ->
        EcScope.hierror "invalid pragma: `%s'\n%!" x);
     EcCommands.addnotifier notifier;
