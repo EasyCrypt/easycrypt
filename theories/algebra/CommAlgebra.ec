@@ -19,18 +19,19 @@ type t.
 clone import IDomain as ID with type t <= t.
 
 (* -------------------------------------------------------------------- *)
+(* The big operators are owned here and pushed down into the Ideal      *)
+(* clone, so that instances only ever substitute top-level theories.    *)
+clone BigComRing as BR with
+  theory CR <= ID.
+
+(* -------------------------------------------------------------------- *)
 clone Ideal.Ideal as I with
-  type t <- t,
-  theory IDomain <= ID.
+  type t         <- t,
+  theory IDomain <- ID,
+  theory BigDom  <- BR.
 
 (* -------------------------------------------------------------------- *)
 abbrev (+) = I.idD.
-
-(* -------------------------------------------------------------------- *)
-clone BigComRing as BR
-  with theory CR <= ID,
-       op     BAdd.big ['a] <= I.BigDom.BAdd.big<:'a>,
-       op     BMul.big ['a] <= I.BigDom.BMul.big<:'a>.
 
 (* -------------------------------------------------------------------- *)
 import I.
@@ -130,7 +131,7 @@ lemma dvdr_sum ['a] (P : 'a -> bool) (F : 'a -> t) (cs : 'a list) (a : t) :
      (forall c, c \in cs => P c => a %| F c)
   => a %| BR.BAdd.big P F cs.
 proof.
-elim: cs => [|c cs ih] hdvd @/BR.BAdd.big //=. (* FIXME *)
+elim: cs => [|c cs ih] hdvd.
 - by rewrite BR.BAdd.big_nil dvdr0.
 rewrite BR.BAdd.big_cons; case: (P c) => Pc /=; last first.
 - by apply/ih=> *; apply/hdvd => //#.
@@ -142,7 +143,7 @@ qed.
 lemma dvdr_prod ['a] (P : 'a -> bool) (F : 'a -> t) (cs : 'a list) (a : t) (x : 'a) :
   x \in cs => P x => a %| F x => a %| BR.BMul.big P F cs.
 proof.
-move=> x_in_cs Px dvd_a_Fx @/BR.BMul.big.
+move=> x_in_cs Px dvd_a_Fx.
 move/perm_to_rem: x_in_cs => /BR.BMul.eq_big_perm ->.
 by rewrite BR.BMul.big_cons Px /= dvdr_mulr.
 qed.
@@ -204,7 +205,7 @@ lemma comax_prod ['a] (P : 'a -> bool) (F : 'a -> t) (c : t) (cs : 'a list) :
      (forall i, i \in cs => P i => comax (F i) c)
   => comax (BR.BMul.big P F cs) c.
 proof.
-elim: cs => [|x xs ih] hcm @/BR.BMul.big.
+elim: cs => [|x xs ih] hcm.
 - by rewrite BR.BMul.big_nil comax1r.
 rewrite BR.BMul.big_cons; case: (P x) => Px; last by apply/ih => /#.
 apply/comaxMl.
@@ -230,7 +231,7 @@ lemma dvdr_prodl_comax ['a] (F : 'a -> t) (cs : 'a list) (a : t) :
   => all (fun b => b %| a) (map F cs)
   => BR.BMul.big predT F cs %| a.
 proof.
-elim: cs => [|c cs ih] hcm hdvd /= @/BR.BMul.big.
+elim: cs => [|c cs ih] hcm hdvd /=.
 - by rewrite BR.BMul.big_nil dvd1r.
 rewrite BR.BMul.big_consT dvdrMl_comax.
 - apply/comaxC/comax_prod => b b_in_cs _.
@@ -266,7 +267,7 @@ have hsol: forall i, 0 <= i < k => M i * N i + m i * n i = oner.
   by case: (cmN i rgi) => Mi mi ?; exists (Mi, mi).
 pose x := BR.BAdd.bigi predT (fun i => a i * M i * N i) 0 k.
 exists x; apply/(@all_nthP _ _ witness) => i rgi /=.
-rewrite -/(n i) -/(a i) /x /BR.BAdd.big (@BR.BAdd.bigD1 _ _ i) /=.
+rewrite -/(n i) -/(a i) /x (@BR.BAdd.bigD1 _ _ i) /=.
 - by rewrite mem_range. - by apply: range_uniq.
 rewrite addrAC &(@idealD (idgen [n i])); 1: solve; last first. (* FIXME *)
 - apply/mem_idgen1_dvd/dvdr_sum=> j /mem_range rgj @/predC1 ne_ji /=.
@@ -440,8 +441,8 @@ apply/predeq_leP; split=> z @/idD.
   by rewrite !nth_cat -!addrA /= eqx ltzNge lez_addr ge0i.
 - case/idgenP=> cs [sz_cs ->].
   pose csx := take (size xs) cs; pose csy := drop (size xs) cs.
-  pose x := BigDom.BAdd.bigi predT (fun (i : int) => csx.[i] * xs.[i]) 0 (size xs).
-  pose y := BigDom.BAdd.bigi predT (fun (i : int) => csy.[i] * ys.[i]) 0 (size ys).
+  pose x := BR.BAdd.bigi predT (fun (i : int) => csx.[i] * xs.[i]) 0 (size xs).
+  pose y := BR.BAdd.bigi predT (fun (i : int) => csy.[i] * ys.[i]) 0 (size ys).
   exists x y; rewrite size_cat; split.
   - by split; [exists csx | exists csy].
   rewrite (@BR.BAdd.big_cat_int (size xs)) ~-1:#smt:(size_ge0); congr.
@@ -683,13 +684,13 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma isdecomp_nil (x : t) : isdecomp x [] <=>  x = oner.
-proof. by rewrite /isdecomp /BR.BMul.big BR.BMul.big_nil. qed. (* FIXME *)
+proof. by rewrite /isdecomp BR.BMul.big_nil. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma isdecompM (x : t) (y : t) (ys : t list) :
   isdecomp y ys => isdecomp (x * y) (x :: ys).
 proof.
-by move=> -> @/isdecomp; rewrite /BR.BMul.big BR.BMul.big_consT. (* FIXME *)
+by move=> -> @/isdecomp; rewrite BR.BMul.big_consT.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -697,7 +698,7 @@ lemma isdecomp_cons (x : t) (y : t) (ys : t list) :
   isdecomp x (y :: ys) => exists z, x = y * z /\ isdecomp z ys.
 proof.
 move=> ->; pose z := BR.BMul.big predT idfun ys.
-by exists z; rewrite /BR.BMul.big BR.BMul.big_consT. (* FIXME *)
+by exists z; rewrite BR.BMul.big_consT.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -721,7 +722,7 @@ move=> irr_x irr_xs hdecomp; suff: exists x', x' \in xs /\ x %= x'.
 - case=> x' [x'_in_xs /eqmodfP [u] [unit_u ->>]].
   exists (invr u) (rem x' xs); rewrite mulrA mulVr //= invrK.
   rewrite unitrV unit_u /= perm_to_rem //=.
-  move: hdecomp => @/isdecomp @/BR.BMul.big.
+  move: hdecomp => @/isdecomp.
   rewrite (@BR.BMul.eq_big_perm _ _ _ _ (perm_to_rem x'_in_xs)). (* FIXME *)
   rewrite BR.BMul.big_consT /= -mulrA mulrCA &(mulfI).
   by apply: irdc_neq0; apply: irdc_Ml irr_x.
@@ -730,8 +731,8 @@ elim: xs x irr_x y irr_xs hdecomp => [|v vs ih] x irr_x y /=.
 case=> irr_v irr_vs hdecomp ; case: (x %= v)=> [eq_xv|ne_xv].
 - by exists v.
 have cop_xv: coprime x v by apply: irdc_coprime.
-move: (hdecomp) => @/isdecomp; rewrite /BR.BMul.big.
-rewrite BR.BMul.big_consT /=; pose z := BigDom.BMul.big _ _ _.
+move: (hdecomp) => @/isdecomp.
+rewrite BR.BMul.big_consT /=; pose z := BR.BMul.big _ _ _.
 move=> eq; have [dvdx dvdv]: x %| v * z /\ v %| x * y.
 - split; apply/dvdrP.
   - by exists y; rewrite [_*x]mulrC &(eq_sym).
@@ -943,7 +944,7 @@ lemma decomp_uniq (z1 z2 : t) (xs1 xs2 : t list) :
 proof.
 elim: xs1 z1 z2 xs2 => [|x1 xs1 ih] z1 z2 xs2 /=.
 - move=> irdc_xs2 eq1x dcp2 eqz; have ->>: z1 = oner.
-  - by rewrite eq1x /(BR.BMul.big) BR.BMul.big_nil.
+  - by rewrite eq1x BR.BMul.big_nil.
   suff -> /=: xs2 = [] by exists [] => /=; rewrite mkseq0.
   case: xs2 irdc_xs2 dcp2 => //= x2 xs2; case=> + _.
   move/irdc_Nunit; apply: contra => /isdecomp_cons.
@@ -961,10 +962,10 @@ wlog: xs2 irdc_xs2 dcp_xs2 eq_xs2 / (xs2 = (u * (invr w * x1)) :: ys).
     - by do! apply/irdc_Ml => //; apply/unitrV.
     move=> ?; move/allP: irdc_xs2; apply.
     by move/perm_eq_mem: eq_xs2 => -> /=; right.
-  - rewrite /isdecomp /(BR.BMul.big) BR.BMul.big_consT /=.
+  - rewrite /isdecomp BR.BMul.big_consT /=.
     apply/(mulrI (w * invr u) _).
     - by apply/unitrM; split=> //; apply/unitrV.
-    rewrite -[_ * BigDom.BMul.big _ _ _]mulrA; congr.
+    rewrite -[_ * BR.BMul.big _ _ _]mulrA; congr.
     rewrite [u*_]mulrC -!mulrA; do 2! congr.
     apply/(mulrI (invr u)); first by apply/unitrV.
     by rewrite mulrA dcp_ys mulrAC mulVr.
@@ -1098,7 +1099,7 @@ lemma coprime_prod ['a] (P : 'a -> bool) (F : 'a -> t) (c : t) (cs : 'a list) :
      (forall i, i \in cs => P i => coprime (F i) c)
   => coprime (BR.BMul.big P F cs) c.
 proof.
-move=> @/BR.BMul.big; elim: cs => /= [|x xs ih]. (* FIXME *)
+elim: cs => /= [|x xs ih].
 - by rewrite BR.BMul.big_nil coprime1r.
 move=> cop; rewrite BR.BMul.big_cons; case: (P x); last smt().
 by move=> Px; apply/coprimeMl => /#.
@@ -1131,7 +1132,7 @@ lemma dvdr_prodl_coprime ['a] (F : 'a -> t) (cs : 'a list) (a : t) :
   => all (fun b => b %| a) (map F cs)
   => BR.BMul.big predT F cs %| a.
 proof.
-elim: cs => [|c cs ih] hcop hdvd /= @/BR.BMul.big.
+elim: cs => [|c cs ih] hcop hdvd /=.
 - by rewrite BR.BMul.big_nil dvd1r.
 rewrite BR.BMul.big_consT dvdrMl_coprime.
 - apply/coprimeC/coprime_prod => b b_in_cs _.
@@ -1228,7 +1229,7 @@ qed.
 lemma isdecomp_cat (x y : t) (xs ys : t list) :
   isdecomp x xs => isdecomp y ys => isdecomp (x * y) (xs ++ ys).
 proof.
-move=> xsE ysE @/isdecomp @/BR.BMul.big. (* FIXME *)
+move=> xsE ysE @/isdecomp.
 by rewrite BR.BMul.big_cat xsE ysE.
 qed.
 
