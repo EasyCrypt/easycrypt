@@ -303,14 +303,14 @@ by move: nz_x; rewrite -asint_eq zeroE pmod_small // rg_asint.
 qed.
 
 clone import Ring.Field as ZModpField with
-  type t     <- zmod,
-  op   zeror <- zero,
-  op   oner  <- one,
-  op   ( + ) <- ( + ),
-  op   [ - ] <- ([-]),
-  op   ( * ) <- ( * ),
-  op   invr  <- inv,
-  op   exp   <- ZModpRing.exp
+  type t     <= zmod,
+  op   zeror <= zero,
+  op   oner  <= one,
+  op   ( + ) <= ( + ),
+  op   [ - ] <= ([-]),
+  op   ( * ) <= ( * ),
+  op   invr  <= inv,
+  op   exp   <= ZModpRing.exp
   proof *
   remove abbrev (-)
   remove abbrev (/).
