@@ -328,6 +328,11 @@ let main () =
               ["-boot"]
             else [] in
 
+          let stdlib =
+            options.o_options.o_loader.ldro_stdlib
+            |> List.map (fun d -> ["-stdlib"; d])
+            |> List.flatten in
+
           let idirs =
             options.o_options.o_loader.ldro_idirs
             |> List.map (fun (pfx, name, rec_) ->
@@ -341,7 +346,7 @@ let main () =
             maxjobs; timeout; cpufactor; ppwidth;
             provers; quorum ; pragmas  ; checkall;
             profile; why3srv  ; why3    ;
-            reloc  ; noevict; boot     ; idirs   ;
+            reloc  ; noevict; boot     ; stdlib  ; idirs   ;
           ]
         in
 
@@ -420,11 +425,20 @@ let main () =
   let ldropts = options.o_options.o_loader in
 
   begin
+    (* [-stdlib DIR] (repeatable) fully replaces the built-in
+       [Sites.theories] roots. This is stronger than [-boot], which
+       only skips the recursive-System add but still injects
+       [<Sites.theories>/prelude]. *)
+    let theories =
+      match ldropts.ldro_stdlib with
+      | [] -> Sites.theories
+      | ds -> ds
+    in
     List.iter (fun theory ->
       EcCommands.addidir ~namespace:`System (Filename.concat theory "prelude");
       if not ldropts.ldro_boot then
         EcCommands.addidir ~namespace:`System ~recursive:true theory
-    ) Sites.theories;
+    ) theories;
     List.iter (fun (onm, name, isrec) ->
         EcCommands.addidir
           ?namespace:(omap (fun nm -> `Named nm) onm)
