@@ -68,8 +68,9 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string * bool) list;
-  ldro_boot  : bool;
+  ldro_idirs  : (string option * string * bool) list;
+  ldro_boot   : bool;
+  ldro_stdlib : string list;
 }
 
 and glb_options = {
@@ -423,9 +424,10 @@ let specs = {
     ]);
 
     ("loader", "Options related to loader", [
-      `Spec ("I"   , `String, "Add <dir> to the list of include directories");
-      `Spec ("R"   , `String, "Recursively add <dir> to the list of include directories");
-      `Spec ("boot", `Flag  , "Don't load prelude")])
+      `Spec ("I"     , `String, "Add <dir> to the list of include directories");
+      `Spec ("R"     , `String, "Recursively add <dir> to the list of include directories");
+      `Spec ("stdlib", `String, "Use <dir> as a standard-library root (System namespace, prelude + recursive), replacing the built-in one; repeatable");
+      `Spec ("boot"  , `Flag  , "Don't load prelude")])
   ]
 }
 
@@ -485,8 +487,9 @@ let dirs_of_env =
 
 (* -------------------------------------------------------------------- *)
 let ldr_options_of_values ~env ?(ini = []) values =
+  let stdlib = get_strings "stdlib" values in
   if get_flag "boot" values then
-    { ldro_idirs = []; ldro_boot = true; }
+    { ldro_idirs = []; ldro_boot = true; ldro_stdlib = stdlib; }
   else
     let add_rec (fl : bool) ((nm, x) : string option * string) =
       (nm, x, fl) in
@@ -500,8 +503,9 @@ let ldr_options_of_values ~env ?(ini = []) values =
     let rdirs   = List.map (add_rec true) rdirs in
     let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
 
-    { ldro_idirs = idirs @ idirs_I @ rdirs @ idirs_R;
-      ldro_boot  = false; }
+    { ldro_idirs  = idirs @ idirs_I @ rdirs @ idirs_R;
+      ldro_boot   = false;
+      ldro_stdlib = stdlib; }
 
 let glb_options_of_values ~env ini values =
   let why3 =
