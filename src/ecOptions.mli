@@ -64,8 +64,12 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string * bool) list;
-  ldro_boot  : bool;
+  ldro_idirs  : (string option * string * bool) list;
+  ldro_boot   : bool;
+  ldro_stdlib : string list;
+    (* When non-empty, these directories replace the built-in
+       [Sites.theories] for prelude and recursive-System namespace
+       loading. Empty means "use the built-in stdlib". *)
 }
 
 and glb_options = {
