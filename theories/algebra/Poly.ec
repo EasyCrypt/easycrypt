@@ -1147,4 +1147,17 @@ proof.
 rewrite /polyV; case: (deg p = 1); last done.
 by case/deg_eq1=> c [nz_c ->>]; rewrite !degC polyCE /= invr_eq0.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma peval_mprod_out (rs : coeff list) (a : coeff) :
+  ! (a \in rs) => peval (mprod rs) a <> IDCoeff.zeror.
+proof.
+elim: rs => [|r rs ih] hnin.
+- rewrite mprod_nil pevalC.
+  by apply IDCoeff.oner_neq0.
+rewrite mprod_cons pevalM pevalB pevalX pevalC.
+apply/negP => /IDCoeff.mulf_eq0 [h0|h0].
+- by move: h0; rewrite IDCoeff.subr_eq0; smt().
+by move: h0; smt().
+qed.
 end Poly.
