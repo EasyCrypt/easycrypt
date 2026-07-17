@@ -877,7 +877,7 @@ have [xs [_ ->]] := surj_polyL p (deg p) _; 1: by done.
 by apply main.
 qed.
 
-lemma peval_big ['a] (P : 'a -> bool) (F : 'a -> poly) (s : 'a list) (a : coeff) :
+lemma peval_sum ['a] (P : 'a -> bool) (F : 'a -> poly) (s : 'a list) (a : coeff) :
   peval (BigPoly.PCA.big P F s) a
     = BCA.big P (fun x => peval (F x) a) s.
 proof.
