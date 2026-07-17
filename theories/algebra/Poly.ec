@@ -724,7 +724,7 @@ import BigPoly.
 
 (* -------------------------------------------------------------------- *)
 op peval (p : poly) (a : coeff) =
-  BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
+  BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p).
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = Coeff.zeror.
@@ -776,6 +776,115 @@ apply/poly_eqP=> c ge0_c; rewrite polyLE; case: (c < n).
 - by move=> lt_cn; rewrite (nth_map 0) ?size_range ?nth_range //#.
 - rewrite ltrNge /= => le_nc; rewrite gedeg_coeff // 1:/#.
   by rewrite nth_out // size_map size_range /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma polyL_nil : polyL [<:coeff>] = poly0.
+proof. by apply poly_eqP => i ge0; rewrite polyLE poly0E. qed.
+
+lemma polyL_cons (c : coeff) (xs : coeff list) :
+  polyL (c :: xs) = polyC c + polyL xs * X.
+proof.
+apply poly_eqP => i ge0.
+rewrite polyLE polyDE polyCE polyMXE polyLE.
+case: (i = 0) => [->|nz] /=.
+- by rewrite nth_neg // Coeff.addr0.
+by rewrite Coeff.add0r /= ifF //.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma pevalE_ge (p : poly) (a : coeff) (n : int) : deg p <= n =>
+  peval p a = BCA.bigi predT (fun i => p.[i] * Coeff.exp a i) 0 n.
+proof.
+move=> @/peval /lez_eqVlt [<<-//|hlt].
+rewrite (BCA.big_cat_int (deg p) 0 n) ~-1:#smt:(ge0_deg).
+rewrite [BCA.bigi _ _ _ n](_ : _ = zeror) ?addr0 //.
+rewrite BCA.big1_seq //= => i /mem_range ?.
+by rewrite gedeg_coeff 1:/# mul0r.
+qed.
+
+lemma pevalC (c : coeff) (a : coeff) : peval (polyC c) a = c.
+proof.
+rewrite (pevalE_ge (polyC c) a 1) 1:degC_le BCA.big_int1 /=.
+by rewrite polyCE /= expr0 mulr1.
+qed.
+
+lemma peval0 (a : coeff) : peval poly0 a = zeror.
+proof. by rewrite pevalC. qed.
+
+lemma pevalD (p q : poly) (a : coeff) :
+  peval (p + q) a = peval p a + peval q a.
+proof.
+pose n := max (deg p) (deg q).
+rewrite (pevalE_ge (p + q) a n) 1:#smt:(degD).
+rewrite (pevalE_ge p a n) 1:/# (pevalE_ge q a n) 1:/#.
+rewrite -BCA.big_split /= &(BCA.eq_big_int) /=.
+by move=> i rgi /=; rewrite polyDE Coeff.mulrDl.
+qed.
+
+lemma pevalN (p : poly) (a : coeff) : peval (- p) a = - peval p a.
+proof.
+have hd : deg (- p) <= deg p by rewrite degN.
+rewrite (pevalE_ge (- p) a (deg p)) 1:hd.
+rewrite (pevalE_ge p a (deg p)) 1://.
+rewrite BCA.sumrN /= &(BCA.eq_big_int).
+by move=> i rgi /=; rewrite polyNE Coeff.mulNr.
+qed.
+
+lemma pevalB (p q : poly) (a : coeff) :
+  peval (p - q) a = peval p a - peval q a.
+proof. by rewrite pevalD pevalN. qed.
+
+lemma pevalMX (p : poly) (a : coeff) : peval (p * X) a = peval p a * a.
+proof.
+have hd : deg (p * X) <= deg p + 1.
+- case: (p = poly0) => [->>|nz].
+  - by rewrite mul0r // #smt:(ge0_deg).
+  have := degM_le p X nz nz_polyX.
+  by rewrite degX /#.
+rewrite (pevalE_ge (p * X) a (deg p + 1)) 1:hd.
+rewrite (pevalE_ge p a (deg p)) 1://.
+rewrite BCA.big_int_recl 1:#smt:(ge0_deg) /=.
+rewrite polyMXE lt0_coeff 1:// Coeff.mul0r Coeff.add0r.
+rewrite BCA.mulr_suml &(BCA.eq_big_int) /=.
+by move=> i [??] /=; rewrite polyMXE exprSr //= #ring.
+qed.
+
+lemma pevalX (a : coeff) : peval X a = a.
+proof. by rewrite -[X]mul1r pevalMX pevalC mul1r. qed.
+
+lemma pevalZ (c : coeff) (p : poly) (a : coeff) :
+  peval (c ** p) a = c * peval p a.
+proof.
+have hd : deg (c ** p) <= deg p by apply degZ_le.
+rewrite (pevalE_ge (c ** p) a (deg p)) 1:hd.
+rewrite (pevalE_ge p a (deg p)) 1://.
+rewrite BCA.mulr_sumr &(BCA.eq_big_int) /=.
+by move=> i rgi; rewrite polyZE mulrA.
+qed.
+
+lemma pevalM (p q : poly) (a : coeff) :
+  peval (p * q) a = peval p a * peval q a.
+proof.
+have main : forall (xs : coeff list) (r : poly),
+  peval (polyL xs * r) a = peval (polyL xs) a * peval r a.
+- elim=> [|c xs ih] r.
+  - by rewrite polyL_nil mul0r peval0 Coeff.mul0r.
+  rewrite polyL_cons mulrDl pevalD -scalepE pevalZ.
+  rewrite [polyL xs * _ * _]mulrAC pevalMX ih.
+  by rewrite pevalD pevalC pevalMX #ring.
+have [xs [_ ->]] := surj_polyL p (deg p) _; 1: by done.
+by apply main.
+qed.
+
+lemma peval_big ['a] (P : 'a -> bool) (F : 'a -> poly) (s : 'a list) (a : coeff) :
+  peval (BigPoly.PCA.big P F s) a
+    = BCA.big P (fun x => peval (F x) a) s.
+proof.
+elim: s => [|x s ih].
+- by rewrite PCA.big_nil BCA.big_nil peval0.
+rewrite BigPoly.PCA.big_cons BCA.big_cons.
+by case: (P x) => hP; rewrite ?pevalD ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
