@@ -93,6 +93,198 @@ qed.
 hint simplify [reduce] addi0.
 
 (* -------------------------------------------------------------------- *)
+lemma dvdr_mul (a b a' b' : t) : a %| b => a' %| b' => a * a' %| b * b'.
+proof.
+move=> /dvdrP[d ->] /dvdrP[d' ->]; rewrite mulrACA.
+by apply/dvdrP; exists (d * d').
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvdrD (d a b : t) : d %| a => d %| b => d %| (a + b).
+proof. by move=> /dvdrP[ca ->] /dvdrP[cb ->]; rewrite -mulrDl dvdr_mull. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvdrN (a b : t) : a %| b => a %| -b.
+proof. by case=> c ->; exists (-c); rewrite mulNr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvdrB (d a b : t) : d %| a => d %| b => d %| (a - b).
+proof. by move=> ??; apply/dvdrD/dvdrN. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvd1r (a : t) : oner %| a.
+proof. by exists a. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvdr_sum ['a] (P : 'a -> bool) (F : 'a -> t) (cs : 'a list) (a : t) :
+     (forall c, c \in cs => P c => a %| F c)
+  => a %| BR.BAdd.big P F cs.
+proof.
+elim: cs => [|c cs ih] hdvd @/BR.BAdd.big //=. (* FIXME *)
+- by rewrite BR.BAdd.big_nil dvdr0.
+rewrite BR.BAdd.big_cons; case: (P c) => Pc /=; last first.
+- by apply/ih=> *; apply/hdvd => //#.
+- rewrite dvdrD; first by apply: hdvd.
+  by apply/ih=> *; apply/hdvd => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvdr_prod ['a] (P : 'a -> bool) (F : 'a -> t) (cs : 'a list) (a : t) (x : 'a) :
+  x \in cs => P x => a %| F x => a %| BR.BMul.big P F cs.
+proof.
+move=> x_in_cs Px dvd_a_Fx @/BR.BMul.big.
+move/perm_to_rem: x_in_cs => /BR.BMul.eq_big_perm ->.
+by rewrite BR.BMul.big_cons Px /= dvdr_mulr.
+qed.
+
+(* ==================================================================== *)
+(* Co-maximality, with explicit Bezout witnesses.  The CRT cluster is   *)
+(* stated at this level: it consumes co-primality only through the      *)
+(* witnesses, so that instances can supply them directly, without any   *)
+(* recourse to gcds (e.g. binomial moduli X^n - c1, X^n - c2, whose     *)
+(* witnesses are constants).  The Euclidean structure below closes the  *)
+(* gap in the other direction (coprime => comax, via Bezout).           *)
+(* ==================================================================== *)
+op comax (x y : t) = exists u v, u * x + v * y = oner.
+
+(* -------------------------------------------------------------------- *)
+lemma comaxC (x y : t) : comax x y <=> comax y x.
+proof. by split; case=> u v h; exists v u; rewrite addrC. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma comaxr1 (x : t) : comax x oner.
+proof. by exists zeror oner; rewrite mul0r mulr1 add0r. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma comax1r (y : t) : comax oner y.
+proof. by rewrite comaxC comaxr1. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma comax_Gauss (a b c : t) : comax a b => a %| b * c => a %| c.
+proof.
+case=> u v huv hdvd.
+have h1 : c * (u * a + v * b) = c by rewrite huv mulr1.
+have -> : c = u * c * a + v * (b * c).
+- by rewrite -{1}h1; ring.
+apply/dvdrD.
+- by apply/dvdr_mull/dvdrr.
+- by apply/dvdr_mull.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma comaxMr (a b c : t) : comax a b => comax a c => comax a (b * c).
+proof.
+case=> u1 v1 h1; case=> u2 v2 h2.
+exists (u1 * u2 * a + u1 * v2 * c + v1 * b * u2) (v1 * v2).
+have h : (u1 * a + v1 * b) * (u2 * a + v2 * c) = oner.
+- by rewrite h1 h2 mulr1.
+by rewrite -h; ring.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma comaxMl (a b c : t) : comax a c => comax b c => comax (a * b) c.
+proof.
+move=> h1 h2; rewrite comaxC; apply comaxMr.
+- by rewrite comaxC.
+- by rewrite comaxC.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma comax_prod ['a] (P : 'a -> bool) (F : 'a -> t) (c : t) (cs : 'a list) :
+     (forall i, i \in cs => P i => comax (F i) c)
+  => comax (BR.BMul.big P F cs) c.
+proof.
+elim: cs => [|x xs ih] hcm @/BR.BMul.big.
+- by rewrite BR.BMul.big_nil comax1r.
+rewrite BR.BMul.big_cons; case: (P x) => Px; last by apply/ih => /#.
+apply/comaxMl.
+- by apply/hcm.
+- by apply/ih => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvdrMl_comax (a1 a2 b : t) :
+  comax a1 a2 => a1 %| b => a2 %| b => a1 * a2 %| b.
+proof.
+move=> cm dvd1 dvd2; case/dvdrP: dvd1=> q ->>.
+rewrite [q * a1]mulrC dvdr_mul //.
+apply (@comax_Gauss a2 a1 q).
+- by rewrite comaxC.
+- by rewrite mulrC.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dvdr_prodl_comax ['a] (F : 'a -> t) (cs : 'a list) (a : t) :
+     (forall i j, 0 <= i < size cs => 0 <= j < size cs => i <> j =>
+        comax (F (nth witness cs i)) (F (nth witness cs j)))
+  => all (fun b => b %| a) (map F cs)
+  => BR.BMul.big predT F cs %| a.
+proof.
+elim: cs => [|c cs ih] hcm hdvd /= @/BR.BMul.big.
+- by rewrite BR.BMul.big_nil dvd1r.
+rewrite BR.BMul.big_consT dvdrMl_comax.
+- apply/comaxC/comax_prod => b b_in_cs _.
+  have := hcm (1 + index b cs) 0 _ _ _ => /=;
+    ~-1: smt(index_ge0 size_ge0 index_mem).
+  by rewrite add1z_neq0 ?index_ge0 /= nth_index.
+- by move: hdvd => /= [+ _]; apply.
+- apply: ih; last by move: hdvd=> /= [_]; apply.
+  move=> i j rgi rgj ne_ij.
+  have /= := hcm (i + 1) (j + 1) _ _ _; ~-1: smt().
+  by rewrite ![_+1]addrC !add1z_neq0 //#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma crt_comax (rs : (t * t) list) :
+  (forall i j,
+     0 <= i < size rs => 0 <= j < size rs => i <> j =>
+       comax (nth witness rs i).`2 (nth witness rs j).`2)
+  => exists (x : t), all (fun (an : _ * _) => idgen [an.`2] (x - an.`1)) rs.
+proof.
+move=> hcm; pose k := size rs.
+pose a i := (nth witness rs i).`1.
+pose n i := (nth witness rs i).`2.
+pose N i := BR.BMul.bigi ((<>) i) n 0 k.
+have cmN: forall i, 0 <= i < k => comax (N i) (n i).
+- move=> i rgi; apply: comax_prod => j /mem_range /= [ge0_j ltj] ne_ij.
+  by (have := hcm i j _ _ ne_ij; ~-1: done); rewrite comaxC.
+pose P i (Mm : _ * _) := Mm.`1 * N i + Mm.`2 * n i = oner.
+pose B i := choiceb (P i) witness.
+pose M i := (B i).`1; pose m i := (B i).`2.
+have hsol: forall i, 0 <= i < k => M i * N i + m i * n i = oner.
+- move=> i rgi @/M @/n @/B; have := choicebP (P i) witness _; last done.
+  by case: (cmN i rgi) => Mi mi ?; exists (Mi, mi).
+pose x := BR.BAdd.bigi predT (fun i => a i * M i * N i) 0 k.
+exists x; apply/(@all_nthP _ _ witness) => i rgi /=.
+rewrite -/(n i) -/(a i) /x /BR.BAdd.big (@BR.BAdd.bigD1 _ _ i) /=.
+- by rewrite mem_range. - by apply: range_uniq.
+rewrite addrAC &(@idealD (idgen [n i])); 1: solve; last first. (* FIXME *)
+- apply/mem_idgen1_dvd/dvdr_sum=> j /mem_range rgj @/predC1 ne_ji /=.
+  by rewrite &(dvdr_mull) &(dvdr_prod i) ?mem_range.
+have := hsol i rgi; move/(congr1 (( * ) (a i))) => /=.
+rewrite mulrDr !mulrA eq_sym -subr_eq => <-.
+by rewrite addrAC subrr /= mem_idgen1_dvd dvdrN dvdr_mull.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma crt_uniq_comax (rs : (t * t) list) (x1 x2 : t) :
+     (forall i j,
+        0 <= i < size rs => 0 <= j < size rs => i <> j =>
+          comax (nth witness rs i).`2 (nth witness rs j).`2)
+  => all (fun (an : _ * _) => idgen [an.`2] (x1 - an.`1)) rs
+  => all (fun (an : _ * _) => idgen [an.`2] (x2 - an.`1)) rs
+  => idgen [BR.BMul.big predT (fun an : _ * _ => an.`2) rs] (x2 - x1).
+proof.
+move=> hcm sol1 sol2; rewrite mem_idgen1_dvd &(dvdr_prodl_comax) //.
+rewrite all_map /preim; apply/allP=> y y_rs /=.
+have ->: x2 - x1 = x2 - y.`1 - (x1 - y.`1) by ring.
+by apply/dvdrB; [
+       move/allP/(_ _ y_rs): sol2 => /=
+     | move/allP/(_ _ y_rs): sol1 => /=
+   ]; move/mem_idgen1_dvd.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op w : t -> int.
 
 axiom ge0_w : forall x, 0 <= w x.
@@ -113,6 +305,16 @@ op coprime (x y : t) =
 (* -------------------------------------------------------------------- *)
 lemma coprimeC (x y : t) : coprime x y <=> coprime y x.
 proof. smt(). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma comax_coprime (x y : t) : comax x y => coprime x y.
+proof.
+case=> u v huv d dx dy.
+have hd : d %| oner.
+- rewrite -huv; apply/dvdrD; by apply/dvdr_mull.
+case: hd => c hc; apply/unitrP; exists c.
+by rewrite -hc.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma Ncoprime0 : coprime zeror zeror => false.
@@ -321,15 +523,16 @@ proof. split.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma isgcd00 d : isgcd zeror zeror d => d = zeror.
-proof. done. qed.
+lemma coprime_comax (x y : t) : coprime x y => comax x y.
+proof.
+move=> cop; have := Bezout x y oner _.
+- by apply/coprime_isgcdP.
+by case=> u v h; exists u v.
+qed.
 
 (* -------------------------------------------------------------------- *)
-lemma dvdr_mul (a b a' b' : t) : a %| b => a' %| b' => a * a' %| b * b'.
-proof.
-move=> /dvdrP[d ->] /dvdrP[d' ->]; rewrite mulrACA.
-by apply/dvdrP; exists (d * d').
-qed.
+lemma isgcd00 d : isgcd zeror zeror d => d = zeror.
+proof. done. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma isgcd0r (a : t) : isgcd zeror a a.
@@ -375,10 +578,6 @@ proof. by move: a b d; apply/isgcdW. qed.
 (* -------------------------------------------------------------------- *)
 lemma dvdr_isgcdr (a b d : t) : isgcd a b d => d %| b.
 proof. by move: a b d; apply/isgcdW. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dvdrD (d a b : t) : d %| a => d %| b => d %| (a + b).
-proof. by move=> /dvdrP[ca ->] /dvdrP[cb ->]; rewrite -mulrDl dvdr_mull. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma isgcdMr (a b c : t) (da d : t) :
@@ -818,10 +1017,6 @@ lemma eqpC (x y : t) : (x %= y) <=> (y %= x).
 proof. by split=> /eqp_sym. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma dvd1r (a : t) : oner %| a.
-proof. by exists a. qed.
-
-(* -------------------------------------------------------------------- *)
 lemma coprimeP (a b : t) :
   coprime a b <=> exists (u v : t), u * a + v * b = oner.
 proof.
@@ -885,66 +1080,14 @@ by move=> Px; apply/coprimeMl => /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma dvdr_sum ['a] (P : 'a -> bool) (F : 'a -> t) (cs : 'a list) (a : t) :
-     (forall c, c \in cs => P c => a %| F c)
-  => a %| BR.BAdd.big P F cs.
-proof.
-elim: cs => [|c cs ih] hdvd @/BR.BAdd.big //=. (* FIXME *)
-- by rewrite BR.BAdd.big_nil dvdr0.
-rewrite BR.BAdd.big_cons; case: (P c) => Pc /=; last first.
-- by apply/ih=> *; apply/hdvd => //#.
-- rewrite dvdrD; first by apply: hdvd.
-  by apply/ih=> *; apply/hdvd => /#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dvdr_prod ['a] (P : 'a -> bool) (F : 'a -> t) (cs : 'a list) (a : t) (x : 'a) :
-  x \in cs => P x => a %| F x => a %| BR.BMul.big P F cs.
-proof.
-move=> x_in_cs Px dvd_a_Fx @/BR.BMul.big.
-move/perm_to_rem: x_in_cs => /BR.BMul.eq_big_perm ->.
-by rewrite BR.BMul.big_cons Px /= dvdr_mulr.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dvdrN (a b : t) : a %| b => a %| -b.
-proof. by case=> c ->; exists (-c); rewrite mulNr. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dvdrB (d a b : t) : d %| a => d %| b => d %| (a - b).
-proof. by move=> ??; apply/dvdrD/dvdrN. qed.
-
-(* -------------------------------------------------------------------- *)
 lemma crt (rs : (t * t) list) :
   (forall i j,
      0 <= i < size rs => 0 <= j < size rs => i <> j =>
        coprime (nth witness rs i).`2 (nth witness rs j).`2)
   => exists (x : t), all (fun (an : _ * _) => idgen [an.`2] (x - an.`1)) rs.
 proof.
-move=> hcop; pose k := size rs.
-pose a i := (nth witness rs i).`1.
-pose n i := (nth witness rs i).`2.
-pose N i := BR.BMul.bigi ((<>) i) n 0 k.
-have copN: forall i, 0 <= i < k => coprime (N i) (n i).
-- move=> i rgi; apply: coprime_prod => j /mem_range /= [ge0_j ltj] ne_ij.
-  by (have := hcop i j _ _ ne_ij; ~-1: done); rewrite coprimeC.
-pose P i (Mm : _ * _) := Mm.`1 * N i + Mm.`2 * n i = oner.
-pose B i := choiceb (P i) witness.
-pose M i := (B i).`1; pose m i := (B i).`2.
-have hsol: forall i, 0 <= i < k => M i * N i + m i * n i = oner.
-- move=> i rgi @/M @/n @/B; have := choicebP (P i) witness _; last done.
-  have := Bezout (N i) (n i) oner _; first by apply/coprime_isgcdP/copN.
-  by case=> Mi mi ?; exists (Mi, mi).
-pose x := BR.BAdd.bigi predT (fun i => a i * M i * N i) 0 k.
-exists x; apply/(@all_nthP _ _ witness) => i rgi /=.
-rewrite -/(n i) -/(a i) /x /BR.BAdd.big (@BR.BAdd.bigD1 _ _ i) /=.
-- by rewrite mem_range. - by apply: range_uniq.
-rewrite addrAC &(@idealD (idgen [n i])); 1: solve; last first. (* FIXME *)
-- apply/mem_idgen1_dvd/dvdr_sum=> j /mem_range rgj @/predC1 ne_ji /=.
-  by rewrite &(dvdr_mull) &(dvdr_prod i) ?mem_range.
-have := hsol i rgi; move/(congr1 (( * ) (a i))) => /=.
-rewrite mulrDr !mulrA eq_sym -subr_eq => <-.
-by rewrite addrAC subrr /= mem_idgen1_dvd dvdrN dvdr_mull.
+move=> hcop; apply: crt_comax => i j rgi rgj ne_ij.
+by apply/coprime_comax/hcop.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -986,13 +1129,8 @@ lemma crt_uniq (rs : (t * t) list) (x1 x2 : t) :
   => all (fun (an : _ * _) => idgen [an.`2] (x2 - an.`1)) rs
   => idgen [BR.BMul.big predT (fun an : _ * _ => an.`2) rs] (x2 - x1).
 proof.
-move=> hcop sol1 sol2; rewrite mem_idgen1_dvd &(dvdr_prodl_coprime) //.
-rewrite all_map /preim; apply/allP=> y y_rs /=.
-have ->: x2 - x1 = x2 - y.`1 - (x1 - y.`1) by ring.
-by apply/dvdrB; [
-       move/allP/(_ _ y_rs): sol2 => /=
-     | move/allP/(_ _ y_rs): sol1 => /=
-   ]; move/mem_idgen1_dvd.
+move=> hcop sol1 sol2; apply: crt_uniq_comax => //.
+move=> i j rgi rgj ne_ij; by apply/coprime_comax/hcop.
 qed.
 
 (* -------------------------------------------------------------------- *)
