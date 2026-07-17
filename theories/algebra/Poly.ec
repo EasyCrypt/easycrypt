@@ -1173,75 +1173,63 @@ clone include Poly with
   type coeff     <- coeff,
   theory IDCoeff <- FCoeff.
 
+import BigCf BigPoly.
+
 (* -------------------------------------------------------------------- *)
 (* Lagrange interpolation over a uniq root list: any assignment of      *)
 (* values at the roots is realized by a polynomial of degree at most    *)
 (* the number of roots                                                  *)
-op lag (rs : coeff list) (r : coeff) : poly =
-  polyC (FCoeff.invr (peval (mprod (rem r rs)) r)) * mprod (rem r rs).
+theory Lagrange.
+  op lag (rs : coeff list) (r : coeff) : poly =
+    polyC (invr (peval (mprod (rem r rs)) r)) * mprod (rem r rs).
+  
+  lemma lag_eval_same (rs : coeff list) (r : coeff) :
+    uniq rs => r \in rs => peval (lag rs r) r = FCoeff.oner.
+  proof.
+  move=> hu hmem @/lag; rewrite pevalM pevalC.
+  rewrite &(mulVf) &(peval_mprod_out).
+  by rewrite rem_filter // mem_filter.
+  qed.
 
-lemma lag_eval_same (rs : coeff list) (r : coeff) :
-  uniq rs => r \in rs => peval (lag rs r) r = FCoeff.oner.
-proof.
-move=> hu hmem.
-rewrite /lag pevalM pevalC.
-apply FCoeff.mulVf.
-apply peval_mprod_out.
-rewrite (rem_filter r rs hu) mem_filter /predC1.
-by smt().
-qed.
+  lemma lag_eval_other (rs : coeff list) (r r' : coeff) :
+    uniq rs => r' \in rs => r' <> r
+      => peval (lag rs r) r' = FCoeff.zeror.
+  proof.
+  move=> hu hm hne @/lag; rewrite pevalM.
+  rewrite (mprod_root (rem r rs) r').
+  - by rewrite rem_filter // mem_filter.
+  - by rewrite mulr0.
+  qed.
 
-lemma lag_eval_other (rs : coeff list) (r r' : coeff) :
-  uniq rs => r' \in rs => r' <> r => peval (lag rs r) r' = FCoeff.zeror.
-proof.
-move=> hu hm hne.
-rewrite /lag pevalM.
-rewrite (mprod_root (rem r rs) r').
-- rewrite (rem_filter r rs hu) mem_filter /predC1.
-  by smt().
-by rewrite FCoeff.mulr0.
-qed.
+  lemma deg_lag (rs : coeff list) (r : coeff) :
+    uniq rs => r \in rs => deg (lag rs r) <= size rs.
+  proof.
+  move=> hu hm @/lag; rewrite -scalepE.
+  apply/(ler_trans _ _ _ (degZ_le _ _)).
+  by rewrite deg_mprod size_rem.
+  qed.
 
-lemma deg_lag (rs : coeff list) (r : coeff) :
-  uniq rs => r \in rs => deg (lag rs r) <= size rs.
-proof.
-move=> hu hm.
-rewrite /lag -scalepE.
-have := degZ_le (FCoeff.invr (peval (mprod (rem r rs)) r)) (mprod (rem r rs)).
-rewrite deg_mprod size_rem 1://.
-by smt().
-qed.
+  (* -------------------------------------------------------------------- *)
+  op interp (rs : coeff list) (f : coeff -> coeff) : poly =
+    BigPoly.PCA.big predT (fun r => polyC (f r) * lag rs r) rs.
 
-(* -------------------------------------------------------------------- *)
-op interp (rs : coeff list) (f : coeff -> coeff) : poly =
-  BigPoly.PCA.big predT (fun r => polyC (f r) * lag rs r) rs.
+  lemma interp_evalP (rs : coeff list) (f : coeff -> coeff) (r0 : coeff) :
+    uniq rs => r0 \in rs => peval (interp rs f) r0 = f r0.
+  proof.
+  move=> hu hm @/interp; rewrite peval_sum.
+  rewrite (BCA.eq_big_perm _ _ _ _ (perm_to_rem _ _ hm)).
+  rewrite BCA.big_consT /= pevalM pevalC.
+  rewrite lag_eval_same ~-1:// mulr1 BCA.big1_seq /= ?addr0 //.
+  move=> r; rewrite rem_filter // mem_filter // => -[hne hmem2].
+  by rewrite pevalM pevalC (lag_eval_other rs r r0) ~-1://# mulr0.
+  qed.
 
-lemma interp_evalP (rs : coeff list) (f : coeff -> coeff) (r0 : coeff) :
-  uniq rs => r0 \in rs => peval (interp rs f) r0 = f r0.
-proof.
-move=> hu hm.
-rewrite /interp peval_sum.
-rewrite (BigCf.BCA.eq_big_perm _ _ _ _ (perm_to_rem _ _ hm)).
-rewrite BigCf.BCA.big_cons /predT /=.
-rewrite pevalM pevalC lag_eval_same 1,2:// FCoeff.mulr1.
-rewrite BigCf.BCA.big1_seq /=.
-- move=> r hr.
-  have := hr; rewrite (rem_filter r0 rs hu) mem_filter /predC1 => -[hne hmem2].
-  rewrite /root pevalM pevalC (lag_eval_other rs r r0) 1:// 1:// 1:/#.
-  by rewrite FCoeff.mulr0.
-by rewrite FCoeff.addr0.
-qed.
-
-lemma deg_interp (rs : coeff list) (f : coeff -> coeff) :
-  uniq rs => deg (interp rs f) <= size rs.
-proof.
-move=> hu.
-rewrite /interp BigPoly.PCA.big_seq.
-apply BigPoly.deg_sum; 1: smt(size_ge0).
-move=> r /= hr.
-rewrite -scalepE.
-have h1 := degZ_le (f r) (lag rs r).
-have h2 := deg_lag rs r hu hr.
-by smt().
-qed.
+  lemma deg_interp (rs : coeff list) (f : coeff -> coeff) :
+    uniq rs => deg (interp rs f) <= size rs.
+  proof.
+  move=> hu @/interp; rewrite PCA.big_seq &(deg_sum) //=.
+  move=> r hr; rewrite -scalepE.
+  by apply/(ler_trans _ _ _ (degZ_le _ _))/deg_lag.
+  qed.
+end Lagrange.
 end PolyField.
