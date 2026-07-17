@@ -5,20 +5,30 @@ require (*--*) Ideal.
 
 pragma +implicits.
 
+(* ==================================================================== *)
+(* Ideal-theoretic core over an integral domain: divisibility, and the  *)
+(* CRT cluster against explicit Bezout witnesses (comax).  No division  *)
+(* structure is assumed: instances enter here by supplying the ring     *)
+(* alone, and discharge comax hypotheses by exhibiting the witnesses.   *)
+(* ==================================================================== *)
+abstract theory Base.
+
 (* -------------------------------------------------------------------- *)
-clone import IDomain.
+type t.
+
+clone import IDomain as ID with type t <= t.
 
 (* -------------------------------------------------------------------- *)
 clone Ideal.Ideal as I with
-  type t <- IDomain.t,
-  theory IDomain <= IDomain.
+  type t <- t,
+  theory IDomain <= ID.
 
 (* -------------------------------------------------------------------- *)
 abbrev (+) = I.idD.
 
 (* -------------------------------------------------------------------- *)
 clone BigComRing as BR
-  with theory CR <= IDomain,
+  with theory CR <= ID,
        op     BAdd.big ['a] <= I.BigDom.BAdd.big<:'a>,
        op     BMul.big ['a] <= I.BigDom.BMul.big<:'a>.
 
@@ -284,12 +294,27 @@ by apply/dvdrB; [
    ]; move/mem_idgen1_dvd.
 qed.
 
+end Base.
+
+(* ==================================================================== *)
+(* Euclidean structure: a weight function with division.  Provides gcds *)
+(* (hence Bezout witnesses: coprime => comax), principality, and the    *)
+(* coprime-phrased CRT as corollaries of the witness-level cluster.     *)
+(* ==================================================================== *)
+abstract theory Euclidean.
+
+(* -------------------------------------------------------------------- *)
+clone include Base.
+
+import ID I.
+
 (* -------------------------------------------------------------------- *)
 op w : t -> int.
 
 axiom ge0_w : forall x, 0 <= w x.
 axiom eq0_wP : forall x, w x = 0 <=> x = zeror.
-axiom dvdw : forall (x y : t), x %| y => w x <= w y.
+axiom dvdw : forall (x y : t),
+  x <> zeror => y <> zeror => x %| y => w x <= w y.
 
 axiom Euclide :
   forall x y, y <> zeror =>
@@ -1224,3 +1249,5 @@ case=> [ys] [irr_ys ysE] [zs] [irr_zs zsE].
 exists (zs ++ ys); rewrite all_cat !(irr_ys, irr_zs) /=.
 by apply: isdecomp_cat.
 qed.
+
+end Euclidean.
