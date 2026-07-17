@@ -988,16 +988,16 @@ op polyV (p : poly) =
   if deg p = 1 then polyC (IDCoeff.invr p.[0]) else p.
 
 (* -------------------------------------------------------------------- *)
-clone import Ring.IDomain as IDPoly with
-  type t      <- poly ,
-    op zeror  <- poly0,
-    op oner   <- poly1,
-    op ( + )  <- polyD,
-    op [ - ]  <- polyN,
-    op ( * )  <- polyM,
-    op invr   <- polyV,
-    op exp    <- PolyComRing.exp,
-  pred unit   <- unitp
+clone export Ring.IDomain as IDPoly with
+  type t      <= poly ,
+    op zeror  <= poly0,
+    op oner   <= poly1,
+    op ( + )  <= polyD,
+    op [ - ]  <= polyN,
+    op ( * )  <= polyM,
+    op invr   <= polyV,
+    op exp    <= PolyComRing.exp,
+  pred unit   <= unitp
 
   proof *
 
