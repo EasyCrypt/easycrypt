@@ -898,6 +898,63 @@ by case: (P x) => hP; rewrite ?pevalM ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(* Products of monic linear factors                                     *)
+op mprod (rs : coeff list) : poly =
+  PCM.big predT (fun r => X - polyC r) rs.
+
+lemma mprod_nil : mprod [] = poly1.
+proof. by rewrite /mprod PCM.big_nil. qed.
+
+lemma mprod_cons (r : coeff) (rs : coeff list) :
+  mprod (r :: rs) = (X - polyC r) * mprod rs.
+proof. by rewrite /mprod PCM.big_consT. qed.
+
+lemma mprod_cat (rs1 rs2 : coeff list) :
+  mprod (rs1 ++ rs2) = mprod rs1 * mprod rs2.
+proof. by rewrite /mprod PCM.big_cat. qed.
+
+lemma mprod_mem_factor (rs : coeff list) (r : coeff) :
+  r \in rs => exists q, mprod rs = (X - polyC r) * q.
+proof.
+move=> hmem; exists (mprod (rem r rs)).
+rewrite /mprod (PCM.eq_big_perm _ _ _ _ (perm_to_rem _ _ hmem)).
+by rewrite PCM.big_consT.
+qed.
+
+lemma mprod_root (rs : coeff list) (a : coeff) :
+  a \in rs => root (mprod rs) a.
+proof.
+move=> hin; have [q ->] := mprod_mem_factor rs a hin.
+by rewrite pevalM pevalB pevalX pevalC Coeff.subrr Coeff.mul0r.
+qed.
+
+lemma lc_XC (r : coeff) : lc (X - polyC r) = oner.
+proof.
+rewrite (_ : X - polyC r = X + (- polyC r)) 1:// lcDl.
+- by rewrite degN; smt(degC_le degX).
+by rewrite lcX.
+qed.
+
+lemma deg_XC (r : coeff) : deg (X - polyC r) = 2.
+proof.
+rewrite (_ : X - polyC r = X + (- polyC r)) 1:// degDl.
+- by rewrite degN; smt(degC_le degX).
+by rewrite degX.
+qed.
+
+lemma deg_mprod (rs : coeff list) : deg (mprod rs) = 1 + size rs.
+proof.
+elim: rs => [|r rs ih].
+- by rewrite mprod_nil deg1.
+rewrite mprod_cons degM_proper.
+- rewrite lc_XC Coeff.mul1r.
+  apply /negP => h0.
+  have : mprod rs = poly0 by rewrite -lc_eq0 h0.
+  by rewrite -deg_eq0 ih; smt(size_ge0).
+by rewrite deg_XC ih /= /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma finite_for_poly_ledeg n p s :
      is_finite_for p s
   => is_finite_for
