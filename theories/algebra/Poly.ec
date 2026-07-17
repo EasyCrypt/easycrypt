@@ -402,17 +402,36 @@ apply: degP=> //.
   by apply/ltrW/(ltr_le_trans _ _ _ le_pq).
 qed.
 
+lemma degDr p q : deg p < deg q => deg (p + q) = deg q.
+proof. by move/degDl; rewrite addrC. qed.
+
+lemma degBl p q : deg q < deg p => deg (p - q) = deg p.
+proof. by move=> ?; rewrite degDl ?degN. qed.
+
 lemma lcDl p q : deg q < deg p => lc (p + q) = lc p.
 proof.
 move=> ^lt_pq /degDl ->; rewrite polyDE.
 by rewrite addrC gedeg_coeff ?add0r //#.
 qed.
 
-lemma degDr p q : deg p < deg q => deg (p + q) = deg q.
-proof. by move/degDl; rewrite addrC. qed.
+lemma lcBl p q : deg q < deg p => lc (p - q) = lc p.
+proof. by move=> ?; rewrite lcDl ?degN. qed.
 
 lemma lcDr p q : deg q < deg p => lc (p + q) = lc p.
 proof. by move/lcDl; rewrite addrC. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma degXBC (r : coeff) : deg (X - polyC r) = 2.
+proof.
+rewrite degDl ?degN.
+- by rewrite degX &(ler_lt_trans _ _ _ (degC_le _)).
+- by rewrite degX.
+qed.
+
+lemma lcXBC (r : coeff) : lc (X - polyC r) = oner.
+proof.
+by rewrite lcBl ?lcX // degX &(ler_lt_trans _ _ _ (degC_le _)).
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma polyMEw M p q k : (k <= M)%Int => (p * q).[k] =
@@ -928,30 +947,14 @@ move=> hin; have [q ->] := mprod_mem_factor rs a hin.
 by rewrite pevalM pevalB pevalX pevalC Coeff.subrr Coeff.mul0r.
 qed.
 
-lemma lc_XC (r : coeff) : lc (X - polyC r) = oner.
-proof.
-rewrite (_ : X - polyC r = X + (- polyC r)) 1:// lcDl.
-- by rewrite degN; smt(degC_le degX).
-by rewrite lcX.
-qed.
-
-lemma deg_XC (r : coeff) : deg (X - polyC r) = 2.
-proof.
-rewrite (_ : X - polyC r = X + (- polyC r)) 1:// degDl.
-- by rewrite degN; smt(degC_le degX).
-by rewrite degX.
-qed.
-
 lemma deg_mprod (rs : coeff list) : deg (mprod rs) = 1 + size rs.
 proof.
-elim: rs => [|r rs ih].
-- by rewrite mprod_nil deg1.
+elim: rs => [|r rs ih]; first by rewrite mprod_nil deg1.
 rewrite mprod_cons degM_proper.
-- rewrite lc_XC Coeff.mul1r.
-  apply /negP => h0.
-  have : mprod rs = poly0 by rewrite -lc_eq0 h0.
+- rewrite lcXBC mul1r; apply/negP=> h.
+  have: mprod rs = poly0 by rewrite -lc_eq0 h.
   by rewrite -deg_eq0 ih; smt(size_ge0).
-by rewrite deg_XC ih /= /#.
+by rewrite degXBC ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1152,12 +1155,10 @@ qed.
 lemma peval_mprod_out (rs : coeff list) (a : coeff) :
   ! (a \in rs) => peval (mprod rs) a <> IDCoeff.zeror.
 proof.
-elim: rs => [|r rs ih] hnin.
-- rewrite mprod_nil pevalC.
-  by apply IDCoeff.oner_neq0.
+elim: rs => [|r rs ih] /=.
+- by rewrite mprod_nil pevalC &(IDCoeff.oner_neq0).
+move/negb_or => [nz_ar a_notin_rs].
 rewrite mprod_cons pevalM pevalB pevalX pevalC.
-apply/negP => /IDCoeff.mulf_eq0 [h0|h0].
-- by move: h0; rewrite IDCoeff.subr_eq0; smt().
-by move: h0; smt().
+by rewrite &(IDCoeff.mulf_neq0) -1:ih // subr_eq0.
 qed.
 end Poly.
