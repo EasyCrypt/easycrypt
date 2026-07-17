@@ -887,6 +887,16 @@ rewrite BigPoly.PCA.big_cons BCA.big_cons.
 by case: (P x) => hP; rewrite ?pevalD ih.
 qed.
 
+lemma peval_prod ['a] (P : 'a -> bool) (F : 'a -> poly) (s : 'a list) (a : coeff) :
+  peval (BigPoly.PCM.big P F s) a
+    = BCM.big P (fun x => peval (F x) a) s.
+proof.
+elim: s => [|x s ih].
+- by rewrite PCM.big_nil BCM.big_nil pevalC.
+rewrite BigPoly.PCM.big_cons BCM.big_cons.
+by case: (P x) => hP; rewrite ?pevalM ih.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma finite_for_poly_ledeg n p s :
      is_finite_for p s
