@@ -354,6 +354,12 @@ clone Ring.FieldMixin as ZModpFieldMx with
   theory R <= ZModpRing
   proof unitfP by exact unitE.
 
+(* the field, as a single substitutable bundle *)
+clone Ring.FieldBundle as ZModpFieldBd with
+  type t   <= zmod,
+  theory R <= ZModpRing,
+  theory F <= ZModpFieldMx.
+
 (* -------------------------------------------------------------------- *)
 instance field with zmod
   op rzero = ZModField.zero
