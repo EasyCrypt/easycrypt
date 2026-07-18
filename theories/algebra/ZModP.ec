@@ -345,6 +345,16 @@ qed.
 abbrev exp = ZModpRing.exp.
 
 (* -------------------------------------------------------------------- *)
+(* The same field structure as a delta-only mixin over ZModpRing: one   *)
+(* axiom (units are the nonzero elements), everything else derived      *)
+(* generically -- including mulf_eq0.  The bundled ZModpField clone     *)
+(* above is kept for compatibility during the migration.                *)
+clone Ring.FieldMixin as ZModpFieldMx with
+  type t   <= zmod,
+  theory R <= ZModpRing
+  proof unitfP by exact unitE.
+
+(* -------------------------------------------------------------------- *)
 instance field with zmod
   op rzero = ZModField.zero
   op rone  = ZModField.one
