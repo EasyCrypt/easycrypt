@@ -699,8 +699,12 @@ type fun_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
-type seq_info =
-  oside * pcodegap1 doption * pformula doption * p_seq_xt_info
+type seq_info = {
+  seqi_side : oside;                 (* side (prhl only) *)
+  seqi_at   : pcodegap1 doption;     (* split position(s) *)
+  seqi_mid  : pformula doption;      (* intermediate assertion / (pre, post) *)
+  seqi_bd   : p_seq_xt_info;         (* bound information (bdhoare only) *)
+}
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [
