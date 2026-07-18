@@ -568,7 +568,7 @@ lemma div_def (a b : group): g ^ (loge a - loge b) = a / b
   by rewrite log_bij logDrN loggK.
 
 lemma g_neq0 : g ^ zero <> g
-  by rewrite -{2}[g]exp1 -pow_bij; smt(ZModpField.unitr1).
+  by rewrite -{2}[g]exp1 -pow_bij; smt(ZModpRing.oner_neq0).
 
 lemma mulN (x : group) : x * inv x = g ^ zero by rewrite mulcV -(exp0 g).
 

@@ -302,54 +302,15 @@ apply/mulmV; first by apply/prime_p.
 by move: nz_x; rewrite -asint_eq zeroE pmod_small // rg_asint.
 qed.
 
-clone import Ring.Field as ZModpField with
-  type t     <= zmod,
-  op   zeror <= zero,
-  op   oner  <= one,
-  op   ( + ) <= ( + ),
-  op   [ - ] <= ([-]),
-  op   ( * ) <= ( * ),
-  op   invr  <= inv,
-  op   exp   <= ZModpRing.exp
-  proof *
-  remove abbrev (-)
-  remove abbrev (/).
-
-realize addrA.     proof. by apply/ZModule.addrA. qed.
-realize addrC.     proof. by apply/ZModule.addrC. qed.
-realize add0r.     proof. by apply/ZModule.add0r. qed.
-realize addNr.     proof. by apply/ZModule.addNr. qed.
-realize mulrA.     proof. by apply/ComRing.mulrA. qed.
-realize mulrC.     proof. by apply/ComRing.mulrC. qed.
-realize mul1r.     proof. by apply/ComRing.mul1r. qed.
-realize mulrDl.    proof. by apply/ComRing.mulrDl. qed.
-realize oner_neq0. proof. by apply/ComRing.oner_neq0. qed.
-
-realize mulVr.
-proof. by move=> x nz_x; rewrite &(ComRing.mulVr) unitE. qed.
-
-realize unitP.
-proof. by move=> x y h; rewrite -unitE &(ComRing.unitP _ y). qed.
-
-realize unitout.
-proof. by move=> x; rewrite -unitE &(ComRing.unitout). qed.
-
-realize mulf_eq0.
-proof.                          (* FIXME: should be generic *)
-move=> x y; case: (x = zero) => //= [->|]; first by rewrite ZModpRing.mul0r.
-move=> nz_x; split=> [|->]; last by rewrite ZModpRing.mulr0.
-move=> h; apply: (ZModpRing.mulrI x); last by rewrite ZModpRing.mulr0.
-by rewrite unitE.
-qed.
+import ZModpRing.
 
 abbrev exp = ZModpRing.exp.
 
 (* -------------------------------------------------------------------- *)
-(* The same field structure as a delta-only mixin over ZModpRing: one   *)
-(* axiom (units are the nonzero elements), everything else derived      *)
-(* generically -- including mulf_eq0.  The bundled ZModpField clone     *)
-(* above is kept for compatibility during the migration.                *)
-clone Ring.FieldMixin as ZModpFieldMx with
+(* The field structure as a delta-only mixin over ZModpRing: one axiom  *)
+(* (units are the nonzero elements), everything else derived            *)
+(* generically -- including mulf_eq0.                                   *)
+clone import Ring.FieldMixin as ZModpFieldMx with
   type t   <= zmod,
   theory R <= ZModpRing
   proof unitfP by exact unitE.
@@ -370,19 +331,19 @@ instance field with zmod
   op inv   = ZModField.inv
   op expr  = ZModpRing.exp
 
-  proof oner_neq0 by apply/ZModpField.oner_neq0
-  proof addr0     by apply/ZModpField.addr0
-  proof addrA     by apply/ZModpField.addrA
-  proof addrC     by apply/ZModpField.addrC
-  proof addrN     by apply/ZModpField.addrN
-  proof mulr1     by apply/ZModpField.mulr1
-  proof mulrA     by apply/ZModpField.mulrA
-  proof mulrC     by apply/ZModpField.mulrC
-  proof mulrDl    by apply/ZModpField.mulrDl
-  proof mulrV     by apply/ZModpField.mulrV
-  proof expr0     by apply/ZModpField.expr0
-  proof exprS     by apply/ZModpField.exprS
-  proof exprN     by (move=> ?? _; apply/ZModpField.exprN).
+  proof oner_neq0 by apply/ZModpRing.oner_neq0
+  proof addr0     by apply/ZModpRing.addr0
+  proof addrA     by apply/ZModpRing.addrA
+  proof addrC     by apply/ZModpRing.addrC
+  proof addrN     by apply/ZModpRing.addrN
+  proof mulr1     by apply/ZModpRing.mulr1
+  proof mulrA     by apply/ZModpRing.mulrA
+  proof mulrC     by apply/ZModpRing.mulrC
+  proof mulrDl    by apply/ZModpRing.mulrDl
+  proof mulrV     by apply/ZModpFieldMx.mulfV
+  proof expr0     by apply/ZModpRing.expr0
+  proof exprS     by apply/ZModpRing.exprS
+  proof exprN     by (move=> ?? _; apply/ZModpRing.exprN).
 
 (* -------------------------------------------------------------------- *)
 lemma exp_inzmod m n :
@@ -449,7 +410,7 @@ proof.
   rewrite -(invrK (exp (inzmod _) _)); apply congr1.
   rewrite -exprN -(mul1r (exp _ _)).
   rewrite -(expr1z (- n %/ k)) -eq_exp_one -exprM mulrN Ring.IntID.mulrC -exprD.
-  + apply/negP => eq_inzmod_zero; move: eq_inzmod_zero eq_exp_one => ->.
+  + rewrite unitE; apply/negP => eq_inzmod_zero; move: eq_inzmod_zero eq_exp_one => ->.
     by rewrite expr0z neqk0 /= eq_sym oner_neq0.
   by rewrite -opprD -divz_eq inzmod_exp oppr_ge0 ltzW //= ltrNge.
 qed.
