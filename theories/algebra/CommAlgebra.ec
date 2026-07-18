@@ -153,6 +153,77 @@ by rewrite BR.BMul.big_cons Px /= dvdr_mulr.
 qed.
 
 (* ==================================================================== *)
+(* Congruence modulo an element: the modulus-parametric equality        *)
+(* eqm m x y, i.e. m %| (x - y).  An abbreviation, so hypotheses and    *)
+(* goals convert freely with the divisibility form.                     *)
+(* ==================================================================== *)
+abbrev eqm (m x y : t) = m %| (x - y).
+
+lemma eqmP (m x y : t) : eqm m x y <=> exists h, x - y = h * m.
+proof. by apply: dvdrP. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqm_refl (m x : t) : eqm m x x.
+proof. by rewrite subrr dvdr0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqm_sym (m x y : t) : eqm m x y => eqm m y x.
+proof. by move=> h; rewrite -opprB dvdrN. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqm_trans (m y x z : t) : eqm m x y => eqm m y z => eqm m x z.
+proof.
+move=> h1 h2; have ->: x - z = (x - y) + (y - z).
+- by rewrite addrA subrK.
+by apply dvdrD.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqm_eq (m x y : t) : x = y => eqm m x y.
+proof. by move=> ->; apply eqm_refl. qed.
+
+(* the modulus is congruent to zero *)
+lemma eqm_mod0 (m : t) : eqm m m zeror.
+proof. by rewrite subr0 dvdrr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmD (m x1 x2 y1 y2 : t) :
+  eqm m x1 x2 => eqm m y1 y2 => eqm m (x1 + y1) (x2 + y2).
+proof.
+move=> h1 h2; have ->: x1 + y1 - (x2 + y2) = (x1 - x2) + (y1 - y2).
+- by rewrite opprD addrACA.
+by apply dvdrD.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmN (m x y : t) : eqm m x y => eqm m (- x) (- y).
+proof.
+move=> h; have ->: - x - - y = - (x - y).
+- by rewrite opprK opprB addrC.
+by apply dvdrN.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmB (m x1 x2 y1 y2 : t) :
+  eqm m x1 x2 => eqm m y1 y2 => eqm m (x1 - y1) (x2 - y2).
+proof. by move=> h1 h2; apply eqmD => //; apply eqmN. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmM (m x1 x2 y1 y2 : t) :
+  eqm m x1 x2 => eqm m y1 y2 => eqm m (x1 * y1) (x2 * y2).
+proof.
+move=> h1 h2; have ->: x1 * y1 - x2 * y2 = x1 * (y1 - y2) + (x1 - x2) * y2.
+- by rewrite mulrBr mulrBl addrA subrK.
+by apply dvdrD; [apply dvdr_mull | apply dvdr_mulr].
+qed.
+
+(* restriction to a factor of the modulus: the CRT-tree "descend" *)
+lemma eqm_mulm (m1 m2 x y : t) : eqm (m1 * m2) x y => eqm m1 x y.
+proof.
+by move=> h; apply (dvdr_trans (m1 * m2)) => //; apply/dvdr_mulr/dvdrr.
+qed.
+
+(* ==================================================================== *)
 (* Co-maximality, with explicit Bezout witnesses.  The CRT cluster is   *)
 (* stated at this level: it consumes co-primality only through the      *)
 (* witnesses, so that instances can supply them directly, without any   *)
