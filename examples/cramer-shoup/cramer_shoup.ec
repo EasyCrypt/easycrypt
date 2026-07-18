@@ -9,7 +9,7 @@ require DiffieHellman.
 clone DiffieHellman as DH.
 import DH.DDH DH.G DH.GP DH.FD DH.GP.ZModE.
 
-clone DH.GP.ZModE.ZModpField as ZPF.
+clone DH.GP.ZModE.ZModpFieldBd as ZPF.
 
 lemma gt1_q : 1 < order by smt(ge2_p).
 
@@ -576,7 +576,7 @@ section Security_Aux.
     move=> kL _ xL _ x2L _ yL _ y2L _ zL _ resu bL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
     have H2 : (-uL) * wL + u'L * wL <> zero.
-    + rewrite H1 ZPF.mulf_eq0 negb_or HwL /=.
+    + rewrite H1 ZPF.F.mulf_eq0 negb_or HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
     move=> z2L _; split => [ | _]; 1: by field.
@@ -605,7 +605,7 @@ section Security_Aux.
     move=> kL _ yL _ y2L _ zL _ r'L _ xL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
     have H2 : (-uL) * wL + u'L * wL <> zero.
-    + rewrite H1 ZPF.mulf_eq0 negb_or HwL /=.
+    + rewrite H1 ZPF.F.mulf_eq0 negb_or HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
     move=> z2L _; split => [ | _]; 1: by field.
@@ -751,7 +751,7 @@ section Security_Aux.
     move=> yL _ y2L _ zL _ r'L _ xL _ rL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
     have H2 : (-uL) * wL + u'L * wL <> zero.
-    + rewrite H1 ZPF.mulf_eq0 negb_or HwL0 /=.
+    + rewrite H1 ZPF.F.mulf_eq0 negb_or HwL0 /=.
       by move: HuL;apply: contra => H;ring H.
     split => [ | _ /#].
     rewrite log_bij !(logg1, logrzM, logDr); field.
