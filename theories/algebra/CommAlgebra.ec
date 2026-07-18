@@ -16,19 +16,23 @@ abstract theory Base.
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone import IDomain as ID with type t <= t.
+clone import Ring.ComRing as R with type t <= t.
+
+clone import Ring.IDomainMixin as Dom with
+  type t <= t, theory R <= R.
 
 (* -------------------------------------------------------------------- *)
 (* The big operators are owned here and pushed down into the Ideal      *)
 (* clone, so that instances only ever substitute top-level theories.    *)
 clone BigComRing as BR with
-  theory CR <= ID.
+  theory CR <= R.
 
 (* -------------------------------------------------------------------- *)
 clone Ideal.Ideal as I with
-  type t         <- t,
-  theory IDomain <- ID,
-  theory BigDom  <- BR.
+  type t        <- t,
+  theory R      <- R,
+  theory Dom    <- Dom,
+  theory BigDom <- BR.
 
 (* -------------------------------------------------------------------- *)
 abbrev (+) = I.idD.
@@ -307,7 +311,7 @@ abstract theory Euclidean.
 (* -------------------------------------------------------------------- *)
 clone include Base.
 
-import ID I.
+import R Dom I.
 
 (* -------------------------------------------------------------------- *)
 op w : t -> int.

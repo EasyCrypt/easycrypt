@@ -689,7 +689,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 theory BigPoly.
-clone include BigComRing with theory CR <- PolyComRing
+clone include BigComRing with theory CR <= PolyComRing
 
   remove abbrev CR.(-)
   remove abbrev CR.(/) 

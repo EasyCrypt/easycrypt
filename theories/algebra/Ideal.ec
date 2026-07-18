@@ -558,41 +558,14 @@ end IdealComRing.
 abstract theory Ideal.
 type t.
 
-clone import IDomain with type t <- t.
+clone import Ring.ComRing as R with type t <= t.
 
-clear [IDomain.* IDomain.AddMonoid.* IDomain.MulMonoid.*].
+clone import Ring.IDomainMixin as Dom with
+  type t <= t, theory R <= R.
 
 clone include IdealComRing with
-  type t               <- t,
-  pred IComRing.unit   <- IDomain.unit,
-    op IComRing.zeror  <- IDomain.zeror,
-    op IComRing.oner   <- IDomain.oner,
-    op IComRing.( + )  <- IDomain.( + ),
-    op IComRing.([-])  <- IDomain.([-]),
-    op IComRing.( * )  <- IDomain.( * ),
-    op IComRing.invr   <- IDomain.invr,
-    op IComRing.intmul <- IDomain.intmul,
-    op IComRing.ofint  <- IDomain.ofint,
-    op IComRing.exp    <- IDomain.exp,
-    op IComRing.lreg   <- IDomain.lreg
-
-  proof IComRing.*
-
-  remove abbrev IComRing.(-)
-  remove abbrev IComRing.(/).
-
-realize IComRing.addrA     by apply: IDomain.addrA    .
-realize IComRing.addrC     by apply: IDomain.addrC    .
-realize IComRing.add0r     by apply: IDomain.add0r    .
-realize IComRing.addNr     by apply: IDomain.addNr    .
-realize IComRing.oner_neq0 by apply: IDomain.oner_neq0.
-realize IComRing.mulrA     by apply: IDomain.mulrA    .
-realize IComRing.mulrC     by apply: IDomain.mulrC    .
-realize IComRing.mul1r     by apply: IDomain.mul1r    .
-realize IComRing.mulrDl    by apply: IDomain.mulrDl   .
-realize IComRing.mulVr     by apply: IDomain.mulVr    .
-realize IComRing.unitP     by apply: IDomain.unitP    .
-realize IComRing.unitout   by apply: IDomain.unitout  .
+  type t          <- t,
+  theory IComRing <- R.
 
 lemma eqmodfP x y : (x %= y) <=> (exists u, unit u /\ x = u * y).
 proof.
