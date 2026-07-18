@@ -959,6 +959,22 @@ abstract theory FieldMixin.
   qed.
 end FieldMixin.
 
+(* -------------------------------------------------------------------- *)
+(* Bundles: references only, one slot per level, no library of their    *)
+(* own.  Consumers declare ONE bundle parameter; instances substitute   *)
+(* ONE theory.                                                          *)
+abstract theory IDomainBundle.
+  type t.
+  clone import ComRing      as R   with type t <= t.
+  clone import IDomainMixin as Dom with type t <= t, theory R <= R.
+end IDomainBundle.
+
+abstract theory FieldBundle.
+  type t.
+  clone import ComRing    as R with type t <= t.
+  clone import FieldMixin as F with type t <= t, theory R <= R.
+end FieldBundle.
+
 (* --------------------------------------------------------------------- *)
 abstract theory Additive.
 
