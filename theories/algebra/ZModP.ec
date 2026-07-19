@@ -321,6 +321,11 @@ clone Ring.FieldBundle as ZModpFieldBd with
   theory R <= ZModpRing,
   theory F <= ZModpFieldMx.
 
+(* the classical flat field namespace, as a packed alias: every member
+   resolves to the one ring object (ZModpRing) or to the field mixin
+   (ZModpFieldMx) -- no duplicated objects *)
+theory ZModpField = ZModpRing + ZModpFieldMx.
+
 (* -------------------------------------------------------------------- *)
 instance field with zmod
   op rzero = ZModField.zero
