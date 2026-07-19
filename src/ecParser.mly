@@ -3948,7 +3948,7 @@ realize:
 (* Theory aliasing                                                      *)
 
 theory_alias: (* FIXME: THEORY ALIAS -> S/R conflict *)
-| THEORY name=uident EQ target=uqident { (name, target) }
+| THEORY name=uident EQ targets=plist1(uqident, PLUS) { (name, targets) }
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
