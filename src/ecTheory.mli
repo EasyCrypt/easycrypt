@@ -29,7 +29,7 @@ and theory_item_r =
   | Th_reduction of reduction_rule
   | Th_crbinding of crbinding * is_local
   | Th_auto      of auto_rule
-  | Th_alias     of (symbol * path)
+  | Th_alias     of (symbol * path list)
 
 and thsource = {
   ths_base : EcPath.path;

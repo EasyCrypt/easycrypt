@@ -219,7 +219,7 @@ module Theory : sig
 
   (* [alias scope (name, thname)] create a theory alias [name] to
    * [thname] *)
-  val alias : scope -> psymbol * pqsymbol -> scope
+  val alias : scope -> psymbol * pqsymbol list -> scope
 end
 
 (* -------------------------------------------------------------------- *)
