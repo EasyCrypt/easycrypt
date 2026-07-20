@@ -1133,7 +1133,8 @@ proof.
   move=> s_x; pose i := index x s.
   exists i; exists (drop (i + 1) s ++ take i s).
   rewrite -cat_cons /i /rot => {i}; congr=> //=.
-  elim: s s_x => //= y s IHs; case: (x = y); smt().
+  elim: s s_x=> //= y s IHs; rewrite index_cons.
+  by case: (x = y)=> [<- /= | /#]; rewrite drop0.
 qed.
 
 (* -------------------------------------------------------------------- *)
