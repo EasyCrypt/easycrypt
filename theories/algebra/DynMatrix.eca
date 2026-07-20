@@ -1939,7 +1939,11 @@ qed.
 lemma supp_dmatrix_full m d r c : 
   0 <= r => 0 <= c =>
   is_full d => m \in dmatrix d r c <=> size m = (r,c).
-proof. smt(supp_dmatrix). qed.
+proof.
+move=> ge0_r ge0_c d_fu.
+rewrite supp_dmatrix //; split=> //.
+by move=> -> /= i j _; rewrite d_fu.
+qed.
 
 lemma dvector_rnd_funi (d : R distr) (v1 v2 : vector) l :
   is_funiform d => size v1 = size v2 => 

@@ -858,7 +858,10 @@ proof. by rewrite /= lezNgt; case: (0 < n). qed.
 
 lemma size_drop n (s : 'a list):
   0 <= n => size (drop n s) = max 0 (size s - n).
-proof. by elim: s n => //= /#. qed.
+proof.
+elim: s n => //= [/#|x xs ih n ge0_n].
+smt(size_ge0).
+qed.
 
 lemma drop_cat n (s1 s2 : 'a list):
   drop n (s1 ++ s2) =
