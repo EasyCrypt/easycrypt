@@ -650,7 +650,8 @@ qed.
 
 lemma distr_0Vmem (d : 'a distr) : d = dnull \/ exists x, x \in d.
 proof.
-have := pred_0Vmem (support d); smt(support_eq0 supportP).
+have:= pred_0Vmem (support d); case: (exists x, x \in d)=> //=.
+by rewrite negb_exists=> /support_eq0.
 qed.
 
 lemma pmax_dnull ['a] : p_max dnull<:'a> = 0%r.

@@ -30,7 +30,6 @@ type 'a stlkg = [
    | Ch_Available of 'a
 ].
 
-
 theory FChan.
 
 type msg.
@@ -1523,8 +1522,8 @@ proof.
       progress; smt ().
 
     + proc => /=; inline *; wp; skip => /> &1 &2; rewrite /party_output /kstp /= /#.
-    + proc; match; 1,2 : smt().
-      + move=> m1 m2.
+    + proc; match = => |>.
+      + move=> m1.
         inline OTP(DHKE.FKE.FKEAuth.FKEAuth).step OTP_AUX(RO, DHKE.FKE.FKEAuth.FKEAuth).step.
         sp 1 1; if => //; conseq />; last by sim.
         inline *.
@@ -1543,16 +1542,15 @@ proof.
         case : (FKE.st{1}.`kst) => />; rewrite //=.
         rewrite /= dmap_ll //=.
         by apply  dt_ll.
-      move => m1 m2.
+      move => m1.
       inline DHKE.FKE.FKEAuth.FKEAuth.step.
       sp 1 1; match; 1,2: smt().
       + by move=> *; inline *; auto => /#.
       move=> tt1 tt2; inline *; auto => /> &1 &2 heq ??.
       by rewrite /unblock /kstp heq; case: (FKE.st{2}.`kst) => />.
-    + proc.
-      match; 1,2 : smt().
-      + by move=> m1 m2; inline *; sim; auto.
-      by move=> m1 m2; inline *; auto => /> /#.
+    + proc; match = => |>.
+      + by move=> m1; inline *; sim; auto.
+      by move=> m1; inline *; auto => /> /#.
     inline *; auto => />; rewrite /is_lossless weight_dmap dt_ll /= => *.
     by rewrite get_setE /init /= mem_empty /= mem_set.
   have -> : Pr[D(RO).distinguish() @ &m : res] = Pr[D(LRO).distinguish() @ &m : res].
@@ -1731,8 +1729,8 @@ call (_: invotp OTP.Initiator.p{1}
                 FKE.st{1}.`kst <> KE_Available (snd OTP.Initiator.p{1},
                                                 rcv OTP.Initiator.p{1},()) /\
                 (oget (getr (oget lke{2}))) = KE_Wait (snd OTP.Initiator.p{1},
-                                                        rcv OTP.Initiator.p{1},())));
-            first by wp;skip;rewrite /invotp /#.
+                                                        rcv OTP.Initiator.p{1},()))).
+          + by auto=> /#.
           case (_K{1} = None).
           + rcondf {1} 1; first by auto => /#.
             by match {2}; auto => /#.
@@ -1792,8 +1790,8 @@ sp 0 1; match; first 2 by smt().
 + by move => m1 b1; inline *; wp;skip;rewrite /invotp; smt().
 
 (* Backdooring the hybrid functionalities *)
-move => m2 b2; inline *.
-by sp 1 0; match; 1,2: (by smt()); auto => />; rewrite /invotp /#.
+move => m2 b2; inline *; sp 1 0.
+by match = => |>; auto=> |> &1 &2 /#.
 qed.
 
 (* Main theorem for secure channel based on OTP using ideal functionalities
@@ -1875,9 +1873,10 @@ byequiv => //.
 proc;inline *.  
   wp;call(_: ={ DHKE.DHKE_SIM._X, DHKE.DHKE_SIM._Y, glob DHKE.SimAuth.FAuthLR.FAuth, glob DHKE.SimAuth.FAuthRL.FAuth, glob OTP, glob DHKE.FKE.FKEAuth.FChan.FAuth.FAuth, glob FKE});
      first 2 by sim.
-  + proc; match; [1,2: by smt()]; move => *;inline *; auto => /> /#.  
-  + proc; match; [1,2: by smt()]; move=>  m1 m2;inline *;auto => />.
-    move => &2;case m2 => x; smt(). 
+  + proc; match = => |>; auto; inline *; auto=> |> &2.
+    by case: m2=> |> [] //=; case: (leak FKE.st{2})=> |> [].
+  + proc; match = => |>; auto; inline *; auto => |> &2.
+    by case: m2=> |> [] //= [] //=; case: (leak FKE.st{2})=> |> [].
     
  by  auto => />.
 qed.

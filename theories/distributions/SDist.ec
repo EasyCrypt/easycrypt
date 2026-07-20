@@ -119,7 +119,9 @@ have <- : `| Sp - Sn | = `|weight d1 - weight d2|.
   rewrite /Sp /Sn -sumB /=; try exact/summable_cond/summable_sdist.
   rewrite !weightE -sumB /= ?summable_mu1. 
   by congr; apply eq_sum => x /= /#.
-suff : flub F = Sp by rewrite /sdist -/F; smt(ler_def).
+suff : flub F = Sp.
++ rewrite /sdist -/F. print ler_def.
+  by move: ler_Sn_Sp=> /ler_def -> /#.
 apply ler_anti; split => [|_]; last first. 
 - apply (ler_trans (F pos)); last first.
   + by apply (flub_upper_bound); exists 1%r; rewrite /is_fub; smt(mu_bounded).

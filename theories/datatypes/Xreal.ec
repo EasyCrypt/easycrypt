@@ -195,7 +195,12 @@ lemma of_realM x y : 0.0 <= x => 0.0 <= y =>
 proof. smt (of_realdK to_realP). qed.
 
 lemma of_realI (x:real) : (inv x)%rp = inv x%rp.
-proof. smt (of_realdK to_realP  of_real_neg divr0). qed.
+proof.
+case: (0%r <= x)=> [ge0_x|/ltrNge lt0_x].
++ rewrite -{1}(of_realdK x) 1:#smt:(divr0).
+  by rewrite -to_realI to_realKd.
+by rewrite (of_real_neg x) // of_real_neg // invr_lt0.
+qed.
 hint simplify of_realI.
 
 op (%pos) (x:real) = if 0.0 <= x then x else 0.0.
