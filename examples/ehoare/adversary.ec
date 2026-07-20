@@ -14,7 +14,11 @@ axiom dr_mu_test : 0%r < p.
 op eps : real.
 axiom dr_mu1 : forall (x:r), mu1 dr x <= eps.
 
-lemma eps_ge0: 0%r <= eps. by smt(dr_mu1 mu_bounded). qed.
+lemma eps_ge0: 0%r <= eps.
+apply: (ler_trans (mu1 dr witness)).
++ exact: ge0_mu.
+exact: dr_mu1.
+qed.
 
 module type Oracle = { 
   proc o () : unit 
@@ -91,7 +95,10 @@ proof.
   + auto => &hr /=.
     case: (O.c{hr} = Q) => [ -> /= | *].
     + rewrite Ep_mu (:(fun (a : r) => a \in O.log{hr}) = mem O.log{hr}); 1: by auto.
-      rewrite -of_realM /=; smt(mu_mem_le_mu1 size_ge0 eps_ge0 dr_mu1).
+      rewrite -of_realM /= 1:le_fromint 1:size_ge0 1:eps_ge0.
+      rewrite /(%pos) (: 0%r <= _) /=.
+      + by apply: mulr_ge0; [exact/le_fromint/size_ge0 | exact: eps_ge0].
+      exact/mu_mem_le_mu1/dr_mu1.
     case: (Q < O.c{hr}); by smt().
   auto => &hr /=; apply xle_cxr => *; split; 1:smt().
   have -> /=: (Q < O.c{hr} + 1) = (Q <= O.c{hr}) by smt().

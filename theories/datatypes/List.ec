@@ -446,7 +446,15 @@ proof. by move/onth_some => [? <-]; apply/mem_nth. qed.
 
 lemma nthP (x0 : 'a) (s : 'a list) (x : 'a) :
   (x \in s) <=> (exists (i : int), 0 <= i < size s /\ nth x0 s i = x) .
-proof. elim: s; smt(size_ge0). qed.
+proof.
+elim: s=> [/#|y ys] /= ih; case: (x = y)=> [<<-|x_neq_y] /=.
++ by exists 0=> |>; smt(size_ge0).
+rewrite ih; split=> - [] i [#].
++ by move=> ge0_i i_lt_szys ith_ys_is_x; exists (i + 1)=> /#.
+move=> /lez_eqVlt; rewrite (eq_sym 0 i).
+case: (i = 0)=> [|>|/=] i_neq_0 gt0_i i_lt_Sszys ith_ys_x.
+by exists (i - 1)=> /#.
+qed.
 
 lemma nthPn (x0 : 'a) (s : 'a list) (x : 'a) :
   ! (x \in s) <=> (forall (i : int), 0 <= i < size s => nth x0 s i <> x).
@@ -873,10 +881,8 @@ proof. by rewrite /= lezNgt; case: (0 < n). qed.
 lemma size_drop n (s : 'a list):
   0 <= n => size (drop n s) = max 0 (size s - n).
 proof.
-elim: s n=> //= n; first by smt(lez_maxl).
-move=> l ih n0 ?; case (n0 = 0).
-+ by move=> -> /=; smt(size_ge0).
-+ by smt().
+elim: s n => //= [/#|x xs ih n ge0_n].
+smt(size_ge0).
 qed.
 
 lemma drop_cat n (s1 s2 : 'a list):

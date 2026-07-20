@@ -85,7 +85,7 @@ section RCPA.
   proof.
     byequiv=> //=; proc.
     call (_: true).
-      by proc; inline *; auto; smt.
+    + by proc; inline *; auto=> |>; smt(leak_pad).
     by call (_: true).
   qed.
 
@@ -99,7 +99,7 @@ section RCPA.
     byequiv=> //=; proc; inline *.
     call (_:    ={glob S}
              /\ ={k}(RCPA_Wrap,CoreDefs.RCPA.RCPA_Wrap)).
-      by proc; inline *; wp; call (_: true); auto; smt.
+      by proc; inline *; wp; call (_: true); auto.
     by call (_: true).
   qed.
 end section RCPA.

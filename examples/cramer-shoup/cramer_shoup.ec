@@ -868,8 +868,10 @@ section Security_Aux.
     (forall (x : 'a), mu1 dt x <= r) => mu dt (mem l) <= n%r * r.
   proof.
     move=> Hsize Hmu1;apply (ler_trans ((size l)%r * r)).
-    + by apply mu_mem_le_mu1.
-    apply ler_wpmul2r; 1: smt (mu_bounded).
+    + by apply: mu_mem_le_mu1.
+    apply: ler_wpmul2r.
+    + apply: (ler_trans (mu1 dt witness)); 1:exact: ge0_mu.
+      exact: Hmu1.
     by apply le_fromint.
   qed.
 

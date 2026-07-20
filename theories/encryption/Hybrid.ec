@@ -428,7 +428,8 @@ section.
     by rewrite range_uniq=> /= x; rewrite mem_range supp_dinter=> /#.
   have Huni : forall (x : int), x \in [0..max 0 (q - 1)] => mu1 [0..max 0 (q - 1)] x = 1%r / q%r.
   + move=> x hx; rewrite dinter1E /=.
-    by rewrite -supp_dinter hx /= /#.
+    rewrite -supp_dinter hx /= /max subz_gt0.
+    by case: (1 < q)=> |> /lezNgt /lez_eqVlt=> - [] /#.
   pose ev :=
     fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
       let (ga,ge,l,l0) = g in p ga ge l r /\ l <= q.

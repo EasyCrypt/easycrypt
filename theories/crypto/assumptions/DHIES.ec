@@ -985,8 +985,8 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     case _: (Adv2_Procs.kindex.[(pk, ctxt.`1)]{2}).
     + by move: H10; rewrite -mem_fdom H -H2 mem_fdom domE.
     smt ().
-   wp; skip; rewrite /inv /= /#.
-  wp; skip; rewrite /inv /#.
+   by auto=> |> &1 &2 @/inv |> _ + _ _ _ _ _ _ _ _ _ _ /#.
+  by auto=> |> &1 &2 @/inv |> _ _ + _ _ _ _ _ _ _ /#.
 + by auto => />.
 + by auto => />.
 qed.
