@@ -402,17 +402,36 @@ apply: degP=> //.
   by apply/ltrW/(ltr_le_trans _ _ _ le_pq).
 qed.
 
+lemma degDr p q : deg p < deg q => deg (p + q) = deg q.
+proof. by move/degDl; rewrite addrC. qed.
+
+lemma degBl p q : deg q < deg p => deg (p - q) = deg p.
+proof. by move=> ?; rewrite degDl ?degN. qed.
+
 lemma lcDl p q : deg q < deg p => lc (p + q) = lc p.
 proof.
 move=> ^lt_pq /degDl ->; rewrite polyDE.
 by rewrite addrC gedeg_coeff ?add0r //#.
 qed.
 
-lemma degDr p q : deg p < deg q => deg (p + q) = deg q.
-proof. by move/degDl; rewrite addrC. qed.
+lemma lcBl p q : deg q < deg p => lc (p - q) = lc p.
+proof. by move=> ?; rewrite lcDl ?degN. qed.
 
 lemma lcDr p q : deg q < deg p => lc (p + q) = lc p.
 proof. by move/lcDl; rewrite addrC. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma degXBC (r : coeff) : deg (X - polyC r) = 2.
+proof.
+rewrite degDl ?degN.
+- by rewrite degX &(ler_lt_trans _ _ _ (degC_le _)).
+- by rewrite degX.
+qed.
+
+lemma lcXBC (r : coeff) : lc (X - polyC r) = oner.
+proof.
+by rewrite lcBl ?lcX // degX &(ler_lt_trans _ _ _ (degC_le _)).
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma polyMEw M p q k : (k <= M)%Int => (p * q).[k] =
@@ -497,32 +516,11 @@ qed.
 lemma onep_neq0 : poly1 <> poly0.
 proof. by apply/negP => /poly_eqP /(_ 0); rewrite !polyCE /= oner_neq0. qed.
 
-clone export Ring.ComRing as PolyComRing with
-  type t      <= poly ,
-    op zeror  <= poly0,
-    op oner   <= poly1,
-    op ( + )  <= polyD,
-    op [ - ]  <= polyN,
-    op ( * )  <= polyM
-
-  proof addrA     by apply ZPoly.addrA
-  proof addrC     by apply ZPoly.addrC
-  proof add0r     by apply ZPoly.add0r
-  proof addNr     by apply ZPoly.addNr
-  proof mulrA     by apply mulpA
-  proof mulrC     by apply mulpC
-  proof mul1r     by apply mul1p
-  proof mulrDl    by apply mulpDl
-  proof oner_neq0 by apply onep_neq0
-
-  remove abbrev (-)
-  remove abbrev (/).
-
 (* -------------------------------------------------------------------- *)
 lemma mul_lc p q : lc p * lc q = (p * q).[deg p + deg q - 2].
 proof.
-case: (p = poly0) => [->|nz_p]; first by rewrite !(mul0r, poly0E).
-case: (q = poly0) => [->|nz_q]; first by rewrite !(mulr0, poly0E).
+case: (p = poly0) => [->|nz_p]; first by rewrite mul0p !(mul0r, poly0E).
+case: (q = poly0) => [->|nz_q]; first by rewrite mulpC mul0p !(mulr0, poly0E).
 have ->: deg p + deg q - 2 = (deg p - 1) + (deg q - 1) by ring.
 pose cp := deg p - 1; pose cq := deg q - 1.
 rewrite polyME (BCA.bigD1 _ _ cp) ?range_uniq //=.
@@ -558,6 +556,27 @@ move=> nz_lc; apply/(IntID.addIr 1); rewrite -!addrA /=.
 apply: contraR nz_lc; rewrite eqr_le degM_le //=.
 by rewrite lerNgt /= => lt_pq; rewrite mul_lc gedeg_coeff //#.
 qed.
+
+clone export Ring.ComRing as PolyComRing with
+  type t      <= poly ,
+    op zeror  <= poly0,
+    op oner   <= poly1,
+    op ( + )  <= polyD,
+    op [ - ]  <= polyN,
+    op ( * )  <= polyM
+
+  proof addrA     by apply ZPoly.addrA
+  proof addrC     by apply ZPoly.addrC
+  proof add0r     by apply ZPoly.add0r
+  proof addNr     by apply ZPoly.addNr
+  proof mulrA     by apply mulpA
+  proof mulrC     by apply mulpC
+  proof mul1r     by apply mul1p
+  proof mulrDl    by apply mulpDl
+  proof oner_neq0 by apply onep_neq0
+
+  remove abbrev (-)
+  remove abbrev (/).
 
 (* -------------------------------------------------------------------- *)
 lemma lcM_proper p q :
@@ -670,7 +689,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 theory BigPoly.
-clone include BigComRing with theory CR <- PolyComRing
+clone include BigComRing with theory CR <= PolyComRing
 
   remove abbrev CR.(-)
   remove abbrev CR.(/) 
@@ -724,7 +743,7 @@ import BigPoly.
 
 (* -------------------------------------------------------------------- *)
 op peval (p : poly) (a : coeff) =
-  BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
+  BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p).
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = Coeff.zeror.
@@ -776,6 +795,166 @@ apply/poly_eqP=> c ge0_c; rewrite polyLE; case: (c < n).
 - by move=> lt_cn; rewrite (nth_map 0) ?size_range ?nth_range //#.
 - rewrite ltrNge /= => le_nc; rewrite gedeg_coeff // 1:/#.
   by rewrite nth_out // size_map size_range /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma polyL_nil : polyL [<:coeff>] = poly0.
+proof. by apply poly_eqP => i ge0; rewrite polyLE poly0E. qed.
+
+lemma polyL_cons (c : coeff) (xs : coeff list) :
+  polyL (c :: xs) = polyC c + polyL xs * X.
+proof.
+apply poly_eqP => i ge0.
+rewrite polyLE polyDE polyCE polyMXE polyLE.
+case: (i = 0) => [->|nz] /=.
+- by rewrite nth_neg // Coeff.addr0.
+by rewrite Coeff.add0r /= ifF //.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma pevalE_ge (p : poly) (a : coeff) (n : int) : deg p <= n =>
+  peval p a = BCA.bigi predT (fun i => p.[i] * Coeff.exp a i) 0 n.
+proof.
+move=> @/peval /lez_eqVlt [<<-//|hlt].
+rewrite (BCA.big_cat_int (deg p) 0 n) ~-1:#smt:(ge0_deg).
+rewrite [BCA.bigi _ _ _ n](_ : _ = zeror) ?addr0 //.
+rewrite BCA.big1_seq //= => i /mem_range ?.
+by rewrite gedeg_coeff 1:/# mul0r.
+qed.
+
+lemma pevalC (c : coeff) (a : coeff) : peval (polyC c) a = c.
+proof.
+rewrite (pevalE_ge (polyC c) a 1) 1:degC_le BCA.big_int1 /=.
+by rewrite polyCE /= expr0 mulr1.
+qed.
+
+lemma peval0 (a : coeff) : peval poly0 a = zeror.
+proof. by rewrite pevalC. qed.
+
+lemma pevalD (p q : poly) (a : coeff) :
+  peval (p + q) a = peval p a + peval q a.
+proof.
+pose n := max (deg p) (deg q).
+rewrite (pevalE_ge (p + q) a n) 1:#smt:(degD).
+rewrite (pevalE_ge p a n) 1:/# (pevalE_ge q a n) 1:/#.
+rewrite -BCA.big_split /= &(BCA.eq_big_int) /=.
+by move=> i rgi /=; rewrite polyDE Coeff.mulrDl.
+qed.
+
+lemma pevalN (p : poly) (a : coeff) : peval (- p) a = - peval p a.
+proof.
+have hd : deg (- p) <= deg p by rewrite degN.
+rewrite (pevalE_ge (- p) a (deg p)) 1:hd.
+rewrite (pevalE_ge p a (deg p)) 1://.
+rewrite BCA.sumrN /= &(BCA.eq_big_int).
+by move=> i rgi /=; rewrite polyNE Coeff.mulNr.
+qed.
+
+lemma pevalB (p q : poly) (a : coeff) :
+  peval (p - q) a = peval p a - peval q a.
+proof. by rewrite pevalD pevalN. qed.
+
+lemma pevalMX (p : poly) (a : coeff) : peval (p * X) a = peval p a * a.
+proof.
+have hd : deg (p * X) <= deg p + 1.
+- case: (p = poly0) => [->>|nz].
+  - by rewrite mul0r // #smt:(ge0_deg).
+  have := degM_le p X nz nz_polyX.
+  by rewrite degX /#.
+rewrite (pevalE_ge (p * X) a (deg p + 1)) 1:hd.
+rewrite (pevalE_ge p a (deg p)) 1://.
+rewrite BCA.big_int_recl 1:#smt:(ge0_deg) /=.
+rewrite polyMXE lt0_coeff 1:// Coeff.mul0r Coeff.add0r.
+rewrite BCA.mulr_suml &(BCA.eq_big_int) /=.
+by move=> i [??] /=; rewrite polyMXE exprSr //= #ring.
+qed.
+
+lemma pevalX (a : coeff) : peval X a = a.
+proof. by rewrite -[X]mul1r pevalMX pevalC mul1r. qed.
+
+lemma pevalZ (c : coeff) (p : poly) (a : coeff) :
+  peval (c ** p) a = c * peval p a.
+proof.
+have hd : deg (c ** p) <= deg p by apply degZ_le.
+rewrite (pevalE_ge (c ** p) a (deg p)) 1:hd.
+rewrite (pevalE_ge p a (deg p)) 1://.
+rewrite BCA.mulr_sumr &(BCA.eq_big_int) /=.
+by move=> i rgi; rewrite polyZE mulrA.
+qed.
+
+lemma pevalM (p q : poly) (a : coeff) :
+  peval (p * q) a = peval p a * peval q a.
+proof.
+have main : forall (xs : coeff list) (r : poly),
+  peval (polyL xs * r) a = peval (polyL xs) a * peval r a.
+- elim=> [|c xs ih] r.
+  - by rewrite polyL_nil mul0r peval0 Coeff.mul0r.
+  rewrite polyL_cons mulrDl pevalD -scalepE pevalZ.
+  rewrite [polyL xs * _ * _]mulrAC pevalMX ih.
+  by rewrite pevalD pevalC pevalMX #ring.
+have [xs [_ ->]] := surj_polyL p (deg p) _; 1: by done.
+by apply main.
+qed.
+
+lemma peval_sum ['a] (P : 'a -> bool) (F : 'a -> poly) (s : 'a list) (a : coeff) :
+  peval (BigPoly.PCA.big P F s) a
+    = BCA.big P (fun x => peval (F x) a) s.
+proof.
+elim: s => [|x s ih].
+- by rewrite PCA.big_nil BCA.big_nil peval0.
+rewrite BigPoly.PCA.big_cons BCA.big_cons.
+by case: (P x) => hP; rewrite ?pevalD ih.
+qed.
+
+lemma peval_prod ['a] (P : 'a -> bool) (F : 'a -> poly) (s : 'a list) (a : coeff) :
+  peval (BigPoly.PCM.big P F s) a
+    = BCM.big P (fun x => peval (F x) a) s.
+proof.
+elim: s => [|x s ih].
+- by rewrite PCM.big_nil BCM.big_nil pevalC.
+rewrite BigPoly.PCM.big_cons BCM.big_cons.
+by case: (P x) => hP; rewrite ?pevalM ih.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Products of monic linear factors                                     *)
+op mprod (rs : coeff list) : poly =
+  PCM.big predT (fun r => X - polyC r) rs.
+
+lemma mprod_nil : mprod [] = poly1.
+proof. by rewrite /mprod PCM.big_nil. qed.
+
+lemma mprod_cons (r : coeff) (rs : coeff list) :
+  mprod (r :: rs) = (X - polyC r) * mprod rs.
+proof. by rewrite /mprod PCM.big_consT. qed.
+
+lemma mprod_cat (rs1 rs2 : coeff list) :
+  mprod (rs1 ++ rs2) = mprod rs1 * mprod rs2.
+proof. by rewrite /mprod PCM.big_cat. qed.
+
+lemma mprod_mem_factor (rs : coeff list) (r : coeff) :
+  r \in rs => exists q, mprod rs = (X - polyC r) * q.
+proof.
+move=> hmem; exists (mprod (rem r rs)).
+rewrite /mprod (PCM.eq_big_perm _ _ _ _ (perm_to_rem _ _ hmem)).
+by rewrite PCM.big_consT.
+qed.
+
+lemma mprod_root (rs : coeff list) (a : coeff) :
+  a \in rs => root (mprod rs) a.
+proof.
+move=> hin; have [q ->] := mprod_mem_factor rs a hin.
+by rewrite pevalM pevalB pevalX pevalC Coeff.subrr Coeff.mul0r.
+qed.
+
+lemma deg_mprod (rs : coeff list) : deg (mprod rs) = 1 + size rs.
+proof.
+elim: rs => [|r rs ih]; first by rewrite mprod_nil deg1.
+rewrite mprod_cons degM_proper.
+- rewrite lcXBC mul1r; apply/negP=> h.
+  have: mprod rs = poly0 by rewrite -lc_eq0 h.
+  by rewrite -deg_eq0 ih; smt(size_ge0).
+by rewrite degXBC ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -850,15 +1029,66 @@ end PolyComRing.
 abstract theory Poly.
 type coeff.
 
-clone import IDomain as IDCoeff with type t <= coeff.
+clone import ComRing as CR with type t <= coeff.
+
+clone import IDomainMixin as CoeffDom with
+  type t <= coeff, theory R <= CR.
 
 clone include PolyComRing with
   type coeff   <- coeff,
-  theory Coeff <- IDCoeff,
+  theory Coeff <- CR,
   op PolyComRing.invr (p : poly) =
-    (if deg p = 1 then polyC (IDCoeff.invr p.[0]) else p).
+    (if deg p = 1 then polyC (CR.invr p.[0]) else p),
+  pred PolyComRing.unit (p : poly) =
+    (deg p = 1 /\ CR.unit p.[0])
+  proof *.
 
-clear [PolyComRing.* PolyComRing.AddMonoid.* PolyComRing.MulMonoid.*].
+(* -------------------------------------------------------------------- *)
+realize PolyComRing.mulVr.
+proof.
+move=> p inv_p; apply/poly_eqP=> c /ler_eqVlt [<<-|].
++ rewrite polyCE /= polyME /= BigCf.BCA.big_int1 /= /PolyComRing.invr.
+  by case: inv_p => -> inv_p0 /=; rewrite polyCE /= CR.mulVr.
++ move=> gt0_c; rewrite polyME polyCE gtr_eqF //=.
+  rewrite BigCf.BCA.big_seq BigCf.BCA.big1 //= => i; rewrite mem_range.
+  case: inv_p => @/PolyComRing.invr ^ degp -> inv_p0 [+ lt_i_Sc] - /ler_eqVlt [<<-|] /=.
+  - by rewrite (gedeg_coeff _ c) -1:mulr0 // degp /#.
+  - move=> gt0_i; rewrite (gedeg_coeff _ i) -1:mul0r //.
+    by apply/(ler_trans _ _ _ (degC_le _)) => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+realize PolyComRing.unitout.
+proof.
+move=> p @/PolyComRing.unit @/PolyComRing.invr; case: (deg p = 1) => //=.
+move=> dp_eq1 unitN_p0; apply/poly_eqP => c ge0_c.
+case: (c < 1) => [lt1_c|/lerNgt ge1_c]; last first.
+- rewrite !(@gedeg_coeff _ c) 2:dp_eq1 //.
+  by apply/(ler_trans _ _ _ _ ge1_c)/degC_le.
+- suff ->: c = 0 by rewrite polyCE /= CR.invr_out.
+  by rewrite eqr_le ge0_c /= -ltz1.
+qed.
+
+(* -------------------------------------------------------------------- *)
+realize PolyComRing.unitP.
+proof.
+have degMP: forall (p q : poly), p <> poly0 => q <> poly0 =>
+  deg (polyM p q) = deg p + deg q - 1.
++ move=> p q; rewrite -!lc_eq0 -!CoeffDom.lregP => reg_p reg_q.
+  by rewrite &(degM_proper) CoeffDom.mulf_eq0 negb_or -!CoeffDom.lregP.
+move=> p q ^pMqE /(congr1 deg); rewrite deg1.
+move/(congr1 ((+) 1)) => /=; rewrite addrC; move: pMqE.
+case: (deg p = 0) => [/deg_eq0->|nz_p].
+- by rewrite mulpC mul0p eq_sym onep_neq0.
+case: (deg q = 0) => [/deg_eq0->|nz_q].
+- by rewrite mul0p eq_sym onep_neq0.
+rewrite degMP -1?deg_eq0 // => ME eq.
+have {eq}[]: deg p = 1 /\ deg q = 1 by smt(ge0_deg).
+move/deg_eq1=> [cp [nz_cp ->>]]; move/deg_eq1=> [cq [nz_cq ->>]].
+move/poly_eqP: ME => /(_ 0 _) //; rewrite polyCE /=.
+rewrite polyME BigCf.BCA.big_int1 /= => /CR.unitP @/PolyComRing.unit -> /=.
+by rewrite deg_eq1; exists cp.
+qed.
 
 import BigCf.
 
@@ -871,84 +1101,10 @@ by rewrite &(degM_proper) mulf_eq0 negb_or -!lregP.
 qed.
 
 (* -------------------------------------------------------------------- *)
-pred unitp (p : poly) =
-  deg p = 1 /\ IDCoeff.unit p.[0].
+clone export IDomainMixin as IDPoly with
+  type t <= poly, theory R <= PolyComRing
+  proof *.
 
-(* -------------------------------------------------------------------- *)
-op polyV (p : poly) =
-  if deg p = 1 then polyC (IDCoeff.invr p.[0]) else p.
-
-(* -------------------------------------------------------------------- *)
-clone import Ring.IDomain as IDPoly with
-  type t      <- poly ,
-    op zeror  <- poly0,
-    op oner   <- poly1,
-    op ( + )  <- polyD,
-    op [ - ]  <- polyN,
-    op ( * )  <- polyM,
-    op invr   <- polyV,
-    op exp    <- PolyComRing.exp,
-  pred unit   <- unitp
-
-  proof *
-
-  remove abbrev (-)
-  remove abbrev (/).
-
-realize addrA     by apply PolyComRing.addrA    .
-realize addrC     by apply PolyComRing.addrC    .
-realize add0r     by apply PolyComRing.add0r    .
-realize addNr     by apply PolyComRing.addNr    .
-realize mulrA     by apply PolyComRing.mulrA    .
-realize mulrC     by apply PolyComRing.mulrC    .
-realize mul1r     by apply PolyComRing.mul1r    .
-realize mulrDl    by apply PolyComRing.mulrDl   .
-realize oner_neq0 by apply PolyComRing.oner_neq0.
-
-(* -------------------------------------------------------------------- *)
-realize mulVr.
-proof.
-move=> p inv_p; apply/poly_eqP=> c /ler_eqVlt [<<-|].
-+ rewrite polyCE /= polyME /= BCA.big_int1 /= /polyV.
-  by case: inv_p => -> inv_p0 /=; rewrite polyCE /= mulVr.
-+ move=> gt0_c; rewrite polyME polyCE gtr_eqF //=.
-  rewrite BCA.big_seq BCA.big1 //= => i; rewrite mem_range.
-  case: inv_p => @/polyV ^ degp -> inv_p0 [+ lt_i_Sc] - /ler_eqVlt [<<-|] /=.
-  - by rewrite (gedeg_coeff _ c) -1:mulr0 // degp /#.
-  - move=> gt0_i; rewrite (gedeg_coeff _ i) -1:mul0r //.
-    by apply/(ler_trans _ _ _ (degC_le _)) => /#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-realize unitout.
-proof.
-move=> p @/unitp @/polyV; case: (deg p = 1) => //=.
-move=> dp_eq1 unitN_p0; apply/poly_eqP => c ge0_c.
-case: (c < 1) => [lt1_c|/lerNgt ge1_c]; last first.
-- rewrite !(@gedeg_coeff _ c) 2:dp_eq1 //.
-  by apply/(ler_trans _ _ _ _ ge1_c)/degC_le.
-- suff ->: c = 0 by rewrite polyCE /= invr_out.
-  by rewrite eqr_le ge0_c /= -ltz1.
-qed.
-
-(* -------------------------------------------------------------------- *)
-realize unitP.
-proof.
-move=> p q ^pMqE /(congr1 deg); rewrite deg1.
-move/(congr1 ((+) 1)) => /=; rewrite addrC; move: pMqE.
-case: (deg p = 0) => [/deg_eq0->|nz_p].
-- by rewrite mulpC mul0p eq_sym onep_neq0.
-case: (deg q = 0) => [/deg_eq0->|nz_q].
-- by rewrite mul0p eq_sym onep_neq0.
-rewrite degM -1?deg_eq0 // => ME eq.
-have {eq}[]: deg p = 1 /\ deg q = 1 by smt(ge0_deg).
-move/deg_eq1=> [cp [nz_cp ->>]]; move/deg_eq1=> [cq [nz_cq ->>]].
-move/poly_eqP: ME => /(_ 0 _) //; rewrite polyCE /=.
-rewrite polyME BCA.big_int1 /= => /IDCoeff.unitP @/unitp -> /=.
-by rewrite deg_eq1; exists cp.
-qed.
-
-(* -------------------------------------------------------------------- *)
 realize mulf_eq0.
 proof.
 move=> p q; split=> [|[] ->]; last 2 by rewrite (mulr0, mul0r).
@@ -966,9 +1122,93 @@ by rewrite lcM_proper // mulf_eq0 !lc_eq0 !(nz_p, nz_q).
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma degV (p : poly) : deg (polyV p) = deg p.
+lemma degV (p : poly) : deg (invr p) = deg p.
 proof.
-rewrite /polyV; case: (deg p = 1); last done.
+rewrite /PolyComRing.invr; case: (deg p = 1); last done.
 by case/deg_eq1=> c [nz_c ->>]; rewrite !degC polyCE /= invr_eq0.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma peval_mprod_out (rs : coeff list) (a : coeff) :
+  ! (a \in rs) => peval (mprod rs) a <> CR.zeror.
+proof.
+elim: rs => [|r rs ih] /=.
+- by rewrite mprod_nil pevalC &(CR.oner_neq0).
+move/negb_or => [nz_ar a_notin_rs].
+rewrite mprod_cons pevalM pevalB pevalX pevalC.
+by rewrite &(CoeffDom.mulf_neq0) -1:ih // subr_eq0.
+qed.
 end Poly.
+
+(* ==================================================================== *)
+abstract theory PolyField.
+type coeff.
+
+clone import FieldBundle as K with type t <= coeff.
+
+clone include Poly with
+  type coeff      <- coeff,
+  theory CR       <- K.R,
+  theory CoeffDom <- K.F.Dom.
+
+import K.R K.F.
+import BigCf BigPoly.
+
+(* -------------------------------------------------------------------- *)
+(* Lagrange interpolation over a uniq root list: any assignment of      *)
+(* values at the roots is realized by a polynomial of degree at most    *)
+(* the number of roots                                                  *)
+theory Lagrange.
+  op lag (rs : coeff list) (r : coeff) : poly =
+    polyC (invr (peval (mprod (rem r rs)) r)) * mprod (rem r rs).
+  
+  lemma lag_eval_same (rs : coeff list) (r : coeff) :
+    uniq rs => r \in rs => peval (lag rs r) r = K.R.oner.
+  proof.
+  move=> hu hmem @/lag; rewrite pevalM pevalC.
+  rewrite &(mulVf) &(peval_mprod_out).
+  by rewrite rem_filter // mem_filter.
+  qed.
+
+  lemma lag_eval_other (rs : coeff list) (r r' : coeff) :
+    uniq rs => r' \in rs => r' <> r
+      => peval (lag rs r) r' = K.R.zeror.
+  proof.
+  move=> hu hm hne @/lag; rewrite pevalM.
+  rewrite (mprod_root (rem r rs) r').
+  - by rewrite rem_filter // mem_filter.
+  - by rewrite mulr0.
+  qed.
+
+  lemma deg_lag (rs : coeff list) (r : coeff) :
+    uniq rs => r \in rs => deg (lag rs r) <= size rs.
+  proof.
+  move=> hu hm @/lag; rewrite -scalepE.
+  apply/(ler_trans _ _ _ (degZ_le _ _)).
+  by rewrite deg_mprod size_rem.
+  qed.
+
+  (* -------------------------------------------------------------------- *)
+  op interp (rs : coeff list) (f : coeff -> coeff) : poly =
+    BigPoly.PCA.big predT (fun r => polyC (f r) * lag rs r) rs.
+
+  lemma interp_evalP (rs : coeff list) (f : coeff -> coeff) (r0 : coeff) :
+    uniq rs => r0 \in rs => peval (interp rs f) r0 = f r0.
+  proof.
+  move=> hu hm @/interp; rewrite peval_sum.
+  rewrite (BCA.eq_big_perm _ _ _ _ (perm_to_rem _ _ hm)).
+  rewrite BCA.big_consT /= pevalM pevalC.
+  rewrite lag_eval_same ~-1:// mulr1 BCA.big1_seq /= ?addr0 //.
+  move=> r; rewrite rem_filter // mem_filter // => -[hne hmem2].
+  by rewrite pevalM pevalC (lag_eval_other rs r r0) ~-1://# mulr0.
+  qed.
+
+  lemma deg_interp (rs : coeff list) (f : coeff -> coeff) :
+    uniq rs => deg (interp rs f) <= size rs.
+  proof.
+  move=> hu @/interp; rewrite PCA.big_seq &(deg_sum) //=.
+  move=> r hr; rewrite -scalepE.
+  by apply/(ler_trans _ _ _ (degZ_le _ _))/deg_lag.
+  qed.
+end Lagrange.
+end PolyField.

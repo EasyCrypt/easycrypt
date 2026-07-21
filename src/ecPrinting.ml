@@ -3953,8 +3953,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
       Format.fprintf fmt "%abind circuit %a \"%s\"."
         pp_locality lc (pp_opname ppe) cr.operator cr.name
   end
-  | EcTheory.Th_alias (name, target) ->
-      Format.fprintf fmt "theory %s = %a." name (pp_thname ~alias:false ppe) target
+  | EcTheory.Th_alias (name, targets) ->
+      Format.fprintf fmt "theory %s = %a." name
+        (pp_list " +@ " (pp_thname ~alias:false ppe)) targets
 
 (* -------------------------------------------------------------------- *)
 and pp_th_item ppe p fmt item =

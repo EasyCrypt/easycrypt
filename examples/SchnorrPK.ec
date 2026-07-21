@@ -15,7 +15,7 @@ clone G.PowZMod as GP with
 
 clone GP.FDistr as FD.
 
-clone GP.ZModE.ZModpField as ZPF.
+clone GP.ZModE.ZModpFieldBd as ZPF.
 
 import G GP GP.ZModE FD.
 
@@ -145,7 +145,7 @@ section SchnorrPKSecurity.
     auto; rewrite /R /R_DL /oget => &hr /> hne 2!-> /=.
     rewrite expM !expB accepting_transcript_1 accepting_transcript_2.
     rewrite invM (mulcC m{hr}) -mulcA (mulcA m{hr}) mulcV mulcA mulc1 -expB -expM.
-    by rewrite ZPF.divrr ?ZPF.subr_eq0 // exp1.
+    by rewrite ZPF.F.divff ?ZPF.R.subr_eq0 // exp1.
   qed.
 
   (* Special honest verifier zero knowledge *)

@@ -90,6 +90,21 @@ let process_change fp (tc : tcenv1) =
   t_change fp tc
 
 (* -------------------------------------------------------------------- *)
+(* Resolve the [-delta ops] / [+delta ops] items of a hint clause and
+   record them as reduction-opacity overrides in the simplify context. *)
+let apply_hint_opacity tc env (specs : (bool * pqsymbol list) list) simpl =
+  List.fold_left (fun simpl (opq, ops) ->
+    let ops =
+      List.map (fun ps ->
+        match EcEnv.Op.lookup_opt (unloc ps) env with
+        | None   -> tc_lookup_error !!tc ~loc:ps.pl_loc `Operator (unloc ps)
+        | Some p -> fst p) ops
+    in
+    EcEnv.SimplifyContext.set_opacity
+      (List.map (fun p -> (p, opq)) ops) simpl)
+    simpl specs
+
+(* -------------------------------------------------------------------- *)
 let process_local_hint (hint : plocalhint) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let simpl = FApi.tc1_simplify_context tc in
@@ -136,8 +151,13 @@ let process_local_hint (hint : plocalhint) (tc : tcenv1) =
             in
             (mode, List.rev ops))
         in
-        hd |> Option.fold ~none:simpl ~some:(fun hd ->
-          EcEnv.SimplifyContext.set_default_hd (Some hd) simpl)
+        let simpl =
+          hd |> Option.fold ~none:simpl ~some:(fun hd ->
+            EcEnv.SimplifyContext.set_default_hd (Some hd) simpl)
+        in
+
+        (* reduction-opacity overrides ([-delta ops] / [+delta ops]) *)
+        apply_hint_opacity tc env h.ph_opacity simpl
 
     | PLHClear base ->
         EcEnv.SimplifyContext.clear ?base simpl
@@ -202,6 +222,9 @@ let process_simplify_info ri (tc : tcenv1) =
       EcEnv.SimplifyContext.add_rules [(path, rule)] simpl
     ) simpl hint.ph_lemmas
   in
+
+  (* Per-call reduction-opacity overrides ([-delta ops] / [+delta ops]). *)
+  let simpl = apply_hint_opacity tc env hint.ph_opacity simpl in
 
   (* Database list consulted by this call: the unsigned selection if any
      (else the proof-local default / active set), with the signed

@@ -575,14 +575,16 @@ type pmpred_args = (osymbol * pformula) list
    [ph_lemmas] are lemmas added to the default DB for this call (lemma
    sets are add-only -- the head filter restricts which rules apply). *)
 type psimplify_hint = {
-  ph_select : symbol list;
-  ph_dbs    : (bool * symbol) list;
-  ph_hd     : ([`Include | `Exclude] * pqsymbol list) option;
-  ph_lemmas : pqsymbol list;
+  ph_select  : symbol list;
+  ph_dbs     : (bool * symbol) list;
+  ph_hd      : ([`Include | `Exclude] * pqsymbol list) option;
+  ph_lemmas  : pqsymbol list;
+  (* [-delta ops] / [+delta ops]: true = make reduction-opaque *)
+  ph_opacity : (bool * pqsymbol list) list;
 }
 
 let empty_simplify_hint = {
-  ph_select = []; ph_dbs = []; ph_hd = None; ph_lemmas = [];
+  ph_select = []; ph_dbs = []; ph_hd = None; ph_lemmas = []; ph_opacity = [];
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1501,7 +1503,7 @@ type global_action =
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning
-  | GthAlias     of (psymbol * pqsymbol)
+  | GthAlias     of (psymbol * pqsymbol list)
   | GModImport   of pmsymbol located list
   | GsctOpen     of osymbol_r
   | GsctClose    of osymbol_r

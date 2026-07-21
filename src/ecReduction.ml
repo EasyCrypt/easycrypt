@@ -705,13 +705,32 @@ let nohead = NotRed NoHead
 let needsubterm = NotRed NeedSubTerm
 
 (* -------------------------------------------------------------------- *)
+(* Effective reduction-opacity of an operator: the proof-local override
+   ([hint -delta op] / [hint +delta op]) wins over the operator's
+   [opaque] declaration. *)
+let reduction_opaque (ri : reduction_info) (env : EcEnv.env) (p : EcPath.path) =
+  match EcEnv.SimplifyContext.opacity p ri.user_local with
+  | Some b -> b
+  | None   -> (oget (EcEnv.Op.by_path_opt p env)).op_opaque.reduction
+
+(* Adjust a delta mode by the proof-local opacity override: [Some true]
+   blocks the reduction (unless forced), [Some false] upgrades default
+   transparency-gated unfolding to a forced one. *)
+let opacity_mode (ri : reduction_info) (p : EcPath.path) mode =
+  match mode, EcEnv.SimplifyContext.opacity p ri.user_local with
+  | (`Force | `No), _ | _, None -> mode
+  | _, Some true                -> `No
+  | `IfTransparent, Some false  -> `Force
+  | `IfApplied, Some false      -> `IfApplied
+
+(* -------------------------------------------------------------------- *)
 let reduce_local ri hyps x  =
   if   ri.delta_h x
   then try LDecl.unfold x hyps with NotReducible -> raise nohead
   else raise nohead
 
 let reduce_op ri env nargs p tys =
-  match ri.delta_p p with
+  match opacity_mode ri p (ri.delta_p p) with
   | `No ->
      raise nohead
 
@@ -1064,7 +1083,10 @@ let reduce_head simplify ri env hyps f =
 
     (* ι-reduction (match-fix) *)
   | Fapp ({ f_node = Fop (p, tys); }, fargs)
-      when ri.iota && EcEnv.Op.is_fix_def env p ->
+      when ri.iota && EcEnv.Op.is_fix_def env p
+           && (match ri.delta_p p with
+               | `Force -> true
+               | _ -> not (reduction_opaque ri env p)) ->
 
       let op  = oget (EcEnv.Op.by_path_opt p env) in
       let fix = EcDecl.operator_as_fix op in

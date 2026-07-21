@@ -2545,6 +2545,7 @@ simplify_hint_item:
 | m=pmode x=lident             { `Db    (m = `Plus, unloc x) }
 | m=pmode l=bracket(qoident+)  { `Hd    (m, l) }
 | l=brace(qident+)             { `Lemma l }
+| m=pmode DELTA l=qoident+     { `Opacity (m = `Minus, l) }
 
 (* The body of a [hint] clause: an unsigned base database selection
    followed by items. A clause may not both select databases (unsigned
@@ -2562,6 +2563,7 @@ simplify_hint_body:
             let m = match m with `Plus -> `Include | `Minus -> `Exclude in
             { h with ph_hd = Some (m, l) }
         | `Lemma l -> { h with ph_lemmas = h.ph_lemmas @ l }
+        | `Opacity (b, l) -> { h with ph_opacity = h.ph_opacity @ [(b, l)] }
       in
       let h =
         List.fold_left doit
@@ -3938,7 +3940,7 @@ realize:
 (* Theory aliasing                                                      *)
 
 theory_alias: (* FIXME: THEORY ALIAS -> S/R conflict *)
-| THEORY name=uident EQ target=uqident { (name, target) }
+| THEORY name=uident EQ targets=plist1(uqident, PLUS) { (name, targets) }
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)

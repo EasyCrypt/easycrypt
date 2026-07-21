@@ -1265,16 +1265,19 @@ and replay_crbinding (ove : _ ovrenv) (subst, ops, proofs, scope) (import, bindi
 
 (* -------------------------------------------------------------------- *)
 and replay_alias
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, target)
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, targets)
 =
   let scenv = ove.ovre_hooks.henv scope in
   let env = EcSection.env scenv in
-  let p = EcSubst.subst_path subst target in
+  let targets = List.map (EcSubst.subst_path subst) targets in
+  let subst, name = rename ove subst (`Theory, name) in
 
-  if is_none (EcEnv.Theory.by_path_opt p env) then
+  if List.for_all
+       (fun p -> is_some (EcEnv.Theory.by_path_opt p env)) targets
+  then
+    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_alias (name, targets)) in
     (subst, ops, proofs, scope)
   else
-    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_alias (name, target)) in
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -1328,8 +1331,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
   | Th_instance _ ->
     (subst, ops, proofs, scope)
 
-  | Th_alias (name, target) ->
-     replay_alias ove (subst, ops, proofs, scope) (item.ti_import, name, target)
+  | Th_alias (name, targets) ->
+     replay_alias ove (subst, ops, proofs, scope) (item.ti_import, name, targets)
 
   | Th_crbinding (binding, lc) when not hidden ->
      replay_crbinding ove (subst, ops, proofs, scope) (item.ti_import, binding, lc)

@@ -2522,7 +2522,7 @@ section PROOFS.
     have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
     rewrite mapP /==> [#] [][] x1 x2 x3 x4 /=; rewrite mem_filter /= => [#] <<- ? ->>.
     smt(get_setE).
-  smt(List.mem_filter mem_cat mapP).
+  smt(List.mem_filter mem_cat mapP map_f).
   qed.
 
   local clone EventPartitioning as EP with 
