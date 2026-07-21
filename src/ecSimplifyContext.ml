@@ -30,6 +30,8 @@ type simplify_context = {
   ls_default_hd : head_filter option;
   (* Per-database overlay of locally added rules (add-only). *)
   ls_added      : entry list Msym.t;
+  (* Reduction-opacity overrides ([hint -delta op] / [hint +delta op]). *)
+  ls_opacity    : bool Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -38,6 +40,7 @@ let empty : simplify_context = {
   ls_default_db = None;
   ls_default_hd = None;
   ls_added      = Msym.empty;
+  ls_opacity    = Mp.empty;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -51,6 +54,19 @@ let default_db (ls : simplify_context) : symbol list option =
 (* -------------------------------------------------------------------- *)
 let default_hd (ls : simplify_context) : head_filter option =
   ls.ls_default_hd
+
+(* -------------------------------------------------------------------- *)
+let set_opacity (specs : (path * bool) list) (ls : simplify_context) : simplify_context =
+  { ls with ls_opacity =
+      List.fold_left (fun m (p, b) -> Mp.add p b m) ls.ls_opacity specs }
+
+(* -------------------------------------------------------------------- *)
+let opacity (p : path) (ls : simplify_context) : bool option =
+  Mp.find_opt p ls.ls_opacity
+
+(* -------------------------------------------------------------------- *)
+let opacity_only (ls : simplify_context) : simplify_context =
+  { empty with ls_opacity = ls.ls_opacity }
 
 (* -------------------------------------------------------------------- *)
 (* [None] denotes the default database. *)
