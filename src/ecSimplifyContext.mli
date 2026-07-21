@@ -35,6 +35,13 @@ val set_default_hd :
   (head_mode * path list) option -> simplify_context -> simplify_context
 val clear_default : simplify_context -> simplify_context
 
+(* Per-proof / per-call reduction-opacity overrides ([hint -delta op] /
+   [hint +delta op]): [Some true] blocks delta/iota reduction of the
+   operator, [Some false] re-enables it, [None] defers to the
+   operator's [opaque] declaration. *)
+val set_opacity : (path * bool) list -> simplify_context -> simplify_context
+val opacity : path -> simplify_context -> bool option
+
 val added : ?base:symbol -> simplify_context -> entry list
 
 val add_rules : ?base:symbol -> entry list -> simplify_context -> simplify_context
