@@ -14,7 +14,11 @@ axiom dr_mu_test : 0%r < p.
 op eps : real.
 axiom dr_mu1 : forall (x:r), mu1 dr x <= eps.
 
-lemma eps_ge0: 0%r <= eps. by smt(dr_mu1 mu_bounded). qed.
+lemma eps_ge0: 0%r <= eps.
+apply: (ler_trans (mu1 dr witness)).
++ exact: ge0_mu.
+exact: dr_mu1.
+qed.
 
 module type Oracle = { 
   proc o () : unit 

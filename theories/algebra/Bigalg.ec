@@ -324,7 +324,7 @@ elim: s => // x s IHs F_ge0; rewrite BMul.big_cons.
 have {IHs} IHs := IHs _; first by smt().
 case: (P x) => [Px F_big_gt0 a a_x_s Pa| nPx /IHs]; 2:smt().
 rewrite pmulr_gt0 in F_big_gt0; 1, 3:smt().
-apply: prodr_ge0_seq; smt().
+by apply: prodr_ge0_seq; smt().
 qed.
 
 lemma ler_prod_seq (P : 'a -> bool) (F1 F2 : 'a -> t) s:
