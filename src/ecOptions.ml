@@ -551,6 +551,47 @@ let prv_options_of_values ini values =
       prvo_why3server = get_string "why3server" values;
     }
 
+(* -------------------------------------------------------------------- *)
+(* Overlay project INI settings (an [easycrypt.project] discovered when
+   a file is loaded at run time, e.g. by the LLM REPL's [LOAD]) on top
+   of already-parsed prover options. Mirrors the precedence used by
+   [prv_options_of_values] when the project file is known at
+   option-parsing time: project provers/pragmas extend the parsed
+   lists, project scalars take over the parsed values. *)
+let prv_options_with_ini (ini : ini_context list) (prv : prv_options) =
+  let provers =
+    match Ini.get_all_provers ini with
+    | [] -> prv.prvo_provers
+    | ps ->
+        let old = odfl [] prv.prvo_provers in
+        Some (ps @ List.filter (fun p -> not (List.mem p ps)) old)
+  in
+  { prv with
+      prvo_provers = provers;
+      prvo_timeout = begin
+        match Ini.get_all_timeout ini with
+        | None -> prv.prvo_timeout
+        | Some _ as i -> i
+      end;
+      prvo_quorum = begin
+        match Ini.get_all_quorum ini with
+        | None -> prv.prvo_quorum
+        | Some _ as i -> i
+      end;
+      prvo_ppwidth = begin
+        match Ini.get_all_ppwidth ini with
+        | None -> prv.prvo_ppwidth
+        | Some _ as i -> i
+      end;
+      prvo_pragmas = Ini.get_all_pragmas ini @ prv.prvo_pragmas; }
+
+(* The load path contributed by INI contexts, in the shape and order of
+   [ldro_idirs]: plain include dirs first, then recursive ones. *)
+let ini_loadpath (ini : ini_context list) =
+  List.map (fun (nm, dir) -> (nm, dir, false)) (Ini.get_all_idirs ini)
+  @ List.map (fun (nm, dir) -> (nm, dir, true)) (Ini.get_all_rdirs ini)
+
+(* -------------------------------------------------------------------- *)
 let cli_options_of_values ini values =
   { clio_emacs   = get_flag "emacs" values;
     clio_provers = prv_options_of_values ini values; }
