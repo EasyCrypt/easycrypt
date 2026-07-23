@@ -316,6 +316,8 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
 
   (* ------------------------------------------------------------------ *)
   (* OK/ERROR/<END> wire envelope. *)
+  let had_error = ref false in
+
   let module Wire = struct
     let reply_ok ?(tag="") body =
       let n = Buffer.contents notices in
@@ -336,6 +338,7 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
       else reply_ok ~tag (Goals.goals_to_string ~all ())
 
     let reply_error msg =
+      had_error := true;
       let goals = Goals.goals_to_string () in
       Printf.printf "ERROR [uuid:%d]\n%s\n" (EcCommands.uuid ()) msg;
       if goals <> "" then begin
@@ -1117,4 +1120,7 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
   | End_of_file -> ()
   end;
 
-  exit 0
+  (* Scripted runs (-eval) report in-band errors through the exit
+     status, so that automation does not mistake an ERROR reply for
+     success. Interactive sessions keep exiting 0. *)
+  exit (if llmopts.llmo_eval <> None && !had_error then 1 else 0)
