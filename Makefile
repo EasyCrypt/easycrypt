@@ -3,14 +3,12 @@
 # --------------------------------------------------------------------
 DUNE      ?= dune
 ECARGS    ?=
-ECTOUT    ?= 10
 ECJOBS    ?= 0
 ECEXTRA   ?= --report=report.log
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
 CHECK     += --bin=./ec.native
 CHECK     += --jobs="$(ECJOBS)"
-CHECK     += --bin-args=-timeout --bin-args="$(ECTOUT)"
 CHECK     += $(foreach arg,$(ECARGS),--bin-args="$(arg)")
 CHECK     += $(ECEXTRA) config/tests.config
 NIX       ?= nix --extra-experimental-features "nix-command flakes"
