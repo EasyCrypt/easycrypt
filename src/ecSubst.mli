@@ -28,7 +28,11 @@ val add_path     : subst -> src:path -> dst:path -> subst
 val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst
 val add_pddef    : subst -> path -> (EcIdent.t list * form) -> subst
-val add_moddef   : subst -> src:path -> dst:mpath -> subst (* Only concrete modules *)
+(* Re-root references to the concrete module expression [src] (possibly
+   applied, possibly a sub-module) onto [dst].  References to an
+   enclosing module's state, to sibling sub-modules, and to other
+   applications of the same functor are left untouched. *)
+val add_moddef   : subst -> src:mpath -> dst:mpath -> subst
 val add_memory   : subst -> EcIdent.t -> EcIdent.t -> subst
 
 val add_flocal : subst -> EcIdent.t -> form -> subst
