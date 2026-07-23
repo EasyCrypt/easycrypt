@@ -24,6 +24,29 @@ exception SubstNameClash of subst_name_clash
 exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
+(* A module-definition substitution: references to a source module
+   expression are re-rooted onto a destination module.  The source is a
+   concrete module expression [P(a1..an).q] (possibly applied, possibly
+   a sub-module), recorded as its top-level path [P] (the map key), its
+   arguments [sm_args] and its inner path [sm_sub].  A reference
+   [`Concrete (P, sub)] applied at [args] is rewritten iff:
+
+     - [sub] lies at or below [sm_sub] (trivially true when [sm_sub] is
+       [None]); and
+     - [args] is empty (references to program variables carry no
+       arguments) or extends [sm_args].
+
+   The remainders (the inner path below [sm_sub], the arguments beyond
+   [sm_args]) are transplanted onto the destination.  References that do
+   not match (an enclosing module's state, sibling sub-modules, other
+   applications) denote state that is not copied along with the source's
+   items, and are left untouched.  See [subst_mpath]. *)
+type sub_moddef = {
+  sm_args : EcPath.mpath list;
+  sm_sub  : EcPath.path option;
+  sm_dst  : EcPath.mpath;
+}
+
 type subst = {
   sb_module   : EcPath.mpath Mid.t;
   sb_path     : EcPath.path Mp.t;
@@ -33,7 +56,7 @@ type subst = {
   sb_fmem     : EcIdent.t Mid.t;
   sb_tydef    : (EcIdent.t list * ty) Mp.t;
   sb_def      : (EcIdent.t list * [`Op of  expr | `Pred of form]) Mp.t;
-  sb_moddef   : EcPath.mpath Mp.t; (* Only top-level modules *)
+  sb_moddef   : sub_moddef Mp.t; (* keyed by the source's TOP-LEVEL path *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -74,27 +97,73 @@ let rec _subst_path (s : EcPath.path Mp.t) (p : EcPath.path) =
 let subst_path (s : subst) (p : EcPath.path) = _subst_path s.sb_path p
 
 (* -------------------------------------------------------------------- *)
+(* Try to match a reference [`Concrete (p, sub)] at (substituted)
+   arguments [args] against a module-definition entry for [p].  On a
+   match, return the rewritten mpath; otherwise return [None] and let
+   the caller fall through to the ordinary path substitution. *)
+let _moddef_apply (md : sub_moddef) (args : EcPath.mpath list)
+                  (sub : EcPath.path option) : EcPath.mpath option =
+  (* Sub component: the reference must lie at or below the source's
+     inner path; the remainder survives below the destination. *)
+  let sub_rem =
+    match md.sm_sub with
+    | None -> Some sub
+    | Some q ->
+      match sub with
+      | None -> None
+      | Some sp ->
+        omap
+          (List.fold_left (fun acc x -> Some (EcPath.pqoname acc x)) None)
+          (EcPath.remprefix ~prefix:q ~path:sp)
+  in
+
+  (* Args component: program-variable references carry no arguments;
+     other self-references are applied at the source's arguments,
+     possibly further applied.  The excess arguments survive after the
+     destination's own.  ([sm_args] is compared as recorded: the callers
+     build single-purpose substitutions, so the reference's arguments
+     cannot have been rewritten by other entries.) *)
+  let args_rem =
+    if List.is_empty args then
+      Some []
+    else if List.length args < List.length md.sm_args then
+      None
+    else
+      let pre, rest = List.takedrop (List.length md.sm_args) args in
+      if List.for_all2 EcPath.m_equal pre md.sm_args then Some rest else None
+  in
+
+  match sub_rem, args_rem with
+  | Some sub_rem, Some args_rem ->
+    let (d_p, d_sub, d_args) =
+      match md.sm_dst with
+      | { m_top = `Concrete (d_p, d_sub); m_args = d_args } ->
+        (d_p, d_sub, d_args)
+      | _ -> assert false in
+    let cat_sub =
+      match d_sub with
+      | None       -> sub_rem
+      | Some d_sub -> Some (EcPath.poappend d_sub sub_rem) in
+    Some (EcPath.mpath_crt d_p (d_args @ args_rem) cat_sub)
+
+  | _, _ -> None
+
 let subst_mpath (s : subst) (mp : EcPath.mpath) =
   let rec doit s (mp : EcPath.mpath) =
       let args = List.map (doit s) mp.m_args in
       match mp.m_top with
-      | `Concrete (p, sub) when Mp.mem p s.sb_moddef -> begin
-        let s_p, s_sub, s_args =
-          match Mp.find p s.sb_moddef with
-          | { m_top = `Concrete (s_p, s_sub); m_args } -> (s_p, s_sub, m_args)
-          | _ -> assert false in
-
-        let cat_sub =
-          match s_sub with
-          | None -> sub
-          | Some s_sub -> Some (EcPath.poappend s_sub sub) in
-
-        EcPath.mpath_crt s_p (s_args @ mp.m_args) cat_sub
+      | `Concrete (p, sub) -> begin
+        let rewritten =
+          obind
+            (fun md -> _moddef_apply md args sub)
+            (Mp.find_opt p s.sb_moddef)
+        in
+        match rewritten with
+        | Some mp -> mp
+        | None ->
+          let p = _subst_path s.sb_path p in
+          EcPath.mpath_crt p args sub
       end
-
-      | `Concrete (p, sub) ->
-        let p = _subst_path s.sb_path p in
-        EcPath.mpath_crt p args sub
 
       | `Local id ->
          match Mid.find_opt id s.sb_module with
@@ -284,10 +353,19 @@ let add_pddef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
   { s with sb_def = Mp.add p (ids, `Pred f) s.sb_def }
 
-let add_moddef (s : subst) ~(src : EcPath.path) ~(dst : EcPath.mpath) =
-  assert (Mp.find_opt src s.sb_moddef = None);
+(* [src] is a concrete module expression (possibly applied, possibly a
+   sub-module); references to it (and to its sub-modules) get re-rooted
+   onto [dst].  See the [sub_moddef] documentation above. *)
+let add_moddef (s : subst) ~(src : EcPath.mpath) ~(dst : EcPath.mpath) =
+  let (p, sub) =
+    match src.m_top with
+    | `Concrete (p, sub) -> (p, sub)
+    | `Local _ -> assert false in
+  assert (Mp.find_opt p s.sb_moddef = None);
   assert (EcPath.is_concrete dst);
-  { s with sb_moddef = Mp.add src dst s.sb_moddef }
+  { s with sb_moddef =
+      Mp.add p { sm_args = src.m_args; sm_sub = sub; sm_dst = dst; }
+        s.sb_moddef }
 
 (* -------------------------------------------------------------------- *)
 let subst_flocal (s : subst) (f : form) =
