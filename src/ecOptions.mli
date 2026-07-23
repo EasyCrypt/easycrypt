@@ -102,6 +102,16 @@ exception InvalidIniFile of (int * string)
 
 val read_ini_file : string -> ini_options
 
+(* -------------------------------------------------------------------- *)
+(* Overlay project INI settings discovered at run time (e.g. by the LLM
+   REPL's [LOAD]) on top of already-parsed prover options, mirroring
+   the precedence of option parsing with a known project file. *)
+val prv_options_with_ini : ini_context list -> prv_options -> prv_options
+
+(* The load path contributed by INI contexts, in [ldro_idirs] shape:
+   (namespace, dir, recursive). *)
+val ini_loadpath : ini_context list -> (string option * string * bool) list
+
 val parse_cmdline :
      ?ini:(string option -> ini_context list)
   -> string array

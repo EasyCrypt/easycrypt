@@ -158,7 +158,7 @@ let main () =
   let (module Sites) = EcRelocate.sites in
 
   (* Parse command line arguments *)
-  let conffiles, options =
+  let conffiles, projini, options =
     let sysfile =
       let xdgini =
         XDG.Config.file
@@ -220,6 +220,19 @@ let main () =
           exit 1
     in
 
+    (* The [easycrypt.project] context of a file (walking up from the
+       file's directory; from the cwd when no file is given). Also used
+       by the LLM REPL to reconfigure per loaded file. *)
+    let projini (path : string option) =
+      Option.bind (projfile path) (fun conffile ->
+        Option.map
+          (fun ini -> {
+             inic_ini  = ini;
+             inic_root = Some (Filename.dirname conffile);
+          })
+          (read_ini_file conffile)
+      ) in
+
     let getini (path : string option) =
       let inisys =
         List.filter_map
@@ -230,20 +243,9 @@ let main () =
           conffiles
       in
 
-      let iniproj =
-        Option.bind (projfile path) (fun conffile ->
-          Option.map
-            (fun ini -> {
-               inic_ini  = ini;
-               inic_root = Some (Filename.dirname conffile);
-            })
-            (read_ini_file conffile)
-        )
-      in
+      List.ocons (projini path) inisys in
 
-      List.ocons iniproj inisys in
-
-    (conffiles, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
+    (conffiles, projini, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
 
   (* Execution of eager commands *)
   begin
@@ -584,7 +586,7 @@ let main () =
       end
 
     | `Llm llmopts ->
-        EcLlm.run ~relocdir ~boot:ldropts.ldro_boot llmopts
+        EcLlm.run ~relocdir ~boot:ldropts.ldro_boot ~projini llmopts
 
     | `Runtest _ ->
         (* Eagerly executed *)
