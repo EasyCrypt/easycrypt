@@ -35,7 +35,7 @@ let print_llm_guide () =
     Printf.eprintf "cannot read LLM guide: %s\n%!" e
 
 (* -------------------------------------------------------------------- *)
-let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
+let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   if llmopts.llmo_help then begin
     print_llm_guide ();
     exit 0
@@ -56,7 +56,12 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
    | None     -> EcCommands.addidir Filename.current_dir_name
    | Some pwd -> EcCommands.addidir pwd);
 
-  let checkmode = {
+  (* Prover options in effect: refreshed by [LOAD] with the loaded
+     file's [easycrypt.project] settings overlaid on the command-line
+     options, as the batch compiler does at option-parsing time. *)
+  let cur_prvopts = ref prvopts in
+
+  let checkmode_of (prvopts : EcOptions.prv_options) = {
     EcCommands.cm_checkall  = prvopts.prvo_checkall;
     EcCommands.cm_timeout   = odfl 3 prvopts.prvo_timeout;
     EcCommands.cm_cpufactor = odfl 1 prvopts.prvo_cpufactor;
@@ -76,6 +81,10 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
   (* Has [EcCommands.initialize] been called? Subsequent calls pass
      [~restart:true]. *)
   let initialized = ref false in
+
+  (* Project-file load-path entries already added to the (global)
+     loader, so repeated [LOAD]s do not pile up duplicates. *)
+  let projdirs : (string option * string * bool) list ref = ref [] in
 
   (* True iff replies should suppress goal bodies. Toggled by QUIET. *)
   let quiet = ref false in
@@ -110,17 +119,17 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
   let do_initialize () =
     EcCommands.initialize
       ~restart:!initialized ~undo:true
-      ~boot ~checkmode ~checkproof:true;
+      ~boot ~checkmode:(checkmode_of !cur_prvopts) ~checkproof:true;
     initialized := true;
     (try
-       List.iter EcCommands.apply_pragma_option prvopts.prvo_pragmas
+       List.iter EcCommands.apply_pragma_option !cur_prvopts.prvo_pragmas
      with EcCommands.InvalidPragma x ->
        EcScope.hierror "invalid pragma: `%s'\n%!" x);
     EcCommands.addnotifier notifier;
     oiter (fun ppwidth ->
       let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
       EcGState.setvalue "PP:width" (`Int ppwidth) gs)
-      prvopts.prvo_ppwidth
+      !cur_prvopts.prvo_ppwidth
   in
 
   (* ------------------------------------------------------------------ *)
@@ -635,10 +644,28 @@ let run ~relocdir ~boot (llmopts : EcOptions.llm_option) =
             "unknown file extension: %s" ext)
         end;
 
+        (* Apply the configuration attached to the loaded file's
+           [easycrypt.project], as the batch compiler does when the
+           file is given on the command line: refresh the prover
+           options (timeout, provers, pragmas, ...) and extend the
+           load path with the project's include dirs. *)
+        let ini = Option.to_list (projini (Some filename)) in
+        cur_prvopts :=
+          EcOptions.prv_options_with_ini ini llmopts.llmo_provers;
+        List.iter (fun ((nm, dir, isrec) as entry) ->
+          if not (List.mem entry !projdirs) then begin
+            projdirs := entry :: !projdirs;
+            EcCommands.addidir
+              ?namespace:(omap (fun nm -> `Named nm) nm)
+              ~recursive:isrec dir
+          end)
+          (EcOptions.ini_loadpath ini);
+
         do_initialize ();
         Hashtbl.clear checkpoints;
         Transcript.clear ();
         EcCommands.addidir (Filename.dirname filename);
+        EcCommands.set_current_path (Filename.dirname filename);
 
         let reader = EcIo.from_file filename in
 
