@@ -997,6 +997,69 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
+(* Rotate the focus of the currently active proof so that the goal at
+   1-based index [k] becomes the focused one. The change is persisted
+   in the context with a new uuid so UNDO/REVERT can roll it back.
+   Returns the new number of open goals on success, or an error
+   message on failure. *)
+let focus_goal (k : int) : (int, string) result =
+  match !context with
+  | None -> Error "no active context"
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> Error "no active proof"
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> Error "no active proof"
+      | Some (pac, pct) ->
+        match pac.EcScope.puc_jdg with
+        | EcScope.PSNoCheck -> Error "proof is in no-check mode"
+        | EcScope.PSCheck pf ->
+          let n = List.length (EcCoreGoal.all_hd_opened pf) in
+          if n = 0 then Error "no open goals"
+          else if k < 1 || k > n then
+            Error (Printf.sprintf
+              "focus: index %d out of range (1..%d)" k n)
+          else if k = 1 then Ok n
+          else begin
+            let pf = EcCoreGoal.rotate_focus k pf in
+            let pac = { pac with EcScope.puc_jdg = EcScope.PSCheck pf } in
+            let puc =
+              { puc with EcScope.puc_active = Some (pac, pct) } in
+            let scope = EcScope.set_xgoal ctxt.ct_current puc in
+            context := Some (push_context scope ctxt);
+            Ok n
+          end
+
+(* Disable bullet enforcement for REPL-driven phrases. Drops the global
+   pragma so newly-opened proofs have no bullet stack, and clears the
+   stack on any currently active proof so REPL phrases are not checked
+   against it. Idempotent. Does not advance the undo level. Returns
+   the stack that was in place (if any) at the moment the active
+   proof's bullets were first cleared; returns [None] on idempotent
+   calls (where the stack is already gone). Callers use the returned
+   stack to drive bullet-character selection in [COMMIT]. *)
+let disable_repl_bullets () : EcBullets.stack option =
+  pragma_strict_bullets false;
+  match !context with
+  | None -> None
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> None
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> None
+      | Some (pac, pct) ->
+        match pac.EcScope.puc_bullets with
+        | None -> None
+        | Some _ as prior ->
+          let pac = { pac with EcScope.puc_bullets = None } in
+          let puc = { puc with EcScope.puc_active = Some (pac, pct) } in
+          let scope = EcScope.set_xgoal ctxt.ct_current puc in
+          context := Some { ctxt with ct_current = scope };
+          prior
+
+(* -------------------------------------------------------------------- *)
 let initialize ~restart ~undo ~boot ~checkmode ~checkproof =
   assert (restart || EcUtils.is_none !context);
   if restart then Pragma.set dpragma;
@@ -1136,8 +1199,39 @@ let pp_current_goal ?(all = false) stream =
   end
 
 (* -------------------------------------------------------------------- *)
+let in_proof () =
+  Option.is_some (S.xgoal (current ()))
+
+(* Return the list of open-goal handles at the top level of the active
+   proof, focused-first, or [] if no proof is active. *)
+let open_handles () : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.all_hd_opened pf
+  | _ -> []
+
+(* Direct DAG children of [h] in the active proof. [] if no proof. *)
+let children_of (h : EcCoreGoal.handle) : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.children_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> []
+
+(* Parent of [h] in the active proof's DAG, or [None] if [h] is the
+   root or no proof is active. *)
+let parent_of (h : EcCoreGoal.handle) : EcCoreGoal.handle option =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.parent_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> None
+
 let pp_current_goal_or_noproof ?(all = false) stream =
-  if Option.is_some (S.xgoal (current ())) then
+  if in_proof () then
     pp_current_goal ~all stream
   else
     Format.fprintf stream "No active proof.@\n%!"
@@ -1174,4 +1268,35 @@ let pp_all_goals () =
         Buffer.contents buffer) goals
   end
 
+  | _ -> []
+
+(* -------------------------------------------------------------------- *)
+(* Render the open-subgoals tree. Each entry is (index, is_focused,
+   text). [index] is 1-based, [is_focused] marks the focused goal
+   (always at index 1 with EC's current focus model), and [text] is
+   either a one-line conclusion digest (when [~all = false]) or the
+   full goal body (when [~all = true]). *)
+let pp_tree ?(all = false) () : (int * bool * string) list =
+  let scope = current () in
+  match S.xgoal scope with
+  | Some { S.puc_active = Some ({ puc_jdg = S.PSCheck pf }, _) } -> begin
+    match EcCoreGoal.opened pf with
+    | None -> []
+    | Some _ ->
+      let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+      let goals = EcCoreGoal.all_opened pf in
+      List.mapi (fun i { EcCoreGoal.g_hyps; EcCoreGoal.g_concl } ->
+        let text =
+          if all then
+            let buf = Buffer.create 256 in
+            let hc  = (EcEnv.LDecl.tohyps g_hyps, g_concl) in
+            Format.fprintf
+              (Format.formatter_of_buffer buf)
+              "%a@?" (EcPrinting.pp_goal1 ppe) hc;
+            Buffer.contents buf
+          else
+            Format.asprintf "%a" (EcPrinting.pp_form ppe) g_concl
+        in
+        (i + 1, i = 0, text)) goals
+  end
   | _ -> []

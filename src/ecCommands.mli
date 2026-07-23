@@ -64,6 +64,13 @@ val pp_current_goal : ?all:bool -> Format.formatter -> unit
 val pp_current_goal_or_noproof : ?all:bool -> Format.formatter -> unit
 val pp_maybe_current_goal : Format.formatter -> unit
 val pp_all_goals : unit -> string list
+val in_proof : unit -> bool
+val disable_repl_bullets : unit -> EcBullets.stack option
+val pp_tree : ?all:bool -> unit -> (int * bool * string) list
+val focus_goal : int -> (int, string) result
+val open_handles : unit -> EcCoreGoal.handle list
+val children_of : EcCoreGoal.handle -> EcCoreGoal.handle list
+val parent_of : EcCoreGoal.handle -> EcCoreGoal.handle option
 
 (* -------------------------------------------------------------------- *)
 val pragma_verbose : bool -> unit

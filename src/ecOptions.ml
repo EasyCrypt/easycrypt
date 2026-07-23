@@ -49,10 +49,9 @@ and doc_option = {
 }
 
 and llm_option = {
-  llmo_input     : string;
   llmo_provers   : prv_options;
-  llmo_lastgoals : bool;
-  llmo_upto      : (int * int option) option;
+  llmo_help      : bool;
+  llmo_eval      : string option;
 }
 
 and prv_options = {
@@ -69,8 +68,9 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string * bool) list;
-  ldro_boot  : bool;
+  ldro_idirs  : (string option * string * bool) list;
+  ldro_boot   : bool;
+  ldro_stdlib : string list;
 }
 
 and glb_options = {
@@ -381,11 +381,11 @@ let specs = {
       `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");
       `Spec  ("compact", `Int   , "<internal>")]);
 
-    ("llm", "LLM-friendly batch compilation", [
+    ("llm", "LLM-friendly interactive mode", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("lastgoals" , `Flag  , "Print last unproved goals on failure");
-      `Spec  ("upto"      , `String, "Compile up to LINE or LINE:COL and print goals")]);
+      `Spec  ("help", `Flag  , "Print the LLM agent guide and exit");
+      `Spec  ("eval", `String, "Run the given commands (newline-separated) and exit, in lieu of reading stdin")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -424,9 +424,10 @@ let specs = {
     ]);
 
     ("loader", "Options related to loader", [
-      `Spec ("I"   , `String, "Add <dir> to the list of include directories");
-      `Spec ("R"   , `String, "Recursively add <dir> to the list of include directories");
-      `Spec ("boot", `Flag  , "Don't load prelude")])
+      `Spec ("I"     , `String, "Add <dir> to the list of include directories");
+      `Spec ("R"     , `String, "Recursively add <dir> to the list of include directories");
+      `Spec ("stdlib", `String, "Use <dir> as a standard-library root (System namespace, prelude + recursive), replacing the built-in one; repeatable");
+      `Spec ("boot"  , `Flag  , "Don't load prelude")])
   ]
 }
 
@@ -486,8 +487,9 @@ let dirs_of_env =
 
 (* -------------------------------------------------------------------- *)
 let ldr_options_of_values ~env ?(ini = []) values =
+  let stdlib = get_strings "stdlib" values in
   if get_flag "boot" values then
-    { ldro_idirs = []; ldro_boot = true; }
+    { ldro_idirs = []; ldro_boot = true; ldro_stdlib = stdlib; }
   else
     let add_rec (fl : bool) ((nm, x) : string option * string) =
       (nm, x, fl) in
@@ -501,8 +503,9 @@ let ldr_options_of_values ~env ?(ini = []) values =
     let rdirs   = List.map (add_rec true) rdirs in
     let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
 
-    { ldro_idirs = idirs @ idirs_I @ rdirs @ idirs_R;
-      ldro_boot  = false; }
+    { ldro_idirs  = idirs @ idirs_I @ rdirs @ idirs_R;
+      ldro_boot   = false;
+      ldro_stdlib = stdlib; }
 
 let glb_options_of_values ~env ini values =
   let why3 =
@@ -548,6 +551,47 @@ let prv_options_of_values ini values =
       prvo_why3server = get_string "why3server" values;
     }
 
+(* -------------------------------------------------------------------- *)
+(* Overlay project INI settings (an [easycrypt.project] discovered when
+   a file is loaded at run time, e.g. by the LLM REPL's [LOAD]) on top
+   of already-parsed prover options. Mirrors the precedence used by
+   [prv_options_of_values] when the project file is known at
+   option-parsing time: project provers/pragmas extend the parsed
+   lists, project scalars take over the parsed values. *)
+let prv_options_with_ini (ini : ini_context list) (prv : prv_options) =
+  let provers =
+    match Ini.get_all_provers ini with
+    | [] -> prv.prvo_provers
+    | ps ->
+        let old = odfl [] prv.prvo_provers in
+        Some (ps @ List.filter (fun p -> not (List.mem p ps)) old)
+  in
+  { prv with
+      prvo_provers = provers;
+      prvo_timeout = begin
+        match Ini.get_all_timeout ini with
+        | None -> prv.prvo_timeout
+        | Some _ as i -> i
+      end;
+      prvo_quorum = begin
+        match Ini.get_all_quorum ini with
+        | None -> prv.prvo_quorum
+        | Some _ as i -> i
+      end;
+      prvo_ppwidth = begin
+        match Ini.get_all_ppwidth ini with
+        | None -> prv.prvo_ppwidth
+        | Some _ as i -> i
+      end;
+      prvo_pragmas = Ini.get_all_pragmas ini @ prv.prvo_pragmas; }
+
+(* The load path contributed by INI contexts, in the shape and order of
+   [ldro_idirs]: plain include dirs first, then recursive ones. *)
+let ini_loadpath (ini : ini_context list) =
+  List.map (fun (nm, dir) -> (nm, dir, false)) (Ini.get_all_idirs ini)
+  @ List.map (fun (nm, dir) -> (nm, dir, true)) (Ini.get_all_rdirs ini)
+
+(* -------------------------------------------------------------------- *)
 let cli_options_of_values ini values =
   { clio_emacs   = get_flag "emacs" values;
     clio_provers = prv_options_of_values ini values; }
@@ -574,26 +618,10 @@ let doc_options_of_values values input =
   { doco_input     = input;
     doco_outdirp   = get_string "outdir" values; }
 
-let parse_upto values =
-  get_string "upto" values |> Option.map (fun s ->
-    let invalid () =
-      raise (Arg.Bad (Printf.sprintf
-        "invalid -upto format: expected LINE or LINE:COL, got %S" s)) in
-    match String.split_on_char ':' s with
-    | [line] ->
-        let line = try int_of_string line with Failure _ -> invalid () in
-        (line, None)
-    | [line; col] ->
-        let line = try int_of_string line with Failure _ -> invalid () in
-        let col  = try int_of_string col  with Failure _ -> invalid () in
-        (line, Some col)
-    | _ -> invalid ())
-
-let llm_options_of_values ini values input =
-  { llmo_input     = input;
-    llmo_provers   = prv_options_of_values ini values;
-    llmo_lastgoals = get_flag "lastgoals" values;
-    llmo_upto      = parse_upto values; }
+let llm_options_of_values ini values =
+  { llmo_provers   = prv_options_of_values ini values;
+    llmo_help      = get_flag "help" values;
+    llmo_eval      = get_string "eval" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
@@ -666,16 +694,14 @@ let parse getini argv =
           raise (Arg.Bad "this command takes a single input file as argument")
       end
 
-    | "llm" -> begin
-        match anons with
-        | [input] ->
-           let ini = getini (Some input) in
-           let cmd = `Llm (llm_options_of_values ini values input) in
-           (cmd, ini, true)
+    | "llm" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
 
-        | _ ->
-           raise (Arg.Bad "this command takes a single argument")
-      end
+        let ini = getini None in
+        let cmd = `Llm (llm_options_of_values ini values) in
+
+        (cmd, ini, true)
 
     | _ -> assert false
 
