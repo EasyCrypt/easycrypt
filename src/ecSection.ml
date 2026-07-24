@@ -1072,7 +1072,8 @@ let generalize_module to_gen prefix me =
       with Inline ->
         let to_gen = { to_gen with tg_subst =
           EcSubst.add_moddef
-            ~src:(EcPath.pqname prefix me.tme_expr.me_name)
+            ~src:(EcPath.mpath_crt
+                    (EcPath.pqname prefix me.tme_expr.me_name) [] None)
             ~dst:mp to_gen.tg_subst } in
         to_gen, None
     end

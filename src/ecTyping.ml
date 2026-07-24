@@ -2185,6 +2185,11 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     if not (List.is_empty sig_.miss_params) then
       tyerror loc env (InvalidModUpdate MUE_Functor);
 
+    (* Prohibit abstract-module updates (a declared module, or a
+       sub-module of one) *)
+    if not (EcPath.is_concrete mp) then
+      tyerror loc env (InvalidModUpdate MUE_AbstractModule);
+
     (* Construct the set of new module variables *)
     let items =
       List.concat_map
@@ -2201,8 +2206,14 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     let delete_vars = List.map (fun v -> v.pl_desc) delete_vars in
 
     let me, _ = EcEnv.Mod.by_mpath mp env in
-    let p = match mp.m_top with | `Concrete (p, _) -> p | _ -> assert false in
-    let subst = EcSubst.add_moddef EcSubst.empty ~src:p ~dst:(EcEnv.mroot env) in
+    (* Re-root references to the base module expression [mp] (its own
+       state and procedures, sub-modules included, self-references
+       unsuspended at the base's arguments) onto the module being
+       defined, whose items are copies of the base's.  References to
+       anything else (an enclosing module's state, sibling sub-modules,
+       other modules) denote state that is shared with the base, not
+       copied, and are left untouched. *)
+    let subst = EcSubst.add_moddef EcSubst.empty ~src:mp ~dst:(EcEnv.mroot env) in
     let me = EcSubst.subst_module subst me in
 
     let update_fun env fn plocals pupdates pupdate_res =
