@@ -372,6 +372,21 @@ let start_aux ~cwd ~sw ~label =
     cancel_promise;
     cancel_resolver;
   } in
+  (* Machine-profile convention (EcLlm base): QUIET ON keeps OK reply
+     bodies payload-only — the daemon reads goal state exclusively via
+     GOALS-JSON, and directive output (print / search) arrives on the
+     NOTICE channel. Without this, every reply carries the current
+     goal text appended to its body (addition-21 equivalent lives
+     daemon-side now). *)
+  Eio.Flow.copy_string "QUIET ON\n" t.stdin;
+  (match read_reply_with_cancel t.stdout_buf t.cancel_promise with
+   | Some { status = `Ok; _ } -> ()
+   | _ ->
+     Transcript.record_g Transcript.Log_warn
+       (`Assoc [
+          "label", `String label;
+          "msg", `String "QUIET ON handshake did not return OK";
+        ]));
   (* Supervisor fiber. Awaits the subprocess; on exit when the user
      hasn't asked for termination, records [session.crashed] and
      invokes the global on-crash callback. Fires for EOF-mid-exec
@@ -576,14 +591,31 @@ let exec t ~corr ~sentence_class ~source =
         })
       end
       else begin
-        t.uuid <- r.uuid;
+        (* EcLlm base: directives ride the same undo-push path as
+           executables and advance uuid. Revert immediately so they
+           stay state-neutral (the daemon-v1 +0 contract) and the
+           undo stack doesn't grow on every print/search — the
+           payload has already arrived via the notice channel. On a
+           failed revert, keep the bumped uuid: tracking stays
+           consistent, the stack just grows. *)
+        let final_uuid =
+          if (match sentence_class with
+              | `Directive -> true | _ -> false)
+             && r.uuid = pre_uuid + 1
+          then
+            match send_and_read t (Printf.sprintf "REVERT %d" pre_uuid) with
+            | Some { status = `Ok; uuid = u; _ } -> u
+            | _ -> r.uuid
+          else r.uuid
+        in
+        t.uuid <- final_uuid;
         let sid = Sentence_id.of_source source in
-        t.executed_list <- (sid, r.uuid) :: t.executed_list;
+        t.executed_list <- (sid, final_uuid) :: t.executed_list;
         Transcript.record_g ~corr Transcript.Session_reply
           (`Assoc [
              "label",  `String t.label;
              "status", `String "ok";
-             "uuid",   `Int r.uuid;
+             "uuid",   `Int final_uuid;
              "restarted", `Bool false;
              "notices_count", `Int (List.length r.notices);
              "sentence_id", `String (Sentence_id.to_string sid);
@@ -592,7 +624,7 @@ let exec t ~corr ~sentence_class ~source =
            ]);
         Ok Session.{
             sentence_id  = sid;
-            replied_uuid = r.uuid;
+            replied_uuid = final_uuid;
             notices      = r.notices;
             restarted    = false;
             output       = String.concat "\n" r.body;
@@ -774,6 +806,31 @@ let goals ?(structured = true) t =
          Error (Error.Internal { detail }))
     | Some r ->
       Ok (String.concat "\n" r.body)
+
+(* Generic labeled-command pass-through for the MCP surface (TREE /
+   FOCUS / NEXT / COMMIT / ANALYZE-JSON file / LOAD / ...). Tracks
+   the reply's uuid (FOCUS advances it undoably; LOAD resets it).
+   The caller owns command validity; state-mutating *EasyCrypt*
+   input must go through [exec] so the sid→uuid history stays
+   coherent — MCP's uuid-based reverts don't consult that history,
+   which is why LOAD-through-here is acceptable there. *)
+let raw_command t (line : string) =
+  if t.cancelled || t.closed then
+    Error (Error.Cancelled { reason = "session unavailable" })
+  else
+    match send_and_read t line with
+    | None ->
+      t.cancelled <- true;
+      Error (Error.Session_restarted { reason = "subprocess EOF" })
+    | Some r when r.status = `Error ->
+      (match r.error_json with
+       | Some raw -> Error (error_of_json raw)
+       | None ->
+         Error (Error.Internal { detail = String.concat "\n" r.body }))
+    | Some r ->
+      t.uuid <- r.uuid;
+      if has_tag r "restarted" then t.executed_list <- [];
+      Ok (String.concat "\n" r.body, r.notices)
 
 (* ---------------------------------------------------------------- *)
 (* Parsing a document via the addition-1 PARSE-BEGIN/PARSE-DONE frame *)

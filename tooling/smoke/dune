@@ -117,3 +117,9 @@
 (executable
  (name run_search_debug)
  (libraries ecd_core eio_main))
+
+(test
+ (name run_mcp_smoke)
+ (package tooling)
+ (libraries unix yojson str)
+ (deps (alias_rec ../daemon/all)))

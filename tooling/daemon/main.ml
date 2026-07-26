@@ -476,6 +476,34 @@ let run_daemon ~label ~socket_override ~log_path ~stdio ~ec_bin =
     Log.info "ecd daemon exited cleanly";
     Eio.Flow.close listener
 
+(* ---------------------------------------------------------------- *)
+(* `ecd mcp` — Model Context Protocol server over stdio.             *)
+
+let run_mcp ~ec_bin =
+  Transcript.configure (Transcript.to_channel stderr);
+  Eio_main.run @@ fun env ->
+  Eio.Switch.run @@ fun sw ->
+  Ec_llm_session.configure
+    ~process_mgr:(Eio.Stdenv.process_mgr env)
+    ~fs:(Eio.Stdenv.fs env)
+    ~executable:ec_bin ();
+  Mcp_server.run ~sw
+    ~stdin:(Eio.Stdenv.stdin env)
+    ~stdout:(Eio.Stdenv.stdout env)
+
+let mcp_cmd =
+  let info =
+    Cmd.info "mcp"
+      ~doc:"Serve the Model Context Protocol over stdin/stdout \
+            (agents-first surface). Tools multiplex named EC proof \
+            sessions — open_file, exec, goals, tree, focus, \
+            try_tactic, commit_proof, analyze_file — so parallel \
+            agents each hold a coherent state. Stdout is the MCP \
+            wire; logs and transcripts go to stderr."
+  in
+  let action ec_bin = run_mcp ~ec_bin in
+  Cmd.v info Term.(const action $ bin_arg)
+
 let label_arg =
   let doc = "Discovery label (default: \"default\")." in
   Arg.(value & opt string "default" & info ["label"] ~docv:"NAME" ~doc)
@@ -516,4 +544,5 @@ let () =
   exit
     (Cmd.eval
        (Cmd.group root_info
-          [ drive_cmd; repl_cmd; tui_cmd; replay_cmd; daemon_cmd ]))
+          [ drive_cmd; repl_cmd; tui_cmd; replay_cmd; daemon_cmd;
+            mcp_cmd ]))
