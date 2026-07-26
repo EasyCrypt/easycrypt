@@ -3,7 +3,7 @@
 Meeting doc, 2026-07-26. Detailed evidence in the appendices.
 
 **Context.** Two descendants of the original `llm-interactive` REPL
-now exist. PYS force-pushed `origin/llm-interactive` @ `fd5e04a0e`:
+now exist. Pierre-Yves force-pushed `origin/llm-interactive` @ `fd5e04a0e`:
 the REPL rewritten into `src/ecLlm.ml` (15 commits over Jul-15
 main). Gustavo's local branch @ `8268700ec` (204 commits over Apr-29
 main): the daemon/LSP/VSCode stack, whose EC side is the *old* REPL
@@ -13,7 +13,7 @@ speak the same protocol family (`READY/OK/ERROR [uuid:N]`, `<END>`,
 
 ## Where we each are
 
-- **EcLlm** (PYS): clean Parse/Dispatch REPL; TREE / FOCUS / NEXT
+- **EcLlm** (Pierre-Yves): clean Parse/Dispatch REPL; TREE / FOCUS / NEXT
   over a real proof DAG (`pr_parent` in `EcCoreGoal.proofenv`),
   COMMIT (bullet-structured proof emission), `LOAD -trace|-nosmt` +
   per-LOAD `easycrypt.project` overlay, `-eval` scripted mode,
@@ -47,7 +47,7 @@ from session-first authoring back into text.
 
 **Construction rule (proposed): split by layer, not by branch.**
 
-- **Kernel / TCB / proof checker — PY's, verbatim.** His
+- **Kernel / TCB / proof checker — Pierre-Yves', verbatim.** His
   `pr_parent` DAG, `rotate_focus`, DAG accessors, `focus_goal`,
   `pp_tree`, bullets machinery, `set_xgoal` are maintainer-
   validated and land as-is. Future kernel-adjacent work routes
@@ -59,7 +59,7 @@ from session-first authoring back into text.
   uniform JSON wire (v2, behind a proto bump): every reply, notice,
   error, and goal structured end-to-end — the substrate a proper
   MCP needs. EXEC-JSON generalizes from side-command to *the*
-  command channel. PY's ergonomic line REPL (pp-text, TREE,
+  command channel. Pierre-Yves' ergonomic line REPL (pp-text, TREE,
   `-eval`) is untouched as the human/direct-agent mode; both modes
   share the session core in `ecLlm.ml`.
 - **Tooling on top — ours, reordered: MCP is the first target**
@@ -138,7 +138,7 @@ for the ported surface.
    REPL skeleton, our wire inside; batch `llm` mode retired). The
    old line is preserved at `archive/llm-interactive-20260726`.
    Catch-up to the `main` tip happens by rebase, ideally riding
-   PY's own next rebase. Smoke suite green gates each step.
+   Pierre-Yves' own next rebase. Smoke suite green gates each step.
 2. Wire v2: pin the JSON envelope schema (NDJSON replies/events,
    typed errors, structured goals native; commands via generalized
    EXEC-JSON), implement behind a proto bump; daemon flips in
@@ -199,7 +199,7 @@ into the v2 command channel.
 speculation), MCP server (new — first target), LSP + VSCode
 extension, TUI, smoke/replay/diff-oracle substrate.
 
-**Routed through PY (TCB rule) — both deferred from pass 1** to
+**Routed through Pierre-Yves (TCB rule) — both deferred from pass 1** to
 keep the ec-core delta minimal: EcCancel + combinator
 instrumentation + prover-bridge kill/respawn (until then, daemon
 cancel degrades to kill + respawn of the EC subprocess);

@@ -1,6 +1,6 @@
 # STATUS — tooling worktree
 
-> **2026-07-26 — this branch is `llm-interactive-next`**: PY's EcLlm
+> **2026-07-26 — this branch is `llm-interactive-next`**: Pierre-Yves' EcLlm
 > base rebased onto current `main`, plus the transplanted daemon /
 > vscode stack, the machine-profile port (`src/ecLlmJson.ml` +
 > additive `ecLlm.ml` wiring, proto 2), and **MCP v1** (`ecd mcp`,
