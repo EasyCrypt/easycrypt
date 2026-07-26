@@ -38,10 +38,9 @@ let print_llm_guide () =
 (* Machine-profile protocol version advertised in the READY handshake
    (addition 6). The daemon compares this against its own minimum and
    fails the handshake on a lower report — bump in lock-step with any
-   wire-visible change. v2 = the EcLlm command set + the JSON machine
-   profile (GOALS-JSON, PARSE/ANALYZE frames, ERROR-JSON, restart
-   tags); EXEC-JSON and searchall from the daemon-v1 line are
-   deferred (see doc/ecllm-compat.md). *)
+   wire-visible change. v2 = the EcLlm command set + the full JSON
+   machine profile (GOALS-JSON, PARSE/ANALYZE frames, EXEC-JSON,
+   ERROR-JSON/OK-JSON, restart tags, searchall). *)
 let llm_protocol_version = 2
 
 (* -------------------------------------------------------------------- *)
@@ -352,14 +351,25 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   (* OK/ERROR/<END> wire envelope. *)
   let had_error = ref false in
 
+  (* Addition 15: the next OK reply's `OK-JSON:` payload. EXEC-JSON
+     (addition 13) stages structured metadata here before feeding its
+     rendered text through [process_ec_input]; [Wire.reply_ok]
+     consumes it one-shot and falls back to the `{}` stub. *)
+  let next_ok_payload : string option ref = ref None in
+
   let module Wire = struct
     let reply_ok ?(tag="") body =
       let n = Buffer.contents notices in
       Printf.printf "OK [uuid:%d]%s\n" (EcCommands.uuid ()) tag;
-      (* Addition 15 stub: structured success envelope symmetric with
-         ERROR-JSON. v0 payload is `{}`; populated fields arrive with
-         the wire-v2 work. *)
-      Printf.printf "OK-JSON: {}\n";
+      (* Addition 15: structured success envelope symmetric with
+         ERROR-JSON. `{}` stub unless a producer (EXEC-JSON) staged a
+         payload for this reply. *)
+      let payload =
+        match !next_ok_payload with
+        | Some s -> next_ok_payload := None; s
+        | None -> "{}"
+      in
+      Printf.printf "OK-JSON: %s\n" payload;
       if n <> "" then print_string n;
       if body <> "" then begin
         print_string body;
@@ -380,12 +390,16 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
        protocol-level errors (no exn) classify as Internal/protocol.
        [?tag] mirrors [reply_ok] — used for `[restarted]`
        (addition 4). *)
-    let reply_error ?(tag="") ?exn msg =
+    let reply_error ?(tag="") ?exn ?error_json msg =
       had_error := true;
       let goals = Goals.goals_to_string () in
       Printf.printf "ERROR [uuid:%d]%s\n" (EcCommands.uuid ()) tag;
-      Printf.printf "ERROR-JSON: %s\n"
-        (EcLlmJson.error_json_line ?exn ~fallback:msg ());
+      let json =
+        match error_json with
+        | Some j -> j
+        | None -> EcLlmJson.error_json_line ?exn ~fallback:msg ()
+      in
+      Printf.printf "ERROR-JSON: %s\n" json;
       Printf.printf "%s\n" msg;
       if goals <> "" then begin
         print_string goals;
@@ -932,6 +946,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Goals_json             (* machine profile: GOALS-JSON *)
       | Parse_file   of string (* machine profile: PARSE-JSON "file" *)
       | Analyze_file of string (* machine profile: ANALYZE-JSON "file" *)
+      | Exec_json    of string (* machine profile: EXEC-JSON <payload> *)
       | Begin_multi of [ `Ec | `Parse | `Analyze ]
       | Done_multi
       | Multi_line of string
@@ -1031,6 +1046,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           match keyword_arg "LOAD"       line with Some a -> parse_load       a | None ->
           match keyword_arg "PARSE-JSON"   line with Some a -> Parse_file   a | None ->
           match keyword_arg "ANALYZE-JSON" line with Some a -> Analyze_file a | None ->
+          match keyword_arg "EXEC-JSON"    line with Some a -> Exec_json    a | None ->
           Ec line
   end in
 
@@ -1151,6 +1167,33 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
         Buffer.add_char multi_buf '\n';
       Buffer.add_string multi_buf s
 
+    (* Addition 13: structured execution. Parse the payload, render it
+       to EC source via [EcExecJson.render], and feed the text through
+       [process_ec_input] exactly as if the client had typed it —
+       staging the render metadata as the reply's OK-JSON payload.
+       Render failures surface their structured code directly. *)
+    let do_exec_json payload =
+      Buffer.clear notices;
+      let emit_error code detail =
+        Wire.reply_error
+          ~error_json:(EcLlmJson.protocol_error_json ~code ~detail)
+          detail
+      in
+      match Yojson.Safe.from_string payload with
+      | exception e ->
+        emit_error "MalformedExecJson"
+          (Printf.sprintf "EXEC-JSON: %s" (Printexc.to_string e))
+      | json ->
+        (match EcExecJson.render json with
+         | EcExecJson.Err (code, detail) -> emit_error code detail
+         | EcExecJson.Ok_render (text, metadata) ->
+           next_ok_payload := Some metadata;
+           process_ec_input text;
+           (* If process_ec_input replied ERROR, the staged payload
+              never fired; clear it so an unrelated later OK doesn't
+              inherit it. *)
+           next_ok_payload := None)
+
     (* PARSE-JSON / ANALYZE-JSON over a file argument (quoted or
        bareword). *)
     let do_json_file builder label args =
@@ -1216,6 +1259,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           (EcLlmJson.analyze_to_json
              ~checkmode:(checkmode_of !cur_prvopts))
           "ANALYZE-JSON" a
+      | Exec_json p  -> do_exec_json p
       | Begin_multi kind -> do_begin_multi kind
       | Done_multi   -> do_done_multi ()
       | Multi_line s -> do_multi_line s

@@ -24,3 +24,7 @@ val analyze_to_json :
    without it, a protocol-level Internal payload built from
    [fallback]. *)
 val error_json_line : ?exn:exn -> fallback:string -> unit -> string
+
+(* Protocol-level ERROR-JSON with an explicit code (EXEC-JSON's
+   MalformedExecJson / UnsupportedExecJson). *)
+val protocol_error_json : code:string -> detail:string -> string

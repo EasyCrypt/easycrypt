@@ -98,6 +98,15 @@ let error_json_line ?exn ~fallback () =
        \"location\":null,\"detail\":\"%s\"}"
       (json_escape fallback)
 
+(* Protocol-level ERROR-JSON with an explicit code — used by
+   EXEC-JSON (addition 13) for MalformedExecJson /
+   UnsupportedExecJson. *)
+let protocol_error_json ~code ~detail =
+  Printf.sprintf
+    "{\"code\":\"%s\",\"phase\":\"protocol\",\
+     \"location\":null,\"detail\":\"%s\"}"
+    (json_escape code) (json_escape detail)
+
 (* -------------------------------------------------------------------- *)
 (* Structured JSON goals (addition 3, v0 + amendments 20/23/24).
    Schema:

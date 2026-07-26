@@ -685,7 +685,29 @@ let exec_json t ~corr ~command_json =
     | Some r ->
       let restarted = has_tag r "restarted" in
       let sid = Sentence_id.of_source command_json in
-      t.uuid <- r.uuid;
+      (* Mirror the text path's directive neutrality on the EcLlm
+         base: the render metadata (OK-JSON) carries command_kind;
+         when a directive advanced uuid, revert immediately so both
+         paths agree (the EXEC-JSON round-trip oracle checks this). *)
+      let is_directive =
+        match r.ok_json with
+        | None -> false
+        | Some raw ->
+          (match Yojson.Safe.from_string raw with
+           | exception _ -> false
+           | j ->
+             (match Yojson.Safe.Util.member "command_kind" j with
+              | `String "directive" -> true
+              | _ -> false))
+      in
+      let final_uuid =
+        if (not restarted) && is_directive && r.uuid = pre_uuid + 1 then
+          match send_and_read t (Printf.sprintf "REVERT %d" pre_uuid) with
+          | Some { status = `Ok; uuid = u; _ } -> u
+          | _ -> r.uuid
+        else r.uuid
+      in
+      t.uuid <- final_uuid;
       if restarted then begin
         t.executed_list <- [];
         Transcript.record_g ~corr Transcript.Session_restart
@@ -698,14 +720,14 @@ let exec_json t ~corr ~command_json =
              "exec_json", `Bool true;
            ])
       end
-      else if r.uuid > pre_uuid then
-        t.executed_list <- (sid, r.uuid) :: t.executed_list;
+      else if final_uuid > pre_uuid then
+        t.executed_list <- (sid, final_uuid) :: t.executed_list;
       if not restarted then
         Transcript.record_g ~corr Transcript.Session_reply
           (`Assoc [
              "label",  `String t.label;
              "status", `String "ok";
-             "uuid",   `Int r.uuid;
+             "uuid",   `Int final_uuid;
              "restarted", `Bool false;
              "notices_count", `Int (List.length r.notices);
              "sentence_id", `String (Sentence_id.to_string sid);
@@ -715,7 +737,7 @@ let exec_json t ~corr ~command_json =
            ]);
       Ok Session.{
           sentence_id  = sid;
-          replied_uuid = r.uuid;
+          replied_uuid = final_uuid;
           notices      = r.notices;
           restarted;
           output       = String.concat "\n" r.body;
