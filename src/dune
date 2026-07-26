@@ -21,6 +21,7 @@
 
 (executable
  (public_name easycrypt)
+ (package easycrypt)
  (name ec)
  (modules ec)
  (promote (until-clean))
