@@ -35,6 +35,16 @@ let print_llm_guide () =
     Printf.eprintf "cannot read LLM guide: %s\n%!" e
 
 (* -------------------------------------------------------------------- *)
+(* Machine-profile protocol version advertised in the READY handshake
+   (addition 6). The daemon compares this against its own minimum and
+   fails the handshake on a lower report — bump in lock-step with any
+   wire-visible change. v2 = the EcLlm command set + the JSON machine
+   profile (GOALS-JSON, PARSE/ANALYZE frames, ERROR-JSON, restart
+   tags); EXEC-JSON and searchall from the daemon-v1 line are
+   deferred (see doc/ecllm-compat.md). *)
+let llm_protocol_version = 2
+
+(* -------------------------------------------------------------------- *)
 let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   if llmopts.llmo_help then begin
     print_llm_guide ();
@@ -111,9 +121,24 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
      Cleared with the transcript on LOAD/Restart. *)
   let prior_bullets : EcBullets.stack option ref = ref None in
 
+  (* Machine profile (addition 4): stream notices as `NOTICE: ` lines
+     immediately (one line per line, flushed) instead of buffering
+     them into the next reply body — clients see progress during
+     long-running commands and reply bodies stay payload-only. A
+     NOTICE line may appear anywhere in the stream and is always
+     identifiable by its prefix. The [notices] buffer above stays for
+     the reply-shape code paths but now remains empty. *)
   let notifier (_ : EcGState.loglevel) (lazy msg) =
-    Buffer.add_string notices msg;
-    Buffer.add_char notices '\n'
+    let n = ref (String.length msg) in
+    while !n > 0
+          && (let c = msg.[!n - 1] in c = '\n' || c = '\r')
+    do decr n done;
+    if !n > 0 then begin
+      List.iter
+        (Printf.printf "NOTICE: %s\n")
+        (String.split_on_char '\n' (String.sub msg 0 !n));
+      flush stdout
+    end
   in
 
   let do_initialize () =
@@ -331,6 +356,10 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
     let reply_ok ?(tag="") body =
       let n = Buffer.contents notices in
       Printf.printf "OK [uuid:%d]%s\n" (EcCommands.uuid ()) tag;
+      (* Addition 15 stub: structured success envelope symmetric with
+         ERROR-JSON. v0 payload is `{}`; populated fields arrive with
+         the wire-v2 work. *)
+      Printf.printf "OK-JSON: {}\n";
       if n <> "" then print_string n;
       if body <> "" then begin
         print_string body;
@@ -346,10 +375,18 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       if !quiet then reply_ok ~tag ""
       else reply_ok ~tag (Goals.goals_to_string ~all ())
 
-    let reply_error msg =
+    (* [?exn] carries the originating exception for structured-error
+       classification (addition 8) on the `ERROR-JSON:` line;
+       protocol-level errors (no exn) classify as Internal/protocol.
+       [?tag] mirrors [reply_ok] — used for `[restarted]`
+       (addition 4). *)
+    let reply_error ?(tag="") ?exn msg =
       had_error := true;
       let goals = Goals.goals_to_string () in
-      Printf.printf "ERROR [uuid:%d]\n%s\n" (EcCommands.uuid ()) msg;
+      Printf.printf "ERROR [uuid:%d]%s\n" (EcCommands.uuid ()) tag;
+      Printf.printf "ERROR-JSON: %s\n"
+        (EcLlmJson.error_json_line ?exn ~fallback:msg ());
+      Printf.printf "%s\n" msg;
       if goals <> "" then begin
         print_string goals;
         let len = String.length goals in
@@ -568,9 +605,9 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
     | EcCommands.Restart ->
       do_initialize ();
       Transcript.clear ();
-      Wire.reply_ok "Session restarted"
+      Wire.reply_ok ~tag:" [restarted]" "Session restarted"
     | e ->
-      Wire.reply_error (Goals.format_error ~src:!last_src e)
+      Wire.reply_error ~exn:e (Goals.format_error ~src:!last_src e)
     end;
     EcIo.finalize reader
   in
@@ -834,6 +871,11 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
               end
         in
 
+        (* LOAD always [do_initialize]s, so every LOAD reply — success
+           or error — carries `[restarted]`: the daemon invalidates its
+           sentence→uuid map on it (addition 4). Error paths tag it
+           even when the failure precedes re-initialization —
+           over-invalidation is the safe direction. *)
         let tag =
           let loaded =
             match !last_loc with
@@ -842,7 +884,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
               let (el, _) = loc.EcLocation.loc_end in
               Printf.sprintf " [loaded:%s:%d]" filename el
           in
-          loaded ^ Goals.focus_tag ()
+          " [restarted]" ^ loaded ^ Goals.focus_tag ()
         in
         Wire.reply_ok ~tag body
 
@@ -851,14 +893,15 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
         do_initialize ();
         Hashtbl.clear checkpoints;
         Transcript.clear ();
-        Wire.reply_ok "Session restarted"
+        Wire.reply_ok ~tag:" [restarted]" "Session restarted"
       | Trace_failed e ->
         let msg = Goals.format_error ~src:!last_src e in
-        Wire.reply_error (!trace_prefix ^ msg)
+        Wire.reply_error ~tag:" [restarted]" ~exn:e (!trace_prefix ^ msg)
       | Failure s ->
-        Wire.reply_error s
+        Wire.reply_error ~tag:" [restarted]" s
       | e ->
-        Wire.reply_error (Goals.format_error ~src:!last_src e)
+        Wire.reply_error ~tag:" [restarted]" ~exn:e
+          (Goals.format_error ~src:!last_src e)
   end in
 
   (* ------------------------------------------------------------------ *)
@@ -886,7 +929,10 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Search     of string   (* trailing "." already stripped *)
       | Load       of string   (* raw arg tail; Load.handle parses *)
       | Ec         of string   (* fall-through: raw EasyCrypt input *)
-      | Begin_multi
+      | Goals_json             (* machine profile: GOALS-JSON *)
+      | Parse_file   of string (* machine profile: PARSE-JSON "file" *)
+      | Analyze_file of string (* machine profile: ANALYZE-JSON "file" *)
+      | Begin_multi of [ `Ec | `Parse | `Analyze ]
       | Done_multi
       | Multi_line of string
       | Blank
@@ -951,17 +997,26 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
     let of_line ~multi_active (raw : string) : command =
       let line = String.strip raw in
       if multi_active then
-        if line = "<DONE>" then Done_multi
-        else Multi_line line
+        (* Enders match on the stripped view; body lines pass through
+           RAW so indentation and blank lines are preserved verbatim —
+           byte offsets reported by PARSE-JSON must line up with the
+           caller's own source buffer (machine profile). *)
+        if line = "<DONE>" || line = "<PARSE-DONE>"
+           || line = "<ANALYZE-DONE>"
+        then Done_multi
+        else Multi_line raw
       else
         match line with
-        | "<BEGIN>"   -> Begin_multi
+        | "<BEGIN>"         -> Begin_multi `Ec
+        | "<PARSE-BEGIN>"   -> Begin_multi `Parse
+        | "<ANALYZE-BEGIN>" -> Begin_multi `Analyze
         | ""          -> Blank
         | "QUIT"      -> Quit
         | "HELP"      -> Help
         | "UNDO"      -> Undo
         | "GOALS"     -> Goals `One
         | "GOALS ALL" -> Goals `All
+        | "GOALS-JSON"-> Goals_json
         | "TREE"      -> Tree `One
         | "TREE ALL"  -> Tree `All
         | "COMMIT"    -> Commit
@@ -974,6 +1029,8 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           match keyword_arg "REVERT"     line with Some a -> parse_revert     a | None ->
           match keyword_arg "SEARCH"     line with Some a -> parse_search     a | None ->
           match keyword_arg "LOAD"       line with Some a -> parse_load       a | None ->
+          match keyword_arg "PARSE-JSON"   line with Some a -> Parse_file   a | None ->
+          match keyword_arg "ANALYZE-JSON" line with Some a -> Analyze_file a | None ->
           Ec line
   end in
 
@@ -983,6 +1040,9 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
      held here so [Parse] can stay pure. *)
   let multi_buf = Buffer.create 256 in
   let in_multi  = ref false in
+  (* Which frame opened the active multi-line block: plain EasyCrypt
+     input (<BEGIN>) or the machine-profile PARSE/ANALYZE frames. *)
+  let multi_mode : [ `Ec | `Parse | `Analyze ] ref = ref `Ec in
 
   let module Dispatch = struct
     let do_help () =
@@ -1065,20 +1125,57 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
     let do_search query =
       process_ec_input (Printf.sprintf "search %s." query)
 
-    let do_begin_multi () =
+    let do_begin_multi kind =
       Buffer.clear multi_buf;
+      multi_mode := kind;
       in_multi := true
 
     let do_done_multi () =
       let input = Buffer.contents multi_buf in
       Buffer.clear multi_buf;
       in_multi := false;
-      if input <> "" then process_ec_input input
+      match !multi_mode with
+      | `Parse ->
+        Buffer.clear notices;
+        Wire.reply_ok (EcLlmJson.parse_to_json input)
+      | `Analyze ->
+        Buffer.clear notices;
+        Wire.reply_ok
+          (EcLlmJson.analyze_to_json
+             ~checkmode:(checkmode_of !cur_prvopts) input)
+      | `Ec ->
+        if input <> "" then process_ec_input input
 
     let do_multi_line s =
       if Buffer.length multi_buf > 0 then
-        Buffer.add_char multi_buf ' ';
+        Buffer.add_char multi_buf '\n';
       Buffer.add_string multi_buf s
+
+    (* PARSE-JSON / ANALYZE-JSON over a file argument (quoted or
+       bareword). *)
+    let do_json_file builder label args =
+      Buffer.clear notices;
+      let args = String.strip args in
+      let filename =
+        if String.length args > 1 && args.[0] = '"' then
+          let close =
+            try String.index_from args 1 '"'
+            with Not_found -> String.length args - 1
+          in
+          String.sub args 1 (close - 1)
+        else args
+      in
+      if filename = "" then
+        Wire.reply_error (Printf.sprintf "%s: missing filename" label)
+      else
+        try
+          let ic = open_in filename in
+          let n = in_channel_length ic in
+          let content = really_input_string ic n in
+          close_in ic;
+          Wire.reply_ok (builder content)
+        with Sys_error msg ->
+          Wire.reply_error (Printf.sprintf "%s: %s" label msg)
 
     let run (cmd : Parse.command) =
       match cmd with
@@ -1109,7 +1206,17 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Search q     -> do_search q
       | Load args    -> Load.handle args
       | Ec input     -> process_ec_input input
-      | Begin_multi  -> do_begin_multi ()
+      | Goals_json   ->
+        Buffer.clear notices;
+        Wire.reply_ok (EcLlmJson.goals_to_json ())
+      | Parse_file a ->
+        do_json_file EcLlmJson.parse_to_json "PARSE-JSON" a
+      | Analyze_file a ->
+        do_json_file
+          (EcLlmJson.analyze_to_json
+             ~checkmode:(checkmode_of !cur_prvopts))
+          "ANALYZE-JSON" a
+      | Begin_multi kind -> do_begin_multi kind
       | Done_multi   -> do_done_multi ()
       | Multi_line s -> do_multi_line s
   end in
@@ -1119,7 +1226,8 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
 
   do_initialize ();
 
-  Printf.printf "READY [uuid:%d]\n<END>\n%!" (EcCommands.uuid ());
+  Printf.printf "READY [uuid:%d] [proto:%d]\n<END>\n%!"
+    (EcCommands.uuid ()) llm_protocol_version;
 
   (* Input source: stdin by default, or the -eval string when given.
      For -eval, we split on newlines up front (no lazy channel), which
