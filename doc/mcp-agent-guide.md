@@ -212,13 +212,25 @@ session ≡ file. If the session itself is wedged (rare), re-run
 
 ## Setup (human operator)
 
-From the `ec-llm-next` worktree, with the dev shell available:
+Build in the `ec-llm-next` worktree with the dev shell — a FULL
+`dune build` (the root `ecd.native` promote rule does not fire on
+incremental `dune build tooling/...` invocations, which leaves a
+stale root binary):
 
 ```bash
-dune build                       # produces ec.native + ecd.native
+dune build                       # refreshes root ecd.native (promote)
+rm -f ec.native && cp _build/default/src/ec.exe ec.native && chmod +w ec.native
+```
+
+Register **from the project directory the agent session works in**
+(local scope is per-project; registering from the tooling repo
+hides the server from real sessions), or add `--scope user` for
+all projects:
+
+```bash
 claude mcp add easycrypt \
-  --env EC_LLM_BIN=$PWD/ec.native \
-  -- $PWD/ecd.native mcp
+  --env EC_LLM_BIN=/Users/gdel/Repos/ec-llm-next/ec.native \
+  -- /Users/gdel/Repos/ec-llm-next/ecd.native mcp
 ```
 
 The server speaks MCP over stdio; sessions spawn `ec llm`

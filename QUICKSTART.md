@@ -27,16 +27,26 @@ are there, skip to step 4.
 
 ## 3. Registration (only if the tools are absent)
 
+Run this **from the project directory you are working in** (e.g.
+your proofs repo) — NOT from `ec-llm-next`. `claude mcp add`
+registers to the current project's local scope by default, so
+registering from the tooling repo makes the server invisible to
+your actual session:
+
 ```bash
-cd /Users/gdel/Repos/ec-llm-next
-claude mcp add easycrypt --env EC_LLM_BIN=$PWD/ec.native -- $PWD/ecd.native mcp
+claude mcp add easycrypt \
+  --env EC_LLM_BIN=/Users/gdel/Repos/ec-llm-next/ec.native \
+  -- /Users/gdel/Repos/ec-llm-next/ecd.native mcp
 ```
+
+(Add `--scope user` to make it available in every project instead
+of just this one.)
 
 MCP servers load at session start — after registering, **tell the
 user to restart the session** so the tools appear. If registration
-or the first `open_file` fails (missing binary, handshake error),
-report the exact error to the user and stop; do not attempt to
-rebuild anything.
+or the first `open_file` fails (missing binary, handshake error,
+unknown command), report the exact error to the user and stop; do
+not attempt to rebuild anything.
 
 ## 4. Read the operating manual
 
@@ -107,7 +117,8 @@ any step fails, report it verbatim and stop.
 
 | Symptom | Action |
 |---|---|
-| MCP tools absent | step 3, then ask the user to restart the session |
+| MCP tools absent | step 3 (from YOUR project dir, not the tooling repo), then ask the user to restart the session |
+| `ecd: unknown command 'mcp'` | stale tooling binary — report to the user and stop; the tooling workstream rebuilds it |
 | `open_file` fails to spawn / handshake error | report the error to the user; the tooling workstream fixes it — do not rebuild |
 | every reply `stale: true` | the file changed on disk — `resync_file` |
 | session confused / mid-proof wedge | `resync_file` (session ≡ file), or re-`open_file` the label |
