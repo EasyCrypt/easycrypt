@@ -291,6 +291,36 @@ let () =
     (match member "uuid" g2 with `Int 5 -> true | _ -> false)
     (Yojson.Safe.to_string (member "uuid" g2));
 
+  let (err, sr) =
+    call fd_in fd_out "search"
+      (`Assoc [ "pattern", `String "(_ <= _)"; "limit", `Int 5 ])
+  in
+  let total_hits =
+    match member "total_hits" sr with `Int n -> n | _ -> -1
+  in
+  let shown_hits =
+    try
+      match member "hits" sr with `List xs -> List.length xs | _ -> -1
+    with _ -> -1
+  in
+  let first_qname_nonempty =
+    try
+      match member "hits" sr with
+      | `List (h :: _) ->
+        (match member "qname" h with
+         | `String s -> String.length s > 0 | _ -> false)
+      | _ -> false
+    with _ -> false
+  in
+  check "search (searchall mode): hits on untyped (_ <= _)"
+    ((not err) && total_hits > 0)
+    (Printf.sprintf "total=%d" total_hits);
+  check "search: limit honored + truncation reported"
+    (shown_hits = 5
+     && (match member "truncated" sr with `Bool true -> true | _ -> false))
+    (Printf.sprintf "shown=%d" shown_hits);
+  check "search: structured hit has qname" first_qname_nonempty "";
+
   let (err, cp) = call fd_in fd_out "commit_proof" (`Assoc []) in
   let proof_text =
     match member "proof" cp with `String s -> s | _ -> ""

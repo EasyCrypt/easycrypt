@@ -182,6 +182,55 @@ let tool_query t args =
             "output", `String output;
           ])))
 
+let tool_search t args =
+  match str_arg args "pattern" with
+  | None -> Error "search: missing required argument 'pattern'"
+  | Some pattern ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       let strict = bool_arg args "strict" in
+       let verb = if strict then "search" else "searchall" in
+       let pattern =
+         let p = String.trim pattern in
+         if String.length p > 0 && p.[String.length p - 1] = '.'
+         then String.sub p 0 (String.length p - 1)
+         else p
+       in
+       let limit =
+         match int_arg args "limit" with
+         | Some n when n > 0 -> n
+         | _ -> 50
+       in
+       let source = Printf.sprintf "%s %s." verb pattern in
+       let corr = Correlation.of_client "mcp-search" in
+       (match
+          Ec_llm_session.exec e.session ~corr
+            ~sentence_class:`Directive ~source
+        with
+        | Error err -> Error (Error.to_string err)
+        | Ok ok ->
+          let hits = Search_result.of_notices ok.notices in
+          let total = List.length hits in
+          let shown = List.filteri (fun i _ -> i < limit) hits in
+          Ok (`Assoc [
+            "session", `String label;
+            "mode", `String verb;
+            "total_hits", `Int total;
+            "truncated", `Bool (total > limit);
+            "hits",
+            `List
+              (List.map
+                 (fun (h : Search_result.hit) ->
+                    `Assoc [
+                      "qname", `String h.qname;
+                      "kind", `String h.kind;
+                      "short_name", `String h.short_name;
+                      "signature", `String h.signature;
+                    ])
+                 shown);
+          ])))
+
 let tool_goals t args =
   match find_session t args with
   | Error e -> Error e
@@ -387,6 +436,23 @@ let tools :
     session_prop;
   ],
   tool_query;
+
+  "search",
+  "Search for lemmas / operators / axioms matching a pattern, \
+   returning structured hits (qname, kind, signature). Default mode \
+   is overload-tolerant (searchall): untyped patterns like \
+   \"(_ <= _)\" work without type ascriptions, unioning all \
+   operator overloads. strict=true uses EC's plain typed search.",
+  schema ~required:[ "pattern" ] [
+    ("pattern", "string",
+     "Search pattern, e.g. \"(_ <= _)\" or \"(_ + _)\"; trailing \
+      '.' optional.");
+    ("strict", "boolean",
+     "Use strict typed search instead of searchall. Default false.");
+    ("limit", "integer", "Max hits returned (default 50).");
+    session_prop;
+  ],
+  tool_search;
 
   "goals",
   "Structured view of the current proof state (GOALS-JSON): subgoal \
