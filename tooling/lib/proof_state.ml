@@ -61,7 +61,7 @@ let restart t ~sw =
 
 let parse_into_cache t ~source =
   match Ec_llm_session.parse_source t.session source with
-  | Ok ss ->
+  | Ok (ss, _perr) ->
     t.cached_sentences <- Array.of_list ss;
     t.cached_source <- source;
     Ok ()
@@ -289,7 +289,7 @@ let reconcile t ~uri ~source =
       else
         match Ec_llm_session.parse_source t.session source with
         | Error e -> Error e
-        | Ok ss ->
+        | Ok (ss, _perr) ->
           let new_arr = Array.of_list ss in
           let cur_idx = current_index t in
           (* Common-prefix length over the parsed sentence list. *)

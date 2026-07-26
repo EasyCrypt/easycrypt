@@ -45,7 +45,7 @@ type config = {
 let cfg : config option ref = ref None
 
 let configure
-    ?(extra_args = []) ?(min_proto = 1) ?fs
+    ?(extra_args = []) ?(min_proto = 3) ?fs
     ~process_mgr ~executable () =
   cfg := Some { process_mgr; executable; extra_args; min_proto; fs }
 
@@ -861,6 +861,9 @@ let raw_command t (line : string) =
 type parsed_sentence = {
   cls       : [ `Executable | `Doc_comment | `Directive | `Meta ];
   kind      : string;
+  (* Declared name (AST-sourced, proto >= 3) for declaration
+     sentences; None otherwise. *)
+  name      : string option;
   start_line : int;
   start_col  : int;
   end_line   : int;
@@ -907,6 +910,8 @@ let parse_source t source =
           {
             cls         = parse_class_of_string (g "class" |> to_string);
             kind        = g "kind" |> to_string;
+            name        =
+              (match g "name" with `String s -> Some s | _ -> None);
             start_line  = g "start_line" |> to_int;
             start_col   = g "start_col"  |> to_int;
             end_line    = g "end_line"   |> to_int;
@@ -918,7 +923,16 @@ let parse_source t source =
         in
         (try
            let items = json |> member "sentences" |> to_list in
-           Ok (List.map parse_one items)
+           (* Surface the parse error alongside the valid prefix —
+             consumers decide strictness (scripts refuse atomically;
+             file syncs carry it). Dropping it reproduced the B5
+             silent-truncation class one layer up. *)
+           let perr =
+             match member "parse_error" json with
+             | `Null -> None
+             | j -> Some (Yojson.Safe.to_string j)
+           in
+           Ok (List.map parse_one items, perr)
          with
          | Yojson.Safe.Util.Type_error (msg, _) ->
            Error (Error.Internal { detail = "PARSE-JSON shape: " ^ msg })

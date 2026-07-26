@@ -16,7 +16,7 @@ let sentence_of_parsed (p : Ec_llm_session.parsed_sentence) : sentence =
 let parse session ~uri ~version ~source =
   match Ec_llm_session.parse_source session source with
   | Error e -> Error e
-  | Ok ps ->
+  | Ok (ps, _perr) ->
     Ok {
       uri;
       version;

@@ -61,8 +61,14 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   scrape pp text when a structured field exists.
 - `tree` / `focus {path|"next"}` — the open-subgoal tree with
   dotted paths, and focus rotation (undoable: advances uuid).
-- `exec {text}` — execute and advance. Reply: new uuid, `time_ms`,
-  `stale`, notices, goals.
+- `exec {text}` — execute and advance, ONE SENTENCE AT A TIME: the
+  input is split by the real parser; successes COMMIT, the first
+  failure stops the sequence, and the reply reports every sentence
+  (per-sentence uuid + time_ms, `goals_at_failure` on error —
+  earlier sentences REMAIN EXECUTED; revert or resync to unwind).
+  Input with a parse error anywhere is refused ATOMICALLY. The
+  wire itself rejects multi-phrase blocks, so nothing can be
+  silently dropped at any layer.
 - `revert {uuid}` — go back to an earlier uuid.
 - `list_sessions` / `close_session {session}` — inventory (with
   modes + claims) and teardown. Close sessions you are done with:
@@ -212,6 +218,13 @@ session ≡ file. If the session itself is wedged (rare), re-run
   are on you until the final re-check catches them.
 - Prefer state-neutral probes (`try_tactic`, `check_script`,
   `check_skeleton`) over exec-then-revert.
+- When a goal embeds a whole `main`, reach for `tree` (one line
+  per goal) or `goal_detail: "shape" | "counts"` — loop tools
+  default to `shape` (program bodies elided to instruction
+  counts); full dumps are what `goals {goal_detail: "full"}` is
+  for. Every reply carries exactly ONE terminal-state field
+  (`goals`/`goals_at_end` on success, `goals_at_failure` on
+  failure).
 - `admit` is allowed and visible (profile counts it; skeleton
   treats it as a hole). Never leave one in text you hand back
   without saying so.

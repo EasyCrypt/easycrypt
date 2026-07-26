@@ -41,7 +41,7 @@ let drive_file ~bin ~extra_args ~transcript_path file =
   (* 1. Split the document into sentences via PARSE-JSON. *)
   let sentences =
     match Ec_llm_session.parse_source s content with
-    | Ok ss -> ss
+    | Ok (ss, _perr) -> ss
     | Error e ->
       Printf.eprintf "parse failed: %s\n%!" (Error.to_string e);
       exit 1

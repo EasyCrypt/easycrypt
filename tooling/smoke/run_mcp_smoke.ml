@@ -669,6 +669,94 @@ let () =
      && member "restore" sk = `String "restored")
     (Yojson.Safe.to_string sk);
 
+  (* -- B5: exec is strictly per-sentence ------------------------- *)
+  let (err, em) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "split.\ntrivial.";
+         "session", `String "w2";
+       ])
+  in
+  let em_goals =
+    try
+      match member "goals" em with
+      | `Assoc _ as g -> member "subgoal_count" g
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "B5: exec runs ALL sentences (split+trivial -> 1 goal)"
+    ((not err)
+     && member "ok" em = `Bool true
+     && member "executed" em = `Int 2
+     && em_goals = `Int 1)
+    (Yojson.Safe.to_string em);
+  let (err, _) =
+    call fd_in fd_out "revert"
+      (`Assoc [ "uuid", `Int 7; "session", `String "w2" ])
+  in
+  check "revert after exec-multi" (not err) "";
+
+  let (err, pe) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "split.\nbogus_tactic_xyz.";
+         "session", `String "w2";
+       ])
+  in
+  check "B5b: parse error in input refuses ATOMICALLY (nothing ran)"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "parse error")
+                     (Yojson.Safe.to_string pe) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string pe);
+
+  let (err, ef) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "split.\napply bogus_lemma_xyz.\ntrivial.";
+         "session", `String "w2";
+       ])
+  in
+  let ef_gaf =
+    try
+      match member "goals_at_failure" ef with
+      | `Assoc _ as g -> member "subgoal_count" g
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "B5: mid-sequence failure reported, prefix committed"
+    ((not err)
+     && member "ok" ef = `Bool false
+     && member "executed" ef = `Int 1
+     && ef_gaf = `Int 2
+     && member "goals" ef = `Null)
+    (Yojson.Safe.to_string ef);
+  let (err, _) =
+    call fd_in fd_out "revert"
+      (`Assoc [ "uuid", `Int 7; "session", `String "w2" ])
+  in
+  check "revert after exec-multi failure" (not err) "";
+
+  let (err, gc) =
+    call fd_in fd_out "goals"
+      (`Assoc [
+         "session", `String "w2"; "goal_detail", `String "counts";
+       ])
+  in
+  let gc_body =
+    try member "goals" gc with _ -> `Null
+  in
+  check "F5: goal_detail=counts — conclusions only, no subgoals"
+    ((not err)
+     && (match member "conclusions" gc_body with
+         | `List [ `String _ ] -> true
+         | _ -> false)
+     && member "subgoals" gc_body = `Null)
+    (Yojson.Safe.to_string gc);
+
   let (err, _) =
     call fd_in fd_out "exec"
       (`Assoc [ "text", `String "split."; "session", `String "w2" ])
@@ -851,8 +939,60 @@ let () =
     with _ -> `Null
   in
   check "F3: goals_at_failure carries the state entering the failure"
-    ((not err) && member "ok" cs2 = `Bool false && gaf = `Int 1)
+    ((not err) && member "ok" cs2 = `Bool false && gaf = `Int 1
+     && member "goals_at_end" cs2 = `Null)
     (Yojson.Safe.to_string cs2);
+
+  (* -- B4: non-lemma declaration forms, from the AST -------------- *)
+  let kinds = Filename.concat fixture_dir "kinds.ec" in
+  let oc = open_out kinds in
+  output_string oc
+    "require import AllCore.\n\
+     module M = { proc f() : int = { return 1; } }.\n\
+     (* banner *)\n\
+     hoare h_plain : M.f : true ==> true.\n\
+     proof.\n\
+     proc.\n\
+     auto.\n\
+     qed.\n";
+  close_out oc;
+  let (err, ko) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String kinds;
+         "session", `String "wk";
+         "mode", `String "proof";
+         "lemmas", `List [ `String "h_plain" ];
+         "nosmt", `Bool true;
+       ])
+  in
+  let kclaim =
+    try
+      match member "claims" ko with `List (c :: _) -> c | _ -> `Null
+    with _ -> `Null
+  in
+  check "B4: hoare declaration claimable via AST name (with banner)"
+    ((not err) && member "lemma" kclaim = `String "h_plain")
+    (Yojson.Safe.to_string ko);
+  let (err, ka) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wk"; "at_lemma", `String "h_plain" ])
+  in
+  let ka_goals =
+    try
+      match member "goals" ka with
+      | `Assoc _ as g -> member "subgoal_count" g
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "B4: at_lemma positions on a hoare declaration"
+    ((not err) && member "ok" ka = `Bool true && ka_goals = `Int 1)
+    (Yojson.Safe.to_string ka);
+  let (err, _) =
+    call fd_in fd_out "close_session"
+      (`Assoc [ "session", `String "wk" ])
+  in
+  check "close wk" (not err) "";
   let (err, us) =
     call fd_in fd_out "resync_file"
       (`Assoc [ "session", `String "wb"; "upto_sentence", `Int 8 ])

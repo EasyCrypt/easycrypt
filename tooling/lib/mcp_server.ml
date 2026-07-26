@@ -260,6 +260,66 @@ let one_line_concl sub =
   let s = String.map (function '\n' -> ' ' | c -> c) s in
   if String.length s > 80 then String.sub s 0 79 ^ "…" else s
 
+(* ---------------------------------------------------------------- *)
+(* Bounded goal payloads (field report F5): ONE transform, ONE
+   parameter, applied wherever goals are emitted.
+     full   — verbatim GOALS-JSON.
+     shape  — program-statement bodies (the size-dominant part of
+              PHL goals) elided to instruction counts; everything
+              else intact.
+     counts — subgoal count + one-line conclusions only.
+   Reply discipline: every reply carries EXACTLY ONE terminal-state
+   field — goals / goals_at_end on success, goals_at_failure on
+   failure — never both. *)
+
+let rec elide_stmts (j : Yojson.Safe.t) : Yojson.Safe.t =
+  match j with
+  | `Assoc kvs ->
+    (match List.assoc_opt "kind" kvs with
+     | Some (`String "stmt") ->
+       let n =
+         match List.assoc_opt "body" kvs with
+         | Some (`List l) -> List.length l
+         | _ -> 0
+       in
+       `Assoc [
+         "kind", `String "stmt";
+         "elided", `Bool true;
+         "instr_count", `Int n;
+       ]
+     | _ -> `Assoc (List.map (fun (k, v) -> (k, elide_stmts v)) kvs))
+  | `List l -> `List (List.map elide_stmts l)
+  | x -> x
+
+let goal_detail_of args ~default =
+  match str_arg args "goal_detail" with
+  | Some "full" -> `Full
+  | Some "shape" -> `Shape
+  | Some "counts" -> `Counts
+  | _ -> default
+
+let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
+  match detail with
+  | `Full -> j
+  | `Shape -> elide_stmts j
+  | `Counts ->
+    let open Yojson.Safe.Util in
+    (match member "active" j with
+     | `Bool true ->
+       let subs =
+         match member "subgoals" j with `List l -> l | _ -> []
+       in
+       `Assoc [
+         "active", `Bool true;
+         "subgoal_count",
+         (match member "subgoal_count" j with
+          | `Int n -> `Int n
+          | _ -> `Int (List.length subs));
+         "conclusions",
+         `List (List.map (fun s -> `String (one_line_concl s)) subs);
+       ]
+     | _ -> j)
+
 (* Leaf paths from a TREE reply: lines shaped "[1.2] <goal> ...". *)
 let tree_paths body =
   String.split_on_char '\n' body
@@ -309,74 +369,6 @@ end
 (* Lemma-claim resolution (proof mode)                                *)
 (* ---------------------------------------------------------------- *)
 
-let ident_prefix s =
-  let is_id c =
-    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-    || (c >= '0' && c <= '9') || c = '_' || c = '\''
-  in
-  let n = String.length s in
-  let rec go i = if i < n && is_id s.[i] then go (i + 1) else i in
-  let k = go 0 in
-  if k = 0 then None else Some (String.sub s 0 k)
-
-(* EC attaches leading comments to the following sentence, so a
-   declaration's src may begin with one or more banner `(* ... *)`
-   blocks (house style on real codebases — field report
-   2026-07-26). Strip them, nesting-aware, before tokenizing. *)
-let strip_leading_comments (src : string) : string =
-  let n = String.length src in
-  let rec skip_ws i =
-    if i < n
-       && (src.[i] = ' ' || src.[i] = '\t' || src.[i] = '\n'
-           || src.[i] = '\r')
-    then skip_ws (i + 1)
-    else i
-  in
-  let rec skip_comment i depth =
-    if i + 1 >= n then n
-    else if src.[i] = '(' && src.[i + 1] = '*' then
-      skip_comment (i + 2) (depth + 1)
-    else if src.[i] = '*' && src.[i + 1] = ')' then
-      if depth = 1 then i + 2 else skip_comment (i + 2) (depth - 1)
-    else skip_comment (i + 1) depth
-  in
-  let rec go i =
-    let i = skip_ws i in
-    if i + 1 < n && src.[i] = '(' && src.[i + 1] = '*' then
-      go (skip_comment (i + 2) 1)
-    else i
-  in
-  let k = go 0 in
-  if k >= n then "" else String.sub src k (n - k)
-
-(* Extract the declared name from a proof-opening declaration's
-   SOURCE text (not pp output): strip attached leading comments,
-   skip local/declare prefixes and nosmt / [attribute] tokens after
-   the keyword; the name is the leading identifier of the next
-   token. v1 heuristic — validation errors list every declaration
-   found, so mismatches are visible. *)
-let decl_name (src : string) : string option =
-  let src = strip_leading_comments src in
-  let toks =
-    String.split_on_char '\n' src
-    |> List.concat_map (String.split_on_char '\t')
-    |> List.concat_map (String.split_on_char ' ')
-    |> List.filter (fun s -> s <> "")
-  in
-  let rec after_kw = function
-    | [] -> None
-    | ("local" | "declare") :: rest -> after_kw rest
-    | ("lemma" | "axiom") :: rest -> skip_attrs rest
-    | _ -> None
-  and skip_attrs = function
-    | [] -> None
-    | "nosmt" :: rest -> skip_attrs rest
-    | tok :: rest when String.length tok > 0 && tok.[0] = '[' ->
-      skip_attrs rest
-    | tok :: _ -> ident_prefix tok
-  in
-  after_kw toks
-
 (* Resolve claimed lemma names against the file's PARSE-JSON
    sentence list. A claim's region runs from its declaration through
    the closing Gsave (qed/save/abort); an unfinished proof extends
@@ -390,7 +382,9 @@ let resolve_claims
     |> List.filter_map
          (fun (i, (s : Ec_llm_session.parsed_sentence)) ->
             if s.kind = "Gaxiom" then
-              Option.map (fun n -> (n, i, s)) (decl_name s.src)
+              (* AST-sourced name (proto 3): every declaration form,
+                 banners and modifiers included, by construction. *)
+              Option.map (fun n -> (n, i, s)) s.name
             else None)
   in
   let region_of i (decl : Ec_llm_session.parsed_sentence) =
@@ -581,7 +575,7 @@ let tool_open_file t args =
                  fail
                    (Printf.sprintf "open_file: parse failed: %s"
                       (Error.to_string e))
-               | Ok ss ->
+               | Ok (ss, file_perr) ->
                  let parsed = Array.of_list ss in
                  let resolved_mode =
                    match wanted with
@@ -638,7 +632,11 @@ let tool_open_file t args =
                          "claims", claims_json mode;
                          "uuid",
                          `Int (Ec_llm_session.current_uuid session);
-                         "load_time_ms", `Int (ms_since t0);
+                         "parse_error",
+                   (match file_perr with
+                    | None -> `Null
+                    | Some s -> json_or_string s);
+                   "load_time_ms", `Int (ms_since t0);
                          "load_output", `String body;
                          "goals", goals_json session;
                        ]))))))
@@ -651,24 +649,94 @@ let tool_exec t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       let corr = Correlation.of_client "mcp-exec" in
-       let t0 = Unix.gettimeofday () in
-       (match
-          Ec_llm_session.exec e.session ~corr
-            ~sentence_class:`Executable ~source:text
-        with
-        | Error err -> Error (Error.to_string err)
-        | Ok ok ->
-          e.synced_upto <- -1;
-          Ok (`Assoc [
+       (* Strict per-sentence execution (field report B5): the input
+          is split by the REAL parser and each sentence executes on
+          its own — successes COMMIT, the first failure stops the
+          sequence, and the reply reports every sentence. The wire
+          itself now rejects multi-phrase blocks (proto 3), so
+          nothing can be silently dropped at any layer. *)
+       (match Ec_llm_session.parse_source e.session text with
+        | Error err ->
+          Error
+            (Printf.sprintf "exec: parse failed: %s"
+               (Error.to_string err))
+        | Ok (_, Some perr) ->
+          Error
+            (Printf.sprintf
+               "exec: input has a parse error — NOTHING was \
+                executed: %s"
+               perr)
+        | Ok (ss, None) ->
+          let corr = Correlation.of_client "mcp-exec" in
+          let detail = goal_detail_of args ~default:`Shape in
+          let results = ref [] in
+          let notices = ref [] in
+          let failed = ref false in
+          let restarted = ref false in
+          let executed = ref 0 in
+          let t0 = Unix.gettimeofday () in
+          (try
+             List.iteri
+               (fun i (s : Ec_llm_session.parsed_sentence) ->
+                  match sentence_class_of s with
+                  | None -> ()
+                  | Some cls ->
+                    let s0 = Unix.gettimeofday () in
+                    (match
+                       Ec_llm_session.exec e.session ~corr
+                         ~sentence_class:cls ~source:s.src
+                     with
+                     | Ok ok ->
+                       incr executed;
+                       if ok.restarted then restarted := true;
+                       notices := List.rev_append ok.notices !notices;
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "ok", `Bool true;
+                           "uuid", `Int ok.replied_uuid;
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results
+                     | Error er ->
+                       failed := true;
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "ok", `Bool false;
+                           "error", `String (Error.to_string er);
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results;
+                       raise Exit))
+               ss
+           with Exit -> ());
+          if !executed > 0 then e.synced_upto <- -1;
+          let base = [
             "session", `String label;
-            "uuid", `Int ok.replied_uuid;
-            "restarted", `Bool ok.restarted;
+            "ok", `Bool (not !failed);
+            "executed", `Int !executed;
+            "uuid", `Int (Ec_llm_session.current_uuid e.session);
+            "restarted", `Bool !restarted;
             "time_ms", `Int (ms_since t0);
             "stale", `Bool (stale_flag e);
-            "notices", `List (List.map (fun n -> `String n) ok.notices);
-            "goals", goals_json e.session;
-          ])))
+            "notices",
+            `List (List.rev_map (fun n -> `String n) !notices);
+            "sentences", `List (List.rev !results);
+          ] in
+          let terminal =
+            if !failed then
+              [ "goals_at_failure",
+                apply_goal_detail detail (goals_json e.session);
+                "note",
+                `String
+                  "sentences before the failure REMAIN EXECUTED — \
+                   revert {uuid} or resync_file to unwind" ]
+            else
+              [ "goals",
+                apply_goal_detail detail (goals_json e.session) ]
+          in
+          Ok (`Assoc (base @ terminal))))
 
 let tool_query t args =
   match str_arg args "text" with
@@ -750,7 +818,9 @@ let tool_goals t args =
       "session", `String label;
       "uuid", `Int (Ec_llm_session.current_uuid e.session);
       "stale", `Bool (stale_flag e);
-      "goals", goals_json e.session;
+      "goals",
+      apply_goal_detail (goal_detail_of args ~default:`Full)
+        (goals_json e.session);
     ])
 
 let tool_tree t args =
@@ -803,7 +873,10 @@ let tool_try_tactic t args =
             "error", `String (Error.to_string err);
           ])
         | Ok _ ->
-          let goals_after = goals_json e.session in
+          let goals_after =
+            apply_goal_detail (goal_detail_of args ~default:`Full)
+              (goals_json e.session)
+          in
           (match
              Ec_llm_session.revert_to_uuid e.session ~target:pre
            with
@@ -931,7 +1004,13 @@ let tool_check_script t args =
           Error
             (Printf.sprintf "check_script: script parse failed: %s"
                (Error.to_string err))
-        | Ok ss ->
+        | Ok (_, Some perr) ->
+          Error
+            (Printf.sprintf
+               "check_script: script has a parse error — nothing \
+                ran: %s"
+               perr)
+        | Ok (ss, None) ->
           let start = Ec_llm_session.current_uuid e.session in
           let corr = Correlation.of_client "mcp-check" in
           let results = ref [] in
@@ -997,19 +1076,23 @@ let tool_check_script t args =
                | Error er ->
                  `String ("RESTORE FAILED: " ^ Error.to_string er))
           in
-          Ok (`Assoc [
+          Ok (`Assoc ([
             "session", `String label;
             "checked", `Int (List.length !results);
             "ok", `Bool ((not !failed) && not !restarted);
             "closes", `Bool closes;
             "results", `List (List.rev !results);
-            "goals_at_failure", !goals_fail;
-            "goals_at_end", goals_at_end;
             "restore", restore;
             "uuid", `Int (Ec_llm_session.current_uuid e.session);
             "total_time_ms", `Int (ms_since t0);
             "stale", `Bool (stale_flag e);
-          ])))
+          ] @ (let detail = goal_detail_of args ~default:`Shape in
+               if !failed then
+                 [ "goals_at_failure",
+                   apply_goal_detail detail !goals_fail ]
+               else
+                 [ "goals_at_end",
+                   apply_goal_detail detail goals_at_end ])))))
 
 (* Incremental re-sync of a session against its (possibly edited)
    file, with sentence-granular target selection over a
@@ -1025,7 +1108,7 @@ let tool_check_script t args =
    state with no reload. The changed/executed tail is always
    full-checked; only the reloaded prefix honors [nosmt]. *)
 let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
-    ~at_lemma =
+    ~at_lemma ~goal_detail =
   match read_file e.file with
   | exception Sys_error m -> Error (Printf.sprintf "resync_file: %s" m)
   | text ->
@@ -1046,7 +1129,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
          Error
            (Printf.sprintf "resync_file: parse failed: %s"
               (Error.to_string err))
-       | Ok ss ->
+       | Ok (ss, file_perr) ->
          let parsed_all = Array.of_list ss in
          let n_all = Array.length parsed_all in
          (* Target = number of leading sentences the session should
@@ -1273,6 +1356,10 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                  [
                    "session", `String label;
                    "changed", `Bool (not unchanged);
+                   "parse_error",
+                   (match file_perr with
+                    | None -> `Null
+                    | Some s -> json_or_string s);
                    "classification", `String classification;
                    "fast_forward", `Bool fast_forward;
                    "common_prefix_sentences", `Int k;
@@ -1284,12 +1371,20 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                    `Int (Ec_llm_session.current_uuid e.session);
                    "stale", `Bool false;
                    "claims", claims_json e.mode;
-                   "goals", goals_json e.session;
                  ]
                  @ warning @ claims_warning
                in
                (match err_opt with
-                | None -> Ok (`Assoc (base @ [ "ok", `Bool true ]))
+                | None ->
+               Ok
+                 (`Assoc
+                    (base
+                     @ [
+                         "ok", `Bool true;
+                         "goals",
+                         apply_goal_detail goal_detail
+                           (goals_json e.session);
+                       ]))
                 | Some (i, s, er) ->
                   Ok
                     (`Assoc
@@ -1297,7 +1392,9 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                         @ [
                             "ok", `Bool false;
                             "error", `String (Error.to_string er);
-                            "goals_at_failure", goals_json e.session;
+                            "goals_at_failure",
+                            apply_goal_detail goal_detail
+                              (goals_json e.session);
                             "failed_sentence",
                             `Assoc [
                               "index", `Int i;
@@ -1556,9 +1653,16 @@ let tool_check_skeleton t args =
           Error
             (Printf.sprintf "check_skeleton: script parse failed: %s"
                (Error.to_string err))
-        | Ok ss ->
+        | Ok (_, Some perr) ->
+          Error
+            (Printf.sprintf
+               "check_skeleton: script has a parse error — nothing \
+                ran: %s"
+               perr)
+        | Ok (ss, None) ->
           let start = Ec_llm_session.current_uuid e.session in
           let corr = Correlation.of_client "mcp-skeleton" in
+          let detail = goal_detail_of args ~default:`Shape in
           let st = Frame_stack.make () in
           let count = ref (fst (goals_info e.session)) in
           let holes = ref [] in
@@ -1580,7 +1684,7 @@ let tool_check_skeleton t args =
                            `Assoc [
                              "path", `String path;
                              "hash", `String (subgoal_hash sub);
-                             "goal", sub;
+                             "goal", apply_goal_detail detail sub;
                            ] :: !holes
                        | _ -> ());
                     (match
@@ -1622,7 +1726,8 @@ let tool_check_skeleton t args =
                | None -> []
                | Some (s, er) ->
                  [ "error", `String er;
-                   "goals_at_failure", !goals_fail;
+                   "goals_at_failure",
+                   apply_goal_detail detail !goals_fail;
                    "failed_at", `Assoc [ "src", `String s.src ] ])))))
 
 (* Semantic bullets: claim one open subtree by TREE path; exec_in
@@ -1714,7 +1819,13 @@ let tool_exec_in t args =
              Error
                (Printf.sprintf "exec_in: parse failed: %s"
                   (Error.to_string err))
-           | Ok ss ->
+           | Ok (_, Some perr) ->
+             Error
+               (Printf.sprintf
+                  "exec_in: input has a parse error — nothing ran: \
+                   %s"
+                  perr)
+           | Ok (ss, None) ->
              (* Lexical gate: no proof closers (skeleton owner's
                 business) and no focus-moving tactics. *)
              let bad =
@@ -1731,6 +1842,9 @@ let tool_exec_in t args =
                       subtree (closers and cycle escape the claim)"
                      (first_token s.src))
               | None ->
+                let detail =
+                  goal_detail_of args ~default:`Shape
+                in
                 let snapshot =
                   Ec_llm_session.current_uuid e.session
                 in
@@ -1805,7 +1919,8 @@ let tool_exec_in t args =
                      "subtree_closed", `Bool sc.sc_closed;
                      "uuid",
                      `Int (Ec_llm_session.current_uuid e.session);
-                     "goals", goals_json e.session;
+                     "goals",
+                     apply_goal_detail detail (goals_json e.session);
                    ] @ (if sc.sc_closed then
                           [ "transcript",
                             `List
@@ -1904,6 +2019,7 @@ let tool_resync_file t args =
     resync_impl ~label e ~nosmt ~upto_line:(int_arg args "upto_line")
       ~upto_sentence:(int_arg args "upto_sentence")
       ~at_lemma:(str_arg args "at_lemma")
+      ~goal_detail:(goal_detail_of args ~default:`Shape)
 
 (* Verified in-place proof replacement: splice [script] over the
    claimed lemma's proof-body lines, resync (weak prefix +
@@ -1976,11 +2092,11 @@ let tool_replace_proof t args =
                | exception Sys_error m ->
                  Error (Printf.sprintf "replace_proof: %s" m)
                | () ->
-                 (match resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None with
+                 (match resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~goal_detail:`Shape with
                   | Error m ->
                     (try write_file e.file orig with _ -> ());
                     ignore
-                      (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None);
+                      (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~goal_detail:`Shape);
                     Error
                       (Printf.sprintf
                          "replace_proof: verification could not run \
@@ -2007,7 +2123,7 @@ let tool_replace_proof t args =
                     else begin
                       (try write_file e.file orig with _ -> ());
                       ignore
-                        (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None);
+                        (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~goal_detail:`Shape);
                       Ok (`Assoc [
                         "ok", `Bool false;
                         "lemma", `String lemma;
@@ -2038,6 +2154,13 @@ let session_prop =
   ("session", "string",
    "Session label (default \"main\"). Use distinct labels to run \
     parallel sessions, e.g. one per lemma/agent.")
+
+let goal_detail_prop =
+  ("goal_detail", "string",
+   "Goal payload size: \"full\" | \"shape\" (program bodies elided \
+    to instruction counts) | \"counts\" (subgoal count + one-line \
+    conclusions). Defaults: full on goals/try_tactic, shape on the \
+    loop tools.")
 
 let tools :
   (string * string * Yojson.Safe.t
@@ -2076,11 +2199,15 @@ let tools :
   tool_open_file;
 
   "exec",
-  "Execute EasyCrypt input (tactics or declarations, '.'-terminated; \
-   multi-sentence allowed) in the session, advancing its state. \
-   Returns the new uuid and the structured goals after execution.",
+  "Execute EasyCrypt input in the session, advancing its state. \
+   Multi-sentence input is split by the real parser and executed \
+   ONE SENTENCE AT A TIME: successes COMMIT, the first failure \
+   stops the sequence, and the reply reports every sentence \
+   (per-sentence uuid and time_ms; goals_at_failure on error — \
+   sentences before the failure REMAIN EXECUTED).",
   schema ~required:[ "text" ] [
     ("text", "string", "EasyCrypt source to execute.");
+    goal_detail_prop;
     session_prop;
   ],
   tool_exec;
@@ -2117,7 +2244,7 @@ let tools :
   "Structured view of the current proof state (GOALS-JSON): subgoal \
    count, hypotheses, conclusion trees (PHL judgments carry \
    structured program statements).",
-  schema [ session_prop ],
+  schema [ goal_detail_prop; session_prop ],
   tool_goals;
 
   "tree",
@@ -2144,6 +2271,7 @@ let tools :
    exec.",
   schema ~required:[ "tactic" ] [
     ("tactic", "string", "Tactic source, '.'-terminated.");
+    goal_detail_prop;
     session_prop;
   ],
   tool_try_tactic;
@@ -2160,6 +2288,7 @@ let tools :
     ("script", "string",
      "EasyCrypt sentences ('.'-terminated, newline-separated), \
       e.g. \"proof.\\nsplit.\\ntrivial.\\nqed.\"");
+    goal_detail_prop;
     session_prop;
   ],
   tool_check_script;
@@ -2175,6 +2304,7 @@ let tools :
     ("script", "string",
      "Skeleton sentences with admit. holes, e.g. \
       \"split.\\nadmit.\\nadmit.\\nqed.\"");
+    goal_detail_prop;
     session_prop;
   ],
   tool_check_skeleton;
@@ -2231,6 +2361,7 @@ let tools :
   schema ~required:[ "text" ] [
     ("text", "string",
      "Tactic sentences ('.'-terminated) for the claimed subtree.");
+    goal_detail_prop;
     session_prop;
   ],
   tool_exec_in;
@@ -2290,6 +2421,7 @@ let tools :
      "Position just inside this lemma's proof (after its proof. \
       sentence) — sentence-granular, works on packed lines where \
       upto_line cannot.");
+    goal_detail_prop;
     session_prop;
   ],
   tool_resync_file;

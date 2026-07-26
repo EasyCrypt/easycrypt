@@ -318,7 +318,7 @@ let cmd_try st src =
     emit st "session is dead; use :restart first"
   else match Ec_llm_session.parse_source st.session src with
     | Error e -> emit st "try: %s" (Error.to_string e)
-    | Ok sentences ->
+    | Ok (sentences, _perr) ->
       let real = List.filter
           (fun (p : Ec_llm_session.parsed_sentence) -> p.cls <> `Meta)
           sentences
@@ -377,7 +377,7 @@ let cmd_feed st src =
     emit st "session is dead; use :restart first"
   else match Ec_llm_session.parse_source st.session src with
     | Error e -> emit st "feed: %s" (Error.to_string e)
-    | Ok sentences ->
+    | Ok (sentences, _perr) ->
       let executables =
         List.filter
           (fun (p : Ec_llm_session.parsed_sentence) -> p.cls <> `Meta)
@@ -469,7 +469,7 @@ let cmd_insert st src =
         emit st "session is dead; :restart before :insert"
       else match Ec_llm_session.parse_source st.session src with
         | Error e -> emit st "insert parse: %s" (Error.to_string e)
-        | Ok parsed ->
+        | Ok (parsed, _perr) ->
           let real = List.filter
               (fun (p : Ec_llm_session.parsed_sentence) -> p.cls <> `Meta)
               parsed

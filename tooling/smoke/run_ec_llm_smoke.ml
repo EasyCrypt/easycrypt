@@ -150,7 +150,7 @@ let () =
        line + indentation before the second sentence and check that
        its [start_offset] points at the `p` of `pragma`. *)
     let src16 = "pragma noop.\n\n   pragma noop." in
-    let parsed16 = expect_ok "parse with leading ws"
+    let (parsed16, _perr16) = expect_ok "parse with leading ws"
       (Ec_llm_session.parse_source s src16)
     in
     (match List.filter
