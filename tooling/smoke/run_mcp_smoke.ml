@@ -482,6 +482,129 @@ let () =
     ((not err) && n_sentences = 8 && n_diags = 0)
     (Printf.sprintf "sentences=%d diags=%d" n_sentences n_diags);
 
+  (* -- refactoring loop: check_script / stale / resync / replace -- *)
+  let (err, cs) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script", `String "split.\ntrivial.\ntrivial.\nqed.";
+         "session", `String "w2";
+       ])
+  in
+  check "check_script: 4 sentences, ok, closes"
+    ((not err)
+     && (match member "checked" cs with `Int 4 -> true | _ -> false)
+     && member "ok" cs = `Bool true
+     && member "closes" cs = `Bool true)
+    (Yojson.Safe.to_string cs);
+  check "check_script: state restored (uuid back to 7)"
+    (member "restore" cs = `String "restored"
+     && member "uuid" cs = `Int 7)
+    (Yojson.Safe.to_string (member "restore" cs));
+
+  (* Edit the file on disk: complete t2's proof. *)
+  let oc = open_out_gen [ Open_append ] 0o644 fixture in
+  output_string oc "trivial.\ntrivial.\nqed.\n";
+  close_out oc;
+
+  let (err, g) =
+    call fd_in fd_out "goals" (`Assoc [ "session", `String "w2" ])
+  in
+  check "stale flag set after on-disk edit"
+    ((not err) && member "stale" g = `Bool true)
+    (Yojson.Safe.to_string (member "stale" g));
+
+  let (err, rp0) =
+    call fd_in fd_out "replace_proof"
+      (`Assoc [
+         "lemma", `String "t1";
+         "script", `String "proof.\nby trivial.\nqed.";
+         "session", `String "w2";
+       ])
+  in
+  check "replace_proof: stale-gated before resync"
+    (err
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "resync")
+                     (Yojson.Safe.to_string rp0) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string rp0);
+
+  let (err, rs) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "w2" ])
+  in
+  check "resync_file: proof-body-only tail re-executed"
+    ((not err)
+     && member "changed" rs = `Bool true
+     && member "classification" rs = `String "proof-body-only"
+     && (match member "tail_executed" rs with
+         | `Int 3 -> true | _ -> false)
+     && member "ok" rs = `Bool true)
+    (Yojson.Safe.to_string rs);
+
+  let (err, rp1) =
+    call fd_in fd_out "replace_proof"
+      (`Assoc [
+         "lemma", `String "t1";
+         "script", `String "proof.\nby trivial.\nqed.";
+         "session", `String "w2";
+       ])
+  in
+  check "replace_proof: verified + written"
+    ((not err) && member "ok" rp1 = `Bool true
+     && member "file_written" rp1 = `Bool true)
+    (Yojson.Safe.to_string rp1);
+  let read_fixture () =
+    let ic = open_in fixture in
+    let n = in_channel_length ic in
+    let s = really_input_string ic n in
+    close_in ic;
+    s
+  in
+  check "replace_proof: file carries the new body"
+    (try
+       ignore (Str.search_forward (Str.regexp_string "by trivial.")
+                 (read_fixture ()) 0);
+       true
+     with Not_found -> false)
+    "";
+
+  let (err, rp2) =
+    call fd_in fd_out "replace_proof"
+      (`Assoc [
+         "lemma", `String "t1";
+         "script", `String "proof.\napply nonexistent_lemma_xyz.\nqed.";
+         "session", `String "w2";
+       ])
+  in
+  check "replace_proof: failing script restores the file"
+    ((not err) && member "ok" rp2 = `Bool false
+     && member "file_restored" rp2 = `Bool true
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "by trivial.")
+                     (read_fixture ()) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string rp2);
+
+  let (err, rp3) =
+    call fd_in fd_out "replace_proof"
+      (`Assoc [
+         "lemma", `String "t2";
+         "script", `String "proof.\nqed.";
+         "session", `String "w2";
+       ])
+  in
+  check "replace_proof: unclaimed lemma refused"
+    (err
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "not claimed")
+                     (Yojson.Safe.to_string rp3) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string rp3);
+
   let (err, cl) =
     call fd_in fd_out "close_session"
       (`Assoc [ "session", `String "w2" ])

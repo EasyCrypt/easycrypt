@@ -36,9 +36,10 @@ let server_version = "0.1.0"
    proof is unfinished). Regions are informational for the
    orchestrator's splicing; the LOCK KEY is the lemma name. *)
 type claim = {
-  lemma      : string;
-  start_line : int;
-  end_line   : int;
+  lemma         : string;
+  start_line    : int;
+  decl_end_line : int;  (* last line of the declaration sentence *)
+  end_line      : int;
 }
 
 (* Edit mode declared at open_file:
@@ -69,7 +70,12 @@ let claim_names = function
 type entry = {
   session : Ec_llm_session.t;
   file    : string;   (* canonical path — the lock-pool key *)
-  mode    : mode;
+  mutable mode   : mode;
+  (* Snapshot of the file as last loaded/synced: the resync diff
+     baseline and the staleness reference. *)
+  mutable text   : string;
+  mutable hash   : Digest.t;
+  mutable parsed : Ec_llm_session.parsed_sentence array;
 }
 
 type t = {
@@ -156,6 +162,46 @@ let read_file path =
   close_in ic;
   s
 
+let write_file path text =
+  let oc = open_out_bin path in
+  output_string oc text;
+  close_out oc
+
+(* Stale = the on-disk file no longer matches what this session
+   loaded/synced. Surfaced on state-bearing replies so a
+   refactoring loop can't silently trust a result computed against
+   old text. *)
+let stale_flag (e : entry) =
+  match Digest.file e.file with
+  | d -> d <> e.hash
+  | exception _ -> true
+
+let ms_since t0 =
+  int_of_float ((Unix.gettimeofday () -. t0) *. 1000.)
+
+let sentence_class_of (s : Ec_llm_session.parsed_sentence) =
+  match s.cls with
+  | `Executable -> Some `Executable
+  | `Directive -> Some `Directive
+  | `Doc_comment -> Some `Doc_comment
+  | `Meta -> None
+
+(* True when the session has no open goal (proof closed or no active
+   proof) — the `closes` verdict for candidate scripts. *)
+let goals_closed session =
+  match Ec_llm_session.goals ~structured:true session with
+  | Error _ -> false
+  | Ok raw ->
+    (match Yojson.Safe.from_string raw with
+     | exception _ -> false
+     | j ->
+       (match Yojson.Safe.Util.member "active" j with
+        | `Bool false -> true
+        | _ ->
+          (match Yojson.Safe.Util.member "subgoal_count" j with
+           | `Int 0 -> true
+           | _ -> false)))
+
 (* ---------------------------------------------------------------- *)
 (* Lemma-claim resolution (proof mode)                                *)
 (* ---------------------------------------------------------------- *)
@@ -228,7 +274,8 @@ let resolve_claims
     match List.find_opt (fun (n, _, _) -> n = name) decls with
     | Some (n, i, s) ->
       let (a, b) = region_of i s in
-      Ok { lemma = n; start_line = a; end_line = b }
+      Ok { lemma = n; start_line = a;
+           decl_end_line = s.end_line; end_line = b }
     | None ->
       let avail = List.map (fun (n, _, _) -> n) decls in
       let avail =
@@ -318,6 +365,7 @@ let claims_json = function
             `Assoc [
               "lemma", `String c.lemma;
               "start_line", `Int c.start_line;
+              "decl_end_line", `Int c.decl_end_line;
               "end_line", `Int c.end_line;
             ])
          cs)
@@ -365,7 +413,9 @@ let tool_open_file t args =
           | `Proof ls ->
             Proof
               (List.map
-                 (fun l -> { lemma = l; start_line = 0; end_line = 0 })
+                 (fun l ->
+                    { lemma = l; start_line = 0;
+                      decl_end_line = 0; end_line = 0 })
                  ls)
         in
         (match
@@ -383,60 +433,66 @@ let tool_open_file t args =
              (try Ec_llm_session.close session with _ -> ());
              Error msg
            in
-           (* Resolve claims against the file's sentence structure
-              (stateless PARSE frame on the fresh session). *)
-           let resolved_mode =
-             match wanted with
-             | `Statement -> Ok Statement
-             | `Proof ls ->
-               (match read_file path with
-                | exception Sys_error m ->
-                  Error (Printf.sprintf "open_file: %s" m)
-                | text ->
-                  (match Ec_llm_session.parse_source session text with
-                   | Error e ->
-                     Error
-                       (Printf.sprintf "open_file: parse failed: %s"
-                          (Error.to_string e))
-                   | Ok ss ->
-                     (match
-                        resolve_claims (Array.of_list ss) ls
-                      with
-                      | Error e -> Error ("open_file: " ^ e)
-                      | Ok cs -> Ok (Proof cs))))
-           in
-           (match resolved_mode with
-            | Error e -> fail e
-            | Ok mode ->
-              let load_cmd =
-                let upto =
-                  match int_arg args "upto_line" with
-                  | Some n -> Printf.sprintf " %d" n
-                  | None -> ""
-                in
-                let nosmt =
-                  if bool_arg args "nosmt" then " -nosmt" else ""
-                in
-                Printf.sprintf "LOAD \"%s\"%s%s" path upto nosmt
-              in
-              (match Ec_llm_session.raw_command session load_cmd with
+           (* Read + parse the file once (stateless PARSE frame on
+              the fresh session): claim resolution, the resync diff
+              baseline, and the stale hash all come from this
+              snapshot. *)
+           (match read_file path with
+            | exception Sys_error m ->
+              fail (Printf.sprintf "open_file: %s" m)
+            | text ->
+              (match Ec_llm_session.parse_source session text with
                | Error e ->
                  fail
-                   (Printf.sprintf "open_file: LOAD failed: %s"
+                   (Printf.sprintf "open_file: parse failed: %s"
                       (Error.to_string e))
-               | Ok (body, _notices) ->
-                 Hashtbl.replace t.sessions label
-                   { session; file = path; mode };
-                 Ok (`Assoc [
-                   "session", `String label;
-                   "file", `String path;
-                   "mode", `String (mode_label mode);
-                   "claims", claims_json mode;
-                   "uuid",
-                   `Int (Ec_llm_session.current_uuid session);
-                   "load_output", `String body;
-                   "goals", goals_json session;
-                 ]))))
+               | Ok ss ->
+                 let parsed = Array.of_list ss in
+                 let resolved_mode =
+                   match wanted with
+                   | `Statement -> Ok Statement
+                   | `Proof ls ->
+                     (match resolve_claims parsed ls with
+                      | Error e -> Error ("open_file: " ^ e)
+                      | Ok cs -> Ok (Proof cs))
+                 in
+                 (match resolved_mode with
+                  | Error e -> fail e
+                  | Ok mode ->
+                    let load_cmd =
+                      let upto =
+                        match int_arg args "upto_line" with
+                        | Some n -> Printf.sprintf " %d" n
+                        | None -> ""
+                      in
+                      let nosmt =
+                        if bool_arg args "nosmt" then " -nosmt" else ""
+                      in
+                      Printf.sprintf "LOAD \"%s\"%s%s" path upto nosmt
+                    in
+                    let t0 = Unix.gettimeofday () in
+                    (match
+                       Ec_llm_session.raw_command session load_cmd
+                     with
+                     | Error e ->
+                       fail
+                         (Printf.sprintf "open_file: LOAD failed: %s"
+                            (Error.to_string e))
+                     | Ok (body, _notices) ->
+                       Hashtbl.replace t.sessions label
+                         { session; file = path; mode; text;
+                           hash = Digest.string text; parsed };
+                       Ok (`Assoc [
+                         "session", `String label;
+                         "file", `String path;
+                         "mode", `String (mode_label mode);
+                         "claims", claims_json mode;
+                         "uuid",
+                         `Int (Ec_llm_session.current_uuid session);
+                         "load_time_ms", `Int (ms_since t0);
+                         "load_output", `String body;
+                         "goals", goals_json session;
+                       ]))))))
     end
 
 let tool_exec t args =
@@ -447,6 +503,7 @@ let tool_exec t args =
      | Error e -> Error e
      | Ok (label, e) ->
        let corr = Correlation.of_client "mcp-exec" in
+       let t0 = Unix.gettimeofday () in
        (match
           Ec_llm_session.exec e.session ~corr
             ~sentence_class:`Executable ~source:text
@@ -457,6 +514,8 @@ let tool_exec t args =
             "session", `String label;
             "uuid", `Int ok.replied_uuid;
             "restarted", `Bool ok.restarted;
+            "time_ms", `Int (ms_since t0);
+            "stale", `Bool (stale_flag e);
             "notices", `List (List.map (fun n -> `String n) ok.notices);
             "goals", goals_json e.session;
           ])))
@@ -540,6 +599,7 @@ let tool_goals t args =
     Ok (`Assoc [
       "session", `String label;
       "uuid", `Int (Ec_llm_session.current_uuid e.session);
+      "stale", `Bool (stale_flag e);
       "goals", goals_json e.session;
     ])
 
@@ -579,6 +639,7 @@ let tool_try_tactic t args =
      | Ok (label, e) ->
        let pre = Ec_llm_session.current_uuid e.session in
        let corr = Correlation.of_client "mcp-try" in
+       let t0 = Unix.gettimeofday () in
        (match
           Ec_llm_session.exec e.session ~corr
             ~sentence_class:`Executable ~source:tactic
@@ -599,6 +660,7 @@ let tool_try_tactic t args =
              Ok (`Assoc [
                "session", `String label;
                "outcome", `String "ok";
+               "time_ms", `Int (ms_since t0);
                "goals_after", goals_after;
                "reverted_to", `Int pre;
              ])
@@ -633,7 +695,11 @@ let tool_commit_proof t args =
     (match Ec_llm_session.raw_command e.session "COMMIT" with
      | Error err -> Error (Error.to_string err)
      | Ok (body, _) ->
-       Ok (`Assoc [ "session", `String label; "proof", `String body ]))
+       Ok (`Assoc [
+         "session", `String label;
+         "stale", `Bool (stale_flag e);
+         "proof", `String body;
+       ]))
 
 let tool_analyze_file t args =
   match str_arg args "path" with
@@ -676,6 +742,422 @@ let tool_close_session t args =
     (try Ec_llm_session.close e.session with _ -> ());
     Hashtbl.remove t.sessions label;
     Ok (`Assoc [ "closed", `String label ])
+
+(* ---------------------------------------------------------------- *)
+(* Refactoring loop: check_script / resync_file / replace_proof       *)
+(* ---------------------------------------------------------------- *)
+
+(* Speculatively run a multi-sentence candidate (a whole proof body)
+   from the CURRENT state: execute sentence-by-sentence until the
+   first failure, report per-sentence verdicts + timing + whether
+   the proof closes, then revert to the starting uuid. The session
+   is left where it was. *)
+let tool_check_script t args =
+  match str_arg args "script" with
+  | None -> Error "check_script: missing required argument 'script'"
+  | Some script ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       (match Ec_llm_session.parse_source e.session script with
+        | Error err ->
+          Error
+            (Printf.sprintf "check_script: script parse failed: %s"
+               (Error.to_string err))
+        | Ok ss ->
+          let start = Ec_llm_session.current_uuid e.session in
+          let corr = Correlation.of_client "mcp-check" in
+          let results = ref [] in
+          let failed = ref false in
+          let restarted = ref false in
+          let t0 = Unix.gettimeofday () in
+          (try
+             List.iteri
+               (fun i (s : Ec_llm_session.parsed_sentence) ->
+                  match sentence_class_of s with
+                  | None -> ()
+                  | Some cls ->
+                    let s0 = Unix.gettimeofday () in
+                    (match
+                       Ec_llm_session.exec e.session ~corr
+                         ~sentence_class:cls ~source:s.src
+                     with
+                     | Ok ok ->
+                       if ok.restarted then begin
+                         restarted := true;
+                         raise Exit
+                       end;
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "ok", `Bool true;
+                           "uuid", `Int ok.replied_uuid;
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results
+                     | Error er ->
+                       failed := true;
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "ok", `Bool false;
+                           "error", `String (Error.to_string er);
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results;
+                       raise Exit))
+               ss
+           with Exit -> ());
+          let closes =
+            (not !failed) && (not !restarted)
+            && goals_closed e.session
+          in
+          let goals_at_end = goals_json e.session in
+          let restore =
+            if !restarted then
+              `String
+                "session restarted mid-script — state NOT restored; \
+                 run resync_file to recover"
+            else if Ec_llm_session.current_uuid e.session = start then
+              `String "unmoved"
+            else
+              (match
+                 Ec_llm_session.revert_to_uuid e.session ~target:start
+               with
+               | Ok () -> `String "restored"
+               | Error er ->
+                 `String ("RESTORE FAILED: " ^ Error.to_string er))
+          in
+          Ok (`Assoc [
+            "session", `String label;
+            "checked", `Int (List.length !results);
+            "ok", `Bool ((not !failed) && not !restarted);
+            "closes", `Bool closes;
+            "results", `List (List.rev !results);
+            "goals_at_end", goals_at_end;
+            "restore", restore;
+            "uuid", `Int (Ec_llm_session.current_uuid e.session);
+            "total_time_ms", `Int (ms_since t0);
+            "stale", `Bool (stale_flag e);
+          ])))
+
+(* Incremental re-sync of a session against its (edited) file:
+   PARSE-diff the new text against the loaded snapshot, weak-check
+   the unchanged prefix via LOAD upto (nosmt by default), then
+   FULL-check the changed tail sentence-by-sentence. Reports the
+   diff classification: proof-body-only edits provably cannot
+   affect downstream lemmas; additive = pure appends;
+   statement-changing invalidates downstream (warned in proof
+   mode). Interactive work not in the file is dropped — resync
+   makes session ≡ file. *)
+let resync_impl ~label (e : entry) ~nosmt ~upto_line =
+  match read_file e.file with
+  | exception Sys_error m -> Error (Printf.sprintf "resync_file: %s" m)
+  | text ->
+    let unchanged = Digest.string text = e.hash in
+    if unchanged && upto_line = None then
+      Ok (`Assoc [
+        "session", `String label;
+        "changed", `Bool false;
+        "stale", `Bool false;
+        "uuid", `Int (Ec_llm_session.current_uuid e.session);
+      ])
+    else
+      (match Ec_llm_session.parse_source e.session text with
+       | Error err ->
+         Error
+           (Printf.sprintf "resync_file: parse failed: %s"
+              (Error.to_string err))
+       | Ok ss ->
+         let parsed_all = Array.of_list ss in
+         let effective =
+           match upto_line with
+           | None -> parsed_all
+           | Some l ->
+             Array.of_list
+               (List.filter
+                  (fun (s : Ec_llm_session.parsed_sentence) ->
+                     s.end_line <= l)
+                  ss)
+         in
+         let old = e.parsed in
+         let k =
+           let n = min (Array.length old) (Array.length effective) in
+           let rec go i =
+             if i < n
+                && (old.(i) : Ec_llm_session.parsed_sentence).src
+                   = (effective.(i) : Ec_llm_session.parsed_sentence)
+                       .src
+             then go (i + 1)
+             else i
+           in
+           go 0
+         in
+         (* The changed window is [k, len - ks) on each side: common
+            prefix AND common suffix are trimmed, so unchanged
+            downstream sentences don't pollute the classification. *)
+         let ks =
+           let n_old = Array.length old in
+           let n_new = Array.length effective in
+           let maxs = min (n_old - k) (n_new - k) in
+           let rec go i =
+             if i < maxs
+                && (old.(n_old - 1 - i)
+                    : Ec_llm_session.parsed_sentence)
+                     .src
+                   = (effective.(n_new - 1 - i)
+                      : Ec_llm_session.parsed_sentence)
+                       .src
+             then go (i + 1)
+             else i
+           in
+           go 0
+         in
+         let window_kinds arr =
+           let n = Array.length arr in
+           let out = ref [] in
+           Array.iteri
+             (fun i (s : Ec_llm_session.parsed_sentence) ->
+                if i >= k && i < n - ks then out := s.kind :: !out)
+             arr;
+           !out
+         in
+         let old_w = window_kinds old in
+         let new_w = window_kinds effective in
+         let proof_kind kd = kd = "Gtactics" || kd = "Gsave" in
+         let classification =
+           if old_w = [] then
+             if List.for_all proof_kind new_w then "proof-body-only"
+             else "additive"
+           else if List.for_all proof_kind (old_w @ new_w) then
+             "proof-body-only"
+           else "statement-changing"
+         in
+         let warning =
+           match e.mode with
+           | Proof _ when classification = "statement-changing" ->
+             [ "warning",
+               `String
+                 "statement-changing edit seen by a PROOF-mode \
+                  session — declarations should change through a \
+                  statement-mode session" ]
+           | _ -> []
+         in
+         let prefix_upto =
+           if k = 0 then 0
+           else
+             (effective.(k - 1) : Ec_llm_session.parsed_sentence)
+               .end_line
+         in
+         let load_cmd =
+           Printf.sprintf "LOAD \"%s\" %d%s" e.file prefix_upto
+             (if nosmt then " -nosmt" else "")
+         in
+         let t0 = Unix.gettimeofday () in
+         (match Ec_llm_session.raw_command e.session load_cmd with
+          | Error err ->
+            Error
+              (Printf.sprintf "resync_file: prefix reload failed: %s"
+                 (Error.to_string err))
+          | Ok _ ->
+            let prefix_ms = ms_since t0 in
+            let t1 = Unix.gettimeofday () in
+            let corr = Correlation.of_client "mcp-resync" in
+            let err_ref = ref None in
+            let count = ref 0 in
+            (try
+               Array.iteri
+                 (fun i (s : Ec_llm_session.parsed_sentence) ->
+                    if i >= k then
+                      match sentence_class_of s with
+                      | None -> ()
+                      | Some cls ->
+                        (match
+                           Ec_llm_session.exec e.session ~corr
+                             ~sentence_class:cls ~source:s.src
+                         with
+                         | Ok _ -> incr count
+                         | Error er ->
+                           err_ref := Some (i, s, er);
+                           raise Exit))
+                 effective
+             with Exit -> ());
+            let tail_ms = ms_since t1 in
+            e.text <- text;
+            e.hash <- Digest.string text;
+            e.parsed <- parsed_all;
+            let claims_warning =
+              match e.mode with
+              | Statement -> []
+              | Proof cs ->
+                let names = List.map (fun c -> c.lemma) cs in
+                (match resolve_claims parsed_all names with
+                 | Ok cs' ->
+                   e.mode <- Proof cs';
+                   []
+                 | Error m ->
+                   [ "claims_warning",
+                     `String
+                       (m
+                        ^ " — previous claim regions kept; locks \
+                           still held by name") ])
+            in
+            let base =
+              [
+                "session", `String label;
+                "changed", `Bool true;
+                "classification", `String classification;
+                "common_prefix_sentences", `Int k;
+                "tail_executed", `Int !count;
+                "prefix_time_ms", `Int prefix_ms;
+                "tail_time_ms", `Int tail_ms;
+                "uuid",
+                `Int (Ec_llm_session.current_uuid e.session);
+                "stale", `Bool false;
+                "claims", claims_json e.mode;
+                "goals", goals_json e.session;
+              ]
+              @ warning @ claims_warning
+            in
+            (match !err_ref with
+             | None -> Ok (`Assoc (base @ [ "ok", `Bool true ]))
+             | Some (i, s, er) ->
+               Ok
+                 (`Assoc
+                    (base
+                     @ [
+                         "ok", `Bool false;
+                         "error", `String (Error.to_string er);
+                         "failed_sentence",
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "start_line", `Int s.start_line;
+                         ];
+                       ])))))
+
+let tool_resync_file t args =
+  match find_session t args with
+  | Error e -> Error e
+  | Ok (label, e) ->
+    let nosmt =
+      match Yojson.Safe.Util.member "nosmt" args with
+      | `Bool b -> b
+      | _ -> true
+    in
+    resync_impl ~label e ~nosmt ~upto_line:(int_arg args "upto_line")
+
+(* Verified in-place proof replacement: splice [script] over the
+   claimed lemma's proof-body lines, resync (weak prefix +
+   full-checked tail), and RESTORE the original file if
+   verification fails. The first tool with write authority — gated
+   on freshness (must resync first if the file changed
+   out-of-band). *)
+let tool_replace_proof t args =
+  match str_arg args "lemma", str_arg args "script" with
+  | None, _ -> Error "replace_proof: missing required argument 'lemma'"
+  | _, None -> Error "replace_proof: missing required argument 'script'"
+  | Some lemma, Some script ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       if stale_flag e then
+         Error
+           "replace_proof: file changed on disk since this session \
+            last synced — run resync_file first"
+       else
+         let claim =
+           match e.mode with
+           | Proof cs ->
+             (match List.find_opt (fun c -> c.lemma = lemma) cs with
+              | Some c -> Ok c
+              | None ->
+                Error
+                  (Printf.sprintf
+                     "replace_proof: lemma '%s' is not claimed by \
+                      session '%s' (claims: %s)"
+                     lemma label
+                     (String.concat ", " (claim_names e.mode))))
+           | Statement ->
+             (match resolve_claims e.parsed [ lemma ] with
+              | Ok [ c ] -> Ok c
+              | Ok _ -> Error "replace_proof: internal claim error"
+              | Error m -> Error ("replace_proof: " ^ m))
+         in
+         (match claim with
+          | Error m -> Error m
+          | Ok c ->
+            if c.end_line <= c.decl_end_line then
+              Error
+                (Printf.sprintf
+                   "replace_proof: lemma '%s' has no separate proof \
+                    body (declaration ends at line %d, region ends \
+                    at %d)"
+                   lemma c.decl_end_line c.end_line)
+            else begin
+              let orig = e.text in
+              let lines = String.split_on_char '\n' orig in
+              let pre =
+                List.filteri (fun i _ -> i < c.decl_end_line) lines
+              in
+              let post =
+                List.filteri (fun i _ -> i >= c.end_line) lines
+              in
+              let script_lines =
+                String.split_on_char '\n' (String.trim script)
+              in
+              let candidate =
+                String.concat "\n" (pre @ script_lines @ post)
+              in
+              let nosmt =
+                match Yojson.Safe.Util.member "nosmt" args with
+                | `Bool b -> b
+                | _ -> true
+              in
+              (match write_file e.file candidate with
+               | exception Sys_error m ->
+                 Error (Printf.sprintf "replace_proof: %s" m)
+               | () ->
+                 (match resync_impl ~label e ~nosmt ~upto_line:None with
+                  | Error m ->
+                    (try write_file e.file orig with _ -> ());
+                    ignore
+                      (resync_impl ~label e ~nosmt ~upto_line:None);
+                    Error
+                      (Printf.sprintf
+                         "replace_proof: verification could not run \
+                          (%s); file restored"
+                         m)
+                  | Ok payload ->
+                    let ok =
+                      match Yojson.Safe.Util.member "ok" payload with
+                      | `Bool b -> b
+                      | _ -> false
+                    in
+                    if ok then
+                      Ok (`Assoc [
+                        "ok", `Bool true;
+                        "lemma", `String lemma;
+                        "replaced_lines",
+                        `Assoc [
+                          "from", `Int (c.decl_end_line + 1);
+                          "to", `Int c.end_line;
+                        ];
+                        "file_written", `Bool true;
+                        "verification", payload;
+                      ])
+                    else begin
+                      (try write_file e.file orig with _ -> ());
+                      ignore
+                        (resync_impl ~label e ~nosmt ~upto_line:None);
+                      Ok (`Assoc [
+                        "ok", `Bool false;
+                        "lemma", `String lemma;
+                        "file_restored", `Bool true;
+                        "verification", payload;
+                      ])
+                    end))
+            end))
 
 (* ---------------------------------------------------------------- *)
 (* Tool registry                                                      *)
@@ -808,6 +1290,22 @@ let tools :
   ],
   tool_try_tactic;
 
+  "check_script",
+  "Speculatively run a multi-sentence candidate script (e.g. a \
+   whole replacement proof body) from the current state: executes \
+   sentence-by-sentence until the first failure, reports per-\
+   sentence verdicts + timings and whether the proof CLOSES, then \
+   restores the session to where it was. The refactoring inner \
+   loop: iterate candidates here without touching the file, write \
+   once with replace_proof when one passes.",
+  schema ~required:[ "script" ] [
+    ("script", "string",
+     "EasyCrypt sentences ('.'-terminated, newline-separated), \
+      e.g. \"proof.\\nsplit.\\ntrivial.\\nqed.\"");
+    session_prop;
+  ],
+  tool_check_script;
+
   "revert",
   "Revert the session to an earlier uuid (as reported by exec / \
    goals).",
@@ -823,6 +1321,47 @@ let tools :
    bridge from session-first exploration back into document text.",
   schema [ session_prop ],
   tool_commit_proof;
+
+  "resync_file",
+  "Re-sync the session with its (edited) file incrementally: diffs \
+   the new text against the loaded snapshot, weak-checks the \
+   unchanged prefix (nosmt, default true), then FULL-checks the \
+   changed tail sentence-by-sentence. Reports the edit \
+   classification — proof-body-only edits provably cannot affect \
+   downstream lemmas; statement-changing edits are warned in proof \
+   mode. Run this after ANY on-disk edit (replies carry stale=true \
+   until you do). Note: session state becomes exactly the file's \
+   state; interactive work not in the file is dropped.",
+  schema [
+    ("nosmt", "boolean",
+     "Weak-check the unchanged prefix (default TRUE — the changed \
+      tail is always fully checked).");
+    ("upto_line", "integer",
+     "Re-sync only up to this line (repositioning). Default: whole \
+      file.");
+    session_prop;
+  ],
+  tool_resync_file;
+
+  "replace_proof",
+  "Verified in-place proof replacement — the refactoring commit \
+   step. Splices 'script' over the claimed lemma's proof-body \
+   lines, re-syncs (weak prefix + fully-checked tail), and \
+   RESTORES the original file automatically if verification \
+   fails. Requires freshness (resync_file first if the file \
+   changed out-of-band) and, in proof mode, a claim on the lemma. \
+   This is the only tool that writes files.",
+  schema ~required:[ "lemma"; "script" ] [
+    ("lemma", "string", "The claimed lemma whose proof to replace.");
+    ("script", "string",
+     "The new proof body, from \"proof.\" through \"qed.\" \
+      (newline-separated sentences).");
+    ("nosmt", "boolean",
+     "Weak-check the unchanged prefix during verification \
+      (default true).");
+    session_prop;
+  ],
+  tool_replace_proof;
 
   "analyze_file",
   "Whole-file batch diagnostics (stateless; the session's state is \
@@ -948,7 +1487,12 @@ let handle_initialize ~stdout ~id params =
           other sessions. Changing declarations requires \
           mode=\"statement\" (the default), which needs the file \
           exclusively: close the proof sessions first, edit, then \
-          re-dispatch.";
+          re-dispatch. Refactoring loop: iterate candidates \
+          in-session with check_script (state-restoring, per-\
+          sentence timings); commit the winner with replace_proof \
+          (verifies and auto-restores the file on failure); after \
+          any other on-disk edit run resync_file — replies carry \
+          stale=true until you do.";
      ])
 
 let handle_message t ~stdout (msg : Yojson.Safe.t) =
