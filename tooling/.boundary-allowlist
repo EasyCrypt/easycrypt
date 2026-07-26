@@ -1,0 +1,45 @@
+# Libraries permitted in tooling/**/dune (libraries ...) stanzas.
+#
+# Discipline: the daemon (and sibling tooling components) must talk to
+# EasyCrypt only through the `ec llm` subprocess protocol — never by
+# linking EC internals. Anything in a tooling dune file's (libraries ...)
+# stanza must appear here, or the boundary lint fails.
+#
+# When you legitimately need a new dep, add it here in the same commit
+# that introduces the dune change.
+
+# In-repo libraries
+ecd_core
+
+# Stdlib-adjacent (always fine)
+str
+unix
+threads
+bytes
+
+# Core daemon deps (Phase 0a)
+cmdliner
+logs
+logs.fmt
+yojson
+
+# Concurrency (Phase 1)
+eio
+eio_main
+eio.core
+eio.runtime
+eio.unix
+
+# TUI (ecd tui — Phase 2+)
+notty
+notty.unix
+
+# LSP framing — JSON-RPC primitives shared by the daemon library and
+# scripted clients in the conformance smokes (Phase 5-core / Stage 3+).
+# The lsp_io framing layer is implemented natively in Eio without
+# Lsp.Io.Make. The daemon library currently hand-encodes LSP method
+# payloads (Diagnostic, Position, etc.) as Yojson; the `lsp` package
+# is reserved for conformance smokes that want typed Lsp.Types.*
+# constructors when asserting wire shapes.
+jsonrpc
+lsp

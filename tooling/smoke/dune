@@ -1,0 +1,119 @@
+(test
+ (name run_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main))
+
+(test
+ (name run_ec_llm_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_smt_scenarios)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_ec_cancel_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_document_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_repl_core_tests)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_diff_oracle)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_replay_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_exec_json_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_semantic_lib_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix str))
+
+(test
+ (name run_proof_speculation_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_supervisor_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_discovery_smoke)
+ (package tooling)
+ (libraries ecd_core unix))
+
+(test
+ (name run_analyze_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_substrate_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main unix))
+
+(test
+ (name run_daemon_subcommand_smoke)
+ (package tooling)
+ (libraries unix)
+ (deps (alias_rec ../daemon/all)))
+
+(test
+ (name run_lsp_io_smoke)
+ (package tooling)
+ (libraries ecd_core eio_main jsonrpc))
+
+(test
+ (name run_lsp_conformance_smoke)
+ (package tooling)
+ (libraries unix yojson jsonrpc)
+ (deps (alias_rec ../daemon/all)))
+
+(test
+ (name run_lsp_stdio_smoke)
+ (package tooling)
+ (libraries unix yojson jsonrpc)
+ (deps (alias_rec ../daemon/all)))
+
+(test
+ (name run_lsp_proof_flow_smoke)
+ (package tooling)
+ (libraries unix yojson jsonrpc)
+ (deps (alias_rec ../daemon/all)))
+
+(test
+ (name run_lsp_speculation_smoke)
+ (package tooling)
+ (libraries unix yojson jsonrpc)
+ (deps (alias_rec ../daemon/all)))
+
+(test
+ (name run_lsp_cancel_smoke)
+ (package tooling)
+ (libraries unix yojson jsonrpc)
+ (deps (alias_rec ../daemon/all)))
+
+(executable
+ (name run_search_debug)
+ (libraries ecd_core eio_main))

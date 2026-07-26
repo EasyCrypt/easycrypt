@@ -1,0 +1,5 @@
+(library
+ (name ecd_core)
+ (public_name tooling.core)
+ (libraries eio yojson unix jsonrpc)
+ (modules_without_implementation overlay session transport))

@@ -1,0 +1,5 @@
+(executable
+ (name main)
+ (public_name ecd)
+ (package tooling)
+ (libraries cmdliner ecd_core eio_main notty notty.unix))
