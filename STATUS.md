@@ -4,9 +4,12 @@
 > base rebased onto current `main`, plus the transplanted daemon /
 > vscode stack, the machine-profile port (`src/ecLlmJson.ml` +
 > additive `ecLlm.ml` wiring, proto 2), and **MCP v1** (`ecd mcp`,
-> 16 tools over named parallel sessions with edit-mode locks and
-> the refactoring loop (check_script / resync_file / replace_proof
-> + stale + timings); `run_mcp_smoke` 48/48).
+> 22 tools over named parallel sessions with edit-mode locks, the
+> refactoring loop (check_script / resync_file / replace_proof +
+> stale + timings), the strategy layer (proof_outline /
+> proof_profile / check_skeleton / extract_lemma), and semantic
+> per-subgoal claims (claim_subgoal / exec_in);
+> `run_mcp_smoke` 58/58).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

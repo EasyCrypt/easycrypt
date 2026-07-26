@@ -240,10 +240,20 @@ dispatched)**. v1 shipped statement (exclusive per file) vs proof
    probe) so no live session's references can silently rebind.
    Merge = insert-only splices, ordered before first use.
 
-**Strategy-level refactoring toolkit (pinned 2026-07-26 — future
-work, not dispatched).** Line-level iteration shipped as
-check_script / resync_file / replace_proof; for restructuring at
-the proof-strategy level:
+**Strategy-level refactoring toolkit — LANDED 2026-07-26** (items
+1–4 as tools; 5–6 as agent-side recipes over proof_outline's reply,
+which carries per-branch scripts + obligation hashes; extract_lemma
+is v1 candidate-only, prop conclusions, unverified). Semantic
+per-subgoal claims landed the same day as claim_subgoal / exec_in —
+the SEMANTIC-CONTAINMENT formulation (count-based + lexical cycle
+gate) supersedes the bullet-syntax-driven one below: bullets are
+re-emitted by COMMIT at text time, not policed during authoring, so
+the strict-bullets flag no longer blocks intra-proof parallelism
+(it remains a re-check-parity item only). Still pinned:
+replace_subproof (holes-only first) + merge_subproofs single-writer
+assembly; handle-level containment (needs a TREE-JSON machine
+command); worker-session-per-subgoal orchestration. Original
+proposal for reference:
 
 1. *proof_outline {lemma}* — materialize an existing script's
    skeleton by replaying it against the proof DAG: split points,
