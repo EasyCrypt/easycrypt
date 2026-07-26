@@ -524,10 +524,16 @@ let exec t ~corr ~sentence_class ~source =
          Error (Error.Internal { detail }))
     | Some r ->
       let restarted = has_tag r "restarted" in
-      let expected_uuid =
+      (* uuid contract: executables and doc comments advance by exactly
+         one. Directives were +0 under the daemon-v1 REPL (addition-21
+         `State` dispatch) but ride the same undo-push path as
+         executables on the EcLlm base, so they may report +1 there.
+         Accept both — the daemon tracks whatever uuid the server
+         reports, and REVERT targets remain valid either way. *)
+      let uuid_ok =
         match sentence_class with
-        | `Executable | `Doc_comment -> pre_uuid + 1
-        | `Directive -> pre_uuid
+        | `Executable | `Doc_comment -> r.uuid = pre_uuid + 1
+        | `Directive -> r.uuid = pre_uuid || r.uuid = pre_uuid + 1
       in
       if restarted then begin
         t.uuid <- r.uuid;
@@ -552,20 +558,21 @@ let exec t ~corr ~sentence_class ~source =
             output       = String.concat "\n" r.body;
           }
       end
-      else if r.uuid <> expected_uuid then begin
+      else if not uuid_ok then begin
         t.cancelled <- true;
         Transcript.record_g ~corr Transcript.Invariant_uuid_mismatch
           (`Assoc [
              "label",    `String t.label;
-             "expected", `Int expected_uuid;
+             "expected", `Int (pre_uuid + 1);
              "got",      `Int r.uuid;
              "class",    `String class_str;
            ]);
         Error (Error.Session_restarted {
           reason =
             Printf.sprintf
-              "invariant-violation: expected uuid %d for class %s, got %d"
-              expected_uuid class_str r.uuid
+              "invariant-violation: unexpected uuid %d for class %s \
+               (pre %d)"
+              r.uuid class_str pre_uuid
         })
       end
       else begin
