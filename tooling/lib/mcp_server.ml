@@ -67,6 +67,20 @@ let claim_names = function
   | Statement -> []
   | Proof cs -> List.map (fun c -> c.lemma) cs
 
+(* "Semantic bullets": a live per-subgoal claim on a session. The
+   agent works one claimed subtree at a time; containment is
+   enforced semantically (goal-count accounting + a lexical gate on
+   focus-moving tactics), not by textual bullets — COMMIT re-emits
+   bullets on the way back to text. One active subclaim per session:
+   true intra-proof parallelism = one worker session per subgoal. *)
+type subclaim = {
+  sc_path : string;
+  sc_entry_hash : string;
+  mutable sc_remaining : int;
+  mutable sc_transcript : string list;  (* reversed *)
+  mutable sc_closed : bool;
+}
+
 type entry = {
   session : Ec_llm_session.t;
   file    : string;   (* canonical path — the lock-pool key *)
@@ -76,6 +90,7 @@ type entry = {
   mutable text   : string;
   mutable hash   : Digest.t;
   mutable parsed : Ec_llm_session.parsed_sentence array;
+  mutable subclaim : subclaim option;
 }
 
 type t = {
@@ -201,6 +216,91 @@ let goals_closed session =
           (match Yojson.Safe.Util.member "subgoal_count" j with
            | `Int 0 -> true
            | _ -> false)))
+
+(* (open-goal count, subgoal JSON list) at the current state. *)
+let goals_info session =
+  match Ec_llm_session.goals ~structured:true session with
+  | Error _ -> (0, [])
+  | Ok raw ->
+    (match Yojson.Safe.from_string raw with
+     | exception _ -> (0, [])
+     | j ->
+       let open Yojson.Safe.Util in
+       let n =
+         match member "subgoal_count" j with `Int n -> n | _ -> 0
+       in
+       let subs =
+         match member "subgoals" j with `List l -> l | _ -> []
+       in
+       (n, subs))
+
+(* Obligation identity of one subgoal: hash of (hypotheses,
+   conclusion) — position-independent, so before/after outlines can
+   be diffed by hash ("same debt, reorganized" vs changed). *)
+let subgoal_hash sub =
+  let open Yojson.Safe.Util in
+  let h = member "hypotheses" sub in
+  let c = member "conclusion" sub in
+  Digest.to_hex
+    (Digest.string (Yojson.Safe.to_string (`List [ h; c ])))
+
+let one_line_concl sub =
+  let open Yojson.Safe.Util in
+  let rec flat j =
+    match member "kind" j with
+    | `String "pp" ->
+      (match member "text" j with `String s -> s | _ -> "")
+    | `String k -> "<" ^ k ^ ">"
+    | _ -> ""
+  in
+  let s = flat (member "conclusion" sub) in
+  let s = String.map (function '\n' -> ' ' | c -> c) s in
+  if String.length s > 80 then String.sub s 0 79 ^ "…" else s
+
+(* Leaf paths from a TREE reply: lines shaped "[1.2] <goal> ...". *)
+let tree_paths body =
+  String.split_on_char '\n' body
+  |> List.filter_map (fun line ->
+      let line = String.trim line in
+      if String.length line > 2 && line.[0] = '[' then
+        match String.index_opt line ']' with
+        | Some i -> Some (String.sub line 1 (i - 1))
+        | None -> None
+      else None)
+
+let first_token s =
+  let s = String.trim s in
+  let n = String.length s in
+  let rec go i = if i < n && s.[i] <> ' ' && s.[i] <> '\n' then go (i+1) else i in
+  let k = go 0 in
+  String.sub s 0 k
+
+(* DFS frame stack over goal-count deltas: applying a sentence to
+   the focused goal replaces it with c = delta+1 children (0 =
+   closed leaf, 1 = continuation, >=2 = split). Reconstructs branch
+   paths with no proof-DAG wire access. *)
+module Frame_stack = struct
+  type t = (int * int) list ref  (* (current child, total), innermost first *)
+
+  let make () : t = ref []
+
+  let path (st : t) =
+    match !st with
+    | [] -> ""
+    | fs -> String.concat "." (List.rev_map (fun (c, _) -> string_of_int c) fs)
+
+  let rec bump = function
+    | [] -> []
+    | (c, total) :: rest ->
+      if c < total then (c + 1, total) :: rest else bump rest
+
+  (* Apply one sentence's child count; returns `Split when it opened
+     a split point. *)
+  let apply (st : t) ~children =
+    if children = 0 then begin st := bump !st; `Closed end
+    else if children = 1 then `Cont
+    else begin st := (1, children) :: !st; `Split end
+end
 
 (* ---------------------------------------------------------------- *)
 (* Lemma-claim resolution (proof mode)                                *)
@@ -481,7 +581,8 @@ let tool_open_file t args =
                      | Ok (body, _notices) ->
                        Hashtbl.replace t.sessions label
                          { session; file = path; mode; text;
-                           hash = Digest.string text; parsed };
+                           hash = Digest.string text; parsed;
+                           subclaim = None };
                        Ok (`Assoc [
                          "session", `String label;
                          "file", `String path;
@@ -986,6 +1087,9 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line =
             e.text <- text;
             e.hash <- Digest.string text;
             e.parsed <- parsed_all;
+            (* Session state was rebuilt from the file — any live
+               subgoal claim is void. *)
+            e.subclaim <- None;
             let claims_warning =
               match e.mode with
               | Statement -> []
@@ -1035,6 +1139,588 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line =
                            "start_line", `Int s.start_line;
                          ];
                        ])))))
+
+(* ---------------------------------------------------------------- *)
+(* Strategy level: outline / profile / skeleton / semantic claims    *)
+(* ---------------------------------------------------------------- *)
+
+(* Locate a lemma's declaration index + body sentence indices in the
+   parsed snapshot. *)
+let body_indices (e : entry) lemma =
+  match resolve_claims e.parsed [ lemma ] with
+  | Error m -> Error m
+  | Ok [ c ] ->
+    let decl_idx = ref (-1) in
+    Array.iteri
+      (fun i (s : Ec_llm_session.parsed_sentence) ->
+         if !decl_idx = -1 && s.kind = "Gaxiom"
+            && s.start_line = c.start_line
+         then decl_idx := i)
+      e.parsed;
+    if !decl_idx < 0 then Error "internal: declaration not re-found"
+    else
+      let body = ref [] in
+      Array.iteri
+        (fun i (s : Ec_llm_session.parsed_sentence) ->
+           if i > !decl_idx && s.end_line <= c.end_line then
+             body := i :: !body)
+        e.parsed;
+      Ok (c, List.rev !body)
+  | Ok _ -> Error "internal: claim resolution shape"
+
+(* Replay a lemma's body sentence-by-sentence, attributing each
+   sentence to its branch via the frame stack and capturing split
+   obligations + timings. REPOSITIONS the session: prefix is
+   weak-checked to the declaration, and the session is left at the
+   lemma's end. Powers proof_outline and proof_profile. *)
+let outline_engine (e : entry) lemma =
+  match body_indices e lemma with
+  | Error m -> Error m
+  | Ok (c, body) ->
+    let load_cmd =
+      Printf.sprintf "LOAD \"%s\" %d -nosmt" e.file c.decl_end_line
+    in
+    (match Ec_llm_session.raw_command e.session load_cmd with
+     | Error err ->
+       Error
+         (Printf.sprintf "prefix load failed: %s" (Error.to_string err))
+     | Ok _ ->
+       e.subclaim <- None;
+       let corr = Correlation.of_client "mcp-outline" in
+       let st = Frame_stack.make () in
+       let count = ref (fst (goals_info e.session)) in
+       let sentences = ref [] in
+       let obligations = ref [] in
+       let splits = ref 0 in
+       let failed = ref None in
+       (try
+          List.iter
+            (fun i ->
+               let s : Ec_llm_session.parsed_sentence = e.parsed.(i) in
+               match sentence_class_of s with
+               | None -> ()
+               | Some cls ->
+                 let path_before = Frame_stack.path st in
+                 let t0 = Unix.gettimeofday () in
+                 (match
+                    Ec_llm_session.exec e.session ~corr
+                      ~sentence_class:cls ~source:s.src
+                  with
+                  | Error er ->
+                    failed := Some (s, Error.to_string er);
+                    raise Exit
+                  | Ok _ ->
+                    let (n, subs) = goals_info e.session in
+                    let children = n - !count + 1 in
+                    let shape =
+                      if s.kind = "Gsave" then `Cont
+                      else Frame_stack.apply st ~children
+                    in
+                    (if shape = `Split then begin
+                       incr splits;
+                       List.iteri
+                         (fun k sub ->
+                            if k < children then
+                              obligations :=
+                                `Assoc [
+                                  "path",
+                                  `String
+                                    (let p = path_before in
+                                     let idx = string_of_int (k + 1) in
+                                     if p = "" then idx
+                                     else p ^ "." ^ idx);
+                                  "hash", `String (subgoal_hash sub);
+                                  "goal", `String (one_line_concl sub);
+                                ] :: !obligations)
+                         subs
+                     end);
+                    count := n;
+                    let tok = first_token s.src in
+                    sentences :=
+                      `Assoc [
+                        "path", `String path_before;
+                        "src", `String s.src;
+                        "time_ms", `Int (ms_since t0);
+                        "goals_after", `Int n;
+                        "closer",
+                        `Bool (children = 0 || s.kind = "Gsave");
+                        "smt", `Bool (tok = "smt" || tok = "smt.");
+                        "admit", `Bool (tok = "admit" || tok = "admit.");
+                        "fragile",
+                        `Bool
+                          (tok = "progress" || tok = "progress."
+                           || (String.length s.src > 0
+                               && String.contains s.src '!'));
+                      ] :: !sentences))
+            body
+        with Exit -> ());
+       Ok
+         (`Assoc [
+            "lemma", `String lemma;
+            "split_points", `Int !splits;
+            "sentences", `List (List.rev !sentences);
+            "obligations", `List (List.rev !obligations);
+            "uuid", `Int (Ec_llm_session.current_uuid e.session);
+          ],
+          !failed))
+
+let tool_proof_outline t args =
+  match str_arg args "lemma" with
+  | None -> Error "proof_outline: missing required argument 'lemma'"
+  | Some lemma ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       if stale_flag e then
+         Error "proof_outline: file changed on disk — resync_file first"
+       else
+         (match outline_engine e lemma with
+          | Error m -> Error ("proof_outline: " ^ m)
+          | Ok (payload, failed) ->
+            let extra =
+              match failed with
+              | None -> [ "ok", `Bool true ]
+              | Some (s, er) ->
+                [ "ok", `Bool false;
+                  "error", `String er;
+                  "failed_at",
+                  `Assoc [ "src", `String s.src;
+                           "start_line", `Int s.start_line ] ]
+            in
+            (match payload with
+             | `Assoc kvs ->
+               Ok (`Assoc (("session", `String label) :: kvs @ extra))
+             | j -> Ok j)))
+
+let tool_proof_profile t args =
+  match str_arg args "lemma" with
+  | None -> Error "proof_profile: missing required argument 'lemma'"
+  | Some lemma ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       if stale_flag e then
+         Error "proof_profile: file changed on disk — resync_file first"
+       else
+         (match outline_engine e lemma with
+          | Error m -> Error ("proof_profile: " ^ m)
+          | Ok (payload, failed) ->
+            let open Yojson.Safe.Util in
+            let sentences =
+              match member "sentences" payload with
+              | `List l -> l
+              | _ -> []
+            in
+            (* Aggregate per branch path. *)
+            let tbl : (string, int ref * int ref * int ref * int ref * int ref)
+                Hashtbl.t = Hashtbl.create 8 in
+            List.iter
+              (fun s ->
+                 let path =
+                   match member "path" s with `String p -> p | _ -> ""
+                 in
+                 let (cnt, tms, smt, adm, fra) =
+                   match Hashtbl.find_opt tbl path with
+                   | Some x -> x
+                   | None ->
+                     let x =
+                       (ref 0, ref 0, ref 0, ref 0, ref 0)
+                     in
+                     Hashtbl.add tbl path x;
+                     x
+                 in
+                 incr cnt;
+                 (match member "time_ms" s with
+                  | `Int n -> tms := !tms + n
+                  | _ -> ());
+                 if member "smt" s = `Bool true then incr smt;
+                 if member "admit" s = `Bool true then incr adm;
+                 if member "fragile" s = `Bool true then incr fra)
+              sentences;
+            let branches =
+              Hashtbl.fold
+                (fun path (cnt, tms, smt, adm, fra) acc ->
+                   `Assoc [
+                     "path", `String path;
+                     "sentences", `Int !cnt;
+                     "time_ms", `Int !tms;
+                     "smt_count", `Int !smt;
+                     "admit_count", `Int !adm;
+                     "fragile_count", `Int !fra;
+                   ] :: acc)
+                tbl []
+              |> List.sort (fun a b ->
+                  match member "time_ms" b, member "time_ms" a with
+                  | `Int x, `Int y -> compare x y
+                  | _ -> 0)
+            in
+            let total f =
+              List.fold_left
+                (fun acc s ->
+                   match member f s with
+                   | `Bool true -> acc + 1
+                   | _ -> acc)
+                0 sentences
+            in
+            Ok (`Assoc ([
+              "session", `String label;
+              "lemma", `String lemma;
+              "branches", `List branches;
+              "total_sentences", `Int (List.length sentences);
+              "total_smt", `Int (total "smt");
+              "total_admits", `Int (total "admit");
+              "total_fragile", `Int (total "fragile");
+              "split_points", member "split_points" payload;
+            ] @ (match failed with
+                 | None -> [ "ok", `Bool true ]
+                 | Some (_, er) ->
+                   [ "ok", `Bool false; "error", `String er ])))))
+
+(* check_script with `admit.`-holes: verifies a restructured
+   SKELETON at admit speed, reporting each hole's branch path +
+   goal snapshot; state restored afterward. *)
+let tool_check_skeleton t args =
+  match str_arg args "script" with
+  | None -> Error "check_skeleton: missing required argument 'script'"
+  | Some script ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       (match Ec_llm_session.parse_source e.session script with
+        | Error err ->
+          Error
+            (Printf.sprintf "check_skeleton: script parse failed: %s"
+               (Error.to_string err))
+        | Ok ss ->
+          let start = Ec_llm_session.current_uuid e.session in
+          let corr = Correlation.of_client "mcp-skeleton" in
+          let st = Frame_stack.make () in
+          let count = ref (fst (goals_info e.session)) in
+          let holes = ref [] in
+          let failed = ref None in
+          (try
+             List.iter
+               (fun (s : Ec_llm_session.parsed_sentence) ->
+                  match sentence_class_of s with
+                  | None -> ()
+                  | Some cls ->
+                    let path = Frame_stack.path st in
+                    let tok = first_token s.src in
+                    let is_hole = tok = "admit" || tok = "admit." in
+                    (if is_hole then
+                       match goals_info e.session with
+                       | (_, sub :: _) ->
+                         holes :=
+                           `Assoc [
+                             "path", `String path;
+                             "hash", `String (subgoal_hash sub);
+                             "goal", sub;
+                           ] :: !holes
+                       | _ -> ());
+                    (match
+                       Ec_llm_session.exec e.session ~corr
+                         ~sentence_class:cls ~source:s.src
+                     with
+                     | Error er ->
+                       failed := Some (s, Error.to_string er);
+                       raise Exit
+                     | Ok _ ->
+                       let (n, _) = goals_info e.session in
+                       let children = n - !count + 1 in
+                       if s.kind <> "Gsave" then
+                         ignore (Frame_stack.apply st ~children);
+                       count := n))
+               ss
+           with Exit -> ());
+          let closes = !failed = None && goals_closed e.session in
+          let restore =
+            if Ec_llm_session.current_uuid e.session = start then
+              `String "unmoved"
+            else
+              (match
+                 Ec_llm_session.revert_to_uuid e.session ~target:start
+               with
+               | Ok () -> `String "restored"
+               | Error er ->
+                 `String ("RESTORE FAILED: " ^ Error.to_string er))
+          in
+          Ok (`Assoc ([
+            "session", `String label;
+            "ok", `Bool (!failed = None);
+            "closes_with_holes", `Bool closes;
+            "holes", `List (List.rev !holes);
+            "restore", restore;
+            "uuid", `Int (Ec_llm_session.current_uuid e.session);
+          ] @ (match !failed with
+               | None -> []
+               | Some (s, er) ->
+                 [ "error", `String er;
+                   "failed_at", `Assoc [ "src", `String s.src ] ])))))
+
+(* Semantic bullets: claim one open subtree by TREE path; exec_in
+   then gates every sentence by goal-count containment plus a
+   lexical gate on focus-moving / proof-closing input. *)
+let tool_claim_subgoal t args =
+  match str_arg args "path" with
+  | None -> Error "claim_subgoal: missing required argument 'path'"
+  | Some path ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       (match e.subclaim with
+        | Some sc when (not sc.sc_closed) && not (bool_arg args "force") ->
+          Error
+            (Printf.sprintf
+               "claim_subgoal: session '%s' already has an open claim \
+                on subtree %s (force=true to abandon it)"
+               label sc.sc_path)
+        | _ ->
+          (match Ec_llm_session.raw_command e.session "TREE" with
+           | Error err -> Error (Error.to_string err)
+           | Ok (body, _) ->
+             let paths = tree_paths body in
+             let under =
+               List.filter
+                 (fun p ->
+                    p = path
+                    || (String.length p > String.length path
+                        && String.sub p 0 (String.length path + 1)
+                           = path ^ "."))
+                 paths
+             in
+             (match under with
+              | [] ->
+                Error
+                  (Printf.sprintf
+                     "claim_subgoal: no open subtree at path %s \
+                      (open leaves: %s)"
+                     path (String.concat ", " paths))
+              | first_leaf :: _ ->
+                (match
+                   Ec_llm_session.raw_command e.session
+                     ("FOCUS " ^ first_leaf)
+                 with
+                 | Error err -> Error (Error.to_string err)
+                 | Ok _ ->
+                   let (_, subs) = goals_info e.session in
+                   (match subs with
+                    | [] -> Error "claim_subgoal: no open goals"
+                    | entry_goal :: _ ->
+                      let sc = {
+                        sc_path = path;
+                        sc_entry_hash = subgoal_hash entry_goal;
+                        sc_remaining = List.length under;
+                        sc_transcript = [];
+                        sc_closed = false;
+                      } in
+                      e.subclaim <- Some sc;
+                      Ok (`Assoc [
+                        "session", `String label;
+                        "subgoal", `String path;
+                        "remaining_in_subtree",
+                        `Int sc.sc_remaining;
+                        "entry_hash", `String sc.sc_entry_hash;
+                        "entry_goal", entry_goal;
+                        "uuid",
+                        `Int (Ec_llm_session.current_uuid e.session);
+                      ])))))))
+
+let tool_exec_in t args =
+  match str_arg args "text" with
+  | None -> Error "exec_in: missing required argument 'text'"
+  | Some text ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       (match e.subclaim with
+        | None ->
+          Error "exec_in: no claimed subtree — call claim_subgoal first"
+        | Some sc when sc.sc_closed ->
+          Error
+            (Printf.sprintf
+               "exec_in: subtree %s is already closed" sc.sc_path)
+        | Some sc ->
+          (match Ec_llm_session.parse_source e.session text with
+           | Error err ->
+             Error
+               (Printf.sprintf "exec_in: parse failed: %s"
+                  (Error.to_string err))
+           | Ok ss ->
+             (* Lexical gate: no proof closers (skeleton owner's
+                business) and no focus-moving tactics. *)
+             let bad =
+               List.find_opt
+                 (fun (s : Ec_llm_session.parsed_sentence) ->
+                    s.kind = "Gsave" || first_token s.src = "cycle")
+                 ss
+             in
+             (match bad with
+              | Some s ->
+                Error
+                  (Printf.sprintf
+                     "exec_in: '%s' is not allowed inside a claimed \
+                      subtree (closers and cycle escape the claim)"
+                     (first_token s.src))
+              | None ->
+                let snapshot =
+                  Ec_llm_session.current_uuid e.session
+                in
+                let corr = Correlation.of_client "mcp-execin" in
+                let count = ref (fst (goals_info e.session)) in
+                let remaining = ref sc.sc_remaining in
+                let executed = ref [] in
+                let err_ref = ref None in
+                (try
+                   List.iter
+                     (fun (s : Ec_llm_session.parsed_sentence) ->
+                        match sentence_class_of s with
+                        | None -> ()
+                        | Some cls ->
+                          if !remaining = 0 then begin
+                            err_ref :=
+                              Some
+                                "subtree closed before the end of \
+                                 the sequence";
+                            raise Exit
+                          end;
+                          (match
+                             Ec_llm_session.exec e.session ~corr
+                               ~sentence_class:cls ~source:s.src
+                           with
+                           | Error er ->
+                             err_ref := Some (Error.to_string er);
+                             raise Exit
+                           | Ok _ ->
+                             let (n, _) = goals_info e.session in
+                             remaining := !remaining + (n - !count);
+                             count := n;
+                             executed := s.src :: !executed;
+                             if !remaining < 0 then begin
+                               err_ref :=
+                                 Some
+                                   "containment violation: sequence \
+                                    closed goals outside the claimed \
+                                    subtree";
+                               raise Exit
+                             end))
+                     ss
+                 with Exit -> ());
+                (match !err_ref with
+                 | Some er ->
+                   (* Transactional: revert the whole sequence. *)
+                   (match
+                      Ec_llm_session.revert_to_uuid e.session
+                        ~target:snapshot
+                    with
+                    | Ok () ->
+                      Error
+                        (Printf.sprintf
+                           "exec_in: %s — sequence reverted" er)
+                    | Error rer ->
+                      Error
+                        (Printf.sprintf
+                           "exec_in: %s — AND revert failed (%s); \
+                            resync_file to recover"
+                           er (Error.to_string rer)))
+                 | None ->
+                   sc.sc_remaining <- !remaining;
+                   sc.sc_transcript <-
+                     List.rev_append !executed sc.sc_transcript;
+                   if !remaining = 0 then sc.sc_closed <- true;
+                   Ok (`Assoc ([
+                     "session", `String label;
+                     "subgoal", `String sc.sc_path;
+                     "ok", `Bool true;
+                     "remaining_in_subtree", `Int !remaining;
+                     "subtree_closed", `Bool sc.sc_closed;
+                     "uuid",
+                     `Int (Ec_llm_session.current_uuid e.session);
+                     "goals", goals_json e.session;
+                   ] @ (if sc.sc_closed then
+                          [ "transcript",
+                            `List
+                              (List.rev_map
+                                 (fun s -> `String s)
+                                 sc.sc_transcript) ]
+                        else []))))))))
+
+(* Candidate standalone-lemma extraction from the FOCUSED goal:
+   hypotheses become binders/premises, the conclusion the claim.
+   v1: prop conclusions only; the output is a CANDIDATE for the
+   agent to refine, not verified text. *)
+let tool_extract_lemma t args =
+  let name =
+    match str_arg args "name" with Some n -> n | None -> "aux_extracted"
+  in
+  match find_session t args with
+  | Error e -> Error e
+  | Ok (label, e) ->
+    let (_, subs) = goals_info e.session in
+    (match subs with
+     | [] -> Error "extract_lemma: no open goal"
+     | sub :: _ ->
+       let open Yojson.Safe.Util in
+       let concl =
+         match member "kind" (member "conclusion" sub) with
+         | `String "pp" ->
+           (match member "text" (member "conclusion" sub) with
+            | `String s -> Ok s
+            | _ -> Error "conclusion text missing")
+         | _ ->
+           Error
+             "extract_lemma v1 supports prop conclusions only (PHL \
+              judgment goals need program context)"
+       in
+       (match concl with
+        | Error m -> Error ("extract_lemma: " ^ m)
+        | Ok concl ->
+          let hyps =
+            match member "hypotheses" sub with `List l -> l | _ -> []
+          in
+          let binders = ref [] in
+          let premises = ref [] in
+          let skipped = ref [] in
+          List.iter
+            (fun h ->
+               let hname =
+                 match member "name" h with `String s -> s | _ -> "_"
+               in
+               let pp =
+                 match member "pp" h with `String s -> s | _ -> ""
+               in
+               match member "kind" h with
+               | `String "var" ->
+                 binders :=
+                   Printf.sprintf "(%s : %s)" hname pp :: !binders
+               | `String "hyp" -> premises := pp :: !premises
+               | `String k -> skipped := (hname ^ ":" ^ k) :: !skipped
+               | _ -> ())
+            hyps;
+          let binder_str =
+            match List.rev !binders with
+            | [] -> ""
+            | bs -> " " ^ String.concat " " bs
+          in
+          let stmt =
+            String.concat " => " (List.rev !premises @ [ concl ])
+          in
+          let candidate =
+            Printf.sprintf "lemma %s%s :\n  %s.\nproof.\nqed."
+              name binder_str stmt
+          in
+          Ok (`Assoc [
+            "session", `String label;
+            "candidate", `String candidate;
+            "call_site_hint",
+            `String
+              (Printf.sprintf
+                 "apply %s.  (* premises become subgoals or take \
+                  hypothesis names as arguments *)"
+                 name);
+            "skipped_hypotheses",
+            `List (List.rev_map (fun s -> `String s) !skipped);
+            "verified", `Bool false;
+          ])))
 
 let tool_resync_file t args =
   match find_session t args with
@@ -1305,6 +1991,90 @@ let tools :
     session_prop;
   ],
   tool_check_script;
+
+  "check_skeleton",
+  "Verify a restructured proof SKELETON at admit-speed: like \
+   check_script, but `admit.` sentences are treated as HOLES — the \
+   reply lists each hole's branch path + goal snapshot + hash so \
+   holes can be discharged individually afterward (claim_subgoal / \
+   parallel sessions). State restored afterward. Iterate strategy \
+   first, pay for leaves later.",
+  schema ~required:[ "script" ] [
+    ("script", "string",
+     "Skeleton sentences with admit. holes, e.g. \
+      \"split.\\nadmit.\\nadmit.\\nqed.\"");
+    session_prop;
+  ],
+  tool_check_skeleton;
+
+  "proof_outline",
+  "Materialize an existing lemma's proof STRUCTURE by replaying its \
+   body (weak-checked prefix): per-sentence branch paths, timings, \
+   split points, and the obligation set (per-split goal hashes + \
+   one-liners). Branch scripts and obligation hashes are the raw \
+   material for similarity spotting and before/after obligation \
+   diffs. REPOSITIONS the session to the lemma's end.",
+  schema ~required:[ "lemma" ] [
+    ("lemma", "string", "Lemma whose proof to outline.");
+    session_prop;
+  ],
+  tool_proof_outline;
+
+  "proof_profile",
+  "Hotspot ranking over a lemma's proof, aggregated per branch: \
+   sentence counts, time, smt/admit counts, fragility markers \
+   (progress, !-rewrites). Same replay as proof_outline \
+   (repositions the session); use it to decide WHAT is worth \
+   restructuring before deciding how.",
+  schema ~required:[ "lemma" ] [
+    ("lemma", "string", "Lemma whose proof to profile.");
+    session_prop;
+  ],
+  tool_proof_profile;
+
+  "claim_subgoal",
+  "Semantic bullets: claim one open subtree (dotted TREE path) as \
+   this session's work unit. Focus moves to it; exec_in then \
+   enforces containment. One open claim per session — true \
+   intra-proof parallelism is one worker session per subgoal. \
+   Returns the entry goal + hash (guards against upstream drift) \
+   and the subtree's open-leaf count.",
+  schema ~required:[ "path" ] [
+    ("path", "string", "Dotted subtree path from `tree`, e.g. \"2\" \
+                        or \"1.2\".");
+    ("force", "boolean",
+     "Abandon an existing open claim on this session.");
+    session_prop;
+  ],
+  tool_claim_subgoal;
+
+  "exec_in",
+  "Execute a tactic sequence INSIDE the claimed subtree, \
+   transactionally: closers (qed/save) and cycle are refused, \
+   goal-count containment is checked after every sentence, and any \
+   violation or failure reverts the whole sequence. Reports \
+   remaining-in-subtree and subtree_closed (with the accumulated \
+   transcript on close) — bullets are re-generated by commit_proof \
+   at text-assembly time, not policed during authoring.",
+  schema ~required:[ "text" ] [
+    ("text", "string",
+     "Tactic sentences ('.'-terminated) for the claimed subtree.");
+    session_prop;
+  ],
+  tool_exec_in;
+
+  "extract_lemma",
+  "Candidate standalone-lemma extraction from the focused goal: \
+   var hypotheses become binders, hyp hypotheses premises, the \
+   conclusion the claim. v1 handles prop conclusions only and \
+   closes over ALL hypotheses — the output is an UNVERIFIED \
+   candidate for the agent to refine, plus a call-site hint.",
+  schema [
+    ("name", "string",
+     "Name for the extracted lemma (default aux_extracted).");
+    session_prop;
+  ],
+  tool_extract_lemma;
 
   "revert",
   "Revert the session to an earlier uuid (as reported by exec / \

@@ -605,6 +605,145 @@ let () =
          with Not_found -> false))
     (Yojson.Safe.to_string rp3);
 
+  (* -- strategy layer: outline / profile / skeleton / claims ------ *)
+  let (err, ol) =
+    call fd_in fd_out "proof_outline"
+      (`Assoc [ "lemma", `String "t2"; "session", `String "w2" ])
+  in
+  let n_obl =
+    try
+      match member "obligations" ol with
+      | `List l -> List.length l
+      | _ -> -1
+    with _ -> -1
+  in
+  check "proof_outline t2: 1 split point, 2 obligations"
+    ((not err)
+     && member "ok" ol = `Bool true
+     && member "split_points" ol = `Int 1
+     && n_obl = 2)
+    (Yojson.Safe.to_string ol);
+
+  let (err, pf) =
+    call fd_in fd_out "proof_profile"
+      (`Assoc [ "lemma", `String "t2"; "session", `String "w2" ])
+  in
+  check "proof_profile t2: aggregates, no smt/admit"
+    ((not err)
+     && member "ok" pf = `Bool true
+     && member "total_smt" pf = `Int 0
+     && member "total_admits" pf = `Int 0
+     && (match member "branches" pf with
+         | `List (_ :: _) -> true
+         | _ -> false))
+    (Yojson.Safe.to_string pf);
+
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "w2"; "upto_line", `Int 7 ])
+  in
+  check "resync to line 7 (t2 open, pre-split)" (not err) "";
+
+  let (err, sk) =
+    call fd_in fd_out "check_skeleton"
+      (`Assoc [
+         "script", `String "split.\nadmit.\nadmit.\nqed.";
+         "session", `String "w2";
+       ])
+  in
+  let hole0_path =
+    try
+      match member "holes" sk with
+      | `List (h :: _) -> member "path" h
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "check_skeleton: 2 holes with paths, closes, restored"
+    ((not err)
+     && member "ok" sk = `Bool true
+     && member "closes_with_holes" sk = `Bool true
+     && (match member "holes" sk with
+         | `List l -> List.length l = 2
+         | _ -> false)
+     && hole0_path = `String "1"
+     && member "restore" sk = `String "restored")
+    (Yojson.Safe.to_string sk);
+
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "split."; "session", `String "w2" ])
+  in
+  check "exec split (2 goals for claims)" (not err) "";
+
+  let (err, cl) =
+    call fd_in fd_out "claim_subgoal"
+      (`Assoc [ "path", `String "2"; "session", `String "w2" ])
+  in
+  check "claim_subgoal 2: remaining=1 with entry hash"
+    ((not err)
+     && member "remaining_in_subtree" cl = `Int 1
+     && (match member "entry_hash" cl with
+         | `String h -> String.length h > 0
+         | _ -> false))
+    (Yojson.Safe.to_string cl);
+
+  let (err, ei0) =
+    call fd_in fd_out "exec_in"
+      (`Assoc [ "text", `String "qed."; "session", `String "w2" ])
+  in
+  check "exec_in: closer refused inside claim"
+    (err
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "not allowed")
+                     (Yojson.Safe.to_string ei0) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string ei0);
+
+  let (err, ei1) =
+    call fd_in fd_out "exec_in"
+      (`Assoc [ "text", `String "trivial."; "session", `String "w2" ])
+  in
+  check "exec_in trivial: subtree closed, transcript returned"
+    ((not err)
+     && member "subtree_closed" ei1 = `Bool true
+     && (match member "transcript" ei1 with
+         | `List [ `String "trivial." ] -> true
+         | _ -> false))
+    (Yojson.Safe.to_string ei1);
+
+  let (err, cl2) =
+    call fd_in fd_out "claim_subgoal"
+      (`Assoc [ "path", `String "9"; "session", `String "w2" ])
+  in
+  check "claim_subgoal: unknown path refused"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "no open subtree")
+                     (Yojson.Safe.to_string cl2) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string cl2);
+
+  let (err, ex) =
+    call fd_in fd_out "extract_lemma"
+      (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])
+  in
+  let cand =
+    match member "candidate" ex with `String s -> s | _ -> ""
+  in
+  check "extract_lemma: candidate for remaining goal 1 = 1"
+    ((not err)
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "lemma aux_x") cand 0);
+           ignore (Str.search_forward
+                     (Str.regexp_string "1 = 1") cand 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string ex);
+
   let (err, cl) =
     call fd_in fd_out "close_session"
       (`Assoc [ "session", `String "w2" ])
