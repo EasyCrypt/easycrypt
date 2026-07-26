@@ -38,10 +38,12 @@ let print_llm_guide () =
 (* Machine-profile protocol version advertised in the READY handshake
    (addition 6). The daemon compares this against its own minimum and
    fails the handshake on a lower report — bump in lock-step with any
-   wire-visible change. v2 = the EcLlm command set + the full JSON
-   machine profile (GOALS-JSON, PARSE/ANALYZE frames, EXEC-JSON,
-   ERROR-JSON/OK-JSON, restart tags, searchall). *)
-let llm_protocol_version = 2
+   wire-visible change. v3 = v2 (EcLlm command set + full JSON
+   machine profile) + PARSE-JSON "name" on declaration sentences
+   (from the AST) + STRICT single-phrase <BEGIN>/<DONE> blocks:
+   trailing phrases are an ERROR instead of being silently dropped
+   (field reports B4/B5). *)
+let llm_protocol_version = 3
 
 (* -------------------------------------------------------------------- *)
 let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
@@ -599,6 +601,28 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
     let last_src = ref "" in
     begin try
       let (src, prog) = EcIo.xparse reader in
+      (* Strict single-phrase contract (proto 3): a block carries
+         exactly one parse unit. Trailing phrases used to be
+         SILENTLY dropped — the worst failure mode: the client
+         believes its state advanced (field report B5). Sequences
+         execute one phrase per block. *)
+      let trailing =
+        match EcIo.xparse reader with
+        | exception End_of_file -> false
+        | (_, prog2) ->
+          (* At end of input the parser yields an EMPTY program with
+             the terminal flag rather than raising — only a real
+             second phrase counts as trailing. *)
+          (match EcLocation.unloc prog2 with
+           | EP.P_Prog ([], _) -> false
+           | _ -> true)
+      in
+      if trailing then
+        Wire.reply_error
+          "block contains more than one phrase; send exactly one \
+           '.'-terminated phrase per <BEGIN>/<DONE> block (execute \
+           sequences one phrase at a time)"
+      else begin
       let src = String.strip src in
       last_src := src;
       begin match EcLocation.unloc prog with
@@ -614,7 +638,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | EP.P_DocComment doc ->
         EcCommands.doc_comment doc;
         Wire.reply_ok ""
-      end
+      end end
     with
     | EcCommands.Restart ->
       do_initialize ();

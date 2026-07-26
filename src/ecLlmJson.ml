@@ -449,6 +449,16 @@ let classify_global (g : EcParsetree.global_action) =
   in
   (kind, cls)
 
+(* Declared name of a declaration sentence, from the AST — the
+   strict source of truth: no source-text scanning, so banners,
+   modifiers, and every declaration form (lemma / axiom / equiv /
+   hoare / phoare / ehoare, local or not) are covered by
+   construction (field report B4). *)
+let decl_name_of_global (g : EcParsetree.global_action) =
+  match g with
+  | Gaxiom { pa_name; _ } -> Some (EcLocation.unloc pa_name)
+  | _ -> None
+
 (* -------------------------------------------------------------------- *)
 (* Compute (line, col) at byte [offset] in [source], 1-indexed. Used by
    addition 16: when [start_offset] advances past leading whitespace,
@@ -510,11 +520,16 @@ let parse_to_json input =
   let reader = EcIo.from_string input in
   let sentences = ref [] in
   let error = ref None in
-  let emit cls kind loc =
+  let emit ?name cls kind loc =
+    let name_field =
+      match name with
+      | Some n -> Printf.sprintf "\"name\":\"%s\"," (json_escape n)
+      | None -> "\"name\":null,"
+    in
     sentences :=
       Printf.sprintf
-        "{\"class\":\"%s\",\"kind\":\"%s\",%s}"
-        cls kind (loc_to_json ~source:input loc)
+        "{\"class\":\"%s\",\"kind\":\"%s\",%s%s}"
+        cls kind name_field (loc_to_json ~source:input loc)
       :: !sentences
   in
   let break = ref false in
@@ -526,9 +541,10 @@ let parse_to_json input =
       | EcParsetree.P_Prog (commands, locterm) ->
         List.iter
           (fun (g : EcParsetree.global) ->
-            let (kind, cls) =
-              classify_global (EcLocation.unloc g.gl_action) in
-            emit cls kind g.gl_action.EcLocation.pl_loc)
+            let act = EcLocation.unloc g.gl_action in
+            let (kind, cls) = classify_global act in
+            emit ?name:(decl_name_of_global act) cls kind
+              g.gl_action.EcLocation.pl_loc)
           commands;
         if locterm then break := true
       | EcParsetree.P_DocComment _ -> emit "doc_comment" "DocComment" ploc
@@ -578,11 +594,16 @@ let analyze_to_json ~(checkmode : EcCommands.checkmode) input =
   let actions = ref [] in
   let parse_diag = ref None in
   let break = ref false in
-  let emit_sentence cls kind loc =
+  let emit_sentence ?name cls kind loc =
+    let name_field =
+      match name with
+      | Some n -> Printf.sprintf "\"name\":\"%s\"," (json_escape n)
+      | None -> "\"name\":null,"
+    in
     let j =
       Printf.sprintf
-        "{\"class\":\"%s\",\"kind\":\"%s\",%s}"
-        cls kind (loc_to_json ~source:input loc)
+        "{\"class\":\"%s\",\"kind\":\"%s\",%s%s}"
+        cls kind name_field (loc_to_json ~source:input loc)
     in
     sentences := (!next_idx, j) :: !sentences;
     incr next_idx
@@ -598,9 +619,10 @@ let analyze_to_json ~(checkmode : EcCommands.checkmode) input =
       | EcParsetree.P_Prog (commands, locterm) ->
         List.iter
           (fun (g : EcParsetree.global) ->
-             let (kind, cls) =
-               classify_global (EcLocation.unloc g.gl_action) in
-             emit_sentence cls kind g.gl_action.EcLocation.pl_loc;
+             let act = EcLocation.unloc g.gl_action in
+             let (kind, cls) = classify_global act in
+             emit_sentence ?name:(decl_name_of_global act) cls kind
+               g.gl_action.EcLocation.pl_loc;
              push_action cls g.gl_action)
           commands;
         if locterm then break := true
