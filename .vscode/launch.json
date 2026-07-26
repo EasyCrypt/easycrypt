@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Extension Host (vscode/)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/vscode",
+        "--user-data-dir=${workspaceFolder}/.vscode-test/user-data",
+        "${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/vscode/out/**/*.js"
+      ],
+      "preLaunchTask": "vscode:compile"
+    }
+  ]
+}

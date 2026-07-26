@@ -3,18 +3,31 @@
  (release (flags -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69)
           (ocamlopt_flags -O3 -unbox-closures)))
 
-(dirs 3rdparty src etc libs theories examples assets scripts doc)
+(dirs 3rdparty src etc libs theories examples assets scripts doc tooling)
 
 (install
+  (package easycrypt)
   (section (site (easycrypt commands)))
   (files (scripts/testing/runtest as runtest)))
 
 (install
+  (package easycrypt)
   (section (site (easycrypt doc)))
   (files
     (assets/styles/styles.css as styles.css)
     (doc/llm/CLAUDE.md as llm-guide.md)))
 
 (install
+  (package easycrypt)
   (section (bin))
   (files (scripts/testing/bin-ec-runtest as ec-runtest)))
+
+; Promote the tooling daemon binary to `ecd.native` at the repo root
+; on every `dune build`. Developer convenience so the REPL can be
+; invoked as `./ecd.native repl -I theories` from the project root
+; without a `dune exec --` prefix. Not committed (see .gitignore).
+(rule
+ (target ecd.native)
+ (deps tooling/daemon/main.exe)
+ (action (copy %{dep:tooling/daemon/main.exe} %{target}))
+ (mode (promote (until-clean))))

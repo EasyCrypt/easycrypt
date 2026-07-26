@@ -1,0 +1,24 @@
+name: Boundary lint
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tooling/**'
+      - 'scripts/boundary-lint.sh'
+      - '.github/workflows/boundary-lint.yml'
+  pull_request:
+    paths:
+      - 'tooling/**'
+      - 'scripts/boundary-lint.sh'
+      - '.github/workflows/boundary-lint.yml'
+
+jobs:
+  boundary-lint:
+    name: Tooling boundary lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run boundary lint
+        run: bash scripts/boundary-lint.sh

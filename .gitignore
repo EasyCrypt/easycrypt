@@ -8,7 +8,13 @@
 /theories/attic
 
 /ec.*
+/ecd.native
 /src/*.exe
+
+# QUICK-BUNDLE: bundled binaries copied in at .vsix-package time
+/vscode/bin/
+/vscode/easycrypt-tooling-bundled-*.vsix
+/vscode/easycrypt-tooling-slim*.vsix
 
 *.eco
 

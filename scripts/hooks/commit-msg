@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# commit-msg hook: validate the prefix grammar documented in
+# doc/commit-conventions.md.
+#
+# Install: ln -s ../../scripts/hooks/commit-msg .git/hooks/commit-msg
+# (run from repo root; path is relative to .git/hooks/).
+
+set -euo pipefail
+
+msg_file="$1"
+first_line=$(head -n1 "$msg_file")
+
+# Skip empty messages (git handles these), comment lines, and
+# fixup/squash/revert auto-messages (these are validated on their
+# eventual rebase).
+case "$first_line" in
+  ''|'#'*|'fixup!'*|'squash!'*|'amend!'*|'Revert "'*) exit 0 ;;
+esac
+
+allowed_prefixes='ec-core|daemon|nvim|tui|tree-sitter|docs|build|ci|merge|revert'
+
+if ! printf '%s\n' "$first_line" | grep -Eq "^(${allowed_prefixes}): [A-Z].*[^.]$"; then
+  cat >&2 <<EOF
+commit-msg: subject does not follow the convention.
+
+Got:
+  ${first_line}
+
+Expected:
+  <prefix>: <Capital-letter start, imperative, no trailing period>
+
+Allowed prefixes: ${allowed_prefixes//|/, }
+
+See doc/commit-conventions.md. Bypass (not recommended) with
+\`git commit --no-verify\`.
+EOF
+  exit 1
+fi
+

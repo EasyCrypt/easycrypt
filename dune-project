@@ -26,3 +26,19 @@
   yojson
   (zarith (>= 1.10))
 ))
+
+(package
+ (name tooling)
+ (synopsis "EasyCrypt tooling daemon (LSP + MCP)")
+ (description
+  "Modular daemon wrapping `ec llm`. Serves LSP to editors and MCP to LLM clients over a shared session pool. PoC scaffolding; see doc/tooling-poc-plan.md.")
+ (depends
+  (ocaml (>= 5.1.0))
+  dune
+  eio
+  eio_main
+  cmdliner
+  logs
+  yojson
+  notty
+))
