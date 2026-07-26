@@ -191,7 +191,9 @@ recast as typed JSON events in wire v2 — plus the structured
 surface: GOALS-JSON stack (conclusion tree, STMT-JSON, per-pregoal
 PPEnv), PARSE/ANALYZE frames (first-token offsets, scope-tagging,
 synthetic-abort), `searchall`, newline-preserving multi-line.
-EXEC-JSON returns as the v2 command channel.
+EXEC-JSON v0 re-landed on the v1 wire 2026-07-26 (round-trip oracle
+42/42; OK-JSON carries its render metadata) and later generalizes
+into the v2 command channel.
 
 **Ours (tooling)**: daemon (sessions, documents, reconcile,
 speculation), MCP server (new — first target), LSP + VSCode

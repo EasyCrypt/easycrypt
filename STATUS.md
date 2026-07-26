@@ -4,9 +4,10 @@
 > base rebased onto current `main`, plus the transplanted daemon /
 > vscode stack, the machine-profile port (`src/ecLlmJson.ml` +
 > additive `ecLlm.ml` wiring, proto 2), and **MCP v1** (`ecd mcp`,
-> 12 tools over named parallel sessions; `run_mcp_smoke` 31/31).
-> Deferred from pass 1: EXEC-JSON, `searchall`, EcCancel, bullets
-> scoping — see [doc/ecllm-compat.md](doc/ecllm-compat.md), which is
+> 13 tools over named parallel sessions; `run_mcp_smoke` 34/34).
+> `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
+> still deferred: EcCancel, bullets scoping — see
+> [doc/ecllm-compat.md](doc/ecllm-compat.md), which is
 > the governing plan. The sections BELOW are the imported daemon-v1
 > snapshot (2026-04-29) and are stale wherever they touch `src/`
 > facts; a full refresh is pending.
