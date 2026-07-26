@@ -240,6 +240,34 @@ dispatched)**. v1 shipped statement (exclusive per file) vs proof
    probe) so no live session's references can silently rebind.
    Merge = insert-only splices, ordered before first use.
 
+**Strategy-level refactoring toolkit (pinned 2026-07-26 — future
+work, not dispatched).** Line-level iteration shipped as
+check_script / resync_file / replace_proof; for restructuring at
+the proof-strategy level:
+
+1. *proof_outline {lemma}* — materialize an existing script's
+   skeleton by replaying it against the proof DAG: split points,
+   branches with sentence ranges/depth, closers used, per-branch
+   time (text→tree; COMMIT's inverse).
+2. *proof_profile {lemma}* — hotspot ranking per branch: smt count,
+   total/max step time, admits, fragility markers (`!`-rewrites,
+   `progress`).
+3. *check_skeleton* — check_script with `admit.`-holes: verify the
+   restructured SKELETON at admit-speed, reply with each hole's
+   goal + path; discharge leaves after (in parallel per-subgoal
+   sessions once bullet-claims land).
+4. *extract_lemma {path}* — subgoal → standalone lemma candidate
+   (v1 closes over all hyps; v2 needs used-hypothesis analysis) +
+   rewritten call site.
+5. *similar_branches* — α-similarity report over branch scripts +
+   entry goals; factoring candidates.
+6. *obligation_diff* — old-vs-new leaf-obligation set diff (by goal
+   hash): "same debt, reorganized" vs "you changed what's owed".
+
+Dependencies: 3 leans on the strict-bullets flag (the Pierre-Yves
+ask); 1/4/5/6 ride the pr_parent DAG + GOALS-JSON already present;
+all are daemon-side.
+
 ## Appendix C — merge conflict surface
 
 Both touch: `src/ec.ml` (ours +1568: old REPL + JSON emission; his:
