@@ -91,7 +91,8 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   whole proof body) from the current state: per-sentence verdicts
   + `time_ms`, a `closes` verdict, then full state restore. The
   refactoring inner loop: iterate candidates here; only write when
-  one passes.
+  one passes. On failure, `goals_at_failure` is the state entering
+  the failed sentence — no blind re-runs to see the residual goal.
 
 ### Writing back (the only file-writing path)
 
@@ -113,6 +114,12 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   downstream (and warns in proof mode — that edit belonged in a
   statement session). Note: session state becomes exactly the
   file's state; un-committed interactive work is dropped.
+  `at_lemma: "<name>"` positions just inside that lemma's proof —
+  sentence-granular, so it works on packed `proof. tac. qed.`
+  lines where `upto_line` cannot; prefer it over manual line math.
+  When the file is unchanged and the target is ahead, the reply
+  carries `fast_forward: true` and nothing reloads — forward hops
+  are near-free.
 
 ### Strategy layer (refactoring at proof-structure level)
 
@@ -181,7 +188,7 @@ edits: close workers → one statement session → edit → re-dispatch.
 ```
 proof_profile {lemma}         → pick the expensive branch
 proof_outline {lemma}         → read the strategy; note obligation hashes
-resync_file {upto_line: <lemma proof start>}
+resync_file {at_lemma: "<lemma>"}
 check_skeleton {new skeleton with admit. holes}
   → for each hole: claim_subgoal {path} → exec_in until closed
   → assemble: skeleton with holes replaced by transcripts

@@ -773,6 +773,91 @@ let () =
      && (match member "analysis" an with `Assoc _ -> true | _ -> false))
     (Yojson.Safe.to_string an);
 
+  (* -- field-report round 2: B2 / at_lemma / fast-forward / F3 ---- *)
+  let b2f = Filename.concat fixture_dir "b2.ec" in
+  let write_b2 body =
+    let oc = open_out b2f in
+    output_string oc
+      ("require import AllCore.\n\
+        lemma p1 : 1 = 1.\n\
+        proof. trivial. qed.\n\
+        lemma p2 : 2 = 2.\n" ^ body);
+    close_out oc
+  in
+  write_b2 "proof. trivial. qed.\n";
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String b2f; "session", `String "wb";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "b2 fixture open (packed lines)" (not err) "";
+  write_b2 "proof. by trivial. qed.\n";
+  let (err, rs) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wb"; "nosmt", `Bool false ])
+  in
+  check "B2: resync into a packed-line proof body"
+    ((not err)
+     && member "ok" rs = `Bool true
+     && member "classification" rs = `String "proof-body-only")
+    (Yojson.Safe.to_string rs);
+
+  let (err, al) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wb"; "at_lemma", `String "p2" ])
+  in
+  let al_goals =
+    try
+      match member "goals" al with
+      | `Assoc _ as g -> member "subgoal_count" g
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "at_lemma p2: positioned inside the proof (1 goal)"
+    ((not err)
+     && member "ok" al = `Bool true
+     && member "classification" al = `String "reposition"
+     && al_goals = `Int 1)
+    (Yojson.Safe.to_string al);
+
+  let (err, ff) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wb" ])
+  in
+  check "fast-forward: unchanged file, forward target, no reload"
+    ((not err)
+     && member "fast_forward" ff = `Bool true
+     && member "ok" ff = `Bool true)
+    (Yojson.Safe.to_string ff);
+
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wb"; "at_lemma", `String "p2" ])
+  in
+  check "reposition back to p2" (not err) "";
+  let (err, cs2) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script", `String "apply nonexistent_xyz.";
+         "session", `String "wb";
+       ])
+  in
+  let gaf =
+    try
+      match member "goals_at_failure" cs2 with
+      | `Assoc _ as g -> member "subgoal_count" g
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "F3: goals_at_failure carries the state entering the failure"
+    ((not err) && member "ok" cs2 = `Bool false && gaf = `Int 1)
+    (Yojson.Safe.to_string cs2);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wb" ])
+  in
+  check "close wb" (not err) "";
+
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
       (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])

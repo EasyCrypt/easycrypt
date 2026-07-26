@@ -90,6 +90,9 @@ type entry = {
   mutable text   : string;
   mutable hash   : Digest.t;
   mutable parsed : Ec_llm_session.parsed_sentence array;
+  (* Leading file-sentence count the session state equals, or -1
+     once interactive work diverged (resync fast-forward gate). *)
+  mutable synced_upto : int;
   mutable subclaim : subclaim option;
 }
 
@@ -611,9 +614,22 @@ let tool_open_file t args =
                          (Printf.sprintf "open_file: LOAD failed: %s"
                             (Error.to_string e))
                      | Ok (body, _notices) ->
+                       let synced0 =
+                         match int_arg args "upto_line" with
+                         | None -> Array.length parsed
+                         | Some l ->
+                           let c = ref 0 in
+                           Array.iteri
+                             (fun i
+                               (s : Ec_llm_session.parsed_sentence) ->
+                                if s.end_line <= l then c := i + 1)
+                             parsed;
+                           !c
+                       in
                        Hashtbl.replace t.sessions label
                          { session; file = path; mode; text;
                            hash = Digest.string text; parsed;
+                           synced_upto = synced0;
                            subclaim = None };
                        Ok (`Assoc [
                          "session", `String label;
@@ -643,6 +659,7 @@ let tool_exec t args =
         with
         | Error err -> Error (Error.to_string err)
         | Ok ok ->
+          e.synced_upto <- -1;
           Ok (`Assoc [
             "session", `String label;
             "uuid", `Int ok.replied_uuid;
@@ -757,6 +774,7 @@ let tool_focus t args =
     (match Ec_llm_session.raw_command e.session cmd with
      | Error err -> Error (Error.to_string err)
      | Ok (_, _) ->
+       e.synced_upto <- -1;
        Ok (`Assoc [
          "session", `String label;
          "uuid", `Int (Ec_llm_session.current_uuid e.session);
@@ -815,6 +833,7 @@ let tool_revert t args =
        (match Ec_llm_session.revert_to_uuid e.session ~target with
         | Error err -> Error (Error.to_string err)
         | Ok () ->
+          e.synced_upto <- -1;
           Ok (`Assoc [
             "session", `String label;
             "uuid", `Int (Ec_llm_session.current_uuid e.session);
@@ -917,6 +936,7 @@ let tool_check_script t args =
           let corr = Correlation.of_client "mcp-check" in
           let results = ref [] in
           let failed = ref false in
+          let goals_fail = ref `Null in
           let restarted = ref false in
           let t0 = Unix.gettimeofday () in
           (try
@@ -945,6 +965,7 @@ let tool_check_script t args =
                          ] :: !results
                      | Error er ->
                        failed := true;
+                       goals_fail := goals_json e.session;
                        results :=
                          `Assoc [
                            "index", `Int i;
@@ -982,6 +1003,7 @@ let tool_check_script t args =
             "ok", `Bool ((not !failed) && not !restarted);
             "closes", `Bool closes;
             "results", `List (List.rev !results);
+            "goals_at_failure", !goals_fail;
             "goals_at_end", goals_at_end;
             "restore", restore;
             "uuid", `Int (Ec_llm_session.current_uuid e.session);
@@ -989,21 +1011,27 @@ let tool_check_script t args =
             "stale", `Bool (stale_flag e);
           ])))
 
-(* Incremental re-sync of a session against its (edited) file:
-   PARSE-diff the new text against the loaded snapshot, weak-check
-   the unchanged prefix via LOAD upto (nosmt by default), then
-   FULL-check the changed tail sentence-by-sentence. Reports the
-   diff classification: proof-body-only edits provably cannot
-   affect downstream lemmas; additive = pure appends;
-   statement-changing invalidates downstream (warned in proof
-   mode). Interactive work not in the file is dropped — resync
-   makes session ≡ file. *)
-let resync_impl ~label (e : entry) ~nosmt ~upto_line =
+(* Incremental re-sync of a session against its (possibly edited)
+   file, with sentence-granular target selection over a
+   line-granular LOAD: when several sentences share the last prefix
+   line (the `proof. tac. qed.` idiom), `LOAD upto <line>` would
+   overshoot into the tail — so the prefix boundary backs off to a
+   line break and the same-line cluster replays through the exec
+   path (field report B2). Targets: whole file, `upto_line`, or
+   `at_lemma` (position just inside the lemma's proof, immune to
+   packed lines — field report F1). Fast path (field report F2):
+   when the file is unchanged and the session state is a known file
+   prefix at or behind the target, execute forward from the current
+   state with no reload. The changed/executed tail is always
+   full-checked; only the reloaded prefix honors [nosmt]. *)
+let resync_impl ~label (e : entry) ~nosmt ~upto_line ~at_lemma =
   match read_file e.file with
   | exception Sys_error m -> Error (Printf.sprintf "resync_file: %s" m)
   | text ->
     let unchanged = Digest.string text = e.hash in
-    if unchanged && upto_line = None then
+    if unchanged && upto_line = None && at_lemma = None
+       && e.synced_upto = Array.length e.parsed
+    then
       Ok (`Assoc [
         "session", `String label;
         "changed", `Bool false;
@@ -1018,175 +1046,260 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line =
               (Error.to_string err))
        | Ok ss ->
          let parsed_all = Array.of_list ss in
-         let effective =
-           match upto_line with
-           | None -> parsed_all
-           | Some l ->
-             Array.of_list
-               (List.filter
-                  (fun (s : Ec_llm_session.parsed_sentence) ->
-                     s.end_line <= l)
-                  ss)
+         let n_all = Array.length parsed_all in
+         (* Target = number of leading sentences the session should
+            end up having executed. *)
+         let target =
+           match at_lemma with
+           | Some lemma ->
+             (match resolve_claims parsed_all [ lemma ] with
+              | Error msg -> Error msg
+              | Ok [ c ] ->
+                let d = ref (-1) in
+                Array.iteri
+                  (fun i (s : Ec_llm_session.parsed_sentence) ->
+                     if !d = -1 && s.kind = "Gaxiom"
+                        && s.start_line = c.start_line
+                     then d := i)
+                  parsed_all;
+                if !d < 0 then
+                  Error "internal: declaration not re-found"
+                else
+                  (* Through the declaration, plus its `proof.` when
+                     present — lands on the lemma's opening goal. *)
+                  let m = !d + 1 in
+                  let m =
+                    if m < n_all
+                       && first_token
+                            (parsed_all.(m)
+                             : Ec_llm_session.parsed_sentence)
+                              .src
+                          = "proof"
+                    then m + 1
+                    else m
+                  in
+                  Ok m
+              | Ok _ -> Error "internal: claim resolution shape")
+           | None ->
+             (match upto_line with
+              | None -> Ok n_all
+              | Some l ->
+                let m = ref 0 in
+                Array.iteri
+                  (fun i (s : Ec_llm_session.parsed_sentence) ->
+                     if s.end_line <= l then m := i + 1)
+                  parsed_all;
+                Ok !m)
          in
-         let old = e.parsed in
-         let k =
-           let n = min (Array.length old) (Array.length effective) in
-           let rec go i =
-             if i < n
-                && (old.(i) : Ec_llm_session.parsed_sentence).src
-                   = (effective.(i) : Ec_llm_session.parsed_sentence)
-                       .src
-             then go (i + 1)
-             else i
-           in
-           go 0
-         in
-         (* The changed window is [k, len - ks) on each side: common
-            prefix AND common suffix are trimmed, so unchanged
-            downstream sentences don't pollute the classification. *)
-         let ks =
-           let n_old = Array.length old in
-           let n_new = Array.length effective in
-           let maxs = min (n_old - k) (n_new - k) in
-           let rec go i =
-             if i < maxs
-                && (old.(n_old - 1 - i)
-                    : Ec_llm_session.parsed_sentence)
-                     .src
-                   = (effective.(n_new - 1 - i)
-                      : Ec_llm_session.parsed_sentence)
-                       .src
-             then go (i + 1)
-             else i
-           in
-           go 0
-         in
-         let window_kinds arr =
-           let n = Array.length arr in
-           let out = ref [] in
-           Array.iteri
-             (fun i (s : Ec_llm_session.parsed_sentence) ->
-                if i >= k && i < n - ks then out := s.kind :: !out)
-             arr;
-           !out
-         in
-         let old_w = window_kinds old in
-         let new_w = window_kinds effective in
-         let proof_kind kd = kd = "Gtactics" || kd = "Gsave" in
-         let classification =
-           if old_w = [] then
-             if List.for_all proof_kind new_w then "proof-body-only"
-             else "additive"
-           else if List.for_all proof_kind (old_w @ new_w) then
-             "proof-body-only"
-           else "statement-changing"
-         in
-         let warning =
-           match e.mode with
-           | Proof _ when classification = "statement-changing" ->
-             [ "warning",
-               `String
-                 "statement-changing edit seen by a PROOF-mode \
-                  session — declarations should change through a \
-                  statement-mode session" ]
-           | _ -> []
-         in
-         let prefix_upto =
-           if k = 0 then 0
-           else
-             (effective.(k - 1) : Ec_llm_session.parsed_sentence)
-               .end_line
-         in
-         let load_cmd =
-           Printf.sprintf "LOAD \"%s\" %d%s" e.file prefix_upto
-             (if nosmt then " -nosmt" else "")
-         in
-         let t0 = Unix.gettimeofday () in
-         (match Ec_llm_session.raw_command e.session load_cmd with
-          | Error err ->
-            Error
-              (Printf.sprintf "resync_file: prefix reload failed: %s"
-                 (Error.to_string err))
-          | Ok _ ->
-            let prefix_ms = ms_since t0 in
-            let t1 = Unix.gettimeofday () in
-            let corr = Correlation.of_client "mcp-resync" in
-            let err_ref = ref None in
-            let count = ref 0 in
-            (try
-               Array.iteri
-                 (fun i (s : Ec_llm_session.parsed_sentence) ->
-                    if i >= k then
-                      match sentence_class_of s with
-                      | None -> ()
-                      | Some cls ->
-                        (match
-                           Ec_llm_session.exec e.session ~corr
-                             ~sentence_class:cls ~source:s.src
-                         with
-                         | Ok _ -> incr count
-                         | Error er ->
-                           err_ref := Some (i, s, er);
-                           raise Exit))
-                 effective
-             with Exit -> ());
-            let tail_ms = ms_since t1 in
-            e.text <- text;
-            e.hash <- Digest.string text;
-            e.parsed <- parsed_all;
-            (* Session state was rebuilt from the file — any live
-               subgoal claim is void. *)
-            e.subclaim <- None;
-            let claims_warning =
+         (match target with
+          | Error msg -> Error ("resync_file: " ^ msg)
+          | Ok m ->
+            let old = e.parsed in
+            let n_old = Array.length old in
+            let k =
+              let n = min n_old m in
+              let rec go i =
+                if i < n
+                   && (old.(i) : Ec_llm_session.parsed_sentence).src
+                      = (parsed_all.(i)
+                         : Ec_llm_session.parsed_sentence)
+                          .src
+                then go (i + 1)
+                else i
+              in
+              go 0
+            in
+            (* Classification over the DIFF WINDOW only: trim the
+               common suffix so unchanged downstream sentences don't
+               pollute a mid-file body edit's classification. *)
+            let ks =
+              let maxs = min (n_old - k) (n_all - k) in
+              let rec go i =
+                if i < maxs
+                   && (old.(n_old - 1 - i)
+                       : Ec_llm_session.parsed_sentence)
+                        .src
+                      = (parsed_all.(n_all - 1 - i)
+                         : Ec_llm_session.parsed_sentence)
+                          .src
+                then go (i + 1)
+                else i
+              in
+              go 0
+            in
+            let window arr lo hi =
+              let out = ref [] in
+              Array.iteri
+                (fun i (s : Ec_llm_session.parsed_sentence) ->
+                   if i >= lo && i < hi then out := s.kind :: !out)
+                arr;
+              !out
+            in
+            let diff_kinds =
+              window old k (n_old - ks)
+              @ window parsed_all k (n_all - ks)
+            in
+            let proof_kind kd = kd = "Gtactics" || kd = "Gsave" in
+            let classification =
+              if unchanged then "reposition"
+              else if diff_kinds = [] then "formatting-only"
+              else if List.for_all proof_kind diff_kinds then
+                "proof-body-only"
+              else if k >= n_old then "additive"
+              else "statement-changing"
+            in
+            let warning =
               match e.mode with
-              | Statement -> []
-              | Proof cs ->
-                let names = List.map (fun c -> c.lemma) cs in
-                (match resolve_claims parsed_all names with
-                 | Ok cs' ->
-                   e.mode <- Proof cs';
-                   []
-                 | Error m ->
-                   [ "claims_warning",
-                     `String
-                       (m
-                        ^ " — previous claim regions kept; locks \
-                           still held by name") ])
+              | Proof _ when classification = "statement-changing" ->
+                [ "warning",
+                  `String
+                    "statement-changing edit seen by a PROOF-mode \
+                     session — declarations should change through a \
+                     statement-mode session" ]
+              | _ -> []
             in
-            let base =
-              [
-                "session", `String label;
-                "changed", `Bool true;
-                "classification", `String classification;
-                "common_prefix_sentences", `Int k;
-                "tail_executed", `Int !count;
-                "prefix_time_ms", `Int prefix_ms;
-                "tail_time_ms", `Int tail_ms;
-                "uuid",
-                `Int (Ec_llm_session.current_uuid e.session);
-                "stale", `Bool false;
-                "claims", claims_json e.mode;
-                "goals", goals_json e.session;
-              ]
-              @ warning @ claims_warning
+            let corr = Correlation.of_client "mcp-resync" in
+            let exec_range lo hi =
+              let err = ref None in
+              let cnt = ref 0 in
+              (try
+                 for i = lo to hi - 1 do
+                   let s : Ec_llm_session.parsed_sentence =
+                     parsed_all.(i)
+                   in
+                   match sentence_class_of s with
+                   | None -> ()
+                   | Some cls ->
+                     (match
+                        Ec_llm_session.exec e.session ~corr
+                          ~sentence_class:cls ~source:s.src
+                      with
+                      | Ok _ -> incr cnt
+                      | Error er ->
+                        err := Some (i, s, er);
+                        raise Exit)
+                 done
+               with Exit -> ());
+              (!cnt, !err)
             in
-            (match !err_ref with
-             | None -> Ok (`Assoc (base @ [ "ok", `Bool true ]))
-             | Some (i, s, er) ->
-               Ok
-                 (`Assoc
-                    (base
-                     @ [
-                         "ok", `Bool false;
-                         "error", `String (Error.to_string er);
-                         "failed_sentence",
-                         `Assoc [
-                           "index", `Int i;
-                           "src", `String s.src;
-                           "start_line", `Int s.start_line;
-                         ];
-                       ])))))
-
+            let fast =
+              unchanged && e.synced_upto >= 0 && e.synced_upto <= m
+              && k >= e.synced_upto
+            in
+            let run () =
+              if fast then begin
+                let t1 = Unix.gettimeofday () in
+                let (c, er) = exec_range e.synced_upto m in
+                Ok (true, 0, ms_since t1, c, er)
+              end
+              else begin
+                (* Back the prefix boundary off shared end-lines so
+                   the line-granular LOAD cannot overshoot past the
+                   sentence-granular target (B2). *)
+                let j = ref (min k m) in
+                while
+                  !j > 0 && !j < n_all
+                  && (parsed_all.(!j)
+                      : Ec_llm_session.parsed_sentence)
+                       .end_line
+                     = (parsed_all.(!j - 1)
+                        : Ec_llm_session.parsed_sentence)
+                         .end_line
+                do
+                  decr j
+                done;
+                let j = !j in
+                let prefix_upto =
+                  if j = 0 then 0
+                  else
+                    (parsed_all.(j - 1)
+                     : Ec_llm_session.parsed_sentence)
+                      .end_line
+                in
+                let load_cmd =
+                  Printf.sprintf "LOAD \"%s\" %d%s" e.file prefix_upto
+                    (if nosmt then " -nosmt" else "")
+                in
+                let t0 = Unix.gettimeofday () in
+                match Ec_llm_session.raw_command e.session load_cmd with
+                | Error err ->
+                  Error
+                    (Printf.sprintf
+                       "resync_file: prefix reload failed: %s"
+                       (Error.to_string err))
+                | Ok _ ->
+                  let pms = ms_since t0 in
+                  let t1 = Unix.gettimeofday () in
+                  let (c, er) = exec_range j m in
+                  Ok (false, pms, ms_since t1, c, er)
+              end
+            in
+            (match run () with
+             | Error msg -> Error msg
+             | Ok (fast_forward, prefix_ms, tail_ms, executed, err_opt) ->
+               e.text <- text;
+               e.hash <- Digest.string text;
+               e.parsed <- parsed_all;
+               (* Session position moved — any live subgoal claim is
+                  void; the synced position is where execution
+                  stopped. *)
+               e.subclaim <- None;
+               e.synced_upto <-
+                 (match err_opt with
+                  | None -> m
+                  | Some (i, _, _) -> i);
+               let claims_warning =
+                 match e.mode with
+                 | Statement -> []
+                 | Proof cs ->
+                   let names = List.map (fun c -> c.lemma) cs in
+                   (match resolve_claims parsed_all names with
+                    | Ok cs' ->
+                      e.mode <- Proof cs';
+                      []
+                    | Error msg ->
+                      [ "claims_warning",
+                        `String
+                          (msg
+                           ^ " — previous claim regions kept; locks \
+                              still held by name") ])
+               in
+               let base =
+                 [
+                   "session", `String label;
+                   "changed", `Bool (not unchanged);
+                   "classification", `String classification;
+                   "fast_forward", `Bool fast_forward;
+                   "common_prefix_sentences", `Int k;
+                   "target_sentences", `Int m;
+                   "tail_executed", `Int executed;
+                   "prefix_time_ms", `Int prefix_ms;
+                   "tail_time_ms", `Int tail_ms;
+                   "uuid",
+                   `Int (Ec_llm_session.current_uuid e.session);
+                   "stale", `Bool false;
+                   "claims", claims_json e.mode;
+                   "goals", goals_json e.session;
+                 ]
+                 @ warning @ claims_warning
+               in
+               (match err_opt with
+                | None -> Ok (`Assoc (base @ [ "ok", `Bool true ]))
+                | Some (i, s, er) ->
+                  Ok
+                    (`Assoc
+                       (base
+                        @ [
+                            "ok", `Bool false;
+                            "error", `String (Error.to_string er);
+                            "goals_at_failure", goals_json e.session;
+                            "failed_sentence",
+                            `Assoc [
+                              "index", `Int i;
+                              "src", `String s.src;
+                              "start_line", `Int s.start_line;
+                            ];
+                          ]))))))
 (* ---------------------------------------------------------------- *)
 (* Strategy level: outline / profile / skeleton / semantic claims    *)
 (* ---------------------------------------------------------------- *)
@@ -1445,6 +1558,7 @@ let tool_check_skeleton t args =
           let count = ref (fst (goals_info e.session)) in
           let holes = ref [] in
           let failed = ref None in
+          let goals_fail = ref `Null in
           (try
              List.iter
                (fun (s : Ec_llm_session.parsed_sentence) ->
@@ -1470,6 +1584,7 @@ let tool_check_skeleton t args =
                      with
                      | Error er ->
                        failed := Some (s, Error.to_string er);
+                       goals_fail := goals_json e.session;
                        raise Exit
                      | Ok _ ->
                        let (n, _) = goals_info e.session in
@@ -1502,6 +1617,7 @@ let tool_check_skeleton t args =
                | None -> []
                | Some (s, er) ->
                  [ "error", `String er;
+                   "goals_at_failure", !goals_fail;
                    "failed_at", `Assoc [ "src", `String s.src ] ])))))
 
 (* Semantic bullets: claim one open subtree by TREE path; exec_in
@@ -1561,6 +1677,7 @@ let tool_claim_subgoal t args =
                         sc_closed = false;
                       } in
                       e.subclaim <- Some sc;
+                      e.synced_upto <- -1;
                       Ok (`Assoc [
                         "session", `String label;
                         "subgoal", `String path;
@@ -1670,6 +1787,7 @@ let tool_exec_in t args =
                             resync_file to recover"
                            er (Error.to_string rer)))
                  | None ->
+                   e.synced_upto <- -1;
                    sc.sc_remaining <- !remaining;
                    sc.sc_transcript <-
                      List.rev_append !executed sc.sc_transcript;
@@ -1779,6 +1897,7 @@ let tool_resync_file t args =
       | _ -> true
     in
     resync_impl ~label e ~nosmt ~upto_line:(int_arg args "upto_line")
+      ~at_lemma:(str_arg args "at_lemma")
 
 (* Verified in-place proof replacement: splice [script] over the
    claimed lemma's proof-body lines, resync (weak prefix +
@@ -1851,11 +1970,11 @@ let tool_replace_proof t args =
                | exception Sys_error m ->
                  Error (Printf.sprintf "replace_proof: %s" m)
                | () ->
-                 (match resync_impl ~label e ~nosmt ~upto_line:None with
+                 (match resync_impl ~label e ~nosmt ~upto_line:None ~at_lemma:None with
                   | Error m ->
                     (try write_file e.file orig with _ -> ());
                     ignore
-                      (resync_impl ~label e ~nosmt ~upto_line:None);
+                      (resync_impl ~label e ~nosmt ~upto_line:None ~at_lemma:None);
                     Error
                       (Printf.sprintf
                          "replace_proof: verification could not run \
@@ -1882,7 +2001,7 @@ let tool_replace_proof t args =
                     else begin
                       (try write_file e.file orig with _ -> ());
                       ignore
-                        (resync_impl ~label e ~nosmt ~upto_line:None);
+                        (resync_impl ~label e ~nosmt ~upto_line:None ~at_lemma:None);
                       Ok (`Assoc [
                         "ok", `Bool false;
                         "lemma", `String lemma;
@@ -2156,6 +2275,10 @@ let tools :
     ("upto_line", "integer",
      "Re-sync only up to this line (repositioning). Default: whole \
       file.");
+    ("at_lemma", "string",
+     "Position just inside this lemma's proof (after its proof. \
+      sentence) — sentence-granular, works on packed lines where \
+      upto_line cannot.");
     session_prop;
   ],
   tool_resync_file;
