@@ -1024,12 +1024,14 @@ let tool_check_script t args =
    prefix at or behind the target, execute forward from the current
    state with no reload. The changed/executed tail is always
    full-checked; only the reloaded prefix honors [nosmt]. *)
-let resync_impl ~label (e : entry) ~nosmt ~upto_line ~at_lemma =
+let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
+    ~at_lemma =
   match read_file e.file with
   | exception Sys_error m -> Error (Printf.sprintf "resync_file: %s" m)
   | text ->
     let unchanged = Digest.string text = e.hash in
     if unchanged && upto_line = None && at_lemma = None
+       && upto_sentence = None
        && e.synced_upto = Array.length e.parsed
     then
       Ok (`Assoc [
@@ -1081,7 +1083,10 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~at_lemma =
                   Ok m
               | Ok _ -> Error "internal: claim resolution shape")
            | None ->
-             (match upto_line with
+             (match upto_sentence with
+              | Some n -> Ok (max 0 (min n_all n))
+              | None ->
+             match upto_line with
               | None -> Ok n_all
               | Some l ->
                 let m = ref 0 in
@@ -1897,6 +1902,7 @@ let tool_resync_file t args =
       | _ -> true
     in
     resync_impl ~label e ~nosmt ~upto_line:(int_arg args "upto_line")
+      ~upto_sentence:(int_arg args "upto_sentence")
       ~at_lemma:(str_arg args "at_lemma")
 
 (* Verified in-place proof replacement: splice [script] over the
@@ -1970,11 +1976,11 @@ let tool_replace_proof t args =
                | exception Sys_error m ->
                  Error (Printf.sprintf "replace_proof: %s" m)
                | () ->
-                 (match resync_impl ~label e ~nosmt ~upto_line:None ~at_lemma:None with
+                 (match resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None with
                   | Error m ->
                     (try write_file e.file orig with _ -> ());
                     ignore
-                      (resync_impl ~label e ~nosmt ~upto_line:None ~at_lemma:None);
+                      (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None);
                     Error
                       (Printf.sprintf
                          "replace_proof: verification could not run \
@@ -2001,7 +2007,7 @@ let tool_replace_proof t args =
                     else begin
                       (try write_file e.file orig with _ -> ());
                       ignore
-                        (resync_impl ~label e ~nosmt ~upto_line:None ~at_lemma:None);
+                        (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None);
                       Ok (`Assoc [
                         "ok", `Bool false;
                         "lemma", `String lemma;
@@ -2275,6 +2281,11 @@ let tools :
     ("upto_line", "integer",
      "Re-sync only up to this line (repositioning). Default: whole \
       file.");
+    ("upto_sentence", "integer",
+     "Execute exactly the first N sentences (sentence-granular \
+      positioning at ANY boundary, incl. mid packed line); indices \
+      match analyze_file\x27s sentence order and the reply\x27s \
+      target_sentences.");
     ("at_lemma", "string",
      "Position just inside this lemma's proof (after its proof. \
       sentence) — sentence-granular, works on packed lines where \

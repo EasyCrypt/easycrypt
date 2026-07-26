@@ -853,6 +853,24 @@ let () =
   check "F3: goals_at_failure carries the state entering the failure"
     ((not err) && member "ok" cs2 = `Bool false && gaf = `Int 1)
     (Yojson.Safe.to_string cs2);
+  let (err, us) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wb"; "upto_sentence", `Int 8 ])
+  in
+  let us_goals =
+    try
+      match member "goals" us with
+      | `Assoc _ as g -> member "active" g
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "upto_sentence 8: mid-packed-line boundary (after by trivial.)"
+    ((not err)
+     && member "ok" us = `Bool true
+     && member "target_sentences" us = `Int 8
+     && member "fast_forward" us = `Bool true
+     && us_goals = `Bool false)
+    (Yojson.Safe.to_string us);
   let (err, _) =
     call fd_in fd_out "close_session" (`Assoc [ "session", `String "wb" ])
   in

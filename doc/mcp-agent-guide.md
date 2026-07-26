@@ -114,6 +114,8 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   downstream (and warns in proof mode — that edit belonged in a
   statement session). Note: session state becomes exactly the
   file's state; un-committed interactive work is dropped.
+  `upto_sentence: N` executes exactly the first N sentences —
+  positioning at ANY sentence boundary, including mid packed line.
   `at_lemma: "<name>"` positions just inside that lemma's proof —
   sentence-granular, so it works on packed `proof. tac. qed.`
   lines where `upto_line` cannot; prefer it over manual line math.
