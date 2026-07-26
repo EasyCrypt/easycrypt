@@ -158,6 +158,10 @@ let write_fixture () =
   let oc = open_out fixture in
   output_string oc
     "require import AllCore.\n\
+     lemma t1 : 0 = 0.\n\
+     proof.\n\
+     trivial.\n\
+     qed.\n\
      lemma t2 : 1 = 1 /\\ 2 = 2.\n\
      proof.\n\
      split.\n";
@@ -220,16 +224,33 @@ let () =
          (List.mem expected tool_names) "")
     [ "open_file"; "exec"; "goals"; "try_tactic"; "commit_proof" ];
 
-  (* -- open + speculate + advance -------------------------------- *)
+  (* -- open (proof mode, claiming t2) + speculate + advance ------- *)
   let (err, opened) =
-    call fd_in fd_out "open_file" (`Assoc [ "path", `String fixture ])
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String fixture;
+         "mode", `String "proof";
+         "lemmas", `List [ `String "t2" ];
+       ])
   in
   check "open_file: ok" (not err) (Yojson.Safe.to_string opened);
   check "open_file: 2 goals after split" (subgoal_count opened = 2)
     (Printf.sprintf "got %d" (subgoal_count opened));
-  check "open_file: uuid=4 (require/lemma/proof/split)"
-    (match member "uuid" opened with `Int 4 -> true | _ -> false)
+  check "open_file: uuid=8 (both lemmas' sentences)"
+    (match member "uuid" opened with `Int 8 -> true | _ -> false)
     (Yojson.Safe.to_string (member "uuid" opened));
+  let claim0 =
+    try
+      match member "claims" opened with
+      | `List (c :: _) -> c
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "open_file: claim resolved to t2's region (lines 6..8)"
+    (member "lemma" claim0 = `String "t2"
+     && member "start_line" claim0 = `Int 6
+     && member "end_line" claim0 = `Int 8)
+    (Yojson.Safe.to_string claim0);
 
   let (err, tried) =
     call fd_in fd_out "try_tactic"
@@ -258,9 +279,9 @@ let () =
   let (err, ex) =
     call fd_in fd_out "exec" (`Assoc [ "text", `String "reflexivity." ])
   in
-  check "exec reflexivity: ok, uuid=5"
+  check "exec reflexivity: ok, uuid=9"
     ((not err)
-     && (match member "uuid" ex with `Int 5 -> true | _ -> false))
+     && (match member "uuid" ex with `Int 9 -> true | _ -> false))
     (Yojson.Safe.to_string ex);
   check "exec reflexivity: 1 goal remains" (subgoal_count ex = 1)
     (Printf.sprintf "got %d" (subgoal_count ex));
@@ -288,7 +309,7 @@ let () =
     (Yojson.Safe.to_string q);
   let (_, g2) = call fd_in fd_out "goals" (`Assoc []) in
   check "query is state-neutral (uuid unchanged)"
-    (match member "uuid" g2 with `Int 5 -> true | _ -> false)
+    (match member "uuid" g2 with `Int 9 -> true | _ -> false)
     (Yojson.Safe.to_string (member "uuid" g2));
 
   let (err, sr) =
@@ -334,12 +355,71 @@ let () =
          with Not_found -> false))
     proof_text;
 
-  (* -- parallel sessions ----------------------------------------- *)
+  (* -- lock discipline ------------------------------------------- *)
+  let (err, conflict) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String fixture;
+         "session", `String "w2";
+         "mode", `String "proof";
+         "lemmas", `List [ `String "t2" ];
+       ])
+  in
+  let conflict_text = Yojson.Safe.to_string conflict in
+  check "proof mode: overlapping lemma claim refused"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "claim conflict")
+                     conflict_text 0);
+           true
+         with Not_found -> false))
+    conflict_text;
+
+  let (err, unknown) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String fixture;
+         "session", `String "w3";
+         "mode", `String "proof";
+         "lemmas", `List [ `String "ghost_lemma" ];
+       ])
+  in
+  check "proof mode: unknown lemma claim refused"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "not found")
+                     (Yojson.Safe.to_string unknown) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string unknown);
+
+  let (err, blocked) =
+    call fd_in fd_out "open_file"
+      (`Assoc [ "path", `String fixture; "session", `String "editor" ])
+  in
+  check "statement mode (default): refused while proof session holds file"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "exclusive")
+                     (Yojson.Safe.to_string blocked) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string blocked);
+
+  (* -- parallel sessions (disjoint claims) ------------------------ *)
   let (err, w2) =
     call fd_in fd_out "open_file"
-      (`Assoc [ "path", `String fixture; "session", `String "w2" ])
+      (`Assoc [
+         "path", `String fixture;
+         "session", `String "w2";
+         "mode", `String "proof";
+         "lemmas", `List [ `String "t1" ];
+       ])
   in
-  check "open_file w2: ok with 2 goals"
+  check "open_file w2 (disjoint claim t1): ok with 2 goals"
     ((not err) && subgoal_count w2 = 2)
     (Printf.sprintf "got %d" (subgoal_count w2));
   let (_, g_main) = call fd_in fd_out "goals" (`Assoc []) in
@@ -349,9 +429,9 @@ let () =
 
   let (err, rv) =
     call fd_in fd_out "revert"
-      (`Assoc [ "uuid", `Int 3; "session", `String "w2" ])
+      (`Assoc [ "uuid", `Int 7; "session", `String "w2" ])
   in
-  check "revert w2 to uuid 3: single conjunction goal"
+  check "revert w2 to uuid 7: single conjunction goal"
     ((not err) && subgoal_count rv = 1)
     (Printf.sprintf "got %d" (subgoal_count rv));
 
@@ -364,6 +444,22 @@ let () =
   in
   check "list_sessions: 2 sessions" ((not err) && n_sessions = 2)
     (Printf.sprintf "got %d" n_sessions);
+  let main_row =
+    try
+      match member "sessions" ls with
+      | `List xs ->
+        List.find_opt
+          (fun r -> member "session" r = `String "main")
+          xs
+        |> Option.value ~default:`Null
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "list_sessions: main row carries mode + claims"
+    (member "mode" main_row = `String "proof"
+     && (match member "claims" main_row with
+         | `List (_ :: _) -> true | _ -> false))
+    (Yojson.Safe.to_string main_row);
 
   let (err, an) =
     call fd_in fd_out "analyze_file"
@@ -382,8 +478,8 @@ let () =
       (s, d)
     with _ -> (-1, -1)
   in
-  check "analyze_file: 4 sentences, 0 diagnostics"
-    ((not err) && n_sentences = 4 && n_diags = 0)
+  check "analyze_file: 8 sentences, 0 diagnostics"
+    ((not err) && n_sentences = 8 && n_diags = 0)
     (Printf.sprintf "sentences=%d diags=%d" n_sentences n_diags);
 
   let (err, cl) =
