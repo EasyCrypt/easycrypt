@@ -316,12 +316,44 @@ let ident_prefix s =
   let k = go 0 in
   if k = 0 then None else Some (String.sub s 0 k)
 
+(* EC attaches leading comments to the following sentence, so a
+   declaration's src may begin with one or more banner `(* ... *)`
+   blocks (house style on real codebases — field report
+   2026-07-26). Strip them, nesting-aware, before tokenizing. *)
+let strip_leading_comments (src : string) : string =
+  let n = String.length src in
+  let rec skip_ws i =
+    if i < n
+       && (src.[i] = ' ' || src.[i] = '\t' || src.[i] = '\n'
+           || src.[i] = '\r')
+    then skip_ws (i + 1)
+    else i
+  in
+  let rec skip_comment i depth =
+    if i + 1 >= n then n
+    else if src.[i] = '(' && src.[i + 1] = '*' then
+      skip_comment (i + 2) (depth + 1)
+    else if src.[i] = '*' && src.[i + 1] = ')' then
+      if depth = 1 then i + 2 else skip_comment (i + 2) (depth - 1)
+    else skip_comment (i + 1) depth
+  in
+  let rec go i =
+    let i = skip_ws i in
+    if i + 1 < n && src.[i] = '(' && src.[i + 1] = '*' then
+      go (skip_comment (i + 2) 1)
+    else i
+  in
+  let k = go 0 in
+  if k >= n then "" else String.sub src k (n - k)
+
 (* Extract the declared name from a proof-opening declaration's
-   SOURCE text (not pp output): skip local/declare prefixes and
-   nosmt / [attribute] tokens after the keyword; the name is the
-   leading identifier of the next token. v1 heuristic — validation
-   errors list every declaration found, so mismatches are visible. *)
+   SOURCE text (not pp output): strip attached leading comments,
+   skip local/declare prefixes and nosmt / [attribute] tokens after
+   the keyword; the name is the leading identifier of the next
+   token. v1 heuristic — validation errors list every declaration
+   found, so mismatches are visible. *)
 let decl_name (src : string) : string option =
+  let src = strip_leading_comments src in
   let toks =
     String.split_on_char '\n' src
     |> List.concat_map (String.split_on_char '\t')
@@ -807,18 +839,33 @@ let tool_analyze_file t args =
   | None -> Error "analyze_file: missing required argument 'path'"
   | Some path ->
     let path = absolute path in
-    (match find_session t args with
-     | Error e -> Error e
-     | Ok (label, e) ->
-       let cmd = Printf.sprintf "ANALYZE-JSON \"%s\"" path in
-       (match Ec_llm_session.raw_command e.session cmd with
-        | Error err -> Error (Error.to_string err)
-        | Ok (body, _) ->
-          Ok (`Assoc [
-            "session", `String label;
-            "file", `String path;
-            "analysis", json_or_string body;
-          ])))
+    let run session =
+      let cmd = Printf.sprintf "ANALYZE-JSON \"%s\"" path in
+      match Ec_llm_session.raw_command session cmd with
+      | Error err -> Error (Error.to_string err)
+      | Ok (body, _) ->
+        Ok [ "file", `String path; "analysis", json_or_string body ]
+    in
+    let label = label_of_args args in
+    (match Hashtbl.find_opt t.sessions label with
+     | Some e ->
+       (match run e.session with
+        | Error m -> Error m
+        | Ok kv -> Ok (`Assoc (("session", `String label) :: kv)))
+     | None ->
+       (* Stateless as documented: no session needed — spawn an
+          ephemeral one so analyze_file stays reachable when
+          open_file itself is what failed (field report). *)
+       let session =
+         Ec_llm_session.start_in_dir
+           ~cwd:(Filename.dirname path) ~sw:t.sw ~label:"mcp-analyze"
+       in
+       let r = run session in
+       (try Ec_llm_session.close session with _ -> ());
+       (match r with
+        | Error m -> Error m
+        | Ok kv ->
+          Ok (`Assoc (("session", `String "(ephemeral)") :: kv))))
 
 let tool_list_sessions t _args =
   let rows =

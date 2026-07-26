@@ -726,6 +726,53 @@ let () =
          with Not_found -> false))
     (Yojson.Safe.to_string cl2);
 
+  (* -- banner-comment declarations + stateless analyze ------------ *)
+  let cmt = Filename.concat fixture_dir "cmt.ec" in
+  let oc = open_out cmt in
+  output_string oc
+    "require import AllCore.\n\
+     (* banner: house style *)\n\
+     lemma banner : 2 + 2 = 4.\n\
+     proof.\n\
+     trivial.\n\
+     qed.\n";
+  close_out oc;
+  let (err, bo) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String cmt;
+         "session", `String "w9";
+         "mode", `String "proof";
+         "lemmas", `List [ `String "banner" ];
+       ])
+  in
+  let bclaim =
+    try
+      match member "claims" bo with `List (c :: _) -> c | _ -> `Null
+    with _ -> `Null
+  in
+  check "banner-comment lemma claimable (field-report bug)"
+    ((not err)
+     && member "lemma" bclaim = `String "banner"
+     && member "decl_end_line" bclaim = `Int 3
+     && member "end_line" bclaim = `Int 6)
+    (Yojson.Safe.to_string bo);
+  let (err, _) =
+    call fd_in fd_out "close_session"
+      (`Assoc [ "session", `String "w9" ])
+  in
+  check "close w9" (not err) "";
+
+  let (err, an) =
+    call fd_in fd_out "analyze_file"
+      (`Assoc [ "path", `String cmt; "session", `String "ephemeral-x" ])
+  in
+  check "analyze_file: session-free (ephemeral spawn)"
+    ((not err)
+     && member "session" an = `String "(ephemeral)"
+     && (match member "analysis" an with `Assoc _ -> true | _ -> false))
+    (Yojson.Safe.to_string an);
+
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
       (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])

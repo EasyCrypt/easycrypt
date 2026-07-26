@@ -50,8 +50,11 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   standard way to position at a lemma). Proof mode requires
   `lemmas`; the reply's `claims` carry each lemma's document
   region (`start_line` / `decl_end_line` / `end_line`) — use them
-  for `upto_line` targeting and splicing. Re-opening a label
-  replaces that session and releases its locks.
+  for `upto_line` targeting and splicing. Leading banner comments
+  attach to the declaration: `start_line` may point at the banner
+  (the region moves as one block), while `decl_end_line` is always
+  the declaration's own last line — target that for positioning.
+  Re-opening a label replaces that session and releases its locks.
 - `goals {session?}` — structured proof state (GOALS-JSON):
   subgoal count, hypotheses (name/kind/pp), conclusion tree (PHL
   judgments carry structured program statements). Parse it; never
@@ -76,7 +79,9 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   `locate f.`). Output arrives as text; state does not move.
 - `analyze_file {path}` — whole-file diagnostics (positions,
   classes, enclosing scopes) without touching session state. Use
-  after batch edits to find breakage cheaply.
+  after batch edits to find breakage cheaply. Session-free: if the
+  label has no session (e.g. `open_file` itself just failed), it
+  runs in an ephemeral one — always available as a diagnostic.
 
 ### The exploration loop (state-neutral)
 
