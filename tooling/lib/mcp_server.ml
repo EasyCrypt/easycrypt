@@ -49,7 +49,13 @@ type claim = {
    Locks are derived from the live session table (no separate
    registry to desync): closing or replacing a session releases its
    locks. Cross-FILE dependencies are not modeled in v1 — a
-   statement session on a required file does not block dependents. *)
+   statement session on a required file does not block dependents.
+
+   Pinned v2 (doc/ecllm-compat.md "Edit-mode roadmap"): proof claims
+   refine to per-SUBGOAL, bullet-driven under +strict_bullets with
+   proof-tree verification; statement splits into full (exclusive)
+   vs additive (parallel, insert-only, semantic no-shadowing
+   guard). *)
 type mode =
   | Statement
   | Proof of claim list

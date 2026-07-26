@@ -213,6 +213,33 @@ statement-hash cache (skip untouched proofs) + `-nosmt` prefix +
 incremental re-check; parallel agents = worker sessions + per-lemma
 region leases + COMMIT/splice merge + primary re-check.
 
+**Edit-mode roadmap (pinned 2026-07-26 — future work, not
+dispatched)**. v1 shipped statement (exclusive per file) vs proof
+(parallel, per-LEMMA claims). Two refinements:
+
+1. *Proof mode v2 — per-SUBGOAL claims, bullet-driven.* Under
+   `+strict_bullets`, bullets give clean subgoal separation; claims
+   become (lemma, subgoal-path) so multiple agents parallelize
+   INSIDE one proof. Requires (a) the bullets-scoping flag (the
+   deferred Tier-3 ask — EcLlm currently blanket-relaxes bullets
+   for REPL phrases), and (b) server-side proof-tree inspection
+   (the pr_parent DAG / TREE) to map bullet scopes to subgoal
+   handles and GUARANTEE a session's execs stay semantically inside
+   its claimed subtree — not just inside a line region. COMMIT
+   already emits bullet-structured bodies, so per-subgoal merge is
+   a bullet-granular splice. Semantically-named subgoals make the
+   claim addresses churn-robust.
+2. *Statement mode v2 — full vs additive.* `full` keeps today's
+   exclusive semantics (arbitrary edits, unique session).
+   `additive` may only ADD declarations: multiple additive sessions
+   run in parallel, and proof sessions stay live alongside them.
+   Safety = a semantic no-shadowing guard: refuse additions that
+   redefine or shadow any name currently in scope (EC hard-errors
+   on same-scope duplicates; the guard must also catch
+   resolution-shadowing of imported names, e.g. via a locate-style
+   probe) so no live session's references can silently rebind.
+   Merge = insert-only splices, ordered before first use.
+
 ## Appendix C — merge conflict surface
 
 Both touch: `src/ec.ml` (ours +1568: old REPL + JSON emission; his:
