@@ -3328,6 +3328,168 @@ module Search = struct
     ) search_res;
     notify scope `Info "%s" (Buffer.contents buffer)
 
+  (* searchall: like [search] but resilient to operator-overload
+     ambiguity in the search pattern. Strategy (Q3 default = all-mode):
+
+     1. Try [trans_pattern] first. Clean queries (no ambiguity) succeed
+        immediately and match [search] speed exactly.
+     2. On any typing failure (typically the "ambiguous operator"
+        hierror from `_ <= _` when both Int and Real overloads are in
+        scope), fall back: walk the parsetree pattern, collect every
+        operator name referenced via PFident, enumerate ALL overloads
+        of each via EcEnv.Op.all, and for each overload reuse the
+        existing [search]'s OB_nott unfolding (so abbreviations like
+        `abbrev (<=) : real -> real -> bool = le` resolve to the
+        underlying `le` path rather than the abbreviation path —
+        critical because lemma bodies reference the underlying op,
+        not the abbreviation). Build a ByOr of ByPath/ByPattern
+        clauses across all paths + patterns.
+
+     Bare PFident at the top level uses the same all-overload union as
+     [search] does (it's already overload-tolerant for that case). *)
+  let searchall (scope : scope) qs =
+    let env = env scope in
+
+    (* Mirror [search]'s for1 with two extensions over the original
+       behavior:
+
+       (1) Multi-level abbreviation chains. When the OB_nott unfold
+           yields a single [Fop pf], pf may ITSELF be an abbreviation
+           (`abbrev a = b. abbrev b = le.`). Recursively unfold via
+           [EcEnv.Op.by_path_opt pf env] until we hit a non-OB_nott op
+           or a path we've already seen (cycle guard). Without this,
+           lemmas using the deepest underlying op (e.g., [le]) would
+           be missed when searching for the top-level alias [a].
+
+       (2) Parameterized abbrev body head-extraction. When the body
+           is a lambda [f_lambda xs (Fapp(Fop p, args))] (e.g.,
+           `abbrev (<=) (x y) = real_le x y`), peel one application
+           layer to add [p] as a candidate path IN ADDITION to the
+           lambda ByPattern. Catches the abbrev-of-application case
+           that the original `search` for1 misses.
+
+       For non-OB_nott ops, just add the op's own path. *)
+    let rec unfold_overload ?(seen=Sp.empty) (paths, pts) (p, decl) =
+      match decl.op_kind with
+      | OB_nott nt -> begin
+        let ps  = ref Mid.empty in
+        let ue  = EcUnify.UniEnv.create None in
+        let tip = EcUnify.UniEnv.opentvi ue decl.op_tparams None in
+        let tip = f_subst_init ~tv:tip () in
+        let es = e_subst tip in
+        let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
+        let bd  = EcFol.form_of_expr (es nt.ont_body) in
+        let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
+        match fp.f_node with
+        | Fop (pf, _) ->
+          (* (1) recursive unfold: if pf is itself an abbreviation,
+             chase it; cycle-detect via seen set. *)
+          if Sp.mem pf seen then (pf :: paths, pts)
+          else begin
+            match EcEnv.Op.by_path_opt pf env with
+            | Some next_decl ->
+              unfold_overload
+                ~seen:(Sp.add pf seen)
+                (paths, pts) (pf, next_decl)
+            | None ->
+              (pf :: paths, pts)
+          end
+        | _ ->
+          (* (2) parameterized body: peel application head to also
+             extract an underlying path, IF the lambda's body is an
+             application headed by an Fop. Add that path AND keep the
+             lambda as a structural pattern. *)
+          let extra_paths =
+            match bd.f_node with
+            | Fapp ({ f_node = Fop (head, _); _ }, _) -> [head]
+            | Fop (head, _) -> [head]
+            | _ -> []
+          in
+          (extra_paths @ paths, (ps, ue, fp) :: pts)
+      end
+      | _ -> (p :: paths, pts)
+    in
+    (* Wrapper for the outer fold (which doesn't pass ~seen). *)
+    let unfold_overload acc op = unfold_overload acc op in
+
+    (* Walk the parsetree pattern, accumulating (paths, pts) from
+       every PFident's overload set via unfold_overload above. *)
+    let rec collect_clauses fp acc =
+      let acc = match unloc fp with
+        | PFident (q, _) ->
+          (match EcEnv.Op.all ~name:q.pl_desc env with
+           | [] -> acc
+           | ops -> List.fold_left unfold_overload acc ops)
+        | _ -> acc
+      in
+      let children = match unloc fp with
+        | PFcast (f, _) | PFforall (_, f) | PFexists (_, f)
+        | PFlambda (_, f) | PFproj (f, _) | PFproji (f, _)
+        | PFside (f, _) | PFscope (_, f) -> [f]
+        | PFtuple xs | PFeqf xs -> xs
+        | PFapp (h, args) -> h :: args
+        | PFif (c, t, e) -> [c; t; e]
+        | PFmatch (e, brs) -> e :: List.map snd brs
+        | PFlet (_, (e1, _), e2) -> [e1; e2]
+        | _ -> []
+      in
+      List.fold_left (fun a c -> collect_clauses c a) acc children
+    in
+
+    let paths =
+      let do1 fp =
+        match unloc fp with
+        | PFident (q, None) -> begin
+            (* Same handling as [search] for bare qname — already
+               overload-tolerant + OB_nott-unfolding. *)
+            match EcEnv.Op.all ~name:q.pl_desc env with
+            | [] ->
+                hierror ~loc:q.pl_loc "unknown operator: `%s'"
+                  (EcSymbols.string_of_qsymbol q.pl_desc)
+            | ops ->
+                let paths, pts = List.fold_left unfold_overload ([], []) ops in
+                let pts = List.map (fun (ps, ue, fp) ->
+                            `ByPattern ((ps, ue), fp)) pts in
+                `ByOr (`ByPath (Sp.of_list paths) :: pts)
+        end
+
+        | _ ->
+          (* Try strict trans_pattern first; if it succeeds, use it.
+             On any typing failure, fall back to operator-overload
+             enumeration via the parsetree walk. *)
+          try
+            let ps = ref Mid.empty in
+            let ue = EcUnify.UniEnv.create None in
+            let fp' = EcTyping.trans_pattern env ps ue fp in
+            `ByPattern ((ps, ue), fp')
+          with _ ->
+            let paths, pts = collect_clauses fp ([], []) in
+            let paths = List.sort_uniq EcPath.p_compare paths in
+            let pts = List.map (fun (ps, ue, fp) ->
+                        `ByPattern ((ps, ue), fp)) pts in
+            if List.is_empty paths && List.is_empty pts then
+              hierror ~loc:(loc fp)
+                "searchall: no operator references found in pattern"
+            else
+              `ByOr (`ByPath (Sp.of_list paths) :: pts)
+      in List.map do1 qs in
+
+    let relevant =
+      let get_path r = function `ByPath s -> Sp.union r s | _ -> r in
+      List.fold_left get_path Sp.empty paths in
+
+    let search_res = EcSearch.search env paths in
+    let search_res = EcSearch.sort relevant search_res in
+
+    let buffer = Buffer.create 0 in
+    let fmt    = Format.formatter_of_buffer buffer in
+    let ppe    = EcPrinting.PPEnv.ofenv env in
+
+    List.iter (fun (p, ax) ->
+      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ~long:true ppe) (p,ax)
+    ) search_res;
+    notify scope `Info "%s" (Buffer.contents buffer)
+
   let locate (scope : scope) ({ pl_desc = name } : pqsymbol) =
     let ppe = EcPrinting.PPEnv.ofenv (env scope) in
 

@@ -233,6 +233,10 @@ let process_search scope qs =
   EcScope.Search.search scope qs
 
 (* -------------------------------------------------------------------- *)
+let process_searchall scope qs =
+  EcScope.Search.searchall scope qs
+
+(* -------------------------------------------------------------------- *)
 let process_locate scope x =
   EcScope.Search.locate scope x
 
@@ -875,6 +879,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gexpect      x    -> `Fct   (fun scope -> process_expect     scope  x; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
+      | Gsearchall   qs   -> `Fct   (fun scope -> process_searchall  scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    ?src scope  t)
       | Gtcdump      info -> `Fct   (fun scope -> process_dump       scope  info)

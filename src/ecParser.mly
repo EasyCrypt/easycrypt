@@ -559,6 +559,7 @@
 %token RRARROW
 %token RWNORMAL
 %token SEARCH
+%token SEARCHALL
 %token SECTION
 %token SELF
 %token SEMICOLON
@@ -4135,6 +4136,7 @@ global_action:
 | EXPECT s=loc(STRING) BY PRINT p=print
     { Gexpect (s, p) }
 | SEARCH x=search+ { Gsearch      x  }
+| SEARCHALL x=search+ { Gsearchall x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
 

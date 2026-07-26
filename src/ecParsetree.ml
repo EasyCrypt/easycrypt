@@ -1493,6 +1493,7 @@ type global_action =
   | Gprint       of pprint
   | Gexpect      of (string located * pprint)
   | Gsearch      of pformula list
+  | Gsearchall   of pformula list
   | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)
   | GthClose     of (theory_clear * psymbol)

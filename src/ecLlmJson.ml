@@ -431,6 +431,7 @@ let classify_global (g : EcParsetree.global_action) =
     | Gpragma _      -> ("Gpragma",      "directive")
     | Gprint _       -> ("Gprint",       "directive")
     | Gsearch _      -> ("Gsearch",      "directive")
+    | Gsearchall _   -> ("Gsearchall",   "directive")
     | Glocate _      -> ("Glocate",      "directive")
     | GdumpWhy3 _    -> ("GdumpWhy3",    "directive")
     (* `expect "<msg>" by <directive>`: runs the inner directive and
