@@ -1,0 +1,468 @@
+{
+  "name": "easycrypt-tooling-vscode",
+  "displayName": "EasyCrypt (tooling daemon)",
+  "description": "VSCode client for the EasyCrypt tooling daemon (ecd). Stage 4 MVP — language registration, real-time diagnostics via publishDiagnostics, and proof navigation via easycrypt/proof/* methods.",
+  "publisher": "easycrypt-tooling",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": [
+    "onLanguage:easycrypt",
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "easycrypt",
+        "aliases": ["EasyCrypt", "easycrypt"],
+        "extensions": [".ec", ".eca"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "easycrypt",
+        "scopeName": "source.easycrypt",
+        "path": "./syntaxes/easycrypt.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "easycrypt.proof.step",
+        "title": "Step Forward",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.back",
+        "title": "Step Backward",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.execToCursor",
+        "title": "Execute To Cursor",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.revertToCursor",
+        "title": "Revert To Cursor",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.goals",
+        "title": "Show Goals at Cursor",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.cycleSubgoalNext",
+        "title": "Goals — Next Subgoal",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.cycleSubgoalPrev",
+        "title": "Goals — Previous Subgoal",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.restart",
+        "title": "Restart Proof Session",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.execAll",
+        "title": "Execute To End Of Document",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.focusCurrentGoal",
+        "title": "Focus Current Goal (insert cycle <delta>.)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.tryTactic",
+        "title": "Try Tactic (speculative)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.suggestClosers",
+        "title": "Suggest Closers",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.cancel",
+        "title": "Cancel In-Flight Tactic / SMT Call",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.previewLog.show",
+        "title": "Open Tactic-Preview Log (per-builder or all)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.moveBuilder",
+        "title": "Move (intro builder)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.rewriteBuilder",
+        "title": "Rewrite (token builder)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.applyBuilder",
+        "title": "Apply (token builder)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.tacticLauncher",
+        "title": "Tactic Builder Launcher (any tactic)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.applyLemma",
+        "title": "Apply Lemma (search + preview)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.compareCycleNext",
+        "title": "Comparison Preview — Next New Subgoal",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.compareCyclePrev",
+        "title": "Comparison Preview — Previous New Subgoal",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.lemmaPickerRefineArgs",
+        "title": "Lemma Picker — Refine Args (phase 3)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.display.togglePrettify",
+        "title": "Toggle Prettify Display (forall→∀ etc.)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.display.toggleProgramWrap",
+        "title": "Toggle Program Wrap / Scroll",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.print",
+        "title": "Print (qname or term)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.printSymbolUnderCursor",
+        "title": "Print Symbol Under Cursor",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.proof.searchSymbols",
+        "title": "Search Symbols (browse + preview)",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.lsp.restart",
+        "title": "Restart Language Server",
+        "category": "EasyCrypt"
+      },
+      {
+        "command": "easycrypt.dev.rebuildAndReload",
+        "title": "Rebuild Daemon + Extension and Reload Window",
+        "category": "EasyCrypt (dev)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "easycrypt.proof.step",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.back",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.execToCursor",
+        "key": "ctrl+alt+enter",
+        "mac": "cmd+alt+enter",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.execAll",
+        "key": "ctrl+alt+shift+enter",
+        "mac": "cmd+alt+shift+enter",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.focusCurrentGoal",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.revertToCursor",
+        "key": "ctrl+alt+backspace",
+        "mac": "cmd+alt+backspace",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.goals",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.tryTactic",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.suggestClosers",
+        "key": "ctrl+alt+s",
+        "mac": "cmd+alt+s",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.cancel",
+        "key": "ctrl+alt+.",
+        "mac": "cmd+alt+.",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.cycleSubgoalNext",
+        "key": "ctrl+alt+]",
+        "mac": "cmd+alt+]",
+        "when": "editorLangId == easycrypt && !easycrypt.lemmaPickerOpen"
+      },
+      {
+        "command": "easycrypt.proof.cycleSubgoalPrev",
+        "key": "ctrl+alt+[",
+        "mac": "cmd+alt+[",
+        "when": "editorLangId == easycrypt && !easycrypt.lemmaPickerOpen"
+      },
+      {
+        "command": "easycrypt.proof.compareCycleNext",
+        "key": "ctrl+alt+]",
+        "mac": "cmd+alt+]",
+        "when": "easycrypt.lemmaPickerOpen"
+      },
+      {
+        "command": "easycrypt.proof.compareCyclePrev",
+        "key": "ctrl+alt+[",
+        "mac": "cmd+alt+[",
+        "when": "easycrypt.lemmaPickerOpen"
+      },
+      {
+        "command": "easycrypt.proof.lemmaPickerRefineArgs",
+        "key": "shift+enter",
+        "mac": "shift+enter",
+        "when": "easycrypt.lemmaPickerOpen"
+      },
+      {
+        "command": "easycrypt.proof.moveBuilder",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.rewriteBuilder",
+        "key": "ctrl+alt+w",
+        "mac": "cmd+alt+w",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.applyBuilder",
+        "key": "ctrl+alt+a",
+        "mac": "cmd+alt+a",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.tacticLauncher",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.display.toggleProgramWrap",
+        "key": "ctrl+alt+z",
+        "mac": "cmd+alt+z",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.applyLemma",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.print",
+        "key": "ctrl+alt+;",
+        "mac": "cmd+alt+;",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.printSymbolUnderCursor",
+        "key": "ctrl+alt+shift+;",
+        "mac": "cmd+alt+shift+;",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.searchSymbols",
+        "key": "ctrl+alt+/",
+        "mac": "cmd+alt+/",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.dev.rebuildAndReload",
+        "key": "ctrl+alt+shift+b",
+        "mac": "cmd+alt+shift+b"
+      },
+      {
+        "command": "easycrypt.proof.step",
+        "key": "ctrl+c ctrl+n",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.back",
+        "key": "ctrl+c ctrl+u",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.execToCursor",
+        "key": "ctrl+c ctrl+enter",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.revertToCursor",
+        "key": "ctrl+c ctrl+backspace",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.goals",
+        "key": "ctrl+c ctrl+l",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.restart",
+        "key": "ctrl+c ctrl+r",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.cancel",
+        "key": "ctrl+c ctrl+c",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.execAll",
+        "key": "ctrl+c ctrl+b",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      },
+      {
+        "command": "easycrypt.proof.focusCurrentGoal",
+        "key": "ctrl+c ctrl+f",
+        "when": "editorLangId == easycrypt && easycrypt.kbdPreset == 'pg'"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "easycrypt.proof.printSymbolUnderCursor",
+          "when": "editorLangId == easycrypt",
+          "group": "easycrypt@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "EasyCrypt (tooling daemon)",
+      "properties": {
+        "easycrypt-tooling.daemon.path": {
+          "type": "string",
+          "default": "ecd",
+          "description": "Path to the ecd binary. Default: 'ecd' (looked up on PATH)."
+        },
+        "easycrypt-tooling.daemon.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["daemon", "--stdio"],
+          "description": "Arguments passed to the ecd binary. Default starts daemon in stdio mode."
+        },
+        "easycrypt-tooling.ec.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the EasyCrypt binary used for ANALYZE-JSON / proof sessions (e.g. 'easycrypt', 'ec.native', or an absolute path). Empty means use the daemon's default lookup ($EC_LLM_BIN, then in-tree _build, then 'easycrypt' on PATH). When set, the extension passes '--bin <path>' to ecd daemon."
+        },
+        "easycrypt-tooling.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace LSP communication to the Output panel."
+        },
+        "easycrypt-tooling.display.prettify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Display unicode equivalents for ASCII operators in goal/print panels (forall→∀, =>→⇒, <=→≤, etc.). Source files unchanged."
+        },
+        "easycrypt-tooling.display.prettify.replacements": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": { "type": "string" },
+          "description": "User-defined prettify replacements (PoC). Each entry maps a single tokenizer token to its display text. Merged with built-ins; user wins on collision. Token must match exactly as the TM grammar emits it (e.g., '=>' is one token; 'foo bar' is two — use 'foo' and 'bar' separately). Per-file pragma version pinned for v1+."
+        },
+        "easycrypt-tooling.display.programWrap": {
+          "type": "string",
+          "enum": ["wrap", "scroll"],
+          "default": "wrap",
+          "description": "How to lay out long program lines in the goal pane. 'wrap' = wrap onto multiple visual lines (tighter inter-wrap spacing). 'scroll' = keep one line per source line, horizontal scroll on overflow."
+        },
+        "easycrypt-tooling.display.equivAlignment": {
+          "type": "string",
+          "enum": ["aligned", "independent"],
+          "default": "aligned",
+          "description": "How to number rows in the equiv goal display (UPSTREAM #24). 'aligned' = single shared row index across both programs (paired row-by-row visually; padding empty cells on the shorter side). 'independent' = each side has its own hierarchical position numbering (left and right may diverge structurally)."
+        },
+        "easycrypt-tooling.preview.timeoutMs": {
+          "type": "number",
+          "default": 3000,
+          "minimum": 100,
+          "description": "Auto-cancel speculative preview tryTactic / closer-sweep / lemma-picker requests that haven't returned within this many milliseconds. Sends easycrypt/proof/cancel to interrupt the in-flight tactic (typically a slow SMT call) so the editor stays responsive. The user can also cancel explicitly via 'EasyCrypt: Cancel In-Flight Tactic / SMT Call' (Cmd/Ctrl+Alt+.)."
+        },
+        "easycrypt-tooling.keybindings.preset": {
+          "type": "string",
+          "enum": ["default", "pg"],
+          "default": "default",
+          "description": "Keybinding preset. 'default' uses the modern Cmd/Ctrl+Alt+<key> bindings; 'pg' overlays Proof-General-style chords (Ctrl+C Ctrl+N for step, Ctrl+C Ctrl+U for back, etc.) for users migrating from Emacs Proof General. The default bindings stay active in either preset; 'pg' simply ADDS the chord aliases. Reload the window after changing this setting (or use the EasyCrypt: Restart Language Server command) — the context key updates live, but pre-existing keybindings.json overrides may need a window reload to re-resolve."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "package": "vsce package --out easycrypt-tooling.vsix",
+    "package:slim": "vsce package --out easycrypt-tooling-slim.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-textmate": "^9.0.0",
+    "vscode-oniguruma": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.32.0",
+    "typescript": "^5.3.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EasyCrypt/easycrypt"
+  }
+}

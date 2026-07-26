@@ -1,0 +1,16 @@
+.vscode/**
+.vscode-test/**
+src/**
+**/*.ts
+**/*.map
+**/tsconfig.json
+# QUICK-BUNDLE: ship all of node_modules wholesale. Pre-package
+# step `npm prune --production` strips devDeps so only runtime
+# deps land in the .vsix. Proper bundling (esbuild) replaces this.
+**/.eslintrc.json
+**/.gitignore
+package-lock.json
+README.md.bak
+out/codepos.test.*
+# QUICK-BUNDLE: scripts/ is build infrastructure, not runtime
+scripts/**
