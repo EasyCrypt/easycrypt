@@ -609,6 +609,15 @@ let () =
       ];
     ]))
   in
+  (* The per-project fixture directories must exist — the daemon
+     spawns each project's EC subprocess with its cwd set there, and
+     a missing cwd fails the spawn (surfaced as fixture rot when /tmp
+     gets cleaned between runs). *)
+  List.iter
+    (fun d ->
+       try Unix.mkdir d 0o755
+       with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+    [ "/tmp/sm-smoke-projA"; "/tmp/sm-smoke-projB" ];
   let uri_a = "file:///tmp/sm-smoke-projA/proof.ec" in
   let uri_b = "file:///tmp/sm-smoke-projB/proof.ec" in
   let body =
