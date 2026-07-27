@@ -436,12 +436,38 @@ let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
        ]
      | _ -> j)
 
-let first_token s =
-  let s = String.trim s in
-  let n = String.length s in
-  let rec go i = if i < n && s.[i] <> ' ' && s.[i] <> '\n' then go (i+1) else i in
-  let k = go 0 in
-  String.sub s 0 k
+(* The first EXECUTABLE keyword of a sentence: past leading
+   whitespace, (nesting-aware) comments, and bullet/focus prefixes
+   (`+` `-` `*`, repeated or stacked), in any interleaving, then the
+   leading identifier run ("" when the sentence has none). Field
+   report B6 was the THIRD defeat of a start-anchored matcher by a
+   legal sentence prefix (B1/F6: comments, B6: bullets — under
+   strict_bullets every frontier `admit.` is bulleted), so this is
+   now the ONLY sentence tokenizer: every keyword matcher goes
+   through it, and the raw first-token helper is gone. *)
+let exec_keyword (src : string) =
+  let n = String.length src in
+  let rec skip i =
+    if i >= n then i
+    else
+      match src.[i] with
+      | ' ' | '\t' | '\n' | '\r' -> skip (i + 1)
+      | '(' when i + 1 < n && src.[i + 1] = '*' ->
+        let rec close j depth =
+          if j + 1 >= n then n
+          else if src.[j] = '(' && src.[j + 1] = '*' then
+            close (j + 2) (depth + 1)
+          else if src.[j] = '*' && src.[j + 1] = ')' then
+            (if depth = 1 then j + 2 else close (j + 2) (depth - 1))
+          else close (j + 1) depth
+        in
+        skip (close i 0)
+      | '+' | '-' | '*' -> skip (i + 1)
+      | _ -> i
+  in
+  let b = skip 0 in
+  let rec go i = if i < n && is_ident_char src.[i] then go (i + 1) else i in
+  String.sub src b (go b - b)
 
 (* Sentence identity up to leading comments and surrounding
    whitespace (nesting-aware — EC comments nest): the parser attaches
@@ -484,17 +510,14 @@ let core_equal (a : Ec_llm_session.parsed_sentence)
     (b : Ec_llm_session.parsed_sentence) =
   a.src = b.src || sentence_core a.src = sentence_core b.src
 
-(* first_token keeps the sentence dot ("proof."), so both spellings
-   must be accepted wherever the proof marker is recognized. *)
-let is_proof_marker tok = tok = "proof" || tok = "proof."
-
 (* Admits are HOLES wherever they execute: the goal an `admit.` is
    about to discharge is captured BEFORE the sentence runs, so every
    executing tool reports swept-under-the-rug debt uniformly in an
-   "admitted" array. *)
+   "admitted" array. Bullet and comment prefixes are transparent
+   (B6): `+ admit.` is exactly the shape real work-in-progress debt
+   takes under strict_bullets. *)
 let is_admit_sentence (s : Ec_llm_session.parsed_sentence) =
-  let t = first_token s.src in
-  t = "admit" || t = "admit."
+  exec_keyword s.src = "admit"
 
 let capture_admit session detail =
   match goals_info session with
@@ -1362,11 +1385,11 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                   let m = !d + 1 in
                   let m =
                     if m < n_all
-                       && is_proof_marker
-                            (first_token
-                               (parsed_all.(m)
-                                : Ec_llm_session.parsed_sentence)
-                                 .src)
+                       && exec_keyword
+                            (parsed_all.(m)
+                             : Ec_llm_session.parsed_sentence)
+                              .src
+                          = "proof"
                     then m + 1
                     else m
                   in
@@ -1877,7 +1900,7 @@ let outline_engine (e : entry) lemma =
                          ] :: !admits
                      | None -> ());
                     count := n;
-                    let tok = first_token s.src in
+                    let kw = exec_keyword s.src in
                     sentences :=
                       `Assoc [
                         "path", `String path_before;
@@ -1886,11 +1909,13 @@ let outline_engine (e : entry) lemma =
                         "goals_after", `Int n;
                         "closer",
                         `Bool (children = 0 || s.kind = "Gsave");
-                        "smt", `Bool (tok = "smt" || tok = "smt.");
-                        "admit", `Bool (tok = "admit" || tok = "admit.");
+                        (* keyword-based: also catches smt(args)
+                           and bulleted forms *)
+                        "smt", `Bool (kw = "smt");
+                        "admit", `Bool (kw = "admit");
                         "fragile",
                         `Bool
-                          (tok = "progress" || tok = "progress."
+                          (kw = "progress"
                            || (String.length s.src > 0
                                && String.contains s.src '!'));
                       ] :: !sentences))
@@ -2067,8 +2092,7 @@ let tool_check_skeleton t args =
                   | None -> ()
                   | Some cls ->
                     let path = Frame_stack.path st in
-                    let tok = first_token s.src in
-                    let is_hole = tok = "admit" || tok = "admit." in
+                    let is_hole = exec_keyword s.src = "admit" in
                     (if is_hole then
                        match goals_info e.session with
                        | (_, sub :: _) ->
@@ -2225,11 +2249,13 @@ let tool_exec_in t args =
                   perr)
            | Ok (ss, None) ->
              (* Lexical gate: no proof closers (skeleton owner's
-                business) and no focus-moving tactics. *)
+                business) and no focus-moving tactics — keyword-
+                based, so a bulleted `+ cycle.` cannot slip the
+                claim (B6 audit). *)
              let bad =
                List.find_opt
                  (fun (s : Ec_llm_session.parsed_sentence) ->
-                    s.kind = "Gsave" || first_token s.src = "cycle")
+                    s.kind = "Gsave" || exec_keyword s.src = "cycle")
                  ss
              in
              (match bad with
@@ -2238,7 +2264,7 @@ let tool_exec_in t args =
                   (Printf.sprintf
                      "exec_in: '%s' is not allowed inside a claimed \
                       subtree (closers and cycle escape the claim)"
-                     (first_token s.src))
+                     (src_preview s.src))
               | None ->
                 let detail =
                   goal_detail_of args ~default:`Shape
@@ -2472,9 +2498,9 @@ let lemma_start_target (e : entry) lemma =
       let m = !d + 1 in
       let m =
         if m < Array.length e.parsed
-           && is_proof_marker
-                (first_token
-                   (e.parsed.(m) : Ec_llm_session.parsed_sentence).src)
+           && exec_keyword
+                (e.parsed.(m) : Ec_llm_session.parsed_sentence).src
+              = "proof"
         then m + 1
         else m
       in
@@ -2488,14 +2514,14 @@ let lemma_start_target (e : entry) lemma =
 let wrap_proof_body (body : string) =
   let body = String.trim body in
   let s =
-    if is_proof_marker (first_token body) then body
+    if exec_keyword body = "proof" then body
     else "proof.\n" ^ body
   in
   let has_save =
     List.exists
       (fun l ->
-         let t = first_token l in
-         t = "qed." || t = "qed" || t = "save." || t = "save")
+         let kw = exec_keyword l in
+         kw = "qed" || kw = "save")
       (String.split_on_char '\n' s)
   in
   if has_save then s else s ^ "\nqed."

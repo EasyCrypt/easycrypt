@@ -865,6 +865,23 @@ let () =
          with Not_found -> false))
     (Yojson.Safe.to_string ei0);
 
+  (* `cycle` is not a tactic, so a bulleted `+ cycle.` is an EC
+     parse error — refused upstream of the gate, nothing runs. The
+     keyword gate remains as defense-in-depth. *)
+  let (err, eib) =
+    call fd_in fd_out "exec_in"
+      (`Assoc [ "text", `String "+ cycle."; "session", `String "w2" ])
+  in
+  check "B6-audit: bulleted cycle cannot advance a claimed session"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp "not allowed\\|nothing ran")
+                     (Yojson.Safe.to_string eib) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string eib);
+
   let (err, ei1) =
     call fd_in fd_out "exec_in"
       (`Assoc [ "text", `String "trivial."; "session", `String "w2" ])
@@ -1443,6 +1460,119 @@ let () =
       (`Assoc [ "session", `String "wce" ])
   in
   check "close wce" (not err) "";
+
+  (* -- round 5 (B6): bulleted admits are debt too ------------------ *)
+  let adm2 = Filename.concat fixture_dir "adm2.ec" in
+  let oc = open_out adm2 in
+  output_string oc
+    "require import AllCore.\n\
+     lemma sole : 1 = 1.\n\
+     proof.\n\
+     admit.\n\
+     qed.\n\
+     lemma seq_unbulleted : 1 = 1.\n\
+     proof.\n\
+     have h : 2 = 2 by trivial.\n\
+     admit.\n\
+     qed.\n\
+     lemma bulleted : 1 = 1 /\\ 2 = 2.\n\
+     proof.\n\
+     split.\n\
+     + admit.\n\
+     + admit.\n\
+     qed.\n";
+  close_out oc;
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String adm2; "session", `String "we";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "adm2 fixture open (B6 repro)" (not err) "";
+  let (err, ag2) =
+    call fd_in fd_out "admitted_goals"
+      (`Assoc [ "session", `String "we" ])
+  in
+  let ag2_s = Yojson.Safe.to_string ag2 in
+  check "B6: admitted_goals counts bulleted admits (4/4, 3 lemmas)"
+    ((not err)
+     && member "admit_count" ag2 = `Int 4
+     && (match member "lemmas_scanned" ag2 with
+         | `List l -> List.length l = 3
+         | _ -> false)
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "\"bulleted\"") ag2_s 0);
+           ignore (Str.search_forward
+                     (Str.regexp_string "2 = 2") ag2_s 0);
+           true
+         with Not_found -> false))
+    ag2_s;
+  let (err, ol2) =
+    call fd_in fd_out "proof_outline"
+      (`Assoc [ "lemma", `String "bulleted"; "session", `String "we" ])
+  in
+  let ol2_admit_paths =
+    try
+      match member "admitted" ol2 with
+      | `List l ->
+        List.filter_map
+          (fun a ->
+             match member "path" a with `String p -> Some p | _ -> None)
+          l
+      | _ -> []
+    with _ -> []
+  in
+  check "B6: outline attributes bulleted admits to branch paths"
+    ((not err) && ol2_admit_paths = [ "1"; "2" ])
+    (Yojson.Safe.to_string ol2);
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "we"; "at_lemma", `String "bulleted" ])
+  in
+  check "we at bulleted" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "split."; "session", `String "we" ])
+  in
+  check "we split" (not err) "";
+  let (err, ba) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "+ admit."; "session", `String "we" ])
+  in
+  check "B6: live admitted capture sees a bulleted admit"
+    ((not err)
+     && (match member "admitted" ba with
+         | `List [ a ] ->
+           (match member "goal" a with
+            | `Assoc _ | `String _ -> true
+            | _ -> false)
+         | _ -> false))
+    (Yojson.Safe.to_string ba);
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "we"; "at_lemma", `String "bulleted" ])
+  in
+  check "we back at bulleted" (not err) "";
+  let (err, sk2) =
+    call fd_in fd_out "check_skeleton"
+      (`Assoc [
+         "script", `String "split.\n+ admit.\n+ admit.\nqed.";
+         "session", `String "we";
+       ])
+  in
+  check "B6: check_skeleton reports bulleted holes"
+    ((not err)
+     && member "closes_with_holes" sk2 = `Bool true
+     && (match member "holes" sk2 with
+         | `List l -> List.length l = 2
+         | _ -> false))
+    (Yojson.Safe.to_string sk2);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "we" ])
+  in
+  check "close we" (not err) "";
 
   let (err, ex) =
     call fd_in fd_out "extract_lemma"

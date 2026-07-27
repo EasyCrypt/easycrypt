@@ -14,8 +14,11 @@
 > environment-equivalence certificate with tail skip,
 > position-preserving formatting-only resyncs, the widened
 > fast-forward gate, src previews, auto-tree on goal growth,
-> `smt_timeout`, and session-lexical `define` bindings;
-> `run_mcp_smoke` 115/115).
+> `smt_timeout`, and session-lexical `define` bindings; round 5
+> (B6): the single `exec_keyword` tokenizer — bullet/comment-blind
+> keyword matching everywhere (bulleted admits are debt; smt(args)
+> flagged; first_token deleted);
+> `run_mcp_smoke` 125/125).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

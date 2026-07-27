@@ -197,7 +197,9 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   every admit-bearing declaration (or one lemma) by replay,
   returning goal + hash per admit. Every executing tool also
   reports a live `admitted` array — swept-under-the-rug debt is
-  always visible. Repositions the session.
+  always visible. Bullet and comment prefixes are transparent:
+  `+ admit.` counts (under strict_bullets that is the shape every
+  frontier admit takes). Repositions the session.
 - `extract_lemma {name?}` — candidate standalone lemma from the
   focused goal (vars → binders, hyps → premises). UNVERIFIED and
   prop-conclusions-only: refine it, `check_script` it, then place
@@ -335,7 +337,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 115/115).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 125/125).
 
 ## Known limits (v1, honest)
 
