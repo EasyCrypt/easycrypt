@@ -54,7 +54,7 @@ not attempt to rebuild anything.
 [/Users/gdel/Repos/ec-llm-next/doc/mcp-agent-guide.md](doc/mcp-agent-guide.md)
 before driving the tools.** It is the contract: the mental model
 (sessions, document-as-truth, uuid, `stale`, edit-mode locks), all
-23 tools grouped by workflow, the standard playbooks (single
+24 tools grouped by workflow, the standard playbooks (single
 lemma, parallel dispatch, big-file refactoring), and the v1
 limits.
 
@@ -71,7 +71,9 @@ The 30-second digest you must not violate:
 - Iterate with the state-neutral tools (`try_tactic`,
   `check_script`, `check_skeleton`); write once, verified.
 - No cancellation yet: keep exploration cheap (`nosmt` prefixes,
-  small candidates).
+  small candidates, `smt_timeout: 1` while probing).
+- Repeating a long formula across calls? `define {name, text}`
+  once, then `$name` everywhere — replies echo `src_expanded`.
 
 ## 5. Two-minute validation proof
 

@@ -1,7 +1,7 @@
 # EasyCrypt MCP — agent guide
 
 Operating manual for LLM agents driving EasyCrypt proof sessions
-through the `ecd mcp` server (23 tools). Written for the agent;
+through the `ecd mcp` server (24 tools). Written for the agent;
 the [Setup](#setup-human-operator) section is for the human
 operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 [doc/ecllm-compat.md](ecllm-compat.md).
@@ -36,8 +36,10 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
    newline-separated for multi-sentence input.
 7. **No cancellation yet.** A slow `smt()` blocks the session until
    it finishes. Keep iteration cheap: `nosmt` prefixes, small
-   candidate scripts, and consider `pragma silent` prover-timeout
-   discipline in exploration.
+   candidate scripts, and `smt_timeout` on the loop tools — fail
+   fast at 1 s while exploring, let a believed-good candidate run
+   long. "Too big or merely too slow" is a fork you can now
+   actually measure.
 
 ## Tools by workflow
 
@@ -68,7 +70,10 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   earlier sentences REMAIN EXECUTED; revert or resync to unwind).
   Input with a parse error anywhere is refused ATOMICALLY. The
   wire itself rejects multi-phrase blocks, so nothing can be
-  silently dropped at any layer.
+  silently dropped at any layer. When the call GROWS the open-goal
+  count, the reply carries the compact `tree` — the subgoal ORDER
+  a `call (_: I)` or `split` produced, with no extra round trip;
+  read it before probing the "first" goal.
 - `revert {uuid}` — go back to an earlier uuid.
 - `list_sessions` / `close_session {session}` — inventory (with
   modes + claims) and teardown. Close sessions you are done with:
@@ -91,14 +96,31 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 
 ### The exploration loop (state-neutral)
 
-- `try_tactic {tactic}` — run one tactic, capture resulting goals,
-  auto-revert. Your cheapest probe.
+- `try_tactic {tactic}` — run one tactic, capture resulting goals
+  (`shape` by default), auto-revert. Your cheapest probe. A goal
+  split attaches the compact `tree` (captured before the revert).
 - `check_script {script}` — run a multi-sentence candidate (a
   whole proof body) from the current state: per-sentence verdicts
   + `time_ms`, a `closes` verdict, then full state restore. The
   refactoring inner loop: iterate candidates here; only write when
   one passes. On failure, `goals_at_failure` is the state entering
   the failed sentence — no blind re-runs to see the residual goal.
+  Per-sentence rows echo a one-line src PREVIEW (you already have
+  the text you sent); the failing sentence keeps its full source.
+- `smt_timeout: N` (on `try_tactic` / `check_script` /
+  `check_skeleton`) — transactional prover timeout in seconds for
+  that call only, restored with the state. Explore at 1, confirm
+  at 30; to set it persistently, `exec {text: "timeout N."}`.
+- `define {name, text}` — bind a name on the session and write
+  `$name` in any EC-bound input (`exec`, `exec_in`, `query`,
+  `try_tactic`, `check_script`, `check_skeleton`,
+  `replace_proof`). A six-line invariant is sent ONCE, referenced
+  everywhere — the single largest payload saving in a
+  `conseq`/`call`/`while` proof. Purely lexical and honest:
+  expansion is single-pass (no nesting), unknown `$names` are hard
+  errors, `<$` sampling never starts a reference, replies echo
+  `src_expanded` whenever expansion fired, and files only ever
+  receive expanded EC. `{name}` alone deletes; no name lists.
 
 ### Writing back (the only file-writing path)
 
@@ -110,27 +132,47 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   be closed — the zero-seam ending after stepping with `exec`.
 - `replace_proof {lemma, script, nosmt?}` — verified in-place body
   replacement: splices over the claimed lemma's body lines,
-  re-syncs (weak prefix + fully-checked tail), and RESTORES the
-  original file automatically if verification fails. Stale-gated
-  and claim-gated. `ok: false` with `file_restored: true` means
+  re-syncs (weak prefix + fully-checked spliced body), and
+  RESTORES the original file automatically if verification fails.
+  The unchanged tail BELOW the lemma is certificate-skipped, not
+  re-executed (see resync below) — on a 2000-line file the write
+  costs the edited lemma, not the file. Stale-gated and
+  claim-gated. `ok: false` with `file_restored: true` means
   "candidate rejected, nothing changed on disk".
 - `resync_file {nosmt?, upto_line?}` — after ANY on-disk edit
   (yours via editor tools, or another agent's): diffs against the
   loaded snapshot, weak-checks the unchanged prefix, fully checks
-  the changed tail. The `classification` field tells you the blast
-  radius: `proof-body-only` provably cannot affect other lemmas;
-  `additive` = pure appends; `statement-changing` invalidates
-  downstream (and warns in proof mode — that edit belonged in a
-  statement session). Note: session state becomes exactly the
+  the changed tail. The diff is COMMENT-BLIND: sentence identity
+  ignores leading comments/whitespace, so banner edits never look
+  like code changes. The `classification` field tells you the
+  blast radius:
+    - `formatting-only` — comments/whitespace only: the snapshot
+      swaps, NOTHING re-executes, and your position, state and
+      subgoal claims are preserved (zero cost).
+    - `proof-body-only` — every changed sentence is a proof tactic
+      on both sides (statements and qed/abort outcomes untouched),
+      which is an environment-equivalence certificate: the edit
+      provably cannot affect other lemmas, so the unchanged tail
+      below is SKIPPED (`tail_skipped`) and the session lands at
+      the edited lemma's end. Resync again (or hop forward) to
+      load the rest when you need it.
+    - `additive` — pure appends (including completing a
+      previously-open proof: that ADDS the lemma to the env).
+    - `statement-changing` — invalidates downstream, everything
+      after the change re-checks (warned in proof mode — that
+      edit belonged in a statement session). A `qed.` → `abort.`
+      flip lands here deliberately: it removes the lemma.
+  Note: any executing resync makes session state exactly the
   file's state; un-committed interactive work is dropped.
   `upto_sentence: N` executes exactly the first N sentences —
   positioning at ANY sentence boundary, including mid packed line.
   `at_lemma: "<name>"` positions just inside that lemma's proof —
   sentence-granular, so it works on packed `proof. tac. qed.`
   lines where `upto_line` cannot; prefer it over manual line math.
-  When the file is unchanged and the target is ahead, the reply
-  carries `fast_forward: true` and nothing reloads — forward hops
-  are near-free.
+  `fast_forward: true` means nothing reloaded — it now fires
+  whenever your executed prefix is still valid against the new
+  text, including after an edit BELOW your position, not just on
+  unchanged files.
 
 ### Strategy layer (refactoring at proof-structure level)
 
@@ -251,9 +293,15 @@ session ≡ file. If the session itself is wedged (rare), re-run
   treats it as a hole). Never leave one in text you hand back
   without saying so.
 - Long `smt()` calls block the session (no cancel yet). In
-  exploration, keep candidates small; rely on `nosmt` prefixes;
-  full-strength checking happens at replace/resync tail time and
-  in the final batch check.
+  exploration, keep candidates small; rely on `nosmt` prefixes and
+  `smt_timeout` (1 s to probe, 30 s to confirm); full-strength
+  checking happens at replace/resync time and in the final batch
+  check.
+- Sending the same invariant twice is a smell — `define` it. The
+  reply's `src_expanded` is your audit trail of what actually ran.
+- When a splitting step lands, its reply already carries the
+  compact `tree` — read the subgoal order there instead of
+  guessing or spending a separate call.
 - Tool errors (`isError`) are protocol/coordination refusals —
   read the message; it names the conflicting session or the
   missing step. EasyCrypt-level failures inside otherwise-OK
@@ -287,7 +335,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 58/58).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 115/115).
 
 ## Known limits (v1, honest)
 

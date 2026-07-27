@@ -3,13 +3,19 @@
 > **2026-07-26 — this branch is `llm-interactive-next`**: Pierre-Yves' EcLlm
 > base rebased onto current `main`, plus the transplanted daemon /
 > vscode stack, the machine-profile port (`src/ecLlmJson.ml` +
-> additive `ecLlm.ml` wiring, proto 2), and **MCP v1** (`ecd mcp`,
-> 23 tools over named parallel sessions with edit-mode locks, the
+> additive `ecLlm.ml` wiring, proto 3), and **MCP v1.5** (`ecd mcp`,
+> 24 tools over named parallel sessions with edit-mode locks, the
 > refactoring loop (check_script / resync_file / replace_proof +
 > stale + timings), the strategy layer (proof_outline /
-> proof_profile / check_skeleton / extract_lemma), and semantic
-> per-subgoal claims (claim_subgoal / exec_in);
-> `run_mcp_smoke` 91/91).
+> proof_profile / check_skeleton / extract_lemma), semantic
+> per-subgoal claims (claim_subgoal / exec_in), admit visibility
+> (admitted arrays + admitted_goals), and — round 4, 2026-07-27 —
+> comment-blind diff identity, the proof-body-only
+> environment-equivalence certificate with tail skip,
+> position-preserving formatting-only resyncs, the widened
+> fast-forward gate, src previews, auto-tree on goal growth,
+> `smt_timeout`, and session-lexical `define` bindings;
+> `run_mcp_smoke` 115/115).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

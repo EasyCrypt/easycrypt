@@ -222,7 +222,8 @@ let () =
     (fun expected ->
        check (Printf.sprintf "tools/list: has %s" expected)
          (List.mem expected tool_names) "")
-    [ "open_file"; "exec"; "goals"; "try_tactic"; "commit_proof" ];
+    [ "open_file"; "exec"; "goals"; "try_tactic"; "commit_proof";
+      "define" ];
 
   (* -- open (proof mode, claiming t2) + speculate + advance ------- *)
   let (err, opened) =
@@ -534,12 +535,15 @@ let () =
     call fd_in fd_out "resync_file"
       (`Assoc [ "session", `String "w2" ])
   in
-  check "resync_file: proof-body-only tail re-executed"
+  check "resync_file: appended completion classifies additive"
     ((not err)
      && member "changed" rs = `Bool true
-     && member "classification" rs = `String "proof-body-only"
+     (* round 4: completing a previously-open proof ADDS the lemma
+        to the environment — that is additive, not body-only. *)
+     && member "classification" rs = `String "additive"
      && (match member "tail_executed" rs with
          | `Int 3 -> true | _ -> false)
+     && member "tail_skipped" rs = `Int 0
      && member "ok" rs = `Bool true)
     (Yojson.Safe.to_string rs);
 
@@ -555,6 +559,12 @@ let () =
     ((not err) && member "ok" rp1 = `Bool true
      && member "file_written" rp1 = `Bool true)
     (Yojson.Safe.to_string rp1);
+  let rp1v = member "verification" rp1 in
+  check "replace_proof: certificate skips the unchanged tail (P5)"
+    (member "classification" rp1v = `String "proof-body-only"
+     && member "tail_skipped" rp1v = `Int 6
+     && (match member "note" rp1v with `String _ -> true | _ -> false))
+    (Yojson.Safe.to_string rp1v);
   let read_fixture () =
     let ic = open_in fixture in
     let n = in_channel_length ic in
@@ -690,6 +700,8 @@ let () =
      && member "executed" em = `Int 2
      && em_goals = `Int 1)
     (Yojson.Safe.to_string em);
+  check "P3: no net goal growth -> no auto-tree"
+    (member "tree" em = `Null) (Yojson.Safe.to_string em);
   let (err, _) =
     call fd_in fd_out "revert"
       (`Assoc [ "uuid", `Int 7; "session", `String "w2" ])
@@ -757,11 +769,76 @@ let () =
      && member "subgoals" gc_body = `Null)
     (Yojson.Safe.to_string gc);
 
-  let (err, _) =
+  (* -- round 4: auto-tree on growth + smt_timeout ----------------- *)
+  let (err, tt2) =
+    call fd_in fd_out "try_tactic"
+      (`Assoc [ "tactic", `String "split."; "session", `String "w2" ])
+  in
+  let tt2_tree =
+    match member "tree" tt2 with `String s -> s | _ -> ""
+  in
+  check "P3: try_tactic split attaches compact tree (pre-revert)"
+    ((not err)
+     && member "outcome" tt2 = `String "ok"
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "2 = 2")
+                     tt2_tree 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string tt2);
+  let (_, g_tt2) =
+    call fd_in fd_out "goals" (`Assoc [ "session", `String "w2" ])
+  in
+  check "P3: try_tactic still state-neutral with tree capture"
+    (member "uuid" g_tt2 = `Int 7)
+    (Yojson.Safe.to_string (member "uuid" g_tt2));
+
+  let (err, st0) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script", `String "split.\ntrivial.\ntrivial.";
+         "smt_timeout", `Int 5;
+         "session", `String "w2";
+       ])
+  in
+  check "P4: smt_timeout applied transactionally and echoed"
+    ((not err)
+     && member "ok" st0 = `Bool true
+     && member "smt_timeout" st0 = `Int 5
+     && member "restore" st0 = `String "restored"
+     && member "uuid" st0 = `Int 7)
+    (Yojson.Safe.to_string st0);
+  let (err, st1) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script", `String "trivial.";
+         "smt_timeout", `Int 0;
+         "session", `String "w2";
+       ])
+  in
+  check "P4: smt_timeout 0 refused"
+    (err
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "positive")
+                     (Yojson.Safe.to_string st1) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string st1);
+
+  let (err, exsp) =
     call fd_in fd_out "exec"
       (`Assoc [ "text", `String "split."; "session", `String "w2" ])
   in
   check "exec split (2 goals for claims)" (not err) "";
+  check "P3: exec goal growth attaches compact tree"
+    (match member "tree" exsp with
+     | `String s ->
+       (try
+          ignore (Str.search_forward (Str.regexp_string "[") s 0);
+          true
+        with Not_found -> false)
+     | _ -> false)
+    (Yojson.Safe.to_string exsp);
 
   let (err, cl) =
     call fd_in fd_out "claim_subgoal"
@@ -1159,6 +1236,213 @@ let () =
     call fd_in fd_out "close_session" (`Assoc [ "session", `String "wd" ])
   in
   check "close wd" (not err) "";
+
+  (* -- round 4: certificate / comment-blind identity / define ----- *)
+  let certf = Filename.concat fixture_dir "cert.ec" in
+  let write_cert ~banner ~c1_line4 ~c2_body =
+    let oc = open_out certf in
+    output_string oc
+      ("require import AllCore.\n" ^ banner
+       ^ "lemma c1 : 1 = 1.\n" ^ c1_line4
+       ^ "lemma c2 : 2 = 2.\nproof.\n" ^ c2_body ^ "qed.\n");
+    close_out oc
+  in
+  write_cert ~banner:"(* banner one *)\n"
+    ~c1_line4:"proof. trivial. qed.\n" ~c2_body:"trivial.\n";
+  let (err, co) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String certf; "session", `String "wce";
+         "mode", `String "proof";
+         "lemmas", `List [ `String "c2" ];
+         "nosmt", `Bool true;
+       ])
+  in
+  check "cert fixture open (proof mode, c2 claimed)" (not err)
+    (Yojson.Safe.to_string co);
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wce"; "at_lemma", `String "c1" ])
+  in
+  check "wce at c1" (not err) "";
+  (* Edit BELOW the session position: the widened fast gate replays
+     forward from the current state — no prefix reload. *)
+  write_cert ~banner:"(* banner one *)\n"
+    ~c1_line4:"proof. trivial. qed.\n" ~c2_body:"by trivial.\n";
+  let (err, wf) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wce" ])
+  in
+  check "P5: below-position edit fast-forwards (no reload)"
+    ((not err)
+     && member "ok" wf = `Bool true
+     && member "changed" wf = `Bool true
+     && member "fast_forward" wf = `Bool true
+     && member "classification" wf = `String "proof-body-only"
+     && member "tail_executed" wf = `Int 6)
+    (Yojson.Safe.to_string wf);
+  (* qed -> abort changes what the environment CONTAINS: the
+     certificate must refuse it (no proof-body-only label). *)
+  write_cert ~banner:"(* banner one *)\n"
+    ~c1_line4:"proof. trivial. abort.\n" ~c2_body:"by trivial.\n";
+  let (err, ab) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wce" ])
+  in
+  check "P5: qed->abort fails the certificate (statement-changing)"
+    ((not err)
+     && member "ok" ab = `Bool true
+     && member "classification" ab = `String "statement-changing"
+     && (match member "warning" ab with `String _ -> true | _ -> false))
+    (Yojson.Safe.to_string ab);
+  write_cert ~banner:"(* banner one *)\n"
+    ~c1_line4:"proof. trivial. qed.\n" ~c2_body:"by trivial.\n";
+  let (err, _) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wce" ])
+  in
+  check "cert restored (qed back)" (not err) "";
+  (* Comment-only edit: snapshot swap, zero execution, position
+     preserved, claim regions remapped to the shifted lines. *)
+  write_cert ~banner:"(* banner one *)\n(* banner two *)\n"
+    ~c1_line4:"proof. trivial. qed.\n" ~c2_body:"by trivial.\n";
+  let (err, fo) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wce" ])
+  in
+  let fo_claim0 =
+    try
+      match member "claims" fo with `List (c :: _) -> c | _ -> `Null
+    with _ -> `Null
+  in
+  check "P6: comment-only edit is formatting-only, zero-cost"
+    ((not err)
+     && member "ok" fo = `Bool true
+     && member "changed" fo = `Bool true
+     && member "classification" fo = `String "formatting-only"
+     && member "tail_executed" fo = `Int 0
+     && member "prefix_time_ms" fo = `Int 0
+     && member "synced_upto" fo = `Int 9
+     && (match member "note" fo with `String _ -> true | _ -> false))
+    (Yojson.Safe.to_string fo);
+  check "P6: claim regions remapped to shifted lines"
+    (member "lemma" fo_claim0 = `String "c2"
+     && member "start_line" fo_claim0 = `Int 6)
+    (Yojson.Safe.to_string fo_claim0);
+
+  (* define: bind once, reference everywhere, expanded text is what
+     runs and what lands. *)
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wce"; "at_lemma", `String "c2" ])
+  in
+  check "wce at c2" (not err) "";
+  let (err, df) =
+    call fd_in fd_out "define"
+      (`Assoc [
+         "name", `String "inv"; "text", `String "1 = 1";
+         "session", `String "wce";
+       ])
+  in
+  check "P1: define binds on the session"
+    ((not err)
+     && (match member "defines" df with
+         | `List [ d ] -> member "name" d = `String "inv"
+         | _ -> false))
+    (Yojson.Safe.to_string df);
+  let (err, dcs) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script", `String "have H : $inv.\ntrivial.\nby trivial.";
+         "session", `String "wce";
+       ])
+  in
+  let dcs_exp =
+    match member "src_expanded" dcs with `String s -> s | _ -> ""
+  in
+  check "P1: $inv expands before parsing; src_expanded echoes"
+    ((not err)
+     && member "ok" dcs = `Bool true
+     && member "closes" dcs = `Bool true
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "have H : 1 = 1") dcs_exp 0);
+           true
+         with Not_found -> false)
+     && not (try
+               ignore (Str.search_forward
+                         (Str.regexp_string "$inv") dcs_exp 0);
+               true
+             with Not_found -> false))
+    (Yojson.Safe.to_string dcs);
+  let (err, qg) =
+    call fd_in fd_out "query"
+      (`Assoc [
+         "text", `String "(* y <$x *) print op (+).";
+         "session", `String "wce";
+       ])
+  in
+  check "P1: <$ never starts a reference (sampling guard)"
+    ((not err) && member "src_expanded" qg = `Null)
+    (Yojson.Safe.to_string qg);
+  let (err, rpd) =
+    call fd_in fd_out "replace_proof"
+      (`Assoc [
+         "lemma", `String "c2";
+         "script",
+         `String "proof.\nhave H : $inv.\ntrivial.\nby trivial.\nqed.";
+         "session", `String "wce";
+       ])
+  in
+  check "P1: replace_proof lands EXPANDED text"
+    ((not err) && member "ok" rpd = `Bool true)
+    (Yojson.Safe.to_string rpd);
+  let cert_text =
+    let ic = open_in certf in
+    let n = in_channel_length ic in
+    let s = really_input_string ic n in
+    close_in ic; s
+  in
+  check "P1: file carries expanded EC, no $names"
+    ((try
+        ignore (Str.search_forward
+                  (Str.regexp_string "have H : 1 = 1") cert_text 0);
+        true
+      with Not_found -> false)
+     && not (try
+               ignore (Str.search_forward
+                         (Str.regexp_string "$inv") cert_text 0);
+               true
+             with Not_found -> false))
+    cert_text;
+  let (err, du) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "have J : $nope.";
+         "session", `String "wce";
+       ])
+  in
+  check "P1: undefined $-reference is a hard error naming defines"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "undefined")
+                     (Yojson.Safe.to_string du) 0);
+           ignore (Str.search_forward
+                     (Str.regexp_string "inv")
+                     (Yojson.Safe.to_string du) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string du);
+  let (err, dd) =
+    call fd_in fd_out "define"
+      (`Assoc [ "name", `String "inv"; "session", `String "wce" ])
+  in
+  check "P1: define {name} alone deletes the binding"
+    ((not err)
+     && (match member "defines" dd with `List [] -> true | _ -> false))
+    (Yojson.Safe.to_string dd);
+  let (err, _) =
+    call fd_in fd_out "close_session"
+      (`Assoc [ "session", `String "wce" ])
+  in
+  check "close wce" (not err) "";
 
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
