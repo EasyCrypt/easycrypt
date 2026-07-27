@@ -54,7 +54,7 @@ not attempt to rebuild anything.
 [/Users/gdel/Repos/ec-llm-next/doc/mcp-agent-guide.md](doc/mcp-agent-guide.md)
 before driving the tools.** It is the contract: the mental model
 (sessions, document-as-truth, uuid, `stale`, edit-mode locks), all
-22 tools grouped by workflow, the standard playbooks (single
+23 tools grouped by workflow, the standard playbooks (single
 lemma, parallel dispatch, big-file refactoring), and the v1
 limits.
 
@@ -105,7 +105,11 @@ any step fails, report it verbatim and stop.
 - Avoid the `progress` tactic (unstable across runs); prefer
   explicit alternatives.
 - Never leave an `admit` in anything you hand back without
-  flagging it loudly.
+  flagging it loudly — and you cannot miss one: every executing
+  reply carries an `admitted` array (the goal each admit
+  discharged, captured before it ran, with a hash), and
+  `admitted_goals {lemma?}` audits a whole file's admit debt in
+  one call.
 - When committing in the USER'S repos, follow that repo's
   conventions; **no AI co-author trailers** on commits.
 - Respect the locks: a refusal naming another session is

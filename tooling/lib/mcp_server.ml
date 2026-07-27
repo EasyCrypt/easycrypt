@@ -320,6 +320,27 @@ let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
        ]
      | _ -> j)
 
+let first_token s =
+  let s = String.trim s in
+  let n = String.length s in
+  let rec go i = if i < n && s.[i] <> ' ' && s.[i] <> '\n' then go (i+1) else i in
+  let k = go 0 in
+  String.sub s 0 k
+
+(* Admits are HOLES wherever they execute: the goal an `admit.` is
+   about to discharge is captured BEFORE the sentence runs, so every
+   executing tool reports swept-under-the-rug debt uniformly in an
+   "admitted" array. *)
+let is_admit_sentence (s : Ec_llm_session.parsed_sentence) =
+  let t = first_token s.src in
+  t = "admit" || t = "admit."
+
+let capture_admit session detail =
+  match goals_info session with
+  | (_, sub :: _) ->
+    Some (apply_goal_detail detail sub, subgoal_hash sub)
+  | _ -> None
+
 (* Leaf paths from a TREE reply: lines shaped "[1.2] <goal> ...". *)
 let tree_paths body =
   String.split_on_char '\n' body
@@ -331,12 +352,6 @@ let tree_paths body =
         | None -> None
       else None)
 
-let first_token s =
-  let s = String.trim s in
-  let n = String.length s in
-  let rec go i = if i < n && s.[i] <> ' ' && s.[i] <> '\n' then go (i+1) else i in
-  let k = go 0 in
-  String.sub s 0 k
 
 (* DFS frame stack over goal-count deltas: applying a sentence to
    the focused goal replaces it with c = delta+1 children (0 =
@@ -674,6 +689,7 @@ let tool_exec t args =
           let failed = ref false in
           let restarted = ref false in
           let executed = ref 0 in
+          let admitted = ref [] in
           let t0 = Unix.gettimeofday () in
           (try
              List.iteri
@@ -682,12 +698,27 @@ let tool_exec t args =
                   | None -> ()
                   | Some cls ->
                     let s0 = Unix.gettimeofday () in
+                    let adm =
+                      if is_admit_sentence s then
+                        capture_admit e.session detail
+                      else None
+                    in
                     (match
                        Ec_llm_session.exec e.session ~corr
                          ~sentence_class:cls ~source:s.src
                      with
                      | Ok ok ->
                        incr executed;
+                       (match adm with
+                        | Some (g, h) ->
+                          admitted :=
+                            `Assoc [
+                              "index", `Int i;
+                              "src", `String s.src;
+                              "goal", g;
+                              "hash", `String h;
+                            ] :: !admitted
+                        | None -> ());
                        if ok.restarted then restarted := true;
                        notices := List.rev_append ok.notices !notices;
                        results :=
@@ -723,6 +754,7 @@ let tool_exec t args =
             "notices",
             `List (List.rev_map (fun n -> `String n) !notices);
             "sentences", `List (List.rev !results);
+            "admitted", `List (List.rev !admitted);
           ] in
           let terminal =
             if !failed then
@@ -1146,6 +1178,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
               | _ -> []
             in
             let corr = Correlation.of_client "mcp-resync" in
+            let admitted = ref [] in
             let exec_range lo hi =
               let err = ref None in
               let cnt = ref 0 in
@@ -1157,11 +1190,27 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                    match sentence_class_of s with
                    | None -> ()
                    | Some cls ->
+                     let adm =
+                       if is_admit_sentence s then
+                         capture_admit e.session goal_detail
+                       else None
+                     in
                      (match
                         Ec_llm_session.exec e.session ~corr
                           ~sentence_class:cls ~source:s.src
                       with
-                      | Ok _ -> incr cnt
+                      | Ok _ ->
+                        incr cnt;
+                        (match adm with
+                         | Some (g, h) ->
+                           admitted :=
+                             `Assoc [
+                               "index", `Int i;
+                               "start_line", `Int s.start_line;
+                               "goal", g;
+                               "hash", `String h;
+                             ] :: !admitted
+                         | None -> ())
                       | Error er ->
                         err := Some (i, s, er);
                         raise Exit)
@@ -1264,6 +1313,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                    "common_prefix_sentences", `Int k;
                    "target_sentences", `Int m;
                    "tail_executed", `Int executed;
+                   "admitted", `List (List.rev !admitted);
                    "prefix_time_ms", `Int prefix_ms;
                    "tail_time_ms", `Int tail_ms;
                    "uuid",
@@ -1352,6 +1402,7 @@ let outline_engine (e : entry) lemma =
        let count = ref (fst (goals_info e.session)) in
        let sentences = ref [] in
        let obligations = ref [] in
+       let admits = ref [] in
        let splits = ref 0 in
        let failed = ref None in
        (try
@@ -1362,6 +1413,14 @@ let outline_engine (e : entry) lemma =
                | None -> ()
                | Some cls ->
                  let path_before = Frame_stack.path st in
+                 let adm =
+                   if is_admit_sentence s then
+                     match goals_info e.session with
+                     | (_, sub :: _) ->
+                       Some (one_line_concl sub, subgoal_hash sub)
+                     | _ -> None
+                   else None
+                 in
                  let t0 = Unix.gettimeofday () in
                  (match
                     Ec_llm_session.exec e.session ~corr
@@ -1395,6 +1454,16 @@ let outline_engine (e : entry) lemma =
                                 ] :: !obligations)
                          subs
                      end);
+                    (match adm with
+                     | Some (g1, h) ->
+                       admits :=
+                         `Assoc [
+                           "path", `String path_before;
+                           "start_line", `Int s.start_line;
+                           "goal", `String g1;
+                           "hash", `String h;
+                         ] :: !admits
+                     | None -> ());
                     count := n;
                     let tok = first_token s.src in
                     sentences :=
@@ -1421,6 +1490,7 @@ let outline_engine (e : entry) lemma =
             "split_points", `Int !splits;
             "sentences", `List (List.rev !sentences);
             "obligations", `List (List.rev !obligations);
+            "admitted", `List (List.rev !admits);
             "uuid", `Int (Ec_llm_session.current_uuid e.session);
           ],
           !failed))
@@ -1532,6 +1602,7 @@ let tool_proof_profile t args =
               "total_admits", `Int (total "admit");
               "total_fragile", `Int (total "fragile");
               "split_points", member "split_points" payload;
+              "admitted", member "admitted" payload;
             ] @ (match failed with
                  | None -> [ "ok", `Bool true ]
                  | Some (_, er) ->
@@ -1751,6 +1822,7 @@ let tool_exec_in t args =
                 let count = ref (fst (goals_info e.session)) in
                 let remaining = ref sc.sc_remaining in
                 let executed = ref [] in
+                let admitted = ref [] in
                 let err_ref = ref None in
                 (try
                    List.iter
@@ -1816,6 +1888,7 @@ let tool_exec_in t args =
                      "ok", `Bool true;
                      "remaining_in_subtree", `Int !remaining;
                      "subtree_closed", `Bool sc.sc_closed;
+                     "admitted", `List (List.rev !admitted);
                      "uuid",
                      `Int (Ec_llm_session.current_uuid e.session);
                      "goals",
@@ -2110,6 +2183,8 @@ let tool_check_script t args =
         | Ok (ss, None) ->
           let start = Ec_llm_session.current_uuid e.session in
           let corr = Correlation.of_client "mcp-check" in
+          let detail = goal_detail_of args ~default:`Shape in
+          let admitted = ref [] in
           let results = ref [] in
           let failed = ref false in
           let goals_fail = ref `Null in
@@ -2122,6 +2197,11 @@ let tool_check_script t args =
                   | None -> ()
                   | Some cls ->
                     let s0 = Unix.gettimeofday () in
+                    let adm =
+                      if is_admit_sentence s then
+                        capture_admit e.session detail
+                      else None
+                    in
                     (match
                        Ec_llm_session.exec e.session ~corr
                          ~sentence_class:cls ~source:s.src
@@ -2131,6 +2211,16 @@ let tool_check_script t args =
                          restarted := true;
                          raise Exit
                        end;
+                       (match adm with
+                        | Some (g, h) ->
+                          admitted :=
+                            `Assoc [
+                              "index", `Int i;
+                              "src", `String s.src;
+                              "goal", g;
+                              "hash", `String h;
+                            ] :: !admitted
+                        | None -> ());
                        results :=
                          `Assoc [
                            "index", `Int i;
@@ -2239,13 +2329,13 @@ let tool_check_script t args =
             "ok", `Bool ((not !failed) && not !restarted);
             "closes", `Bool closes;
             "results", `List (List.rev !results);
+            "admitted", `List (List.rev !admitted);
             "restore", restore;
             "uuid", `Int (Ec_llm_session.current_uuid e.session);
             "total_time_ms", `Int (ms_since t0);
             "stale", `Bool (stale_flag e);
           ] @ commit_fields
-            @ (let detail = goal_detail_of args ~default:`Shape in
-               if !failed then
+            @ (if !failed then
                  [ "goals_at_failure",
                    apply_goal_detail detail !goals_fail ]
                else
@@ -2358,6 +2448,80 @@ let tool_replace_proof t args =
                       ])
                     end))
             end))
+
+(* File-level admit audit: the goals your admits close. Scans the
+   snapshot for declarations whose bodies contain admit sentences
+   and replays each through the outline engine (weak-checked
+   prefix). REPOSITIONS the session like proof_outline; scope with
+   'lemma' on big files (no cancellation yet). *)
+let tool_admitted_goals t args =
+  match find_session t args with
+  | Error e -> Error e
+  | Ok (label, e) ->
+    if stale_flag e then
+      Error "admitted_goals: file changed on disk — resync_file first"
+    else
+      let targets =
+        match str_arg args "lemma" with
+        | Some l -> [ l ]
+        | None ->
+          let cur = ref None in
+          let out = ref [] in
+          Array.iter
+            (fun (s : Ec_llm_session.parsed_sentence) ->
+               (if s.kind = "Gaxiom" then
+                  match s.name with
+                  | Some n -> cur := Some n
+                  | None -> ());
+               if is_admit_sentence s then
+                 match !cur with
+                 | Some n when not (List.mem n !out) ->
+                   out := n :: !out
+                 | _ -> ())
+            e.parsed;
+          List.rev !out
+      in
+      let admits = ref [] in
+      let errors = ref [] in
+      List.iter
+        (fun lemma ->
+           match outline_engine e lemma with
+           | Error m ->
+             errors :=
+               `Assoc [ "lemma", `String lemma; "error", `String m ]
+               :: !errors
+           | Ok (payload, failed) ->
+             (match failed with
+              | Some (_, er) ->
+                errors :=
+                  `Assoc [ "lemma", `String lemma;
+                           "error", `String er ] :: !errors
+              | None -> ());
+             (match Yojson.Safe.Util.member "admitted" payload with
+              | `List l ->
+                List.iter
+                  (fun a ->
+                     match a with
+                     | `Assoc kvs ->
+                       admits :=
+                         `Assoc (("lemma", `String lemma) :: kvs)
+                         :: !admits
+                     | _ -> ())
+                  l
+              | _ -> ()))
+        targets;
+      Ok (`Assoc [
+        "session", `String label;
+        "lemmas_scanned",
+        `List (List.map (fun l -> `String l) targets);
+        "admit_count", `Int (List.length !admits);
+        "admitted", `List (List.rev !admits);
+        "errors", `List (List.rev !errors);
+        "note",
+        `String
+          "session repositioned by the replay — resync_file \
+           {at_lemma} to reposition";
+      ])
 
 (* ---------------------------------------------------------------- *)
 (* Tool registry                                                      *)
@@ -2604,6 +2768,20 @@ let tools :
     session_prop;
   ],
   tool_extract_lemma;
+
+  "admitted_goals",
+  "The goals your admits close: scans for admit-bearing \
+   declarations and replays them (weak prefix) to capture each \
+   admitted goal + hash. Every executing tool also reports a live \
+   'admitted' array; this is the whole-file audit. Repositions \
+   the session. Scope with 'lemma' on big files.",
+  schema [
+    ("lemma", "string",
+     "Audit only this declaration (default: every admit-bearing \
+      one).");
+    session_prop;
+  ],
+  tool_admitted_goals;
 
   "revert",
   "Revert the session to an earlier uuid (as reported by exec / \

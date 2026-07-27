@@ -1092,6 +1092,74 @@ let () =
   in
   check "close wc" (not err) "";
 
+  (* -- admit visibility ------------------------------------------- *)
+  let admf = Filename.concat fixture_dir "adm.ec" in
+  let oc = open_out admf in
+  output_string oc
+    "require import AllCore.\n\
+     lemma la : 1 = 1 /\\ 2 = 2.\n\
+     proof.\n\
+     split.\n\
+     trivial.\n\
+     admit.\n\
+     qed.\n\
+     lemma lb : 3 = 3.\n\
+     proof.\n\
+     admit.\n\
+     qed.\n";
+  close_out oc;
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String admf; "session", `String "wd";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "wd open (admit fixture)" (not err) "";
+  let (err, ag) =
+    call fd_in fd_out "admitted_goals"
+      (`Assoc [ "session", `String "wd" ])
+  in
+  let first_admit_goal =
+    try
+      match member "admitted" ag with
+      | `List (a :: _) ->
+        (match member "goal" a with `String s -> s | _ -> "")
+      | _ -> ""
+    with _ -> ""
+  in
+  check "admitted_goals: both admits audited with their goals"
+    ((not err)
+     && member "admit_count" ag = `Int 2
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "2 = 2") first_admit_goal 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string ag);
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wd"; "at_lemma", `String "lb" ])
+  in
+  check "wd at lb" (not err) "";
+  let (err, ea) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "admit."; "session", `String "wd" ])
+  in
+  check "exec admit: live admitted capture"
+    ((not err)
+     && (match member "admitted" ea with
+         | `List [ a ] ->
+           (match member "hash" a with
+            | `String h -> String.length h > 0
+            | _ -> false)
+         | _ -> false))
+    (Yojson.Safe.to_string ea);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wd" ])
+  in
+  check "close wd" (not err) "";
+
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
       (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])

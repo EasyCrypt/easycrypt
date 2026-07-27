@@ -1,7 +1,7 @@
 # EasyCrypt MCP — agent guide
 
 Operating manual for LLM agents driving EasyCrypt proof sessions
-through the `ecd mcp` server (22 tools). Written for the agent;
+through the `ecd mcp` server (23 tools). Written for the agent;
 the [Setup](#setup-human-operator) section is for the human
 operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 [doc/ecllm-compat.md](ecllm-compat.md).
@@ -151,6 +151,11 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   admit-speed: `admit.` sentences are holes; the reply lists each
   hole's branch path + goal + hash; state restored. Iterate
   structure first, pay for leaves later.
+- `admitted_goals {lemma?}` — the goals your admits close: audits
+  every admit-bearing declaration (or one lemma) by replay,
+  returning goal + hash per admit. Every executing tool also
+  reports a live `admitted` array — swept-under-the-rug debt is
+  always visible. Repositions the session.
 - `extract_lemma {name?}` — candidate standalone lemma from the
   focused goal (vars → binders, hyps → premises). UNVERIFIED and
   prop-conclusions-only: refine it, `check_script` it, then place
