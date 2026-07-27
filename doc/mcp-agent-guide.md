@@ -102,9 +102,12 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 
 ### Writing back (the only file-writing path)
 
-- `commit_proof {session}` — emit your session's successful
-  phrases as a bullet-structured proof body (text is returned, NOT
-  written; splice it yourself or via replace_proof).
+- `commit_proof {session, lemma?, write?}` — emit your session's
+  successful phrases as a bullet-structured proof body. With
+  `write: true` and a claimed `lemma` it LANDS the proof
+  directly: wraps the transcript in `proof.`/`qed.`, splices,
+  resync-verifies, restores on failure. Requires the proof to
+  be closed — the zero-seam ending after stepping with `exec`.
 - `replace_proof {lemma, script, nosmt?}` — verified in-place body
   replacement: splices over the claimed lemma's body lines,
   re-syncs (weak prefix + fully-checked tail), and RESTORES the
@@ -174,15 +177,29 @@ including filling `check_skeleton` holes:
 
 ## Standard workflows
 
-**Prove one lemma.**
+**Prove one lemma — two loops, both landing themselves.**
+
+*Compose loop* (default for routine proofs — one round trip per
+candidate, and the passing candidate lands itself):
 ```
-open_file {path, mode:"proof", lemmas:["foo"], nosmt:true,
-           upto_line:<claims.foo.start_line reply — or just decl line>}
-goals → try_tactic (iterate) → exec (commit steps) → ... →
-commit_proof → splice body into the file → resync_file
+open_file {path, mode:"proof", lemmas:["foo"], nosmt:true}
+resync_file {at_lemma:"foo"}
+check_script {script:<whole body>, on_close:"commit", lemma:"foo"}
+   # fails -> goals_at_failure, state restored; iterate
+   # closes -> written + verified, SAME call. Done.
 ```
-(Or skip the manual splice: iterate with `check_script` and land
-with `replace_proof`.)
+
+*Step loop* (switch when candidates keep dying — per-step goal
+feedback beats blind recomposition, and failed smt() is the cost
+model):
+```
+resync_file {at_lemma:"foo"}
+goals / try_tactic (probe) → exec (commit the winning step) → ...
+   # exec replies carry proof_complete:true when the goals close
+commit_proof {lemma:"foo", write:true}     # transcript lands, verified
+```
+No manual splicing in either loop; `replace_proof` remains for
+landing text composed elsewhere.
 
 **Parallel lemmas (orchestrator + workers).** Orchestrator picks
 disjoint lemmas; each worker opens `{session: "w<i>", mode:

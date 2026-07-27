@@ -1016,6 +1016,82 @@ let () =
   in
   check "close wb" (not err) "";
 
+  (* -- ergonomic landing: iterate call = landing call ------------- *)
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String b2f; "session", `String "wc";
+         "mode", `String "proof";
+         "lemmas", `List [ `String "p2" ];
+         "nosmt", `Bool true;
+       ])
+  in
+  check "wc open (landing tests)" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wc"; "at_lemma", `String "p2" ])
+  in
+  check "wc at p2" (not err) "";
+  let (err, cc) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script", `String "trivial.\nqed.";
+         "on_close", `String "commit";
+         "lemma", `String "p2";
+         "session", `String "wc";
+       ])
+  in
+  check "on_close=commit: passing script LANDS in the same call"
+    ((not err)
+     && member "closes" cc = `Bool true
+     && member "restore" cc = `String "committed"
+     && member "file_written" cc = `Bool true)
+    (Yojson.Safe.to_string cc);
+
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wc"; "at_lemma", `String "p2" ])
+  in
+  check "wc back at p2" (not err) "";
+  let (err, ex2) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "by trivial."; "session", `String "wc" ])
+  in
+  check "exec closing step: proof_complete hint"
+    ((not err)
+     && member "ok" ex2 = `Bool true
+     && member "proof_complete" ex2 = `Bool true)
+    (Yojson.Safe.to_string ex2);
+  let (err, cp) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [
+         "lemma", `String "p2"; "write", `Bool true;
+         "session", `String "wc";
+       ])
+  in
+  check "commit_proof write: transcript lands verified"
+    ((not err)
+     && member "ok" cp = `Bool true
+     && member "file_written" cp = `Bool true)
+    (Yojson.Safe.to_string cp);
+  let b2_final =
+    let ic = open_in b2f in
+    let n = in_channel_length ic in
+    let s = really_input_string ic n in
+    close_in ic; s
+  in
+  check "landed body present in file"
+    (try
+       ignore (Str.search_forward
+                 (Str.regexp_string "by trivial.") b2_final 0);
+       true
+     with Not_found -> false)
+    b2_final;
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wc" ])
+  in
+  check "close wc" (not err) "";
+
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
       (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])

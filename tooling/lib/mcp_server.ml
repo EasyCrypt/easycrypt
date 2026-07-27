@@ -733,8 +733,22 @@ let tool_exec t args =
                   "sentences before the failure REMAIN EXECUTED — \
                    revert {uuid} or resync_file to unwind" ]
             else
-              [ "goals",
-                apply_goal_detail detail (goals_json e.session) ]
+              let gp =
+                apply_goal_detail detail (goals_json e.session)
+              in
+              let closed =
+                let open Yojson.Safe.Util in
+                member "active" gp = `Bool false
+                || member "subgoal_count" gp = `Int 0
+              in
+              [ "goals", gp ]
+              @ (if closed then
+                   [ "proof_complete", `Bool true;
+                     "hint",
+                     `String
+                       "goals closed — commit_proof {lemma, \
+                        write:true} lands this proof in the file" ]
+                 else [])
           in
           Ok (`Assoc (base @ terminal))))
 
@@ -913,19 +927,6 @@ let tool_revert t args =
             "goals", goals_json e.session;
           ])))
 
-let tool_commit_proof t args =
-  match find_session t args with
-  | Error e -> Error e
-  | Ok (label, e) ->
-    (match Ec_llm_session.raw_command e.session "COMMIT" with
-     | Error err -> Error (Error.to_string err)
-     | Ok (body, _) ->
-       Ok (`Assoc [
-         "session", `String label;
-         "stale", `Bool (stale_flag e);
-         "proof", `String body;
-       ]))
-
 let tool_analyze_file t args =
   match str_arg args "path" with
   | None -> Error "analyze_file: missing required argument 'path'"
@@ -992,108 +993,6 @@ let tool_close_session t args =
    first failure, report per-sentence verdicts + timing + whether
    the proof closes, then revert to the starting uuid. The session
    is left where it was. *)
-let tool_check_script t args =
-  match str_arg args "script" with
-  | None -> Error "check_script: missing required argument 'script'"
-  | Some script ->
-    (match find_session t args with
-     | Error e -> Error e
-     | Ok (label, e) ->
-       (match Ec_llm_session.parse_source e.session script with
-        | Error err ->
-          Error
-            (Printf.sprintf "check_script: script parse failed: %s"
-               (Error.to_string err))
-        | Ok (_, Some perr) ->
-          Error
-            (Printf.sprintf
-               "check_script: script has a parse error — nothing \
-                ran: %s"
-               perr)
-        | Ok (ss, None) ->
-          let start = Ec_llm_session.current_uuid e.session in
-          let corr = Correlation.of_client "mcp-check" in
-          let results = ref [] in
-          let failed = ref false in
-          let goals_fail = ref `Null in
-          let restarted = ref false in
-          let t0 = Unix.gettimeofday () in
-          (try
-             List.iteri
-               (fun i (s : Ec_llm_session.parsed_sentence) ->
-                  match sentence_class_of s with
-                  | None -> ()
-                  | Some cls ->
-                    let s0 = Unix.gettimeofday () in
-                    (match
-                       Ec_llm_session.exec e.session ~corr
-                         ~sentence_class:cls ~source:s.src
-                     with
-                     | Ok ok ->
-                       if ok.restarted then begin
-                         restarted := true;
-                         raise Exit
-                       end;
-                       results :=
-                         `Assoc [
-                           "index", `Int i;
-                           "src", `String s.src;
-                           "ok", `Bool true;
-                           "uuid", `Int ok.replied_uuid;
-                           "time_ms", `Int (ms_since s0);
-                         ] :: !results
-                     | Error er ->
-                       failed := true;
-                       goals_fail := goals_json e.session;
-                       results :=
-                         `Assoc [
-                           "index", `Int i;
-                           "src", `String s.src;
-                           "ok", `Bool false;
-                           "error", `String (Error.to_string er);
-                           "time_ms", `Int (ms_since s0);
-                         ] :: !results;
-                       raise Exit))
-               ss
-           with Exit -> ());
-          let closes =
-            (not !failed) && (not !restarted)
-            && goals_closed e.session
-          in
-          let goals_at_end = goals_json e.session in
-          let restore =
-            if !restarted then
-              `String
-                "session restarted mid-script — state NOT restored; \
-                 run resync_file to recover"
-            else if Ec_llm_session.current_uuid e.session = start then
-              `String "unmoved"
-            else
-              (match
-                 Ec_llm_session.revert_to_uuid e.session ~target:start
-               with
-               | Ok () -> `String "restored"
-               | Error er ->
-                 `String ("RESTORE FAILED: " ^ Error.to_string er))
-          in
-          Ok (`Assoc ([
-            "session", `String label;
-            "checked", `Int (List.length !results);
-            "ok", `Bool ((not !failed) && not !restarted);
-            "closes", `Bool closes;
-            "results", `List (List.rev !results);
-            "restore", restore;
-            "uuid", `Int (Ec_llm_session.current_uuid e.session);
-            "total_time_ms", `Int (ms_since t0);
-            "stale", `Bool (stale_flag e);
-          ] @ (let detail = goal_detail_of args ~default:`Shape in
-               if !failed then
-                 [ "goals_at_failure",
-                   apply_goal_detail detail !goals_fail ]
-               else
-                 [ "goals_at_end",
-                   apply_goal_detail detail goals_at_end ])))))
-
 (* Incremental re-sync of a session against its (possibly edited)
    file, with sentence-granular target selection over a
    line-granular LOAD: when several sentences share the last prefix
@@ -2027,6 +1926,333 @@ let tool_resync_file t args =
    verification fails. The first tool with write authority — gated
    on freshness (must resync first if the file changed
    out-of-band). *)
+(* ---------------------------------------------------------------- *)
+(* Verified landing — shared by replace_proof, check_script
+   {on_close:"commit"} and commit_proof {write:true}.               *)
+(* ---------------------------------------------------------------- *)
+
+(* The session's claim on [lemma]: from the lock table in proof
+   mode, resolved on demand in statement mode. *)
+let claim_for (e : entry) label lemma =
+  match e.mode with
+  | Proof cs ->
+    (match List.find_opt (fun c -> c.lemma = lemma) cs with
+     | Some c -> Ok c
+     | None ->
+       Error
+         (Printf.sprintf
+            "lemma '%s' is not claimed by session '%s' (claims: %s)"
+            lemma label
+            (String.concat ", " (claim_names e.mode))))
+  | Statement ->
+    (match resolve_claims e.parsed [ lemma ] with
+     | Ok [ c ] -> Ok c
+     | Ok _ -> Error "internal claim resolution shape"
+     | Error m -> Error m)
+
+(* The at_lemma position (sentence count through the declaration and
+   its `proof.`) for [lemma] against the current snapshot — the
+   position from which a checked script IS the full proof body. *)
+let lemma_start_target (e : entry) lemma =
+  match resolve_claims e.parsed [ lemma ] with
+  | Error m -> Error m
+  | Ok [ c ] ->
+    let d = ref (-1) in
+    Array.iteri
+      (fun i (s : Ec_llm_session.parsed_sentence) ->
+         if !d = -1 && s.kind = "Gaxiom" && s.start_line = c.start_line
+         then d := i)
+      e.parsed;
+    if !d < 0 then Error "declaration not found in snapshot"
+    else
+      let m = !d + 1 in
+      let m =
+        if m < Array.length e.parsed
+           && first_token
+                (e.parsed.(m) : Ec_llm_session.parsed_sentence).src
+              = "proof"
+        then m + 1
+        else m
+      in
+      Ok (c, m)
+  | Ok _ -> Error "internal claim resolution shape"
+
+(* Wrap a body fragment into a full, file-ready proof body: prepend
+   `proof.` unless present, append `qed.` unless a save is present.
+   Always followed by verified execution, so a wrong wrap fails
+   loudly and restores. *)
+let wrap_proof_body (body : string) =
+  let body = String.trim body in
+  let s =
+    if first_token body = "proof" || first_token body = "proof."
+    then body
+    else "proof.\n" ^ body
+  in
+  let has_save =
+    List.exists
+      (fun l ->
+         let t = first_token l in
+         t = "qed." || t = "qed" || t = "save." || t = "save")
+      (String.split_on_char '\n' s)
+  in
+  if has_save then s else s ^ "\nqed."
+
+(* Splice [script] over [c]'s body lines, resync-verify (weak prefix
+   + fully-checked tail), RESTORE the original file if verification
+   fails. Returns (verified, resync payload). *)
+let write_body_verified ~label (e : entry) (c : claim) ~script ~nosmt =
+  let orig = e.text in
+  let lines = String.split_on_char '\n' orig in
+  let pre = List.filteri (fun i _ -> i < c.decl_end_line) lines in
+  let post = List.filteri (fun i _ -> i >= c.end_line) lines in
+  let script_lines = String.split_on_char '\n' (String.trim script) in
+  let candidate = String.concat "\n" (pre @ script_lines @ post) in
+  let resync () =
+    resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None
+      ~at_lemma:None ~goal_detail:`Shape
+  in
+  match write_file e.file candidate with
+  | exception Sys_error m -> Error (Printf.sprintf "write failed: %s" m)
+  | () ->
+    (match resync () with
+     | Error m ->
+       (try write_file e.file orig with _ -> ());
+       ignore (resync ());
+       Error
+         (Printf.sprintf
+            "verification could not run (%s); file restored" m)
+     | Ok payload ->
+       let ok =
+         match Yojson.Safe.Util.member "ok" payload with
+         | `Bool b -> b
+         | _ -> false
+       in
+       if ok then Ok (true, payload)
+       else begin
+         (try write_file e.file orig with _ -> ());
+         ignore (resync ());
+         Ok (false, payload)
+       end)
+
+let tool_commit_proof t args =
+  match find_session t args with
+  | Error e -> Error e
+  | Ok (label, e) ->
+    (match Ec_llm_session.raw_command e.session "COMMIT" with
+     | Error err -> Error (Error.to_string err)
+     | Ok (body, _) ->
+       if not (bool_arg args "write") then
+         Ok (`Assoc [
+           "session", `String label;
+           "stale", `Bool (stale_flag e);
+           "proof", `String body;
+         ])
+       else
+         (* Zero-seam ending for the step loop: transcript ->
+            wrapped body -> verified in-place write. *)
+         (match str_arg args "lemma" with
+          | None ->
+            Error "commit_proof: write=true requires 'lemma'"
+          | Some lemma ->
+            if stale_flag e then
+              Error
+                "commit_proof: file changed on disk — resync_file \
+                 first"
+            else if not (goals_closed e.session) then
+              Error
+                "commit_proof: the proof is not closed — keep \
+                 going, or land a partial body explicitly with \
+                 replace_proof"
+            else
+              (match claim_for e label lemma with
+               | Error m -> Error ("commit_proof: " ^ m)
+               | Ok c ->
+                 let script = wrap_proof_body body in
+                 let nosmt =
+                   match Yojson.Safe.Util.member "nosmt" args with
+                   | `Bool b -> b
+                   | _ -> true
+                 in
+                 (match
+                    write_body_verified ~label e c ~script ~nosmt
+                  with
+                  | Error m -> Error ("commit_proof: " ^ m)
+                  | Ok (okv, payload) ->
+                    Ok (`Assoc [
+                      "ok", `Bool okv;
+                      "lemma", `String lemma;
+                      (if okv then "file_written"
+                       else "file_restored"),
+                      `Bool true;
+                      "proof", `String script;
+                      "verification", payload;
+                    ])))))
+
+
+let tool_check_script t args =
+  match str_arg args "script" with
+  | None -> Error "check_script: missing required argument 'script'"
+  | Some script ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       (match Ec_llm_session.parse_source e.session script with
+        | Error err ->
+          Error
+            (Printf.sprintf "check_script: script parse failed: %s"
+               (Error.to_string err))
+        | Ok (_, Some perr) ->
+          Error
+            (Printf.sprintf
+               "check_script: script has a parse error — nothing \
+                ran: %s"
+               perr)
+        | Ok (ss, None) ->
+          let start = Ec_llm_session.current_uuid e.session in
+          let corr = Correlation.of_client "mcp-check" in
+          let results = ref [] in
+          let failed = ref false in
+          let goals_fail = ref `Null in
+          let restarted = ref false in
+          let t0 = Unix.gettimeofday () in
+          (try
+             List.iteri
+               (fun i (s : Ec_llm_session.parsed_sentence) ->
+                  match sentence_class_of s with
+                  | None -> ()
+                  | Some cls ->
+                    let s0 = Unix.gettimeofday () in
+                    (match
+                       Ec_llm_session.exec e.session ~corr
+                         ~sentence_class:cls ~source:s.src
+                     with
+                     | Ok ok ->
+                       if ok.restarted then begin
+                         restarted := true;
+                         raise Exit
+                       end;
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "ok", `Bool true;
+                           "uuid", `Int ok.replied_uuid;
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results
+                     | Error er ->
+                       failed := true;
+                       goals_fail := goals_json e.session;
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "ok", `Bool false;
+                           "error", `String (Error.to_string er);
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results;
+                       raise Exit))
+               ss
+           with Exit -> ());
+          let closes =
+            (not !failed) && (not !restarted)
+            && goals_closed e.session
+          in
+          let goals_at_end = goals_json e.session in
+          let revert_to_start () =
+            if Ec_llm_session.current_uuid e.session = start then
+              `String "unmoved"
+            else
+              match
+                Ec_llm_session.revert_to_uuid e.session ~target:start
+              with
+              | Ok () -> `String "restored"
+              | Error er ->
+                `String ("RESTORE FAILED: " ^ Error.to_string er)
+          in
+          (* Landing switch (ergonomics): the iterate call is also
+             the landing call. on_close = restore (default) | keep
+             (state stays advanced) | commit (verified in-place
+             write of the full body — requires a claimed lemma and
+             the at_lemma position, so the checked script IS the
+             whole body). *)
+          let do_commit () =
+            match str_arg args "lemma" with
+            | None -> Error "on_close=commit requires 'lemma'"
+            | Some lemma ->
+              (match claim_for e label lemma with
+               | Error m -> Error m
+               | Ok c ->
+                 (match lemma_start_target e lemma with
+                  | Error m -> Error m
+                  | Ok (_, m_target) ->
+                    if e.synced_upto <> m_target then
+                      Error
+                        (Printf.sprintf
+                           "session is not at %s's proof start — \
+                            resync_file {at_lemma: \"%s\"} first, \
+                            then re-check"
+                           lemma lemma)
+                    else
+                      let script =
+                        wrap_proof_body script
+                      in
+                      (match
+                         write_body_verified ~label e c ~script
+                           ~nosmt:true
+                       with
+                       | Error m -> Error m
+                       | Ok (true, payload) ->
+                         Ok [ "file_written", `Bool true;
+                              "verification", payload ]
+                       | Ok (false, payload) ->
+                         Ok [ "file_restored", `Bool true;
+                              "verification", payload ])))
+          in
+          let on_close =
+            match str_arg args "on_close" with
+            | Some "keep" -> `Keep
+            | Some "commit" -> `Commit
+            | _ -> `Restore
+          in
+          let (restore, commit_fields) =
+            if !restarted then
+              (`String
+                 "session restarted mid-script — state NOT \
+                  restored; run resync_file to recover",
+               [])
+            else
+              match on_close, closes with
+              | `Keep, true ->
+                e.synced_upto <- -1;
+                (`String "kept", [])
+              | `Commit, true ->
+                (match do_commit () with
+                 | Ok fields -> (`String "committed", fields)
+                 | Error msg ->
+                   let r = revert_to_start () in
+                   (r, [ "commit_error", `String msg ]))
+              | _ -> (revert_to_start (), [])
+          in
+          Ok (`Assoc ([
+            "session", `String label;
+            "checked", `Int (List.length !results);
+            "ok", `Bool ((not !failed) && not !restarted);
+            "closes", `Bool closes;
+            "results", `List (List.rev !results);
+            "restore", restore;
+            "uuid", `Int (Ec_llm_session.current_uuid e.session);
+            "total_time_ms", `Int (ms_since t0);
+            "stale", `Bool (stale_flag e);
+          ] @ commit_fields
+            @ (let detail = goal_detail_of args ~default:`Shape in
+               if !failed then
+                 [ "goals_at_failure",
+                   apply_goal_detail detail !goals_fail ]
+               else
+                 [ "goals_at_end",
+                   apply_goal_detail detail goals_at_end ])))))
+
+
 let tool_replace_proof t args =
   match str_arg args "lemma", str_arg args "script" with
   | None, _ -> Error "replace_proof: missing required argument 'lemma'"
@@ -2390,9 +2616,23 @@ let tools :
 
   "commit_proof",
   "Emit the session's successfully-executed proof phrases as a \
-   bullet-structured proof body (safe under +strict_bullets) — the \
-   bridge from session-first exploration back into document text.",
-  schema [ session_prop ],
+   bullet-structured proof body — the bridge from session-first \
+   exploration back into text. With write:true AND a claimed \
+   lemma, LANDS the proof directly: wraps the transcript in \
+   proof./qed., splices it over the lemma's body, resync-verifies, \
+   and restores the file on failure. Requires the proof to be \
+   CLOSED. The zero-seam ending for the step loop.",
+  schema [
+    ("lemma", "string",
+     "Required with write:true — the claimed lemma to land into.");
+    ("write", "boolean",
+     "Verified in-place write of the transcript body. Default \
+      false (text is only returned).");
+    ("nosmt", "boolean",
+     "Weak-check the unchanged prefix during write verification \
+      (default true).");
+    session_prop;
+  ],
   tool_commit_proof;
 
   "resync_file",
@@ -2575,7 +2815,11 @@ let handle_initialize ~stdout ~id params =
           sentence timings); commit the winner with replace_proof \
           (verifies and auto-restores the file on failure); after \
           any other on-disk edit run resync_file — replies carry \
-          stale=true until you do.";
+          stale=true until you do. Two landing paths, both \
+          self-writing: check_script {on_close:\"commit\", lemma} \
+          lands a passing body in the same call; or step with exec \
+          (watch for proof_complete:true) and land with \
+          commit_proof {lemma, write:true}.";
      ])
 
 let handle_message t ~stdout (msg : Yojson.Safe.t) =
