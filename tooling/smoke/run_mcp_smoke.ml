@@ -1574,6 +1574,213 @@ let () =
   in
   check "close we" (not err) "";
 
+  (* -- round 6: document-mode bullets / transcript / define ------- *)
+  let sb2 = Filename.concat fixture_dir "sb2.ec" in
+  let write_sb2 () =
+    let oc = open_out sb2 in
+    output_string oc
+      "require import AllCore.\n\
+       pragma +strict_bullets.\n\
+       lemma s1 : (1 = 1 /\\ 2 = 2) /\\ 3 = 3.\n\
+       proof.\n\
+       admit.\n\
+       qed.\n";
+    close_out oc
+  in
+  write_sb2 ();
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String sb2; "session", `String "wf";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "sb2 fixture open (strict_bullets)" (not err) "";
+  (* B7: a bullet-REUSING body must be refused by verification —
+     document text is checked under the file's own rules. *)
+  let (err, b7bad) =
+    call fd_in fd_out "replace_proof"
+      (`Assoc [
+         "lemma", `String "s1";
+         "script",
+         `String
+           "proof.\nsplit.\n+ split.\n  + trivial.\n  + trivial.\n\
+            + trivial.\nqed.";
+         "session", `String "wf";
+       ])
+  in
+  check "B7: strict-bullet violation refused, file restored"
+    ((not err)
+     && member "ok" b7bad = `Bool false
+     && member "file_restored" b7bad = `Bool true
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "bullet")
+                     (Yojson.Safe.to_string b7bad) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string b7bad);
+  (* Same parity one tool earlier: check_script sees the violation. *)
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wf"; "at_lemma", `String "s1" ])
+  in
+  check "wf at s1" (not err) "";
+  let (err, b7cs) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script",
+         `String
+           "split.\n+ split.\n  + trivial.\n  + trivial.\n+ trivial.";
+         "session", `String "wf";
+       ])
+  in
+  check "B7: check_script enforces the file's bullet rules"
+    ((not err)
+     && member "ok" b7cs = `Bool false
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "bullet")
+                     (Yojson.Safe.to_string b7cs) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string b7cs);
+  let (err, b7ok) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script",
+         `String
+           "split.\n- split.\n  + trivial.\n  + trivial.\n- trivial.";
+         "session", `String "wf";
+       ])
+  in
+  check "B7: correctly-bulleted body closes under strict rules"
+    ((not err)
+     && member "ok" b7ok = `Bool true
+     && member "closes" b7ok = `Bool true)
+    (Yojson.Safe.to_string b7ok);
+  (* B8: author bullet-free semantics through exec (typed bullets are
+     ignored AND stripped from the record); COMMIT owns presentation
+     and the landed body satisfies the strict file. *)
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "split."; "session", `String "wf" ])
+  in
+  check "wf split" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "+ split."; "session", `String "wf" ])
+  in
+  check "wf nested split (typed bullet ignored)" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "+ trivial.\n+ trivial.\n+ trivial.";
+         "session", `String "wf";
+       ])
+  in
+  check "wf close all three leaves" (not err) "";
+  let (err, cb) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [ "session", `String "wf" ])
+  in
+  let cb_body =
+    match member "proof" cb with `String s -> s | _ -> ""
+  in
+  check "B8: COMMIT body has single clean bullets (no '- +')"
+    ((not err)
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "- split.")
+                     cb_body 0);
+           true
+         with Not_found -> false)
+     && not (try
+               ignore (Str.search_forward (Str.regexp_string "- +")
+                         cb_body 0);
+               true
+             with Not_found -> false)
+     && not (try
+               ignore (Str.search_forward (Str.regexp_string "+ split.")
+                         cb_body 0);
+               true
+             with Not_found -> false))
+    cb_body;
+  let (err, cw) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [
+         "lemma", `String "s1"; "write", `Bool true;
+         "session", `String "wf";
+       ])
+  in
+  check "B8: COMMIT body lands verified on the strict file"
+    ((not err)
+     && member "ok" cw = `Bool true
+     && member "file_written" cw = `Bool true)
+    (Yojson.Safe.to_string cw);
+  (* Document replay is not authoring: after a full resync the
+     transcript is empty — read-only says so, write refuses. *)
+  let (err, _) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wf" ])
+  in
+  check "wf full resync" (not err) "";
+  let (err, ce) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [ "session", `String "wf" ])
+  in
+  check "B8: empty transcript is explained on read"
+    ((not err)
+     && member "proof" ce = `String ""
+     && (match member "note" ce with `String _ -> true | _ -> false))
+    (Yojson.Safe.to_string ce);
+  let (err, cwe) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [
+         "lemma", `String "s1"; "write", `Bool true;
+         "session", `String "wf";
+       ])
+  in
+  check "B8: empty transcript refuses to land"
+    (err
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "nothing to land")
+                     (Yojson.Safe.to_string cwe) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string cwe);
+  (* B9: define expansion is code-only — $refs inside comments are
+     neither expanded nor errors. *)
+  let (err, _) =
+    call fd_in fd_out "define"
+      (`Assoc [
+         "name", `String "inv2"; "text", `String "3 = 3";
+         "session", `String "wf";
+       ])
+  in
+  check "wf define inv2" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wf"; "at_lemma", `String "s1" ])
+  in
+  check "wf back at s1" (not err) "";
+  let (err, b9) =
+    call fd_in fd_out "check_script"
+      (`Assoc [
+         "script",
+         `String
+           "(* about $inv2 and $undefined_xyz *)\nsplit.\n\
+            - split.\n  + trivial.\n  + trivial.\n- trivial.";
+         "session", `String "wf";
+       ])
+  in
+  check "B9: $names inside comments untouched (no expansion, no error)"
+    ((not err)
+     && member "ok" b9 = `Bool true
+     && member "src_expanded" b9 = `Null)
+    (Yojson.Safe.to_string b9);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wf" ])
+  in
+  check "close wf" (not err) "";
+
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
       (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])

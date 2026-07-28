@@ -320,23 +320,44 @@ let is_ident_start c =
 let is_ident_char c =
   is_ident_start c || (c >= '0' && c <= '9') || c = '\''
 
-(* (start position, name) of each $name reference, left to right. *)
+(* (start position, name) of each $name reference, left to right.
+   Expansion applies to CODE only: comment spans (nesting-aware) and
+   string literals (backslash escapes) are skipped entirely — no
+   expansion and no unknown-$ errors inside them. The file is what
+   humans read (field report B9). *)
 let scan_define_refs (s : string) =
   let n = String.length s in
   let out = ref [] in
   let i = ref 0 in
   while !i < n do
-    if s.[!i] = '$'
-       && (!i = 0 || s.[!i - 1] <> '<')
-       && !i + 1 < n
-       && is_ident_start s.[!i + 1]
-    then begin
+    match s.[!i] with
+    | '(' when !i + 1 < n && s.[!i + 1] = '*' ->
+      let j = ref (!i + 2) in
+      let depth = ref 1 in
+      while !depth > 0 && !j < n do
+        if !j + 1 < n && s.[!j] = '(' && s.[!j + 1] = '*' then begin
+          incr depth; j := !j + 2
+        end
+        else if !j + 1 < n && s.[!j] = '*' && s.[!j + 1] = ')' then begin
+          decr depth; j := !j + 2
+        end
+        else incr j
+      done;
+      i := !j
+    | '"' ->
+      let j = ref (!i + 1) in
+      while !j < n && s.[!j] <> '"' do
+        if s.[!j] = '\\' && !j + 1 < n then j := !j + 2 else incr j
+      done;
+      i := (if !j < n then !j + 1 else n)
+    | '$' when (!i = 0 || s.[!i - 1] <> '<')
+               && !i + 1 < n
+               && is_ident_start s.[!i + 1] ->
       let j = ref (!i + 1) in
       while !j < n && is_ident_char s.[!j] do incr j done;
       out := (!i, String.sub s (!i + 1) (!j - !i - 1)) :: !out;
       i := !j
-    end
-    else incr i
+    | _ -> incr i
   done;
   List.rev !out
 
@@ -1114,7 +1135,7 @@ let apply_smt_timeout (e : entry) args ~corr =
     Error "smt_timeout must be a positive number of seconds"
   | Some n ->
     (match
-       Ec_llm_session.exec e.session ~corr
+       Ec_llm_session.exec e.session ~document:true ~corr
          ~sentence_class:`Executable
          ~source:(Printf.sprintf "timeout %d." n)
      with
@@ -1595,8 +1616,8 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                        else None
                      in
                      (match
-                        Ec_llm_session.exec e.session ~corr
-                          ~sentence_class:cls ~source:s.src
+                        Ec_llm_session.exec e.session ~document:true
+                          ~corr ~sentence_class:cls ~source:s.src
                       with
                       | Ok _ ->
                         incr cnt;
@@ -1858,8 +1879,8 @@ let outline_engine (e : entry) lemma =
                  in
                  let t0 = Unix.gettimeofday () in
                  (match
-                    Ec_llm_session.exec e.session ~corr
-                      ~sentence_class:cls ~source:s.src
+                    Ec_llm_session.exec e.session ~document:true
+                      ~corr ~sentence_class:cls ~source:s.src
                   with
                   | Error er ->
                     failed := Some (s, Error.to_string er);
@@ -2104,8 +2125,8 @@ let tool_check_skeleton t args =
                            ] :: !holes
                        | _ -> ());
                     (match
-                       Ec_llm_session.exec e.session ~corr
-                         ~sentence_class:cls ~source:s.src
+                       Ec_llm_session.exec e.session ~document:true
+                         ~corr ~sentence_class:cls ~source:s.src
                      with
                      | Error er ->
                        failed := Some (s, Error.to_string er);
@@ -2570,12 +2591,20 @@ let tool_commit_proof t args =
     (match Ec_llm_session.raw_command e.session "COMMIT" with
      | Error err -> Error (Error.to_string err)
      | Ok (body, _) ->
+       let empty = String.trim body = "" in
+       let empty_reason =
+         "the authoring transcript is empty — it records only \
+          phrases YOU executed since this proof was opened \
+          (positioning replays don't count, and any resync/LOAD \
+          clears it)"
+       in
        if not (bool_arg args "write") then
-         Ok (`Assoc [
+         Ok (`Assoc ([
            "session", `String label;
            "stale", `Bool (stale_flag e);
            "proof", `String body;
-         ])
+         ] @ (if empty then [ "note", `String empty_reason ]
+              else [])))
        else
          (* Zero-seam ending for the step loop: transcript ->
             wrapped body -> verified in-place write. *)
@@ -2583,7 +2612,12 @@ let tool_commit_proof t args =
           | None ->
             Error "commit_proof: write=true requires 'lemma'"
           | Some lemma ->
-            if stale_flag e then
+            if empty then
+              Error
+                ("commit_proof: nothing to land — " ^ empty_reason
+                 ^ "; re-step the proof, or land composed text \
+                    with replace_proof")
+            else if stale_flag e then
               Error
                 "commit_proof: file changed on disk — resync_file \
                  first"
@@ -2665,9 +2699,14 @@ let tool_check_script t args =
                         capture_admit e.session detail
                       else None
                     in
+                    (* Candidate bodies are DOCUMENT text: they are
+                       destined for the file verbatim, so they are
+                       checked under the file's own rules — strict
+                       bullets included (B7 parity: what passes here
+                       is what lands and compiles). *)
                     (match
-                       Ec_llm_session.exec e.session ~corr
-                         ~sentence_class:cls ~source:s.src
+                       Ec_llm_session.exec e.session ~document:true
+                         ~corr ~sentence_class:cls ~source:s.src
                      with
                      | Ok ok ->
                        if ok.restarted then begin
@@ -3201,10 +3240,12 @@ let tools :
    sentence verdicts + timings and whether the proof CLOSES, then \
    restores the session to where it was. The refactoring inner \
    loop: iterate candidates here without touching the file, write \
-   once with replace_proof when one passes. Per-sentence rows echo \
-   a one-line src PREVIEW (the full source survives on the failing \
-   sentence); a net goal-count increase attaches the compact \
-   `tree`.",
+   once with replace_proof when one passes. Candidates are checked \
+   as DOCUMENT text — under the file's own rules, strict_bullets \
+   included: what passes here is what compiles cold. Per-sentence \
+   rows echo a one-line src PREVIEW (the full source survives on \
+   the failing sentence); a net goal-count increase attaches the \
+   compact `tree`.",
   schema ~required:[ "script" ] [
     ("script", "string",
      "EasyCrypt sentences ('.'-terminated, newline-separated), \
@@ -3328,11 +3369,16 @@ let tools :
   "commit_proof",
   "Emit the session's successfully-executed proof phrases as a \
    bullet-structured proof body — the bridge from session-first \
-   exploration back into text. With write:true AND a claimed \
-   lemma, LANDS the proof directly: wraps the transcript in \
-   proof./qed., splices it over the lemma's body, resync-verifies, \
-   and restores the file on failure. Requires the proof to be \
-   CLOSED. The zero-seam ending for the step loop.",
+   exploration back into text. The transcript is PER-PROOF and \
+   authoring-only: phrases YOU executed since the current proof \
+   opened (typed bullets are stripped — COMMIT owns bullet \
+   presentation, valid under strict_bullets); positioning replays \
+   never count and any resync/LOAD clears it. With write:true AND \
+   a claimed lemma, LANDS the proof directly: wraps the transcript \
+   in proof./qed., splices it over the lemma's body, \
+   resync-verifies, and restores the file on failure. Requires \
+   the proof to be CLOSED; an empty transcript refuses to land. \
+   The zero-seam ending for the step loop.",
   schema [
     ("lemma", "string",
      "Required with write:true — the claimed lemma to land into.");
@@ -3387,13 +3433,14 @@ let tools :
   "replace_proof",
   "Verified in-place proof replacement — the refactoring commit \
    step. Splices 'script' over the claimed lemma's proof-body \
-   lines, re-syncs (weak prefix, fully-checked spliced body; the \
-   unchanged tail below is certificate-skipped, not re-verified), \
-   and RESTORES the original file automatically if verification \
+   lines, re-syncs (weak prefix, fully-checked spliced body under \
+   the file's OWN rules — strict_bullets included; the unchanged \
+   tail below is certificate-skipped, not re-verified), and \
+   RESTORES the original file automatically if verification \
    fails. Requires freshness (resync_file first if the file \
    changed out-of-band) and, in proof mode, a claim on the lemma. \
-   $name references expand from `define` bindings — the file \
-   receives expanded EC text.",
+   $name references expand from `define` bindings (code only — \
+   comments/strings untouched) — the file receives expanded EC.",
   schema ~required:[ "lemma"; "script" ] [
     ("lemma", "string", "The claimed lemma whose proof to replace.");
     ("script", "string",

@@ -40,6 +40,16 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
    fast at 1 s while exploring, let a believed-good candidate run
    long. "Too big or merely too slow" is a fork you can now
    actually measure.
+8. **Two rule regimes: authored vs document text.** Text you STEP
+   with (`exec`, `exec_in`, `try_tactic`) is authored: bullet
+   discipline is exempted (type plain tactics; typed bullets are
+   ignored and stripped from the record — `commit_proof` re-emits
+   correct bullet presentation from the proof tree). Text that is
+   or becomes the FILE (`check_script`/`check_skeleton` candidates,
+   `replace_proof` bodies, resync replays) is document text:
+   checked under exactly the rules the file sets for itself,
+   `pragma +strict_bullets` included — what passes here is what
+   compiles cold.
 
 ## Tools by workflow
 
@@ -117,10 +127,13 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   `replace_proof`). A six-line invariant is sent ONCE, referenced
   everywhere — the single largest payload saving in a
   `conseq`/`call`/`while` proof. Purely lexical and honest:
-  expansion is single-pass (no nesting), unknown `$names` are hard
-  errors, `<$` sampling never starts a reference, replies echo
-  `src_expanded` whenever expansion fired, and files only ever
-  receive expanded EC. `{name}` alone deletes; no name lists.
+  expansion applies to CODE only (`$refs` inside comments and
+  string literals are neither expanded nor errors — files stay
+  human-readable), is single-pass (no nesting), unknown `$names`
+  in code are hard errors, `<$` sampling never starts a
+  reference, replies echo `src_expanded` whenever expansion
+  fired, and files only ever receive expanded EC. `{name}` alone
+  deletes; no name lists.
 
 ### Writing back (the only file-writing path)
 
@@ -130,6 +143,13 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   directly: wraps the transcript in `proof.`/`qed.`, splices,
   resync-verifies, restores on failure. Requires the proof to
   be closed — the zero-seam ending after stepping with `exec`.
+  The transcript is PER-PROOF and authoring-only: it records the
+  phrases you executed since the current proof opened (typed
+  bullets stripped — COMMIT owns presentation, and on a
+  strict_bullets file the emitted body satisfies the strict
+  rules); positioning replays never count, and any resync/LOAD
+  clears it. An empty transcript reads back as `proof: ""` with a
+  note and REFUSES to land.
 - `replace_proof {lemma, script, nosmt?}` — verified in-place body
   replacement: splices over the claimed lemma's body lines,
   re-syncs (weak prefix + fully-checked spliced body), and
@@ -337,7 +357,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 125/125).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 142/142).
 
 ## Known limits (v1, honest)
 

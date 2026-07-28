@@ -17,8 +17,15 @@
 > `smt_timeout`, and session-lexical `define` bindings; round 5
 > (B6): the single `exec_keyword` tokenizer — bullet/comment-blind
 > keyword matching everywhere (bulleted admits are debt; smt(args)
-> flagged; first_token deleted);
-> `run_mcp_smoke` 125/125).
+> flagged; first_token deleted); round 6 (B7/B8/B9): authored vs
+> DOCUMENT text — `<DOC-BEGIN>` wire blocks check file text under
+> the file's own rules (strict_bullets enforced on resync tails,
+> verification, and check_script/check_skeleton candidates; the
+> REPL bullet exemption is per-phrase-scoped, the global pragma is
+> document truth), per-proof authoring transcript (typed bullets
+> stripped — COMMIT owns presentation; empty transcript explains
+> itself and refuses to land), define expansion is code-only;
+> `run_mcp_smoke` 142/142).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

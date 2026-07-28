@@ -467,9 +467,14 @@ let send_and_read t (line : string) : reply option =
     Eio.Flow.copy_string "\n" t.stdin;
   read_reply_with_cancel t.stdout_buf t.cancel_promise
 
-(* Send a multi-line EasyCrypt sentence via <BEGIN>/<DONE>. *)
-let send_multi_and_read t (source : string) : reply option =
-  Eio.Flow.copy_string "<BEGIN>\n" t.stdin;
+(* Send a multi-line EasyCrypt sentence via <BEGIN>/<DONE> (REPL
+   mode) or <DOC-BEGIN>/<DONE> (document mode: the phrase is FILE
+   text — checked under the document's own rules, strict bullets
+   included, and kept out of the authoring transcript). *)
+let send_multi_and_read t ?(document = false) (source : string)
+  : reply option =
+  Eio.Flow.copy_string
+    (if document then "<DOC-BEGIN>\n" else "<BEGIN>\n") t.stdin;
   Eio.Flow.copy_string source t.stdin;
   if not (String.length source > 0 && source.[String.length source - 1] = '\n') then
     Eio.Flow.copy_string "\n" t.stdin;
@@ -480,7 +485,9 @@ let send_multi_and_read t (source : string) : reply option =
 (* BACKEND operations                                                *)
 (* ---------------------------------------------------------------- *)
 
-let exec t ~corr ~sentence_class ~source =
+(* [?document] precedes the positional [t] so plain applications
+   erase it (labeled args alone never erase a preceding optional). *)
+let exec ?(document = false) t ~corr ~sentence_class ~source =
   if t.cancelled then
     Error (Error.Cancelled { reason = "session cancelled" })
   else if t.closed then
@@ -501,6 +508,7 @@ let exec t ~corr ~sentence_class ~source =
          "label", `String t.label;
          "pre_uuid", `Int pre_uuid;
          "class", `String class_str;
+         "document", `Bool document;
          "source", `String source;
          "source_len", `Int (String.length source);
        ]);
@@ -511,7 +519,7 @@ let exec t ~corr ~sentence_class ~source =
       | None -> `Null
       | Some s -> `String s
     in
-    match send_multi_and_read t source with
+    match send_multi_and_read t ~document source with
     | None ->
       t.cancelled <- true;
       Transcript.record_g ~corr Transcript.Session_restart
@@ -1003,7 +1011,10 @@ let () =
   let module _ : Session.BACKEND = struct
     type nonrec t = t
     let start = start
-    let exec = exec
+    (* Document mode is an EcLlm wire concern; the abstract BACKEND
+       contract stays REPL-only (eta-expansion erases the optional). *)
+    let exec t ~corr ~sentence_class ~source =
+      exec t ~corr ~sentence_class ~source
     let revert_to = revert_to
     let goals t = goals t
     let cancel = cancel
