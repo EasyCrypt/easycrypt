@@ -512,6 +512,42 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           let compare = compare
         end)
       in
+      let module Hset =
+        Set.Make (struct
+          type t = EcCoreGoal.handle
+          let compare = compare
+        end)
+      in
+      (* A bullet marks a point where MORE THAN ONE branch is still
+         open once the phrase finishes. Raw DAG fan-out also counts
+         children closed WITHIN the phrase (`have ... by ...` claims,
+         `split; first by ...`), which turned linear chains into
+         one-bullet-level-per-sentence staircases (field report B10).
+         Each entry's successor snapshot records which handles were
+         open after it; a handle "bears" an open goal iff it is an
+         open handle or an ancestor of one. *)
+      let bearing_of opens =
+        let rec up acc h =
+          if Hset.mem h acc then acc
+          else
+            let acc = Hset.add h acc in
+            match EcCommands.parent_of h with
+            | Some p -> up acc p
+            | None -> acc
+        in
+        List.fold_left up Hset.empty opens
+      in
+      (* Pair each entry with the open-handle set AFTER it: the next
+         entry's at-entry snapshot, or the live set for the last. *)
+      let entries =
+        let rec annotate = function
+          | [] -> []
+          | [ e ] -> [ (e, EcCommands.open_handles ()) ]
+          | e :: ((_, _, _, o2) :: _ as rest) ->
+            (e, o2) :: annotate rest
+        in
+        annotate entries
+      in
       let sibling_depth : int Hmap.t ref = ref Hmap.empty in
       let current_depth = ref 0 in
       (* Pick a bullet token for each depth, skipping tokens already
@@ -557,12 +593,12 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
          siblings are still pending. Register all of them at depth 1
          so the first phrase's parent gets a bullet. *)
       (match entries with
-       | (_, _, Some _, (_ :: _ :: _ as opens)) :: _ ->
+       | ((_, _, Some _, (_ :: _ :: _ as opens)), _) :: _ ->
          List.iter
            (fun h -> sibling_depth := Hmap.add h 1 !sibling_depth)
            opens
        | _ -> ());
-      List.iter (fun (_uuid, src, parent_opt, _opens) ->
+      List.iter (fun ((_uuid, src, parent_opt, _opens), opens_after) ->
         match parent_opt with
         | None ->
           Buffer.add_string buf src;
@@ -591,22 +627,30 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           Buffer.add_string buf src;
           Buffer.add_char buf '\n';
           (* Register fresh siblings: walk the subtree rooted at
-             [parent], finding every multi-child split, and register
-             each such child at the right depth. Single-child links
-             are continuations and don't bump depth; multi-child
-             links do. A compound phrase like [split; split.] can
-             produce nested splits within one phrase. *)
+             [parent], registering a bullet level only at nodes where
+             AT LEAST TWO children still bear an open goal after the
+             phrase — a child fully discharged within the phrase is
+             not a branch the file needs a bullet for (B10). A lone
+             surviving child is a continuation and keeps its depth.
+             A compound phrase like [split; split.] still nests. *)
+          let bearing = bearing_of opens_after in
           let rec walk h d =
             match EcCommands.children_of h with
-            | [c] -> walk c d
-            | (_ :: _ :: _) as cs ->
-              List.iter
-                (fun c ->
-                  sibling_depth :=
-                    Hmap.add c d !sibling_depth;
-                  walk c (d + 1))
-                cs
             | [] -> ()
+            | [ c ] -> walk c d
+            | cs ->
+              (match
+                 List.filter (fun c -> Hset.mem c bearing) cs
+               with
+               | [] -> ()
+               | [ c ] -> walk c d
+               | live ->
+                 List.iter
+                   (fun c ->
+                      sibling_depth :=
+                        Hmap.add c d !sibling_depth;
+                      walk c (d + 1))
+                   live)
           in
           walk parent (!current_depth + 1)
       ) entries;
