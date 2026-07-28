@@ -66,6 +66,7 @@ val pp_maybe_current_goal : Format.formatter -> unit
 val pp_all_goals : unit -> string list
 val in_proof : unit -> bool
 val disable_repl_bullets : unit -> EcBullets.stack option
+val with_strict_bullets : bool -> (unit -> 'a) -> 'a
 val pp_tree : ?all:bool -> unit -> (int * bool * string) list
 val focus_goal : int -> (int, string) result
 val open_handles : unit -> EcCoreGoal.handle list

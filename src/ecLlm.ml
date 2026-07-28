@@ -428,10 +428,32 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   end in
 
   (* ------------------------------------------------------------------ *)
+  (* Recorded sources strip any leading bullet token (whitespace and
+     one `+`/`-`/`*` run): under the REPL exemption a typed bullet is
+     semantically ignored, and [Commit] owns bullet PRESENTATION —
+     recording typed bullets produced double-bulleted output
+     ("- + trivial.", field report B8). *)
+  let strip_recorded_bullet (src : string) =
+    let n = String.length src in
+    let rec skip i =
+      if i >= n then i
+      else
+        match src.[i] with
+        | ' ' | '\t' | '\n' | '\r' | '+' | '-' | '*' -> skip (i + 1)
+        | _ -> i
+    in
+    let b = skip 0 in
+    if b = 0 then src else String.sub src b (n - b)
+  in
+
   (* Process a single EasyCrypt command, respecting [gl_fail]. When
      [~record:true], append a transcript entry on success: the parent
      handle (focused goal before the phrase) and the open-handle list,
-     which together let [Commit] reconstruct bullet structure. *)
+     which together let [Commit] reconstruct bullet structure. Any
+     successful declaration opens a NEW authoring scope: the
+     transcript is per-proof (field report B8 — a stale transcript
+     spanning positioning replays and earlier lemmas is not a proof
+     of anything). *)
   let process_action ?(record=false) ~src (p : EP.global) =
     let loc = p.EP.gl_action.EcLocation.pl_loc in
     let pre_uuid = EcCommands.uuid () in
@@ -454,8 +476,13 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       raise (EcScope.toperror_of_exn ~gloc:loc
         (EcScope.HiScopeError (None,
           "this command is expected to fail")));
+    (match EcLocation.unloc p.EP.gl_action with
+     | EP.Gaxiom _ when !succeeded -> Transcript.clear ()
+     | _ -> ());
     if record && !succeeded && not p.EP.gl_fail then
-      transcript := (pre_uuid, src, parent, opens_pre) :: !transcript
+      transcript :=
+        (pre_uuid, strip_recorded_bullet src, parent, opens_pre)
+        :: !transcript
   in
 
   (* ------------------------------------------------------------------ *)
@@ -587,16 +614,29 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   end in
 
   (* ------------------------------------------------------------------ *)
-  (* Process EasyCrypt input typed at the REPL prompt (single phrase
-     or a line ending with a "."). *)
-  let process_ec_input input =
+  (* Process EasyCrypt input, in one of two modes (field report B7):
+
+     - REPL (default): the phrase is AUTHORED text. Bullet
+       enforcement is exempted for the phrase (scoped — the global
+       pragma stays document truth), the active proof's bullet stack
+       is cleared once (snapshotted for COMMIT's token selection),
+       and the phrase is recorded in the authoring transcript.
+
+     - document (~document:true, wire `<DOC-BEGIN>` block): the
+       phrase is DOCUMENT text being replayed (resync tails, body
+       verification, candidate bodies destined for the file). It is
+       checked under exactly the rules the file establishes for
+       itself — strict bullets included — and is NOT recorded: replay
+       is not authoring. *)
+  let process_ec_input ?(document = false) input =
     Buffer.clear notices;
     (* On the first REPL phrase of each proof, capture the bullet stack
        the LOAD prefix left so COMMIT can avoid token collisions with
        it. Subsequent calls return [None] and don't clobber the snapshot. *)
-    (match EcCommands.disable_repl_bullets () with
-     | None -> ()
-     | Some _ as snapshot -> prior_bullets := snapshot);
+    if not document then
+      (match EcCommands.disable_repl_bullets () with
+       | None -> ()
+       | Some _ as snapshot -> prior_bullets := snapshot);
     let reader = EcIo.from_string input in
     let last_src = ref "" in
     begin try
@@ -627,7 +667,11 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       last_src := src;
       begin match EcLocation.unloc prog with
       | EP.P_Prog (commands, _) ->
-        List.iter (process_action ~record:true ~src) commands;
+        if document then
+          List.iter (process_action ~record:false ~src) commands
+        else
+          EcCommands.with_strict_bullets false (fun () ->
+            List.iter (process_action ~record:true ~src) commands);
         Wire.reply_ok_goals ()
       | EP.P_Undo i ->
         EcCommands.undo i;
@@ -971,7 +1015,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Parse_file   of string (* machine profile: PARSE-JSON "file" *)
       | Analyze_file of string (* machine profile: ANALYZE-JSON "file" *)
       | Exec_json    of string (* machine profile: EXEC-JSON <payload> *)
-      | Begin_multi of [ `Ec | `Parse | `Analyze ]
+      | Begin_multi of [ `Ec | `Doc | `Parse | `Analyze ]
       | Done_multi
       | Multi_line of string
       | Blank
@@ -1047,6 +1091,10 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       else
         match line with
         | "<BEGIN>"         -> Begin_multi `Ec
+        (* Document-mode phrase (field report B7): checked under the
+           file's own rules — no REPL bullet exemption, no transcript
+           recording. Same <DONE> closer as <BEGIN>. *)
+        | "<DOC-BEGIN>"     -> Begin_multi `Doc
         | "<PARSE-BEGIN>"   -> Begin_multi `Parse
         | "<ANALYZE-BEGIN>" -> Begin_multi `Analyze
         | ""          -> Blank
@@ -1081,8 +1129,9 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   let multi_buf = Buffer.create 256 in
   let in_multi  = ref false in
   (* Which frame opened the active multi-line block: plain EasyCrypt
-     input (<BEGIN>) or the machine-profile PARSE/ANALYZE frames. *)
-  let multi_mode : [ `Ec | `Parse | `Analyze ] ref = ref `Ec in
+     input (<BEGIN>), document-mode input (<DOC-BEGIN>), or the
+     machine-profile PARSE/ANALYZE frames. *)
+  let multi_mode : [ `Ec | `Doc | `Parse | `Analyze ] ref = ref `Ec in
 
   let module Dispatch = struct
     let do_help () =
@@ -1185,6 +1234,8 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
              ~checkmode:(checkmode_of !cur_prvopts) input)
       | `Ec ->
         if input <> "" then process_ec_input input
+      | `Doc ->
+        if input <> "" then process_ec_input ~document:true input
 
     let do_multi_line s =
       if Buffer.length multi_buf > 0 then

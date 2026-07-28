@@ -1036,16 +1036,30 @@ let focus_goal (k : int) : (int, string) result =
             Ok n
           end
 
-(* Disable bullet enforcement for REPL-driven phrases. Drops the global
-   pragma so newly-opened proofs have no bullet stack, and clears the
-   stack on any currently active proof so REPL phrases are not checked
-   against it. Idempotent. Does not advance the undo level. Returns
-   the stack that was in place (if any) at the moment the active
-   proof's bullets were first cleared; returns [None] on idempotent
-   calls (where the stack is already gone). Callers use the returned
-   stack to drive bullet-character selection in [COMMIT]. *)
+(* Run [f] with the strict-bullets pragma scoped to [b], restoring the
+   prior value on every exit path. The GLOBAL pragma is document truth
+   (set by the file's own `pragma +strict_bullets.`); REPL-driven
+   phrases are exempted per-phrase through this scope instead of
+   clobbering it — document text replayed later in the same session
+   must still be checked under the file's own rules (field report
+   B7). *)
+let with_strict_bullets (b : bool) (f : unit -> 'a) : 'a =
+  let saved = (Pragma.get ()).pm_strict_bullets in
+  pragma_strict_bullets b;
+  Fun.protect ~finally:(fun () -> pragma_strict_bullets saved) f
+
+(* Disable bullet enforcement for REPL-driven phrases: clears the
+   bullet stack on any currently active proof so REPL phrases are not
+   checked against it. Idempotent. Does not advance the undo level.
+   Does NOT touch the global pragma (see [with_strict_bullets] — the
+   per-phrase exemption is scoped; a proof OPENED by a REPL phrase
+   gets no stack because the pragma reads false during that phrase).
+   Returns the stack that was in place (if any) at the moment the
+   active proof's bullets were first cleared; returns [None] on
+   idempotent calls (where the stack is already gone). Callers use
+   the returned stack to drive bullet-character selection in
+   [COMMIT]. *)
 let disable_repl_bullets () : EcBullets.stack option =
-  pragma_strict_bullets false;
   match !context with
   | None -> None
   | Some ctxt ->
