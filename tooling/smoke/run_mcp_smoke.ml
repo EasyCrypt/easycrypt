@@ -1781,6 +1781,79 @@ let () =
   in
   check "close wf" (not err) "";
 
+  (* -- round 7 (B10): bullets only at REAL branch points ---------- *)
+  let linf = Filename.concat fixture_dir "lin.ec" in
+  let oc = open_out linf in
+  output_string oc
+    "require import AllCore.\n\
+     lemma lin : 3 = 3.\n\
+     proof.\n\
+     admit.\n\
+     qed.\n";
+  close_out oc;
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String linf; "session", `String "wl";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "lin fixture open" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wl"; "at_lemma", `String "lin" ])
+  in
+  check "wl at lin" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text",
+         `String
+           "have h1 : 1 = 1 by trivial.\n\
+            have h2 : 2 = 2 by trivial.\n\
+            by trivial.";
+         "session", `String "wl";
+       ])
+  in
+  check "wl linear have-chain executed" (not err) "";
+  let (err, lc) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [ "session", `String "wl" ])
+  in
+  let lc_body =
+    match member "proof" lc with `String s -> s | _ -> "<missing>"
+  in
+  check "B10: linear chain commits FLAT (no bullet staircase)"
+    ((not err)
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "\nhave h2") lc_body 0);
+           true
+         with Not_found -> false)
+     && not (String.length lc_body >= 2
+             && (try
+                   ignore (Str.search_forward
+                             (Str.regexp "^[-+*]") lc_body 0);
+                   true
+                 with Not_found -> false)))
+    lc_body;
+  let (err, lw) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [
+         "lemma", `String "lin"; "write", `Bool true;
+         "session", `String "wl";
+       ])
+  in
+  check "B10: flat body lands verified"
+    ((not err)
+     && member "ok" lw = `Bool true
+     && member "file_written" lw = `Bool true)
+    (Yojson.Safe.to_string lw);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wl" ])
+  in
+  check "close wl" (not err) "";
+
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
       (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])

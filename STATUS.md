@@ -25,7 +25,10 @@
 > document truth), per-proof authoring transcript (typed bullets
 > stripped — COMMIT owns presentation; empty transcript explains
 > itself and refuses to land), define expansion is code-only;
-> `run_mcp_smoke` 142/142).
+> round 7 (B10): COMMIT emits bullets only at REAL branch points
+> (>=2 open-bearing children after the phrase — linear have-chains
+> commit flat, nested splits unchanged);
+> `run_mcp_smoke` 148/148).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

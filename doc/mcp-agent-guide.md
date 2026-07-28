@@ -148,8 +148,11 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   bullets stripped — COMMIT owns presentation, and on a
   strict_bullets file the emitted body satisfies the strict
   rules); positioning replays never count, and any resync/LOAD
-  clears it. An empty transcript reads back as `proof: ""` with a
-  note and REFUSES to land.
+  clears it. Bullets are emitted only at REAL branch points —
+  where two or more branches were still open after a phrase — so
+  a linear `have`-chain commits flat, not as a staircase. An
+  empty transcript reads back as `proof: ""` with a note and
+  REFUSES to land.
 - `replace_proof {lemma, script, nosmt?}` — verified in-place body
   replacement: splices over the claimed lemma's body lines,
   re-syncs (weak prefix + fully-checked spliced body), and
@@ -357,7 +360,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 142/142).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 148/148).
 
 ## Known limits (v1, honest)
 
