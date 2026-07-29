@@ -1854,6 +1854,95 @@ let () =
   in
   check "close wl" (not err) "";
 
+  (* -- round 8 (B11): deep siblings, continuations keep their level  *)
+  let blf = Filename.concat fixture_dir "bl.ec" in
+  let oc = open_out blf in
+  output_string oc
+    "require import AllCore.\n\
+     pragma +strict_bullets.\n\
+     lemma w : (1 = 1 /\\ (2 = 2 /\\ 3 = 3)) /\\ 4 = 4.\n\
+     proof.\n\
+     admit.\n\
+     qed.\n";
+  close_out oc;
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String blf; "session", `String "wm";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "bl fixture open" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wm"; "at_lemma", `String "w" ])
+  in
+  check "wm at w" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text",
+         `String
+           "split.\nsplit.\nby trivial.\n\
+            have h : 5 = 5 by trivial.\nsplit.\n\
+            by trivial.\nby trivial.\nby trivial.";
+         "session", `String "wm";
+       ])
+  in
+  check "wm deep-sibling proof executed" (not err) "";
+  let (err, bc) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [ "session", `String "wm" ])
+  in
+  let bc_body =
+    match member "proof" bc with `String s -> s | _ -> "<missing>"
+  in
+  check "B11: sibling entry bulleted, create-and-close never shifts level"
+    ((not err)
+     (* the have..by phrase ENTERS its sibling: bulleted *)
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "+ have h") bc_body 0);
+           true
+         with Not_found -> false)
+     (* the split after it is a CONTINUATION: same depth, no bullet *)
+     && not (try
+               ignore (Str.search_forward
+                         (Str.regexp "[-+*] split\\.$") bc_body
+                         (Str.search_forward
+                            (Str.regexp_string "+ have h") bc_body 0));
+               true
+             with Not_found -> false)
+     (* its children open one honest level deeper *)
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "* by trivial.") bc_body 0);
+           true
+         with Not_found -> false)
+     (* and no phantom 4th level exists in this 3-level proof *)
+     && not (try
+               ignore (Str.search_forward
+                         (Str.regexp_string "-- ") bc_body 0);
+               true
+             with Not_found -> false))
+    bc_body;
+  let (err, bw) =
+    call fd_in fd_out "commit_proof"
+      (`Assoc [
+         "lemma", `String "w"; "write", `Bool true;
+         "session", `String "wm";
+       ])
+  in
+  check "B11: emitted layout lands verified under strict_bullets"
+    ((not err)
+     && member "ok" bw = `Bool true
+     && member "file_written" bw = `Bool true)
+    (Yojson.Safe.to_string bw);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wm" ])
+  in
+  check "close wm" (not err) "";
+
   let (err, ex) =
     call fd_in fd_out "extract_lemma"
       (`Assoc [ "name", `String "aux_x"; "session", `String "w2" ])

@@ -26,9 +26,13 @@
 > stripped — COMMIT owns presentation; empty transcript explains
 > itself and refuses to land), define expansion is code-only;
 > round 7 (B10): COMMIT emits bullets only at REAL branch points
-> (>=2 open-bearing children after the phrase — linear have-chains
-> commit flat, nested splits unchanged);
-> `run_mcp_smoke` 148/148).
+> (linear have-chains commit flat, nested splits unchanged);
+> round 8 (B11): the COMMIT emitter is a snapshot-driven FRAME
+> simulation (ecBullets' own model — the proof-DAG walk is gone):
+> sibling frames from >=2-new-goal phrases, continuations never
+> shift level, verified on the real 57-sentence bw3_real_eager
+> (emitted body passes check_script under strict_bullets);
+> `run_mcp_smoke` 154/154).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is
