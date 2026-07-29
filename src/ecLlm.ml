@@ -486,11 +486,21 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   in
 
   (* ------------------------------------------------------------------ *)
-  (* COMMIT: replay the transcript against the proof DAG (parent_of /
-     children_of, backed by [EcCoreGoal.pr_parent]), inserting bullets
-     at multi-child splits. Bullet tokens skip any character already on
-     the LOAD prefix's [puc_bullets] stack so emitted bullets cannot
-     collide with frames opened by the prefix. *)
+  (* COMMIT: re-render the transcript with bullet PRESENTATION derived
+     from the recorded open-goal snapshots — the same frame model the
+     strict-bullets checker itself uses (EcBullets), so the emitted
+     layout is what the checker accepts. A phrase that leaves >= 2
+     NEW goals open pushes a sibling frame one level deeper; a phrase
+     whose parent is a pending sibling emits that frame's bullet
+     (popping any inner frames); every other phrase is an unbulleted
+     continuation at the current depth. Phrases that create-and-close
+     within themselves (`have ... by ...`, `if; 1: ...` selectors,
+     non-splitting steps like `proc.`) leave at most one new goal and
+     therefore NEVER shift the level (field reports B10/B11 — the
+     proof-DAG fan-out this used to walk counts internal refinements
+     the file reader never sees). Bullet tokens skip any character
+     already on the LOAD prefix's [puc_bullets] stack so emitted
+     bullets cannot collide with frames opened by the prefix. *)
   let module Commit = struct
     (* Token order matches PR 1017's lexer: -, +, *, --, ++, **,
        ---, +++, *** ... *)
@@ -506,36 +516,11 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       let emit_indent depth =
         for _ = 1 to depth do Buffer.add_string buf "  " done
       in
-      let module Hmap =
-        Map.Make (struct
-          type t = EcCoreGoal.handle
-          let compare = compare
-        end)
-      in
       let module Hset =
         Set.Make (struct
           type t = EcCoreGoal.handle
           let compare = compare
         end)
-      in
-      (* A bullet marks a point where MORE THAN ONE branch is still
-         open once the phrase finishes. Raw DAG fan-out also counts
-         children closed WITHIN the phrase (`have ... by ...` claims,
-         `split; first by ...`), which turned linear chains into
-         one-bullet-level-per-sentence staircases (field report B10).
-         Each entry's successor snapshot records which handles were
-         open after it; a handle "bears" an open goal iff it is an
-         open handle or an ancestor of one. *)
-      let bearing_of opens =
-        let rec up acc h =
-          if Hset.mem h acc then acc
-          else
-            let acc = Hset.add h acc in
-            match EcCommands.parent_of h with
-            | Some p -> up acc p
-            | None -> acc
-        in
-        List.fold_left up Hset.empty opens
       in
       (* Pair each entry with the open-handle set AFTER it: the next
          entry's at-entry snapshot, or the live set for the last. *)
@@ -548,7 +533,8 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
         in
         annotate entries
       in
-      let sibling_depth : int Hmap.t ref = ref Hmap.empty in
+      (* Sibling frames, innermost first: (depth, pending handles). *)
+      let frames : (int * Hset.t ref) list ref = ref [] in
       let current_depth = ref 0 in
       (* Pick a bullet token for each depth, skipping tokens already
          in scope from the LOAD prefix's bullet stack. *)
@@ -589,70 +575,51 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           t
       in
       (* Seed: if the first recorded phrase entered a state with
-         multiple open goals, the LOAD prefix opened a frame whose
-         siblings are still pending. Register all of them at depth 1
-         so the first phrase's parent gets a bullet. *)
+         multiple open goals, the LOAD prefix opened a split whose
+         siblings are still pending — one depth-1 frame holding all
+         of them, so each sibling's first phrase gets a bullet. *)
       (match entries with
        | ((_, _, Some _, (_ :: _ :: _ as opens)), _) :: _ ->
-         List.iter
-           (fun h -> sibling_depth := Hmap.add h 1 !sibling_depth)
-           opens
+         frames := [ (1, ref (Hset.of_list opens)) ]
        | _ -> ());
-      List.iter (fun ((_uuid, src, parent_opt, _opens), opens_after) ->
-        match parent_opt with
-        | None ->
-          Buffer.add_string buf src;
-          Buffer.add_char buf '\n'
-        | Some parent ->
-          (* Walk upward via pr_parent until we hit a registered
-             sibling ancestor. If found, emit its bullet and consume
-             the registration. *)
-          let rec find_ancestor h =
-            match Hmap.find_opt h !sibling_depth with
-            | Some d -> Some (h, d)
+      List.iter (fun ((_uuid, src, parent_opt, opens_pre), opens_after) ->
+        (match parent_opt with
+         | None -> ()
+         | Some parent ->
+           (* Does this phrase start a pending sibling? Search from
+              the innermost frame outward; a hit pops the inner
+              frames (their subproofs are over — or the layout was
+              never linear, which verification rejects loudly). *)
+           let rec find = function
+             | [] -> None
+             | ((d, pend) :: rest) as l ->
+               if Hset.mem parent !pend then Some (d, pend, l)
+               else find rest
+           in
+           (match find !frames with
+            | Some (d, pend, tail) ->
+              frames := tail;
+              pend := Hset.remove parent !pend;
+              emit_indent (d - 1);
+              Buffer.add_string buf (bullet_for_depth d);
+              Buffer.add_char buf ' ';
+              current_depth := d
             | None ->
-              match EcCommands.parent_of h with
-              | Some p -> find_ancestor p
-              | None -> None
-          in
-          (match find_ancestor parent with
-           | Some (h, d) ->
-             emit_indent (d - 1);
-             Buffer.add_string buf (bullet_for_depth d);
-             Buffer.add_char buf ' ';
-             current_depth := d;
-             sibling_depth := Hmap.remove h !sibling_depth
-           | None ->
-             emit_indent !current_depth);
-          Buffer.add_string buf src;
-          Buffer.add_char buf '\n';
-          (* Register fresh siblings: walk the subtree rooted at
-             [parent], registering a bullet level only at nodes where
-             AT LEAST TWO children still bear an open goal after the
-             phrase — a child fully discharged within the phrase is
-             not a branch the file needs a bullet for (B10). A lone
-             surviving child is a continuation and keeps its depth.
-             A compound phrase like [split; split.] still nests. *)
-          let bearing = bearing_of opens_after in
-          let rec walk h d =
-            match EcCommands.children_of h with
-            | [] -> ()
-            | [ c ] -> walk c d
-            | cs ->
-              (match
-                 List.filter (fun c -> Hset.mem c bearing) cs
-               with
-               | [] -> ()
-               | [ c ] -> walk c d
-               | live ->
-                 List.iter
-                   (fun c ->
-                      sibling_depth :=
-                        Hmap.add c d !sibling_depth;
-                      walk c (d + 1))
-                   live)
-          in
-          walk parent (!current_depth + 1)
+              emit_indent !current_depth));
+        Buffer.add_string buf src;
+        Buffer.add_char buf '\n';
+        (* A phrase leaving >= 2 NEW open goals is a branch point the
+           file needs bullets for; anything else (including
+           create-and-close compounds) is not. *)
+        let pre = Hset.of_list opens_pre in
+        (match
+           List.filter (fun h -> not (Hset.mem h pre)) opens_after
+         with
+         | _ :: _ :: _ as created ->
+           frames :=
+             (!current_depth + 1, ref (Hset.of_list created))
+             :: !frames
+         | _ -> ())
       ) entries;
       Buffer.contents buf
   end in
