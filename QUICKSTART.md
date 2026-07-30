@@ -69,11 +69,19 @@ The 30-second digest you must not violate:
 - `stale: true` on any reply → `resync_file` before trusting or
   writing anything.
 - Iterate with the state-neutral tools (`try_tactic`,
-  `check_script`, `check_skeleton`); write once, verified.
+  `check_script`, `check_skeleton`); write once, verified. Probe
+  with `try_tactic`, NEVER with `exec` — exec commits, and a
+  committed probe poisons every later `check_script`. Read
+  `check_script`'s `entry` field: it says which goal the
+  candidate actually ran against.
 - No cancellation yet: keep exploration cheap (`nosmt` prefixes,
   small candidates, `smt_timeout: 1` while probing).
 - Repeating a long formula across calls? `define {name, text}`
   once, then `$name` everywhere — replies echo `src_expanded`.
+- After a statement edit: plain `resync_file` = the fastest
+  whole-file re-verification (`tail_executed` + `admitted` in one
+  call, before any compile). Broken big file: `analyze_file
+  {view: "triage"}` = first error per declaration.
 
 ## 5. Two-minute validation proof
 

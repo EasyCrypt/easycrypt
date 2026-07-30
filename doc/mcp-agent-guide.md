@@ -297,6 +297,18 @@ replace_proof {lemma, script: assembled}
 proof_outline again           → hash-diff obligations vs before
 ```
 
+**"Did my edit land?" — the fastest whole-file verification.**
+After a statement-changing edit, a plain `resync_file` re-checks
+everything downstream and reports `tail_executed` + `admitted`
+in one call (measured: 94 sentences re-verified in 1.9 s) —
+confirmation BEFORE any compile is run. This is the standard
+post-edit move.
+
+**Broken big file? Triage first.** `analyze_file {view:
+"triage"}` returns the FIRST error per enclosing declaration
+with cascades counted — 201 diagnostics are usually a handful of
+root causes, and most are one-line fixes.
+
 **Recover from anything confusing.** `resync_file` makes the
 session ≡ file. If the session itself is wedged (rare), re-run
 `open_file` with the same label.
@@ -309,7 +321,22 @@ session ≡ file. If the session itself is wedged (rare), re-run
   server refuses what it can see, but out-of-band editor writes
   are on you until the final re-check catches them.
 - Prefer state-neutral probes (`try_tactic`, `check_script`,
-  `check_skeleton`) over exec-then-revert.
+  `check_skeleton`) over exec-then-revert. **Never `exec` a
+  shape probe** (a throwaway `seq`, a peek at renamed locals): exec
+  COMMITS, and a committed probe silently becomes part of the
+  state every later `check_script` restores TO. `try_tactic`
+  exists for exactly this; recovery is `revert {uuid}`.
+- `check_script` restores state, so read its `entry` field: it
+  says which goal, how many open, and which bullet stack the
+  candidate ran against. A suffix-only retry after a failure
+  re-runs from the SAME entry state (send the whole body, or exec
+  the verified prefix and probe the fix with `try_tactic`), and
+  the focus never advances — bullet-consuming scripts that should
+  move you to the next goal belong in `exec`.
+- Reply-size defaults: `exec` and the loop tools default to
+  `goal_detail: "shape"`; `goals`/`try_tactic` default to
+  `"full"`. On branching states combine `goal_scope: "focused"`
+  (+ `max_chars` when conclusions embed whole invariants).
 - When a goal embeds a whole `main`, reach for `tree` (one line
   per goal) or `goal_detail: "shape" | "counts"` — loop tools
   default to `shape` (program bodies elided to instruction
@@ -372,7 +399,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 159/159).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 166/166).
 
 ## Known limits (v1, honest)
 

@@ -482,11 +482,84 @@ let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
        ]
      | _ -> j)
 
-(* The standard goal-payload pipeline: scope first (which goals),
-   then detail (how much of each). *)
+(* Round 10 (F13): opt-in hard cap on pretty-printed formula text —
+   the third payload complaint was conclusions (whole invariants
+   duplicated across `if BAD`), which scope and detail don't touch.
+   Applies to "text"/"pp" string fields; the trailing … marks the
+   cut (UTF-8-safe). *)
+let rec truncate_pp max (j : Yojson.Safe.t) : Yojson.Safe.t =
+  match j with
+  | `Assoc kvs ->
+    `Assoc
+      (List.map
+         (fun (k, v) ->
+            match v with
+            | `String s
+              when (k = "text" || k = "pp") && String.length s > max ->
+              let n = ref max in
+              while !n > 0 && Char.code s.[!n] land 0xC0 = 0x80 do
+                decr n
+              done;
+              (k, `String (String.sub s 0 !n ^ "…"))
+            | _ -> (k, truncate_pp max v))
+         kvs)
+  | `List l -> `List (List.map (truncate_pp max) l)
+  | x -> x
+
+(* The standard goal-payload pipeline: scope (which goals), then
+   detail (how much of each), then the optional max_chars cap. *)
 let render_goals args ~detail session_goals =
-  apply_goal_detail detail
-    (apply_goal_scope (goal_scope_of args) session_goals)
+  let j =
+    apply_goal_detail detail
+      (apply_goal_scope (goal_scope_of args) session_goals)
+  in
+  match int_arg args "max_chars" with
+  | Some n when n > 0 -> truncate_pp n j
+  | _ -> j
+
+(* Entry transparency for the state-restoring loop tools (round 10,
+   B12/F11): the reply says WHAT the candidate ran against — the
+   focused goal's one-liner, the open-goal count, and the bullet
+   stack depth — so a focus mismatch or a live mid-proof stack is
+   visible in the reply instead of being inferred from a confusing
+   tactic error. *)
+let entry_fields session =
+  let raw = goals_json session in
+  let open Yojson.Safe.Util in
+  match member "active" raw with
+  | `Bool true ->
+    let n =
+      match member "subgoal_count" raw with `Int n -> n | _ -> 0
+    in
+    let depth = member "bullet_depth" raw in
+    let g =
+      match member "subgoals" raw with
+      | `List (s :: _) -> `String (one_line_concl s)
+      | _ -> `Null
+    in
+    [ "entry",
+      `Assoc [
+        "goal", g;
+        "open_goals", `Int n;
+        "bullet_depth", depth;
+      ] ]
+    @ (match depth with
+       | `Int d when d > 0 ->
+         [ "entry_note",
+           `String
+             (Printf.sprintf
+                "checked against the session's LIVE bullet stack \
+                 (depth %d) — land-equivalent only for continuation \
+                 fragments; a WHOLE-BODY candidate must be checked \
+                 from the lemma's proof start (resync_file \
+                 {at_lemma}, bullet depth 0)"
+                d) ]
+       | _ -> [])
+  | _ ->
+    [ "entry",
+      `Assoc [
+        "goal", `Null; "open_goals", `Int 0; "bullet_depth", `Null;
+      ] ]
 
 (* The first EXECUTABLE keyword of a sentence: past leading
    whitespace, (nesting-aware) comments, and bullet/focus prefixes
@@ -1271,17 +1344,97 @@ let tool_revert t args =
             "goals", goals_json e.session;
           ])))
 
+(* Round 10 (F9): a 2,430-line restatement produced 201 diagnostics
+   that were SIX root causes — the raw 300 kB reply buried them. The
+   view ladder keeps the full dump available while making the
+   default question ("what actually broke, where") one readable
+   reply: diagnostics drops the sentence inventory; triage keeps the
+   FIRST diagnostic per enclosing declaration and counts the
+   cascades it suppressed. *)
+let apply_analysis_view view (a : Yojson.Safe.t) :
+  (string * Yojson.Safe.t) list =
+  let open Yojson.Safe.Util in
+  match view with
+  | `Full -> [ "analysis", a ]
+  | (`Diagnostics | `Triage) as v ->
+    let diags = match member "diagnostics" a with
+      | `List l -> l | _ -> [] in
+    let sents = match member "sentences" a with
+      | `List l -> l | _ -> [] in
+    let counts =
+      [ "sentence_count", `Int (List.length sents);
+        "diagnostic_count", `Int (List.length diags) ]
+    in
+    (match v with
+     | `Diagnostics -> counts @ [ "diagnostics", `List diags ]
+     | `Triage ->
+       let sent_arr = Array.of_list sents in
+       (* Nearest named declaration at or before the diagnostic's
+          sentence — module/type/op/lemma names all come from the
+          AST (proto 3 + round 10). *)
+       let decl_of idx =
+         let rec go i =
+           if i < 0 || i >= Array.length sent_arr then None
+           else
+             match member "name" sent_arr.(i) with
+             | `String n -> Some n
+             | _ -> go (i - 1)
+         in
+         go idx
+       in
+       let seen : (string, int ref) Hashtbl.t = Hashtbl.create 8 in
+       let rows = ref [] in
+       List.iter
+         (fun d ->
+            let idx =
+              match member "sentence_index" d with
+              | `Int i -> i
+              | _ -> -1
+            in
+            let key =
+              match decl_of idx with
+              | Some n -> n
+              | None -> "(preamble)"
+            in
+            match Hashtbl.find_opt seen key with
+            | Some extra -> incr extra
+            | None ->
+              let extra = ref 0 in
+              Hashtbl.add seen key extra;
+              rows := (key, d, extra) :: !rows)
+         diags;
+       counts
+       @ [ "root_causes", `Int (List.length !rows);
+           "triage",
+           `List
+             (List.rev_map
+                (fun (k, d, extra) ->
+                   `Assoc [
+                     "declaration", `String k;
+                     "first_diagnostic", d;
+                     "cascading_suppressed", `Int !extra;
+                   ])
+                !rows) ])
+
 let tool_analyze_file t args =
   match str_arg args "path" with
   | None -> Error "analyze_file: missing required argument 'path'"
   | Some path ->
     let path = absolute path in
+    let view =
+      match str_arg args "view" with
+      | Some "diagnostics" -> `Diagnostics
+      | Some "triage" -> `Triage
+      | _ -> `Full
+    in
     let run session =
       let cmd = Printf.sprintf "ANALYZE-JSON \"%s\"" path in
       match Ec_llm_session.raw_command session cmd with
       | Error err -> Error (Error.to_string err)
       | Ok (body, _) ->
-        Ok [ "file", `String path; "analysis", json_or_string body ]
+        Ok
+          (("file", `String path)
+           :: apply_analysis_view view (json_or_string body))
     in
     let label = label_of_args args in
     (match Hashtbl.find_opt t.sessions label with
@@ -2152,6 +2305,7 @@ let tool_check_skeleton t args =
           let start = Ec_llm_session.current_uuid e.session in
           let corr = Correlation.of_client "mcp-skeleton" in
           let detail = goal_detail_of args ~default:`Shape in
+          let entry = entry_fields e.session in
           (match apply_smt_timeout e args ~corr with
            | Error m -> Error ("check_skeleton: " ^ m)
            | Ok applied ->
@@ -2210,6 +2364,7 @@ let tool_check_skeleton t args =
             "session", `String label;
             "ok", `Bool (!failed = None);
             "closes_with_holes", `Bool closes;
+          ] @ entry @ [
             "holes", `List (List.rev !holes);
             "restore", restore;
             "uuid", `Int (Ec_llm_session.current_uuid e.session);
@@ -2731,6 +2886,7 @@ let tool_check_script t args =
           let start = Ec_llm_session.current_uuid e.session in
           let corr = Correlation.of_client "mcp-check" in
           let detail = goal_detail_of args ~default:`Shape in
+          let entry = entry_fields e.session in
           (match apply_smt_timeout e args ~corr with
            | Error m -> Error ("check_script: " ^ m)
            | Ok applied ->
@@ -2907,6 +3063,7 @@ let tool_check_script t args =
             "checked", `Int (List.length !results);
             "ok", `Bool ((not !failed) && not !restarted);
             "closes", `Bool closes;
+          ] @ entry @ [
             "results", `List (List.rev !results);
             "admitted", `List (List.rev !admitted);
             "restore", restore;
@@ -3151,6 +3308,14 @@ let goal_scope_prop =
     with subgoal_count still reporting the true total. On a \
     20-goal call-dispatch state this is one goal instead of 80 kB.")
 
+let max_chars_prop =
+  ("max_chars", "integer",
+   "Hard cap on each pretty-printed formula in goal payloads \
+    (UTF-8-safe, trailing … marks the cut). The third size axis: \
+    goal_scope picks WHICH goals, goal_detail HOW MUCH structure, \
+    max_chars how much FORMULA text — up-to-bad conclusions \
+    duplicate whole invariants and dwarf everything else.")
+
 let tools :
   (string * string * Yojson.Safe.t
    * (t -> Yojson.Safe.t -> (Yojson.Safe.t, string) result)) list = [
@@ -3201,6 +3366,7 @@ let tools :
   schema ~required:[ "text" ] [
     ("text", "string", "EasyCrypt source to execute.");
     goal_scope_prop;
+    max_chars_prop;
     goal_detail_prop;
     session_prop;
   ],
@@ -3260,7 +3426,7 @@ let tools :
   "Structured view of the current proof state (GOALS-JSON): subgoal \
    count, hypotheses, conclusion trees (PHL judgments carry \
    structured program statements).",
-  schema [ goal_scope_prop; goal_detail_prop; session_prop ],
+  schema [ goal_scope_prop; max_chars_prop; goal_detail_prop; session_prop ],
   tool_goals;
 
   "tree",
@@ -3290,6 +3456,7 @@ let tools :
   schema ~required:[ "tactic" ] [
     ("tactic", "string", "Tactic source, '.'-terminated.");
     goal_scope_prop;
+    max_chars_prop;
     smt_timeout_prop;
     goal_detail_prop;
     session_prop;
@@ -3304,9 +3471,17 @@ let tools :
    restores the session to where it was. The refactoring inner \
    loop: iterate candidates here without touching the file, write \
    once with replace_proof when one passes. Candidates are checked \
-   as DOCUMENT text — under the file's own rules, strict_bullets \
-   included: what passes here is what compiles cold. Per-sentence \
-   rows echo a one-line src PREVIEW (the full source survives on \
+   as DOCUMENT text FROM THE CURRENT STATE — the reply's `entry` \
+   field says exactly what that was (focused goal one-liner, open \
+   count, bullet stack depth). Land-parity for a WHOLE-BODY \
+   candidate therefore needs the lemma's proof-start position \
+   (resync_file {at_lemma}; bullet depth 0) — mid-proof, the live \
+   bullet stack applies and the reply says so. The restore also \
+   means a SUFFIX-only retry re-runs from the same entry state \
+   (send the full body, or exec the verified prefix and probe with \
+   try_tactic), and the focus NEVER advances here — bullet-\
+   consuming scripts that should move you forward belong in exec. \
+   Per-sentence rows echo a one-line src PREVIEW (full source on \
    the failing sentence); a net goal-count increase attaches the \
    compact `tree`.",
   schema ~required:[ "script" ] [
@@ -3314,6 +3489,7 @@ let tools :
      "EasyCrypt sentences ('.'-terminated, newline-separated), \
       e.g. \"proof.\\nsplit.\\ntrivial.\\nqed.\"");
     goal_scope_prop;
+    max_chars_prop;
     smt_timeout_prop;
     goal_detail_prop;
     session_prop;
@@ -3332,6 +3508,7 @@ let tools :
      "Skeleton sentences with admit. holes, e.g. \
       \"split.\\nadmit.\\nadmit.\\nqed.\"");
     goal_scope_prop;
+    max_chars_prop;
     smt_timeout_prop;
     goal_detail_prop;
     session_prop;
@@ -3391,6 +3568,7 @@ let tools :
     ("text", "string",
      "Tactic sentences ('.'-terminated) for the claimed subtree.");
     goal_scope_prop;
+    max_chars_prop;
     goal_detail_prop;
     session_prop;
   ],
@@ -3522,9 +3700,18 @@ let tools :
   "analyze_file",
   "Whole-file batch diagnostics (stateless; the session's state is \
    untouched): parse/type/tactic errors with positions, sentence \
-   classes and enclosing-scope tags.",
+   classes and enclosing-scope tags. Use view=\"triage\" for the \
+   mass-restatement question — first diagnostic per enclosing \
+   declaration with cascades counted (201 diagnostics are usually \
+   a handful of root causes); \"diagnostics\" drops the sentence \
+   inventory; \"full\" (default) is the complete dump.",
   schema ~required:[ "path" ] [
     ("path", "string", "Path to the .ec/.eca file to analyze.");
+    ("view", "string",
+     "\"full\" (default) | \"diagnostics\" (errors only) | \
+      \"triage\" (FIRST error per enclosing declaration + \
+      suppressed-cascade counts — the readable view of a broken \
+      big file).");
     session_prop;
   ],
   tool_analyze_file;

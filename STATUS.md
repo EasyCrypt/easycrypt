@@ -36,8 +36,16 @@
 > tools (one goal instead of 80 kB on call-dispatch states,
 > subgoal_count stays truthful), claim-conflict errors carry the
 > close_session remedy, list_sessions rows carry `alive` and an
-> empty listing explains per-process lock scope;
-> `run_mcp_smoke` 159/159).
+> empty listing explains per-process lock scope; round 10
+> (B12/F8-F13, three-worker parallel round, zero B-series
+> defects): GOALS-JSON carries `bullet_depth`, check_script /
+> check_skeleton echo their `entry` state (goal one-liner + open
+> count + bullet stack — live-stack note when mid-proof),
+> `max_chars` caps formula text (third size axis), `analyze_file
+> {view: diagnostics|triage}` collapses cascades to root causes
+> (decl names now cover module/type/op/pred), restore-discipline
+> promoted to guide+QUICKSTART;
+> `run_mcp_smoke` 166/166).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

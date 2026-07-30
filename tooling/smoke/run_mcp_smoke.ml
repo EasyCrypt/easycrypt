@@ -2024,6 +2024,123 @@ let () =
   in
   check "exec on unknown session: isError" err_sess "";
 
+  (* -- round 10: entry transparency / max_chars / triage ----------- *)
+  let (err, e1) =
+    call fd_in fd_out "check_script"
+      (`Assoc [ "script", `String "trivial." ])
+  in
+  let e1_entry = try member "entry" e1 with _ -> `Null in
+  check "B12/F11: check_script echoes its entry state"
+    ((not err)
+     && (match member "goal" e1_entry with
+         | `String g ->
+           (try
+              ignore (Str.search_forward (Str.regexp_string "2 = 2") g 0);
+              true
+            with Not_found -> false)
+         | _ -> false)
+     && member "open_goals" e1_entry = `Int 1
+     && member "bullet_depth" e1_entry = `Null
+     && member "entry_note" e1 = `Null)
+    (Yojson.Safe.to_string e1);
+  let (err, mc) =
+    call fd_in fd_out "goals" (`Assoc [ "max_chars", `Int 3 ])
+  in
+  let mc_text =
+    try
+      match member "goals" mc with
+      | `Assoc _ as g ->
+        (match member "subgoals" g with
+         | `List (s :: _) ->
+           (match member "conclusion" s with
+            | `Assoc _ as c ->
+              (match member "text" c with `String t -> t | _ -> "")
+            | _ -> "")
+         | _ -> "")
+      | _ -> ""
+    with _ -> ""
+  in
+  check "F13: max_chars caps formula text with … marker"
+    ((not err) && mc_text = "2 =\xe2\x80\xa6")
+    (Yojson.Safe.to_string mc);
+  (* Mid-bullet position on a strict file: entry says WHICH stack. *)
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String blf; "session", `String "wn";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "wn open (landed bulleted file)" (not err) "";
+  let (err, _) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wn"; "upto_sentence", `Int 6 ])
+  in
+  check "wn positioned mid-bullet" (not err) "";
+  let (err, e2) =
+    call fd_in fd_out "check_script"
+      (`Assoc [ "script", `String "by trivial."; "session", `String "wn" ])
+  in
+  let e2_entry = try member "entry" e2 with _ -> `Null in
+  check "B12: live bullet stack surfaced (depth + note)"
+    ((not err)
+     && member "bullet_depth" e2_entry = `Int 1
+     && (match member "entry_note" e2 with
+         | `String n ->
+           (try
+              ignore (Str.search_forward
+                        (Str.regexp_string "LIVE bullet stack") n 0);
+              true
+            with Not_found -> false)
+         | _ -> false))
+    (Yojson.Safe.to_string e2);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wn" ])
+  in
+  check "close wn" (not err) "";
+  (* analyze triage: cascades collapse to root causes. *)
+  let anaf = Filename.concat fixture_dir "ana.ec" in
+  let oc = open_out anaf in
+  output_string oc
+    "require import AllCore.\n\
+     lemma good : 1 = 1.\n\
+     proof. trivial. qed.\n\
+     lemma bad1 : 1 = 2 => 2 = 1.\n\
+     proof.\n\
+     apply nonexistent_one.\n\
+     qed.\n\
+     lemma bad2 : 2 = 2.\n\
+     proof.\n\
+     apply nonexistent_two.\n\
+     qed.\n";
+  close_out oc;
+  let (err, tri) =
+    call fd_in fd_out "analyze_file"
+      (`Assoc [ "path", `String anaf; "view", `String "triage" ])
+  in
+  let tri_rows =
+    try
+      match member "triage" tri with `List l -> l | _ -> []
+    with _ -> []
+  in
+  let tri_decls =
+    List.filter_map
+      (fun r ->
+         match member "declaration" r with
+         | `String d -> Some d
+         | _ -> None)
+      tri_rows
+  in
+  check "F9: triage view — first error per declaration"
+    ((not err)
+     && member "root_causes" tri = `Int 2
+     && tri_decls = [ "bad1"; "bad2" ]
+     && (match member "diagnostic_count" tri with
+         | `Int n -> n >= 2
+         | _ -> false)
+     && member "analysis" tri = `Null)
+    (Yojson.Safe.to_string tri);
+
   (* -- empty listing explains per-process locks (F7) --------------- *)
   let (err, _) =
     call fd_in fd_out "close_session" (`Assoc [])
