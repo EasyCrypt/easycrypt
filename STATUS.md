@@ -32,7 +32,12 @@
 > sibling frames from >=2-new-goal phrases, continuations never
 > shift level, verified on the real 57-sentence bw3_real_eager
 > (emitted body passes check_script under strict_bullets);
-> `run_mcp_smoke` 154/154).
+> round 9 (F6/F7): `goal_scope: focused` on the six goal-bearing
+> tools (one goal instead of 80 kB on call-dispatch states,
+> subgoal_count stays truthful), claim-conflict errors carry the
+> close_session remedy, list_sessions rows carry `alive` and an
+> empty listing explains per-process lock scope;
+> `run_mcp_smoke` 159/159).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

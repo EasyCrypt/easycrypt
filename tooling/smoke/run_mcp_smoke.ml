@@ -376,6 +376,13 @@ let () =
            true
          with Not_found -> false))
     conflict_text;
+  check "F7: conflict error carries the close_session remedy"
+    (try
+       ignore (Str.search_forward
+                 (Str.regexp_string "close_session") conflict_text 0);
+       true
+     with Not_found -> false)
+    conflict_text;
 
   let (err, unknown) =
     call fd_in fd_out "open_file"
@@ -460,6 +467,9 @@ let () =
     (member "mode" main_row = `String "proof"
      && (match member "claims" main_row with
          | `List (_ :: _) -> true | _ -> false))
+    (Yojson.Safe.to_string main_row);
+  check "F7: session rows carry liveness"
+    (member "alive" main_row = `Bool true)
     (Yojson.Safe.to_string main_row);
 
   let (err, an) =
@@ -839,6 +849,22 @@ let () =
         with Not_found -> false)
      | _ -> false)
     (Yojson.Safe.to_string exsp);
+
+  let (err, gf) =
+    call fd_in fd_out "goals"
+      (`Assoc [
+         "session", `String "w2"; "goal_scope", `String "focused";
+       ])
+  in
+  let gf_goals = try member "goals" gf with _ -> `Null in
+  check "F6: goal_scope=focused — one subgoal, true total count"
+    ((not err)
+     && (match member "subgoals" gf_goals with
+         | `List [ _ ] -> true
+         | _ -> false)
+     && member "subgoal_count" gf_goals = `Int 2
+     && member "goal_scope" gf_goals = `String "focused")
+    (Yojson.Safe.to_string gf);
 
   let (err, cl) =
     call fd_in fd_out "claim_subgoal"
@@ -1997,6 +2023,23 @@ let () =
                 "session", `String "ghost" ])
   in
   check "exec on unknown session: isError" err_sess "";
+
+  (* -- empty listing explains per-process locks (F7) --------------- *)
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [])
+  in
+  check "close main" (not err) "";
+  let (_, ls_empty) = call fd_in fd_out "list_sessions" (`Assoc []) in
+  check "F7: empty listing explains per-process lock scope"
+    ((match member "sessions" ls_empty with
+      | `List [] -> true | _ -> false)
+     && (try
+           ignore (Str.search_forward
+                     (Str.regexp_string "DIFFERENT registered")
+                     (Yojson.Safe.to_string ls_empty) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string ls_empty);
 
   (* -- shutdown --------------------------------------------------- *)
   Unix.close fd_in;

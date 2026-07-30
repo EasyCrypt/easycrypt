@@ -428,6 +428,12 @@ let signal_cancel t =
   if not (Eio.Promise.is_resolved t.cancel_promise) then
     Eio.Promise.resolve t.cancel_resolver ()
 
+(* Liveness as this process knows it: false once the subprocess hit
+   EOF (cancelled) or the session was closed. An orphaned session
+   (its AGENT died) still reads alive — its locks release only via
+   close_session, which the conflict errors name. *)
+let is_alive t = not (t.closed || t.cancelled)
+
 let close t =
   if not t.closed then begin
     t.closed <- true;

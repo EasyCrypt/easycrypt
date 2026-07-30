@@ -435,6 +435,31 @@ let goal_detail_of args ~default =
   | Some "counts" -> `Counts
   | _ -> default
 
+(* Orthogonal to goal_detail (round 9, F6): WHICH goals, not how
+   much of each. "focused" slices the payload to the focused
+   subgoal; subgoal_count keeps reporting the true total. On a
+   20-goal call-dispatch state this is the difference between an
+   80 kB reply and one goal. *)
+let goal_scope_of args =
+  match str_arg args "goal_scope" with
+  | Some "focused" -> `Focused
+  | _ -> `All
+
+let apply_goal_scope scope (j : Yojson.Safe.t) : Yojson.Safe.t =
+  match scope, j with
+  | `All, _ -> j
+  | `Focused, `Assoc kvs ->
+    (match List.assoc_opt "subgoals" kvs with
+     | Some (`List (g :: _ :: _)) ->
+       `Assoc
+         (List.map
+            (fun (k, v) ->
+               if k = "subgoals" then (k, `List [ g ]) else (k, v))
+            kvs
+          @ [ "goal_scope", `String "focused" ])
+     | _ -> j)
+  | `Focused, _ -> j
+
 let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
   match detail with
   | `Full -> j
@@ -456,6 +481,12 @@ let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
          `List (List.map (fun s -> `String (one_line_concl s)) subs);
        ]
      | _ -> j)
+
+(* The standard goal-payload pipeline: scope first (which goals),
+   then detail (how much of each). *)
+let render_goals args ~detail session_goals =
+  apply_goal_detail detail
+    (apply_goal_scope (goal_scope_of args) session_goals)
 
 (* The first EXECUTABLE keyword of a sentence: past leading
    whitespace, (nesting-aware) comments, and bullet/focus prefixes
@@ -714,9 +745,20 @@ let lock_conflicts t ~file ~(mode : mode) ~self_label =
             let show (n, l) =
               Printf.sprintf "%s (held by session '%s')" n l
             in
+            let remedy =
+              match taken with
+              | (_, l) :: _ ->
+                Printf.sprintf
+                  " — a holder whose agent is gone releases its \
+                   claims with close_session {\"session\": \"%s\"}; \
+                   locks live in THIS server process only"
+                  l
+              | [] -> ""
+            in
             Error
-              (Printf.sprintf "lemma claim conflict: %s"
-                 (String.concat ", " (List.map show taken)))))
+              (Printf.sprintf "lemma claim conflict: %s%s"
+                 (String.concat ", " (List.map show taken))
+                 remedy)))
 
 let claims_json = function
   | Statement -> `Null
@@ -981,14 +1023,14 @@ let tool_exec t args =
           let terminal =
             if !failed then
               [ "goals_at_failure",
-                apply_goal_detail detail (goals_json e.session);
+                render_goals args ~detail (goals_json e.session);
                 "note",
                 `String
                   "sentences before the failure REMAIN EXECUTED — \
                    revert {uuid} or resync_file to unwind" ]
             else
               let gp =
-                apply_goal_detail detail (goals_json e.session)
+                render_goals args ~detail (goals_json e.session)
               in
               let closed =
                 let open Yojson.Safe.Util in
@@ -1091,7 +1133,7 @@ let tool_goals t args =
       "uuid", `Int (Ec_llm_session.current_uuid e.session);
       "stale", `Bool (stale_flag e);
       "goals",
-      apply_goal_detail (goal_detail_of args ~default:`Full)
+      render_goals args ~detail:(goal_detail_of args ~default:`Full)
         (goals_json e.session);
     ])
 
@@ -1184,7 +1226,8 @@ let tool_try_tactic t args =
             @ src_expanded_field expanded tactic))
         | Ok _ ->
           let goals_after =
-            apply_goal_detail (goal_detail_of args ~default:`Shape)
+            render_goals args
+              ~detail:(goal_detail_of args ~default:`Shape)
               (goals_json e.session)
           in
           (* Captured BEFORE the revert: the post-candidate tree is
@@ -1272,11 +1315,22 @@ let tool_list_sessions t _args =
            "claims", claims_json e.mode;
            "defines",
            `List (List.map (fun (nm, _) -> `String nm) e.defines);
+           "alive", `Bool (Ec_llm_session.is_alive e.session);
            "uuid", `Int (Ec_llm_session.current_uuid e.session);
          ] :: acc)
       t.sessions []
   in
-  Ok (`Assoc [ "sessions", `List rows ])
+  Ok (`Assoc ([ "sessions", `List rows ]
+              @ (if rows = [] then
+                   [ "note",
+                     `String
+                       "no sessions in THIS server process — locks \
+                        live per process, so if a refusal names a \
+                        session that is not listed here, that call \
+                        was answered by a DIFFERENT registered \
+                        server instance (check the registration \
+                        scope)" ]
+                 else [])))
 
 let tool_close_session t args =
   let label = label_of_args args in
@@ -2166,7 +2220,7 @@ let tool_check_skeleton t args =
                | Some (s, er) ->
                  [ "error", `String er;
                    "goals_at_failure",
-                   apply_goal_detail detail !goals_fail;
+                   render_goals args ~detail !goals_fail;
                    "failed_at",
                    `Assoc [ "src", `String s.src ] ])))))))
 
@@ -2368,7 +2422,7 @@ let tool_exec_in t args =
                      "uuid",
                      `Int (Ec_llm_session.current_uuid e.session);
                      "goals",
-                     apply_goal_detail detail (goals_json e.session);
+                     render_goals args ~detail (goals_json e.session);
                    ] @ tree_if_grew e.session ~before:n_goals0
                      @ src_expanded_field expanded text
                      @ (if sc.sc_closed then
@@ -2864,10 +2918,10 @@ let tool_check_script t args =
             @ commit_fields
             @ (if !failed then
                  [ "goals_at_failure",
-                   apply_goal_detail detail !goals_fail ]
+                   render_goals args ~detail !goals_fail ]
                else
                  [ "goals_at_end",
-                   apply_goal_detail detail goals_at_end ]
+                   render_goals args ~detail goals_at_end ]
                  @ tree_extra)))))))
 
 
@@ -3090,6 +3144,13 @@ let smt_timeout_prop =
     run long (30). Restored with the state when the call ends. \
     Persistent variant: exec {text: \"timeout N.\"}.")
 
+let goal_scope_prop =
+  ("goal_scope", "string",
+   "WHICH goals the payload carries (orthogonal to goal_detail): \
+    \"all\" (default) or \"focused\" — only the focused subgoal, \
+    with subgoal_count still reporting the true total. On a \
+    20-goal call-dispatch state this is one goal instead of 80 kB.")
+
 let tools :
   (string * string * Yojson.Safe.t
    * (t -> Yojson.Safe.t -> (Yojson.Safe.t, string) result)) list = [
@@ -3139,6 +3200,7 @@ let tools :
    `define` bindings (reply echoes src_expanded).",
   schema ~required:[ "text" ] [
     ("text", "string", "EasyCrypt source to execute.");
+    goal_scope_prop;
     goal_detail_prop;
     session_prop;
   ],
@@ -3198,7 +3260,7 @@ let tools :
   "Structured view of the current proof state (GOALS-JSON): subgoal \
    count, hypotheses, conclusion trees (PHL judgments carry \
    structured program statements).",
-  schema [ goal_detail_prop; session_prop ],
+  schema [ goal_scope_prop; goal_detail_prop; session_prop ],
   tool_goals;
 
   "tree",
@@ -3227,6 +3289,7 @@ let tools :
    revert).",
   schema ~required:[ "tactic" ] [
     ("tactic", "string", "Tactic source, '.'-terminated.");
+    goal_scope_prop;
     smt_timeout_prop;
     goal_detail_prop;
     session_prop;
@@ -3250,6 +3313,7 @@ let tools :
     ("script", "string",
      "EasyCrypt sentences ('.'-terminated, newline-separated), \
       e.g. \"proof.\\nsplit.\\ntrivial.\\nqed.\"");
+    goal_scope_prop;
     smt_timeout_prop;
     goal_detail_prop;
     session_prop;
@@ -3267,6 +3331,7 @@ let tools :
     ("script", "string",
      "Skeleton sentences with admit. holes, e.g. \
       \"split.\\nadmit.\\nadmit.\\nqed.\"");
+    goal_scope_prop;
     smt_timeout_prop;
     goal_detail_prop;
     session_prop;
@@ -3325,6 +3390,7 @@ let tools :
   schema ~required:[ "text" ] [
     ("text", "string",
      "Tactic sentences ('.'-terminated) for the claimed subtree.");
+    goal_scope_prop;
     goal_detail_prop;
     session_prop;
   ],

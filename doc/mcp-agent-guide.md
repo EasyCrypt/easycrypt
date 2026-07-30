@@ -314,9 +314,12 @@ session ≡ file. If the session itself is wedged (rare), re-run
   per goal) or `goal_detail: "shape" | "counts"` — loop tools
   default to `shape` (program bodies elided to instruction
   counts); full dumps are what `goals {goal_detail: "full"}` is
-  for. Every reply carries exactly ONE terminal-state field
-  (`goals`/`goals_at_end` on success, `goals_at_failure` on
-  failure).
+  for. On MANY-goal states (a `call (_: I)` dispatch), add
+  `goal_scope: "focused"` — only the focused subgoal ships,
+  `subgoal_count` still reports the true total; use `tree` for
+  the order, focused `goals` for the content. Every reply carries
+  exactly ONE terminal-state field (`goals`/`goals_at_end` on
+  success, `goals_at_failure` on failure).
 - `admit` is allowed and visible (profile counts it; skeleton
   treats it as a hole). Never leave one in text you hand back
   without saying so.
@@ -334,6 +337,12 @@ session ≡ file. If the session itself is wedged (rare), re-run
   read the message; it names the conflicting session or the
   missing step. EasyCrypt-level failures inside otherwise-OK
   replies (`ok: false`, per-sentence `error`) are proof feedback.
+- Locks live in ONE server process. A claim refusal names its
+  holder — if that holder's agent is gone, `close_session
+  {session: "<holder>"}` releases its claims (no guessing). If a
+  refusal names a session `list_sessions` does not show, a
+  different registered server instance answered one of the calls:
+  check the registration scope.
 
 ## Setup (human operator)
 
@@ -363,7 +372,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 154/154).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 159/159).
 
 ## Known limits (v1, honest)
 
