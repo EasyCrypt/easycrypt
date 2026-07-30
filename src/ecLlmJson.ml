@@ -388,10 +388,19 @@ let goals_to_json () =
             i (String.concat "," hyps_strs) concl_json
         in
         let subgoal_strs = List.mapi subgoal_json subgoals in
+        (* Bullet context (round 10, B12): depth of the live
+           strict-bullets stack, or null when none is in force
+           (pragma off, or cleared for REPL authoring). Lets clients
+           state WHICH stack a candidate was checked against. *)
+        let bullet_depth =
+          match auc.EcScope.puc_bullets with
+          | None -> "null"
+          | Some stack -> string_of_int (List.length stack)
+        in
         Printf.sprintf
           "{\"active\":true,\"subgoal_count\":%d,\
-           \"current_index\":0,\"subgoals\":[%s]}"
-          count
+           \"current_index\":0,\"bullet_depth\":%s,\"subgoals\":[%s]}"
+          count bullet_depth
           (String.concat "," subgoal_strs)
 
 (* -------------------------------------------------------------------- *)
@@ -455,8 +464,27 @@ let classify_global (g : EcParsetree.global_action) =
    hoare / phoare / ehoare, local or not) are covered by
    construction (field report B4). *)
 let decl_name_of_global (g : EcParsetree.global_action) =
+  let module EP = EcParsetree in
   match g with
   | Gaxiom { pa_name; _ } -> Some (EcLocation.unloc pa_name)
+  (* Round 10 (F9 triage): name the other top-level declaration
+     forms too, so diagnostics group under the right declaration
+     during mass restatements. Claim resolution is unaffected — it
+     filters on kind = Gaxiom before reading names. *)
+  | Goperator { po_name; _ } -> Some (EcLocation.unloc po_name)
+  | Gpredicate { pp_name; _ } -> Some (EcLocation.unloc pp_name)
+  | Gtype (td :: _) -> Some (EcLocation.unloc td.EP.pty_name)
+  | Gmodule { ptm_def = `Abstract { ptm_name; _ }; _ } ->
+    Some (EcLocation.unloc ptm_name)
+  | Gmodule { ptm_def = `Concrete { ptm_header; _ }; _ } ->
+    let rec header_name (h : EP.pmodule_header) =
+      match h with
+      | EP.Pmh_ident name -> Some (EcLocation.unloc name)
+      | EP.Pmh_params { EcLocation.pl_desc = (h, _); _ } ->
+        header_name h
+      | EP.Pmh_cast (h, _) -> header_name h
+    in
+    header_name ptm_header
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
