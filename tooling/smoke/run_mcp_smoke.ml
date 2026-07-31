@@ -2215,6 +2215,8 @@ let () =
      have h1 : 3 = 3 by smt().\n\
      have h2 : 4 = 4\n\
        by smt(addzC addzA mulzC mulzA add0z addz0 mul1z mulz1).\n\
+     have h3 : forall (a b : int), a + b = b + a\n\
+       by move => a b /#.\n\
      by smt().\n\
      qed.\n";
   close_out oc;
@@ -2250,13 +2252,29 @@ let () =
          && member "fragile" s = `Bool false)
       pf_sents
   in
-  check "B14: smt_count counts INVOCATIONS incl. by-smt closers"
+  (* Runtime counting: h3 closes via the `/#` view — the solver runs
+     with NO smt token in the source; only choke-point telemetry
+     sees it (the lexical scan counted it 0). *)
+  let view_row =
+    List.exists
+      (fun s ->
+         match member "src" s with
+         | `String v ->
+           (try
+              ignore (Str.search_forward (Str.regexp_string "h3") v 0);
+              member "smt_calls" s = `Int 1
+              && member "smt_hint_max" s = `Int 0
+            with Not_found -> false)
+         | _ -> false)
+      pf_sents
+  in
+  check "B14: smt_count = RUNTIME invocations (by-smt AND /# counted)"
     ((not err)
      && member "ok" pf = `Bool true
-     && member "total_smt" pf = `Int 3)
+     && member "total_smt" pf = `Int 4)
     (Yojson.Safe.to_string pf);
   check "B14: <=1-branch proof carries the per-sentence table"
-    (List.length pf_sents >= 4 && hint8_row && clean_row)
+    (List.length pf_sents >= 5 && hint8_row && clean_row && view_row)
     (Yojson.Safe.to_string pf);
   let (err, _) =
     call fd_in fd_out "close_session" (`Assoc [ "session", `String "wp" ])

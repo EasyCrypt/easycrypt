@@ -215,14 +215,18 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 ### Strategy layer (refactoring at proof-structure level)
 
 - `proof_profile {lemma}` — per-branch hotspot ranking: time, smt
-  and admit counts, fragility markers. `smt_count` counts
-  INVOCATIONS — `by smt(...)` closers inside `have`/selector
-  sentences included (a seven-smt lemma reports 7, not 1).
-  Fragile = `progress`, `!`-rewrites, or an smt hint list of 8+
-  lemmas (`smt_hint_max` per sentence — long hint lists are a
-  measured flake class). Proofs with <= 1 branch also carry the
-  per-sentence table, so bullet-free bodies get real resolution.
-  Decide WHAT to restructure here.
+  and admit counts, fragility markers. `smt_count` counts solver
+  invocations at RUNTIME (EC's prover choke point), so
+  `by smt(...)` closers, the `/#` view, tacticals and any future
+  syntax count by construction — a seven-smt lemma reports 7, not
+  1, and no lexical scan can drift out of date. `exec` /
+  `check_script` / `try_script` sentence rows carry the same
+  `smt_calls` when nonzero. Fragile = `progress`, `!`-rewrites,
+  or an smt hint list of 8+ lemmas (`smt_hint_max` per sentence —
+  long hint lists are a measured flake class; hint LENGTH is a
+  source-text property and stays lexical by design). Proofs with
+  <= 1 branch also carry the per-sentence table, so bullet-free
+  bodies get real resolution. Decide WHAT to restructure here.
 - `proof_outline {lemma}` — the proof's shape: every sentence
   attributed to a branch path, split points, and the OBLIGATION
   SET (per-split goal hashes + one-liners). Two built-in recipes,

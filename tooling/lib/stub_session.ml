@@ -25,6 +25,7 @@ let exec t ~corr:_ ~sentence_class ~source:_ =
             notices = [];
             restarted = false;
             output = "";
+            smt_calls = 0;
           }
     | `Executable | `Doc_comment ->
         t.uuid <- t.uuid + 1;
@@ -35,6 +36,7 @@ let exec t ~corr:_ ~sentence_class ~source:_ =
             notices = [];
             restarted = false;
             output = "";
+            smt_calls = 0;
           }
 
 let revert_to t sid =

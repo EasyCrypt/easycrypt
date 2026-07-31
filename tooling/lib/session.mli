@@ -22,6 +22,12 @@ type exec_ok = {
       `<END>`). Non-empty for directive/query forms like `print`,
       `search`, `locate` where EC's response carries content; empty
       for state-advancing sentences whose only signal is the uuid. *)
+  smt_calls : int;
+  (** SMT solver invocations this sentence triggered — RUNTIME
+      truth, counted at EC's prover choke point and reported as a
+      per-phrase delta. Catches `by smt` closers, the `/#` view,
+      tacticals, and any future surface form by construction;
+      0 for backends without the telemetry. *)
 }
 
 module type BACKEND = sig

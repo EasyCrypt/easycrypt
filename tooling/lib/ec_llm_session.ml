@@ -491,6 +491,19 @@ let send_multi_and_read t ?(document = false) (source : string)
 (* BACKEND operations                                                *)
 (* ---------------------------------------------------------------- *)
 
+(* Per-phrase SMT-invocation delta from the reply's OK-JSON
+   (runtime-counted at EC's prover choke point); 0 when absent. *)
+let smt_calls_of_reply (r : reply) : int =
+  match r.ok_json with
+  | None -> 0
+  | Some j ->
+    (match Yojson.Safe.from_string j with
+     | exception _ -> 0
+     | j ->
+       (match Yojson.Safe.Util.member "smt_calls" j with
+        | `Int n -> n
+        | _ -> 0))
+
 (* [?document] precedes the positional [t] so plain applications
    erase it (labeled args alone never erase a preceding optional). *)
 let exec ?(document = false) t ~corr ~sentence_class ~source =
@@ -585,6 +598,7 @@ let exec ?(document = false) t ~corr ~sentence_class ~source =
             notices      = r.notices;
             restarted    = true;
             output       = String.concat "\n" r.body;
+            smt_calls    = smt_calls_of_reply r;
           }
       end
       else if not uuid_ok then begin
@@ -642,6 +656,7 @@ let exec ?(document = false) t ~corr ~sentence_class ~source =
             notices      = r.notices;
             restarted    = false;
             output       = String.concat "\n" r.body;
+            smt_calls    = smt_calls_of_reply r;
           }
       end
 
@@ -755,6 +770,7 @@ let exec_json t ~corr ~command_json =
           notices      = r.notices;
           restarted;
           output       = String.concat "\n" r.body;
+          smt_calls    = smt_calls_of_reply r;
         }
 
 (* Resolve [sid] to the NEWEST matching entry in the exec history and

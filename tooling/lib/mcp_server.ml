@@ -594,43 +594,12 @@ let exec_keyword (src : string) =
   let rec go i = if i < n && is_ident_char src.[i] then go (i + 1) else i in
   String.sub src b (go b - b)
 
-(* Count invocations of keyword [kw] ANYWHERE in a sentence — as a
-   whole identifier token, outside comments and strings. The
-   leading-keyword flag missed `by smt(...)` closers inside `have`
-   sentences, under-reporting a seven-smt lemma as one (field
-   report B14): an smt call is an smt call wherever it sits. *)
-let count_keyword kw (src : string) =
-  let n = String.length src in
-  let count = ref 0 in
-  let i = ref 0 in
-  while !i < n do
-    match src.[!i] with
-    | '(' when !i + 1 < n && src.[!i + 1] = '*' ->
-      let j = ref (!i + 2) in
-      let depth = ref 1 in
-      while !depth > 0 && !j < n do
-        if !j + 1 < n && src.[!j] = '(' && src.[!j + 1] = '*' then begin
-          incr depth; j := !j + 2
-        end
-        else if !j + 1 < n && src.[!j] = '*' && src.[!j + 1] = ')'
-        then begin decr depth; j := !j + 2 end
-        else incr j
-      done;
-      i := !j
-    | '"' ->
-      let j = ref (!i + 1) in
-      while !j < n && src.[!j] <> '"' do
-        if src.[!j] = '\\' && !j + 1 < n then j := !j + 2 else incr j
-      done;
-      i := (if !j < n then !j + 1 else n)
-    | c when is_ident_start c ->
-      let j = ref !i in
-      while !j < n && is_ident_char src.[!j] do incr j done;
-      if String.sub src !i (!j - !i) = kw then incr count;
-      i := !j
-    | _ -> incr i
-  done;
-  !count
+(* SMT INVOCATIONS are counted at runtime (EC's prover choke point,
+   reported per phrase as `smt_calls` on exec replies) — a lexical
+   scan was tried twice and was brittle twice (B14: `by smt`
+   closers; then the `/#` view, which invokes the solver with no
+   `smt` token at all). Only the typed HINT-LIST length below stays
+   lexical: it is a property of the source text by nature. *)
 
 (* Largest hint-list length among the sentence's smt(...) calls
    (ident tokens inside the parens). A long hint list is a measured
@@ -1149,13 +1118,17 @@ let tool_exec t args =
                        if ok.restarted then restarted := true;
                        notices := List.rev_append ok.notices !notices;
                        results :=
-                         `Assoc [
+                         `Assoc ([
                            "index", `Int i;
                            "src", `String (src_preview s.src);
                            "ok", `Bool true;
                            "uuid", `Int ok.replied_uuid;
                            "time_ms", `Int (ms_since s0);
-                         ] :: !results
+                         ] @ (if ok.Session.smt_calls > 0 then
+                                [ "smt_calls",
+                                  `Int ok.Session.smt_calls ]
+                              else []))
+                         :: !results
                      | Error er ->
                        failed := true;
                        results :=
@@ -1516,13 +1489,17 @@ let tool_try_script t args =
                             ] :: !admitted
                         | None -> ());
                        results :=
-                         `Assoc [
+                         `Assoc ([
                            "index", `Int i;
                            "src", `String (src_preview s.src);
                            "ok", `Bool true;
                            "uuid", `Int ok.replied_uuid;
                            "time_ms", `Int (ms_since s0);
-                         ] :: !results
+                         ] @ (if ok.Session.smt_calls > 0 then
+                                [ "smt_calls",
+                                  `Int ok.Session.smt_calls ]
+                              else []))
+                         :: !results
                      | Error er ->
                        failed := true;
                        goals_fail := goals_json e.session;
@@ -2343,7 +2320,7 @@ let outline_engine (e : entry) lemma =
                   | Error er ->
                     failed := Some (s, Error.to_string er);
                     raise Exit
-                  | Ok _ ->
+                  | Ok okr ->
                     let (n, subs) = goals_info e.session in
                     let children = n - !count + 1 in
                     let shape =
@@ -2380,10 +2357,10 @@ let outline_engine (e : entry) lemma =
                      | None -> ());
                     count := n;
                     let kw = exec_keyword s.src in
-                    (* Invocation-count, not leading-keyword: `by
-                       smt(...)` closers inside have/selectors are
-                       smt calls too (B14). *)
-                    let smt_calls = count_keyword "smt" s.src in
+                    (* Runtime truth: solver invocations counted at
+                       EC's choke point — `/#`, tacticals and future
+                       syntax included by construction. *)
+                    let smt_calls = okr.Session.smt_calls in
                     let hint_max = smt_hint_max s.src in
                     sentences :=
                       `Assoc [
@@ -3229,13 +3206,17 @@ let tool_check_script t args =
                             ] :: !admitted
                         | None -> ());
                        results :=
-                         `Assoc [
+                         `Assoc ([
                            "index", `Int i;
                            "src", `String (src_preview s.src);
                            "ok", `Bool true;
                            "uuid", `Int ok.replied_uuid;
                            "time_ms", `Int (ms_since s0);
-                         ] :: !results
+                         ] @ (if ok.Session.smt_calls > 0 then
+                                [ "smt_calls",
+                                  `Int ok.Session.smt_calls ]
+                              else []))
+                         :: !results
                      | Error er ->
                        failed := true;
                        goals_fail := goals_json e.session;
@@ -3851,8 +3832,9 @@ let tools :
   "proof_profile",
   "Hotspot ranking over a lemma's proof, aggregated per branch: \
    sentence counts, time, smt/admit counts, fragility markers. \
-   smt_count counts INVOCATIONS — `by smt(...)` closers inside \
-   have/selector sentences included, anywhere in the sentence. \
+   smt_count counts solver INVOCATIONS at RUNTIME (EC's prover \
+   choke point): `by smt(...)` closers, the `/#` view, tacticals \
+   and any future syntax count by construction. \
    Fragile = progress, !-rewrites, or an smt hint list of 8+ \
    lemmas (per-sentence smt_hint_max reported). A proof with <= 1 \
    branch also carries the per-sentence table (src preview + \
