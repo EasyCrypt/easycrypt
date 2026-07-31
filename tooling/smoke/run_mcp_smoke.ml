@@ -2204,6 +2204,65 @@ let () =
      && member "analysis" tri = `Null)
     (Yojson.Safe.to_string tri);
 
+  (* -- round 12 (B14): smt INVOCATION counting + flat profile ----- *)
+  let proff = Filename.concat fixture_dir "prof.ec" in
+  let oc = open_out proff in
+  output_string oc
+    "require import AllCore StdOrder.\n\
+     import IntOrder.\n\
+     lemma pf : 1 = 1.\n\
+     proof.\n\
+     have h1 : 3 = 3 by smt().\n\
+     have h2 : 4 = 4\n\
+       by smt(addzC addzA mulzC mulzA add0z addz0 mul1z mulz1).\n\
+     by smt().\n\
+     qed.\n";
+  close_out oc;
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String proff; "session", `String "wp";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "prof fixture open" (not err) "";
+  let (err, pf) =
+    call fd_in fd_out "proof_profile"
+      (`Assoc [ "lemma", `String "pf"; "session", `String "wp" ])
+  in
+  let pf_sents =
+    try
+      match member "sentences" pf with `List l -> l | _ -> []
+    with _ -> []
+  in
+  let hint8_row =
+    List.exists
+      (fun s ->
+         member "smt_hint_max" s = `Int 8
+         && member "fragile" s = `Bool true)
+      pf_sents
+  in
+  let clean_row =
+    List.exists
+      (fun s ->
+         member "smt_calls" s = `Int 1
+         && member "smt_hint_max" s = `Int 0
+         && member "fragile" s = `Bool false)
+      pf_sents
+  in
+  check "B14: smt_count counts INVOCATIONS incl. by-smt closers"
+    ((not err)
+     && member "ok" pf = `Bool true
+     && member "total_smt" pf = `Int 3)
+    (Yojson.Safe.to_string pf);
+  check "B14: <=1-branch proof carries the per-sentence table"
+    (List.length pf_sents >= 4 && hint8_row && clean_row)
+    (Yojson.Safe.to_string pf);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wp" ])
+  in
+  check "close wp" (not err) "";
+
   (* -- empty listing explains per-process locks (F7) --------------- *)
   let (err, _) =
     call fd_in fd_out "close_session" (`Assoc [])

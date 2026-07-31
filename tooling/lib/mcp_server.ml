@@ -594,6 +594,96 @@ let exec_keyword (src : string) =
   let rec go i = if i < n && is_ident_char src.[i] then go (i + 1) else i in
   String.sub src b (go b - b)
 
+(* Count invocations of keyword [kw] ANYWHERE in a sentence — as a
+   whole identifier token, outside comments and strings. The
+   leading-keyword flag missed `by smt(...)` closers inside `have`
+   sentences, under-reporting a seven-smt lemma as one (field
+   report B14): an smt call is an smt call wherever it sits. *)
+let count_keyword kw (src : string) =
+  let n = String.length src in
+  let count = ref 0 in
+  let i = ref 0 in
+  while !i < n do
+    match src.[!i] with
+    | '(' when !i + 1 < n && src.[!i + 1] = '*' ->
+      let j = ref (!i + 2) in
+      let depth = ref 1 in
+      while !depth > 0 && !j < n do
+        if !j + 1 < n && src.[!j] = '(' && src.[!j + 1] = '*' then begin
+          incr depth; j := !j + 2
+        end
+        else if !j + 1 < n && src.[!j] = '*' && src.[!j + 1] = ')'
+        then begin decr depth; j := !j + 2 end
+        else incr j
+      done;
+      i := !j
+    | '"' ->
+      let j = ref (!i + 1) in
+      while !j < n && src.[!j] <> '"' do
+        if src.[!j] = '\\' && !j + 1 < n then j := !j + 2 else incr j
+      done;
+      i := (if !j < n then !j + 1 else n)
+    | c when is_ident_start c ->
+      let j = ref !i in
+      while !j < n && is_ident_char src.[!j] do incr j done;
+      if String.sub src !i (!j - !i) = kw then incr count;
+      i := !j
+    | _ -> incr i
+  done;
+  !count
+
+(* Largest hint-list length among the sentence's smt(...) calls
+   (ident tokens inside the parens). A long hint list is a measured
+   fragility class (B14: the actual flake was exactly this). *)
+let smt_hint_fragile_threshold = 8
+
+let smt_hint_max (src : string) =
+  let n = String.length src in
+  let best = ref 0 in
+  let i = ref 0 in
+  while !i < n do
+    match src.[!i] with
+    | '(' when !i + 1 < n && src.[!i + 1] = '*' ->
+      let j = ref (!i + 2) in
+      let depth = ref 1 in
+      while !depth > 0 && !j < n do
+        if !j + 1 < n && src.[!j] = '(' && src.[!j + 1] = '*' then begin
+          incr depth; j := !j + 2
+        end
+        else if !j + 1 < n && src.[!j] = '*' && src.[!j + 1] = ')'
+        then begin decr depth; j := !j + 2 end
+        else incr j
+      done;
+      i := !j
+    | c when is_ident_start c ->
+      let j = ref !i in
+      while !j < n && is_ident_char src.[!j] do incr j done;
+      let is_smt = String.sub src !i (!j - !i) = "smt" in
+      i := !j;
+      if is_smt then begin
+        while !i < n && (src.[!i] = ' ' || src.[!i] = '\t') do incr i done;
+        if !i < n && src.[!i] = '(' then begin
+          incr i;
+          let depth = ref 1 in
+          let hints = ref 0 in
+          while !depth > 0 && !i < n do
+            match src.[!i] with
+            | '(' -> incr depth; incr i
+            | ')' -> decr depth; incr i
+            | c when is_ident_start c ->
+              let j = ref !i in
+              while !j < n && is_ident_char src.[!j] do incr j done;
+              incr hints;
+              i := !j
+            | _ -> incr i
+          done;
+          if !hints > !best then best := !hints
+        end
+      end
+    | _ -> incr i
+  done;
+  !best
+
 (* Sentence identity up to leading comments and surrounding
    whitespace (nesting-aware — EC comments nest): the parser attaches
    a leading comment to the FOLLOWING sentence, so a comment edit
@@ -2290,6 +2380,11 @@ let outline_engine (e : entry) lemma =
                      | None -> ());
                     count := n;
                     let kw = exec_keyword s.src in
+                    (* Invocation-count, not leading-keyword: `by
+                       smt(...)` closers inside have/selectors are
+                       smt calls too (B14). *)
+                    let smt_calls = count_keyword "smt" s.src in
+                    let hint_max = smt_hint_max s.src in
                     sentences :=
                       `Assoc [
                         "path", `String path_before;
@@ -2298,15 +2393,16 @@ let outline_engine (e : entry) lemma =
                         "goals_after", `Int n;
                         "closer",
                         `Bool (children = 0 || s.kind = "Gsave");
-                        (* keyword-based: also catches smt(args)
-                           and bulleted forms *)
-                        "smt", `Bool (kw = "smt");
+                        "smt", `Bool (smt_calls > 0);
+                        "smt_calls", `Int smt_calls;
+                        "smt_hint_max", `Int hint_max;
                         "admit", `Bool (kw = "admit");
                         "fragile",
                         `Bool
                           (kw = "progress"
                            || (String.length s.src > 0
-                               && String.contains s.src '!'));
+                               && String.contains s.src '!')
+                           || hint_max >= smt_hint_fragile_threshold);
                       ] :: !sentences))
             body
         with Exit -> ());
@@ -2394,7 +2490,12 @@ let tool_proof_profile t args =
                  (match member "time_ms" s with
                   | `Int n -> tms := !tms + n
                   | _ -> ());
-                 if member "smt" s = `Bool true then incr smt;
+                 (* smt_count = INVOCATIONS (B14), not sentences
+                    whose leading tactic is smt. *)
+                 (match member "smt_calls" s with
+                  | `Int k -> smt := !smt + k
+                  | _ ->
+                    if member "smt" s = `Bool true then incr smt);
                  if member "admit" s = `Bool true then incr adm;
                  if member "fragile" s = `Bool true then incr fra)
               sentences;
@@ -2423,12 +2524,45 @@ let tool_proof_profile t args =
                    | _ -> acc)
                 0 sentences
             in
+            let total_smt_calls =
+              List.fold_left
+                (fun acc s ->
+                   match member "smt_calls" s with
+                   | `Int k -> acc + k
+                   | _ -> acc)
+                0 sentences
+            in
+            (* A proof with no real branching aggregates to one row,
+               which is no resolution at all — fall back to the
+               per-sentence table (src previews) so the hotspot is
+               visible (B14). *)
+            let flat =
+              if List.length branches <= 1 then
+                [ "sentences",
+                  `List
+                    (List.map
+                       (fun s ->
+                          `Assoc [
+                            "src",
+                            (match member "src" s with
+                             | `String v -> `String (src_preview v)
+                             | v -> v);
+                            "time_ms", member "time_ms" s;
+                            "smt_calls", member "smt_calls" s;
+                            "smt_hint_max", member "smt_hint_max" s;
+                            "admit", member "admit" s;
+                            "fragile", member "fragile" s;
+                          ])
+                       sentences) ]
+              else []
+            in
             Ok (`Assoc ([
               "session", `String label;
               "lemma", `String lemma;
               "branches", `List branches;
+            ] @ flat @ [
               "total_sentences", `Int (List.length sentences);
-              "total_smt", `Int (total "smt");
+              "total_smt", `Int total_smt_calls;
               "total_admits", `Int (total "admit");
               "total_fragile", `Int (total "fragile");
               "split_points", member "split_points" payload;
@@ -3716,10 +3850,16 @@ let tools :
 
   "proof_profile",
   "Hotspot ranking over a lemma's proof, aggregated per branch: \
-   sentence counts, time, smt/admit counts, fragility markers \
-   (progress, !-rewrites). Same replay as proof_outline \
-   (repositions the session); use it to decide WHAT is worth \
-   restructuring before deciding how.",
+   sentence counts, time, smt/admit counts, fragility markers. \
+   smt_count counts INVOCATIONS — `by smt(...)` closers inside \
+   have/selector sentences included, anywhere in the sentence. \
+   Fragile = progress, !-rewrites, or an smt hint list of 8+ \
+   lemmas (per-sentence smt_hint_max reported). A proof with <= 1 \
+   branch also carries the per-sentence table (src preview + \
+   time_ms + smt_calls) — bullet-free proofs get per-sentence \
+   resolution instead of one opaque row. Same replay as \
+   proof_outline (repositions the session); use it to decide WHAT \
+   is worth restructuring before deciding how.",
   schema ~required:[ "lemma" ] [
     ("lemma", "string", "Lemma whose proof to profile.");
     session_prop;

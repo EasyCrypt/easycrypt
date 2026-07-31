@@ -52,8 +52,13 @@
 > state-neutral probe; try_tactic refuses sequences in tool
 > vocabulary), bullet_depth lifecycle + triage->upto_sentence
 > 0-based pairing + max_chars:1 instruction-listing idioms
+> documented; round 12 (B14): proof_profile smt_count counts
+> INVOCATIONS (by-smt closers included; 7:1 under-report fixed),
+> long hint lists (8+) are a fragility marker with per-sentence
+> smt_hint_max, <=1-branch proofs carry the per-sentence table;
+> warm-pool timing (A/B-only) + nosmt-prefix timing recipe
 > documented;
-> `run_mcp_smoke` 170/170).
+> `run_mcp_smoke` 174/174).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

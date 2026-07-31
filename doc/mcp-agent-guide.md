@@ -215,7 +215,13 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 ### Strategy layer (refactoring at proof-structure level)
 
 - `proof_profile {lemma}` — per-branch hotspot ranking: time, smt
-  and admit counts, fragility markers (`progress`, `!`-rewrites).
+  and admit counts, fragility markers. `smt_count` counts
+  INVOCATIONS — `by smt(...)` closers inside `have`/selector
+  sentences included (a seven-smt lemma reports 7, not 1).
+  Fragile = `progress`, `!`-rewrites, or an smt hint list of 8+
+  lemmas (`smt_hint_max` per sentence — long hint lists are a
+  measured flake class). Proofs with <= 1 branch also carry the
+  per-sentence table, so bullet-free bodies get real resolution.
   Decide WHAT to restructure here.
 - `proof_outline {lemma}` — the proof's shape: every sentence
   attributed to a branch path, split points, and the OBLIGATION
@@ -392,6 +398,16 @@ session ≡ file. If the session itself is wedged (rare), re-run
   `smt_timeout` (1 s to probe, 30 s to confirm); full-strength
   checking happens at replace/resync time and in the final batch
   check.
+- Timing semantics: per-sentence `time_ms` runs against a WARM
+  prover pool and under-reports batch-compile cost several-fold
+  (measured: ~0.5 s in-session vs 2-11 s of compile time for the
+  same smt calls). Relative ordering holds — use it for A/B
+  between candidates, never to budget absolute seconds.
+- Timing-work recipe: `open_file {nosmt: true}` halves load time
+  and does NOT poison downstream measurements — issue `exec
+  {text: "pragma Proofs:check."}` afterwards and verify SMT is
+  live (`try_tactic {tactic: "have : 1%r = 2%r by smt()."}` must
+  FAIL) before trusting numbers.
 - Sending the same invariant twice is a smell — `define` it. The
   reply's `src_expanded` is your audit trail of what actually ran.
 - When a splitting step lands, its reply already carries the
@@ -436,7 +452,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 170/170).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 174/174).
 
 ## Known limits (v1, honest)
 
