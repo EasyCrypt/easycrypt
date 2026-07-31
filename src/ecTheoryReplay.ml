@@ -574,9 +574,15 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
                   List.map
                     (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
                     tyargs in
-                EcSubst.add_opdef subst
-                  (xpath ove name)
-                  (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
+                let subst =
+                  EcSubst.add_opdef subst
+                    (xpath ove name)
+                    (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)) in
+                (* The definition above rewrites the constructor where it
+                   occurs as an operator expression. The branches of a match
+                   body store it as a bare path, which is redirected through
+                   its own substitution. *)
+                EcSubst.add_ctor subst ~src:(xpath ove name) ~dst:np
                 ) subst octors
             | _ -> subst
           end
