@@ -366,6 +366,10 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
      consumes it one-shot and falls back to the `{}` stub. *)
   let next_ok_payload : string option ref = ref None in
 
+  (* One-shot per-phrase SMT-invocation delta (runtime-counted at
+     the EcSmt.check choke point); merged into the next OK-JSON. *)
+  let smt_calls_delta : int option ref = ref None in
+
   let module Wire = struct
     let reply_ok ?(tag="") body =
       let n = Buffer.contents notices in
@@ -377,6 +381,19 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
         match !next_ok_payload with
         | Some s -> next_ok_payload := None; s
         | None -> "{}"
+      in
+      let payload =
+        match !smt_calls_delta with
+        | None -> payload
+        | Some d ->
+          smt_calls_delta := None;
+          if String.length payload >= 2 && payload.[0] = '{' then
+            if payload = "{}" then
+              Printf.sprintf "{\"smt_calls\":%d}" d
+            else
+              Printf.sprintf "{\"smt_calls\":%d,%s" d
+                (String.sub payload 1 (String.length payload - 1))
+          else payload
       in
       Printf.printf "OK-JSON: %s\n" payload;
       if n <> "" then print_string n;
@@ -685,11 +702,13 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       last_src := src;
       begin match EcLocation.unloc prog with
       | EP.P_Prog (commands, _) ->
-        if document then
+        let smt0 = EcCommands.smt_calls () in
+        (if document then
           List.iter (process_action ~record:false ~src) commands
         else
           EcCommands.with_strict_bullets false (fun () ->
-            List.iter (process_action ~record:true ~src) commands);
+            List.iter (process_action ~record:true ~src) commands));
+        smt_calls_delta := Some (EcCommands.smt_calls () - smt0);
         Wire.reply_ok_goals ()
       | EP.P_Undo i ->
         EcCommands.undo i;

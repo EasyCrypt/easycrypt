@@ -1117,6 +1117,10 @@ let apply_pragma_option (x : string) =
   else apply_pragma x
 
 (* -------------------------------------------------------------------- *)
+let smt_calls () : int =
+  EcGState.smt_calls (EcScope.gstate (current ()))
+
+(* -------------------------------------------------------------------- *)
 let uuid () : int =
   (oget !context).ct_level
 

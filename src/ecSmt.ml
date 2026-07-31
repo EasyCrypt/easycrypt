@@ -1682,6 +1682,11 @@ let make_task tenv toadd decl=
     WTask.add_decl tenv.te_task decl
 
 let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
+  (* Every SMT discharge in EC funnels through here (smt tactic,
+     `by smt` closers, the `/#` view, tacticals). The gstate counter
+     is the runtime truth phrase-level telemetry reads as deltas —
+     counting syntax instead proved brittle twice (B14, then /#). *)
+  EcGState.bump_smt_calls (EcEnv.gstate (LDecl.toenv hyps));
   let out_task filename task =
     let stream = open_out filename in
     EcUtils.try_finally

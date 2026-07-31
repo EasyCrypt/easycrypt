@@ -60,6 +60,10 @@ val add_notifier : (loglevel -> string Lazy.t -> unit) -> gstate -> nid_t
 val rem_notifier : nid_t -> gstate -> unit
 val loglevel     : gstate-> loglevel
 val set_loglevel : loglevel -> gstate -> unit
+
+(* Monotone SMT-invocation counter (readers take deltas). *)
+val smt_calls      : gstate -> int
+val bump_smt_calls : gstate -> unit
 val notify       : loglevel -> string Lazy.t -> gstate -> unit
 val notify_fmt   :
   loglevel -> gstate -> ('a, Format.formatter, unit, unit) format4 -> 'a

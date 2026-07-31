@@ -17,6 +17,11 @@ type gstate = {
   mutable gs_values    : value Mstr.t;
   mutable gs_notifiers : notifier list;
   mutable gs_loglevel  : loglevel;
+  (* Monotone SMT-invocation counter, bumped at the EcSmt.check
+     choke point. Readers take DELTAS. Runtime truth: no syntax
+     knowledge, so `/#`, tacticals, and any future surface form
+     count by construction. *)
+  mutable gs_smt_calls : int;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -28,14 +33,16 @@ let create () : gstate =
   { gs_flags     = Mstr.empty;
     gs_values    = Mstr.empty;
     gs_notifiers = [];
-    gs_loglevel  = `Info; }
+    gs_loglevel  = `Info;
+    gs_smt_calls = 0; }
 
 (* -------------------------------------------------------------------- *)
 let copy (gs : gstate) : gstate =
   { gs_flags     = gs.gs_flags    ;
     gs_values    = gs.gs_values   ;
     gs_notifiers = gs.gs_notifiers;
-    gs_loglevel  = gs.gs_loglevel ; }
+    gs_loglevel  = gs.gs_loglevel ;
+    gs_smt_calls = gs.gs_smt_calls; }
 
 (* -------------------------------------------------------------------- *)
 let from_flags (flags : (string * bool) list) : gstate =
@@ -110,6 +117,13 @@ let loglevel (gs : gstate) =
 (* -------------------------------------------------------------------- *)
 let set_loglevel (lvl : loglevel) (gs : gstate) =
   gs.gs_loglevel <- lvl
+
+(* -------------------------------------------------------------------- *)
+let smt_calls (gs : gstate) : int =
+  gs.gs_smt_calls
+
+let bump_smt_calls (gs : gstate) : unit =
+  gs.gs_smt_calls <- gs.gs_smt_calls + 1
 
 (* -------------------------------------------------------------------- *)
 let int_of_loglevel = function

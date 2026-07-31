@@ -53,6 +53,7 @@ val process : ?src:string -> ?timed:bool -> ?break:bool ->
 val undo  : int  -> unit
 val reset : unit -> unit
 val uuid  : unit -> int
+val smt_calls : unit -> int
 val mode  : unit -> string
 
 val check_eco : string -> bool
