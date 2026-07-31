@@ -300,17 +300,24 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
             let label = String.concat "." (List.rev_map string_of_int path) in
             let marker = if focused then " <- focused" else "" in
             for _ = 1 to depth do Buffer.add_string buf "  " done;
+            (* Line ORDER here is structural (siblings grouped under
+               their split frame), NOT the subgoal order — grouping
+               pulls interleaved siblings together (field report
+               B13). The #N annotation is the order authority: it is
+               the 0-based index into GOALS-JSON's subgoals array
+               (and focus rotation order). *)
             (match texts_all with
              | None ->
                Buffer.add_string buf
-                 (Printf.sprintf "[%s] %s%s\n"
-                    label (one_line text) marker)
+                 (Printf.sprintf "[%s] #%d %s%s\n"
+                    label (idx - 1) (one_line text) marker)
              | Some entries ->
                let (_, _, full) =
                  List.nth entries (idx - 1)
                in
                Buffer.add_string buf
-                 (Printf.sprintf "[%s]%s\n%s\n" label marker full))
+                 (Printf.sprintf "[%s] #%d%s\n%s\n"
+                    label (idx - 1) marker full))
           | Frame children ->
             List.iteri (fun i child ->
               emit ~depth:(depth + 1) ~path:((i + 1) :: path) child)
