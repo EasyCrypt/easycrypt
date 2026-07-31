@@ -54,7 +54,7 @@ not attempt to rebuild anything.
 [/Users/gdel/Repos/ec-llm-next/doc/mcp-agent-guide.md](doc/mcp-agent-guide.md)
 before driving the tools.** It is the contract: the mental model
 (sessions, document-as-truth, uuid, `stale`, edit-mode locks), all
-24 tools grouped by workflow, the standard playbooks (single
+25 tools grouped by workflow, the standard playbooks (single
 lemma, parallel dispatch, big-file refactoring), and the v1
 limits.
 
@@ -69,11 +69,15 @@ The 30-second digest you must not violate:
 - `stale: true` on any reply → `resync_file` before trusting or
   writing anything.
 - Iterate with the state-neutral tools (`try_tactic`,
-  `check_script`, `check_skeleton`); write once, verified. Probe
-  with `try_tactic`, NEVER with `exec` — exec commits, and a
-  committed probe poisons every later `check_script`. Read
-  `check_script`'s `entry` field: it says which goal the
-  candidate actually ran against.
+  `try_script`, `check_script`, `check_skeleton`); write once,
+  verified. Probe with `try_tactic`/`try_script`, NEVER with
+  `exec` — exec commits, and a committed probe poisons every
+  later `check_script`. Read the `entry` field on the loop
+  tools: it says which goal the candidate actually ran against.
+- On `call`-generated many-goal states: `goal_detail: "full"` +
+  `max_chars: 60` is the working default (structure intact,
+  formulas capped); the `tree`'s `#N` indices are the subgoal
+  order, the tree layout is only shape.
 - No cancellation yet: keep exploration cheap (`nosmt` prefixes,
   small candidates, `smt_timeout: 1` while probing).
 - Repeating a long formula across calls? `define {name, text}`

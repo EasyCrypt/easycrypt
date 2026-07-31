@@ -1,7 +1,7 @@
 # EasyCrypt MCP — agent guide
 
 Operating manual for LLM agents driving EasyCrypt proof sessions
-through the `ecd mcp` server (24 tools). Written for the agent;
+through the `ecd mcp` server (25 tools). Written for the agent;
 the [Setup](#setup-human-operator) section is for the human
 operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 [doc/ecllm-compat.md](ecllm-compat.md).
@@ -73,6 +73,11 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   scrape pp text when a structured field exists.
 - `tree` / `focus {path|"next"}` — the open-subgoal tree with
   dotted paths, and focus rotation (undoable: advances uuid).
+  Tree line ORDER is structural (siblings grouped under their
+  split frame), NOT the subgoal order: each line's `#N` is the
+  order authority — the 0-based index into GOALS-JSON's
+  `subgoals` array. Plan bullet skeletons from `#N`; read the
+  tree for shape.
 - `exec {text}` — execute and advance, ONE SENTENCE AT A TIME: the
   input is split by the real parser; successes COMMIT, the first
   failure stops the sequence, and the reply reports every sentence
@@ -106,9 +111,16 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
 
 ### The exploration loop (state-neutral)
 
-- `try_tactic {tactic}` — run one tactic, capture resulting goals
-  (`shape` by default), auto-revert. Your cheapest probe. A goal
-  split attaches the compact `tree` (captured before the revert).
+- `try_tactic {tactic}` — run ONE tactic (sequences are refused
+  with a pointer here), capture resulting goals (`shape` by
+  default), auto-revert. Your cheapest probe. A goal split
+  attaches the compact `tree` (captured before the revert).
+- `try_script {script}` — the multi-sentence state-neutral probe:
+  exec+revert as one atomic call. "Run these two sentences and
+  show me the goal" goes HERE — never through `exec` (a committed
+  probe poisons later check_scripts) and not through
+  `check_script` (that's the document-rules candidate checker).
+  Same `entry` field, previews, auto-`tree` and payload knobs.
 - `check_script {script}` — run a multi-sentence candidate (a
   whole proof body) from the current state: per-sentence verdicts
   + `time_ms`, a `closes` verdict, then full state restore. The
@@ -334,9 +346,34 @@ session ≡ file. If the session itself is wedged (rare), re-run
   the focus never advances — bullet-consuming scripts that should
   move you to the next goal belong in `exec`.
 - Reply-size defaults: `exec` and the loop tools default to
-  `goal_detail: "shape"`; `goals`/`try_tactic` default to
-  `"full"`. On branching states combine `goal_scope: "focused"`
-  (+ `max_chars` when conclusions embed whole invariants).
+  `goal_detail: "shape"`; `goals` defaults to `"full"`. On
+  `call`-generated states the WORKING DEFAULT is `goal_detail:
+  "full"` + a small `max_chars` (40-200): full structure, capped
+  formulas — it is the pair that makes a 2,000-line up-to-bad
+  file tractable, and neither axis alone is enough. Extreme cut:
+  `max_chars: 1` elides every formula, leaving the numbered
+  asgn/rnd/call/if/while instruction listing — the cheapest way
+  to fix a `seq n m` / `sp n m` / `swap i k` bound, because it
+  shows what the INLINER produced, not what the source says.
+- `bullet_depth` lifecycle: `open_file`/document positioning show
+  the file's live stack (0 at a proof start, N mid-bullets);
+  the first AUTHORED phrase (`exec`/`exec_in`) clears the active
+  proof's stack — bullets are ignored while you author, COMMIT
+  re-emits them — so `goals` honestly reports `null` from then
+  on. Depth is real wherever document text put you; null means
+  "no stack in force here".
+- Debugging a broken file: `analyze_file {view: "triage"}` gives
+  the first error per declaration with its `sentence_index`, and
+  `resync_file {upto_sentence: N}` is 0-BASED AGAINST THOSE SAME
+  INDICES — triage says index N fails, `upto_sentence: N` lands
+  you exactly before it. Repositioning deep into a big file costs
+  seconds (measured: 37 s at sentence 385 of 499), so batch your
+  inspections at each position.
+- `commit_proof {write:true}` re-renders presentation: bullet
+  characters follow -/+/* depth order and continuation indents
+  are normalized, so the landed text is equivalent but not
+  byte-identical to what you typed. Diff-review the FILE, not
+  your transcript memory.
 - When a goal embeds a whole `main`, reach for `tree` (one line
   per goal) or `goal_detail: "shape" | "counts"` — loop tools
   default to `shape` (program bodies elided to instruction
@@ -399,7 +436,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 166/166).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 170/170).
 
 ## Known limits (v1, honest)
 

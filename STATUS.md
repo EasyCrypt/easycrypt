@@ -44,8 +44,16 @@
 > `max_chars` caps formula text (third size axis), `analyze_file
 > {view: diagnostics|triage}` collapses cascades to root causes
 > (decl names now cover module/type/op/pred), restore-discipline
-> promoted to guide+QUICKSTART;
-> `run_mcp_smoke` 166/166).
+> promoted to guide+QUICKSTART; round 11 (B13/F14/F15, two more
+> files to zero admits, round-10 features "measured: triage 265
+> diags -> 11 root causes"): tree lines carry #N = the 0-based
+> GOALS-JSON subgoal index (line order is structural, the index
+> is the order authority), try_script = 25th tool (multi-sentence
+> state-neutral probe; try_tactic refuses sequences in tool
+> vocabulary), bullet_depth lifecycle + triage->upto_sentence
+> 0-based pairing + max_chars:1 instruction-listing idioms
+> documented;
+> `run_mcp_smoke` 170/170).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

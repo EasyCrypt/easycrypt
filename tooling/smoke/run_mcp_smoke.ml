@@ -299,6 +299,12 @@ let () =
            true
          with Not_found -> false))
     tree_text;
+  check "B13: tree lines carry the 0-based subgoal index"
+    (try
+       ignore (Str.search_forward (Str.regexp_string "#0") tree_text 0);
+       true
+     with Not_found -> false)
+    tree_text;
 
   let (err, q) =
     call fd_in fd_out "query"
@@ -834,6 +840,63 @@ let () =
            true
          with Not_found -> false))
     (Yojson.Safe.to_string st1);
+
+  (* -- round 11 (F15): try_tactic contract + try_script probe ----- *)
+  let (err, ttm) =
+    call fd_in fd_out "try_tactic"
+      (`Assoc [
+         "tactic", `String "split.\ntrivial.";
+         "session", `String "w2";
+       ])
+  in
+  check "F15: try_tactic refuses sequences in tool vocabulary"
+    (err
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "ONE sentence")
+                     (Yojson.Safe.to_string ttm) 0);
+           ignore (Str.search_forward (Str.regexp_string "try_script")
+                     (Yojson.Safe.to_string ttm) 0);
+           true
+         with Not_found -> false))
+    (Yojson.Safe.to_string ttm);
+  let (err, ts1) =
+    call fd_in fd_out "try_script"
+      (`Assoc [
+         "script", `String "split.\ntrivial.";
+         "session", `String "w2";
+       ])
+  in
+  let ts1_goals =
+    try
+      match member "goals_after" ts1 with
+      | `Assoc _ as g -> member "subgoal_count" g
+      | _ -> `Null
+    with _ -> `Null
+  in
+  check "F15: try_script probes a sequence and restores"
+    ((not err)
+     && member "ok" ts1 = `Bool true
+     && member "checked" ts1 = `Int 2
+     && ts1_goals = `Int 1
+     && member "restore" ts1 = `String "restored"
+     && member "uuid" ts1 = `Int 7
+     && (match member "entry" ts1 with `Assoc _ -> true | _ -> false))
+    (Yojson.Safe.to_string ts1);
+  let (err, ts2) =
+    call fd_in fd_out "try_script"
+      (`Assoc [
+         "script", `String "split.\napply bogus_probe_xyz.";
+         "session", `String "w2";
+       ])
+  in
+  check "F15: failing try_script reports goals_at_failure, restores"
+    ((not err)
+     && member "ok" ts2 = `Bool false
+     && (match member "goals_at_failure" ts2 with
+         | `Assoc _ -> true | _ -> false)
+     && member "restore" ts2 = `String "restored"
+     && member "uuid" ts2 = `Int 7)
+    (Yojson.Safe.to_string ts2);
 
   let (err, exsp) =
     call fd_in fd_out "exec"

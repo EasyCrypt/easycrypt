@@ -1274,6 +1274,30 @@ let tool_try_tactic t args =
        (match expand_defines e tactic with
         | Error m -> Error ("try_tactic: " ^ m)
         | Ok (tactic, expanded) ->
+       (* Single-sentence by contract (round 11, F15): refuse
+          sequences in TOOL vocabulary before anything runs — the
+          wire's block error is protocol-speak a caller can't act
+          on. *)
+       (match Ec_llm_session.parse_source e.session tactic with
+        | Error err ->
+          Error
+            (Printf.sprintf "try_tactic: parse failed: %s"
+               (Error.to_string err))
+        | Ok (_, Some perr) ->
+          Error
+            (Printf.sprintf
+               "try_tactic: parse error — nothing ran: %s" perr)
+        | Ok (ss, None)
+          when List.length
+                 (List.filter
+                    (fun s -> sentence_class_of s <> None) ss)
+               > 1 ->
+          Error
+            "try_tactic takes ONE sentence — use try_script (the \
+             state-neutral sequence probe) for \"run these and \
+             show me the goal\", or check_script for a document-\
+             rules candidate"
+        | Ok _ ->
        let pre = Ec_llm_session.current_uuid e.session in
        let corr = Correlation.of_client "mcp-try" in
        let n_goals0 = fst (goals_info e.session) in
@@ -1325,7 +1349,144 @@ let tool_try_tactic t args =
                (Printf.sprintf
                   "try_tactic: candidate applied but revert failed \
                    (%s); session '%s' state has ADVANCED"
-                  (Error.to_string err) label))))))
+                  (Error.to_string err) label)))))))
+
+(* Multi-sentence STATE-NEUTRAL probe (round 11, F15): exec+revert
+   as one atomic call, asked for independently by two workers. Runs
+   a short AUTHORED sequence from the current state (REPL rules —
+   probes are authored text, not document candidates), reports
+   per-sentence verdicts and the resulting goals, then ALWAYS
+   restores. This is the safe way to ask "what do these sentences
+   do here": a committed exec probe poisons every later
+   check_script (F10), and check_script is the document-rules
+   candidate checker, not a probe. *)
+let tool_try_script t args =
+  match str_arg args "script" with
+  | None -> Error "try_script: missing required argument 'script'"
+  | Some script ->
+    (match find_session t args with
+     | Error e -> Error e
+     | Ok (label, e) ->
+       (match expand_defines e script with
+        | Error m -> Error ("try_script: " ^ m)
+        | Ok (script, expanded) ->
+       (match Ec_llm_session.parse_source e.session script with
+        | Error err ->
+          Error
+            (Printf.sprintf "try_script: parse failed: %s"
+               (Error.to_string err))
+        | Ok (_, Some perr) ->
+          Error
+            (Printf.sprintf
+               "try_script: parse error — nothing ran: %s" perr)
+        | Ok (ss, None) ->
+          let start = Ec_llm_session.current_uuid e.session in
+          let corr = Correlation.of_client "mcp-tryscript" in
+          let detail = goal_detail_of args ~default:`Shape in
+          let entry = entry_fields e.session in
+          (match apply_smt_timeout e args ~corr with
+           | Error m -> Error ("try_script: " ^ m)
+           | Ok applied ->
+          let results = ref [] in
+          let admitted = ref [] in
+          let failed = ref false in
+          let goals_fail = ref `Null in
+          let restarted = ref false in
+          let n_goals0 = fst (goals_info e.session) in
+          let t0 = Unix.gettimeofday () in
+          (try
+             List.iteri
+               (fun i (s : Ec_llm_session.parsed_sentence) ->
+                  match sentence_class_of s with
+                  | None -> ()
+                  | Some cls ->
+                    let s0 = Unix.gettimeofday () in
+                    let adm =
+                      if is_admit_sentence s then
+                        capture_admit e.session detail
+                      else None
+                    in
+                    (match
+                       Ec_llm_session.exec e.session ~corr
+                         ~sentence_class:cls ~source:s.src
+                     with
+                     | Ok ok ->
+                       if ok.restarted then begin
+                         restarted := true;
+                         raise Exit
+                       end;
+                       (match adm with
+                        | Some (g, h) ->
+                          admitted :=
+                            `Assoc [
+                              "index", `Int i;
+                              "src", `String (src_preview s.src);
+                              "goal", g;
+                              "hash", `String h;
+                            ] :: !admitted
+                        | None -> ());
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String (src_preview s.src);
+                           "ok", `Bool true;
+                           "uuid", `Int ok.replied_uuid;
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results
+                     | Error er ->
+                       failed := true;
+                       goals_fail := goals_json e.session;
+                       results :=
+                         `Assoc [
+                           "index", `Int i;
+                           "src", `String s.src;
+                           "ok", `Bool false;
+                           "error", `String (Error.to_string er);
+                           "time_ms", `Int (ms_since s0);
+                         ] :: !results;
+                       raise Exit))
+               ss
+           with Exit -> ());
+          let goals_after = goals_json e.session in
+          let tree_extra =
+            if !failed || !restarted then []
+            else tree_if_grew e.session ~before:n_goals0
+          in
+          let restore =
+            if !restarted then
+              `String
+                "session restarted mid-script — state NOT \
+                 restored; run resync_file to recover"
+            else if Ec_llm_session.current_uuid e.session = start
+            then `String "unmoved"
+            else
+              match
+                Ec_llm_session.revert_to_uuid e.session ~target:start
+              with
+              | Ok () -> `String "restored"
+              | Error er ->
+                `String ("RESTORE FAILED: " ^ Error.to_string er)
+          in
+          Ok (`Assoc ([
+            "session", `String label;
+            "checked", `Int (List.length !results);
+            "ok", `Bool ((not !failed) && not !restarted);
+          ] @ entry @ [
+            "results", `List (List.rev !results);
+            "admitted", `List (List.rev !admitted);
+            "restore", restore;
+            "uuid", `Int (Ec_llm_session.current_uuid e.session);
+            "total_time_ms", `Int (ms_since t0);
+            "stale", `Bool (stale_flag e);
+          ] @ smt_timeout_field applied
+            @ src_expanded_field expanded script
+            @ (if !failed then
+                 [ "goals_at_failure",
+                   render_goals args ~detail !goals_fail ]
+               else
+                 [ "goals_after",
+                   render_goals args ~detail goals_after ]
+                 @ tree_extra)))))))
 
 let tool_revert t args =
   match int_arg args "uuid" with
@@ -3431,7 +3592,12 @@ let tools :
 
   "tree",
   "Render the open-subgoal tree with dotted-path labels (matching \
-   what focus accepts) and the focused goal marked.",
+   what focus accepts) and the focused goal marked. Line ORDER is \
+   STRUCTURAL (siblings grouped under their split frame), not the \
+   subgoal order — each line's #N annotation is the order \
+   authority: the 0-based index into GOALS-JSON's subgoals array \
+   and the focus rotation sequence. Plan bullet skeletons from the \
+   #N indices; read the tree for shape.",
   schema [ session_prop ],
   tool_tree;
 
@@ -3462,6 +3628,26 @@ let tools :
     session_prop;
   ],
   tool_try_tactic;
+
+  "try_script",
+  "Multi-sentence STATE-NEUTRAL probe: run a short authored \
+   sequence from the current state, get per-sentence verdicts and \
+   the resulting goals, then the state is ALWAYS restored — \
+   exec+revert as one atomic call. Use it for \"what do these \
+   sentences do here\": exec would COMMIT the probe (poisoning \
+   later check_scripts), and check_script is the document-rules \
+   candidate checker, not a probe. Replies carry the same entry \
+   field, previews, auto-tree and payload knobs as check_script.",
+  schema ~required:[ "script" ] [
+    ("script", "string",
+     "Sentences ('.'-terminated, newline-separated) to probe.");
+    goal_scope_prop;
+    max_chars_prop;
+    smt_timeout_prop;
+    goal_detail_prop;
+    session_prop;
+  ],
+  tool_try_script;
 
   "check_script",
   "Speculatively run a multi-sentence candidate script (e.g. a \
