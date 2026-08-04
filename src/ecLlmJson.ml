@@ -66,25 +66,48 @@ let classify_error e =
   let detail = String.strip (EcPException.tostring inner) in
   (code, phase, loc, detail)
 
+let loc_json_field (loc : EcLocation.t option) =
+  match loc with
+  | Some l when l <> EcLocation._dummy ->
+    let (sl, sc) = l.EcLocation.loc_start in
+    let (el, ec) = l.EcLocation.loc_end in
+    let file =
+      if l.EcLocation.loc_fname = "" then "null"
+      else Printf.sprintf "\"%s\"" (json_escape l.EcLocation.loc_fname)
+    in
+    Printf.sprintf
+      "{\"file\":%s,\"start_line\":%d,\"start_col\":%d,\
+       \"end_line\":%d,\"end_col\":%d}"
+      file sl sc el ec
+  | _ -> "null"
+
 let error_json_of_exn e =
   let (code, phase, loc, detail) = classify_error e in
-  let loc_field = match loc with
-    | Some l when l <> EcLocation._dummy ->
-      let (sl, sc) = l.EcLocation.loc_start in
-      let (el, ec) = l.EcLocation.loc_end in
-      let file =
-        if l.EcLocation.loc_fname = "" then "null"
-        else Printf.sprintf "\"%s\"" (json_escape l.EcLocation.loc_fname)
-      in
-      Printf.sprintf
-        "{\"file\":%s,\"start_line\":%d,\"start_col\":%d,\
-         \"end_line\":%d,\"end_col\":%d}"
-        file sl sc el ec
-    | _ -> "null"
-  in
   Printf.sprintf
     "{\"code\":\"%s\",\"phase\":\"%s\",\"location\":%s,\"detail\":\"%s\"}"
-    code phase loc_field (json_escape detail)
+    code phase (loc_json_field loc) (json_escape detail)
+
+(* LOAD-failure ERROR-JSON (field report B15): the generic
+   per-exception payload plus the loader's own knowledge — the
+   failing sentence's TOP-FILE parser location (used when the
+   exception's location is missing; the exception's own location may
+   be more precise, or point inside a require'd file) and a "load"
+   object saying how much of the top file remains loaded: complete
+   top-level sentences and the last loaded line. Clients keep the
+   session (its state is exactly that prefix) and resume at the
+   boundary instead of re-deriving the position by cold-compiling. *)
+let load_error_json ~exn:e ~fail_loc ~loaded_sentences ~loaded_line () =
+  let (code, phase, loc, detail) = classify_error e in
+  let loc =
+    match loc with
+    | Some l when l <> EcLocation._dummy -> loc
+    | _ -> fail_loc
+  in
+  Printf.sprintf
+    "{\"code\":\"%s\",\"phase\":\"%s\",\"location\":%s,\
+     \"load\":{\"sentences\":%d,\"line\":%d},\"detail\":\"%s\"}"
+    code phase (loc_json_field loc) loaded_sentences loaded_line
+    (json_escape detail)
 
 (* The `ERROR-JSON:` line payload. Protocol-level errors (no exception
    in hand — e.g. "REVERT: uuid N out of range") classify as

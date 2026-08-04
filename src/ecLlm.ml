@@ -103,6 +103,16 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   (* CHECKPOINT name -> uuid. *)
   let checkpoints : (string, int) Hashtbl.t = Hashtbl.create 16 in
 
+  (* Per-sentence ledger of the most recent [LOAD]: one row per
+     top-level parse unit COMPLETED, in execution order, as
+     [(end_line, uuid_after)]. Queryable via [LEDGER-JSON]: a client
+     that knows a document position's uuid can rewind to it with
+     [REVERT] instead of re-running the prefix (undo is O(1) — the
+     scope stack keeps every uuid). Reset at each LOAD start; rows
+     accumulate even when the LOAD later fails, so a stopped load
+     still reports the boundary uuids of everything that landed. *)
+  let load_ledger : (int * int) list ref = ref [] (* reversed *) in
+
   (* Transcript of REPL-typed phrases that succeeded. Each entry is
      [(uuid_before, src, parent, opens_at_entry)]:
        - [parent]: focused handle right before the phrase ([None] iff
@@ -739,6 +749,17 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       let args = String.strip args in
       let last_src = ref "" in
       let trace_prefix = ref "" in
+      (* Load-progress accounting (field report B15/B18): [units_done]
+         counts COMPLETE top-level parse units executed (the client's
+         sentence index space), [unit_start_uuid] marks a unit in
+         flight so a failure can roll a half-executed unit back to
+         its boundary, and [failing_loc] is the parser location of
+         the sentence that raised — authoritative even when the
+         exception's own location points into a require'd file. *)
+      let units_done = ref 0 in
+      let unit_start_uuid : int option ref = ref None in
+      let failing_loc : EcLocation.t option ref = ref None in
+      let last_loc : EcLocation.t option ref = ref None in
       let exception Trace_failed of exn in
 
       try
@@ -820,6 +841,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
         do_initialize ();
         Hashtbl.clear checkpoints;
         Transcript.clear ();
+        load_ledger := [];
         EcCommands.addidir (Filename.dirname filename);
         EcCommands.set_current_path (Filename.dirname filename);
 
@@ -834,8 +856,6 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
               | None -> false
               | Some c -> ec > c)
         in
-
-        let last_loc = ref None in
 
         (* For -trace: lazy whole-file bytes, used to slice the exact
            source text of a sentence by byte offsets. *)
@@ -862,7 +882,10 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           | None -> ()
           | Some (src, p) ->
             last_src := src;
-            process_action ~src p;
+            (try process_action ~src p
+             with e ->
+               failing_loc := Some p.EP.gl_action.EcLocation.pl_loc;
+               raise e);
             last_loc := Some p.EP.gl_action.EcLocation.pl_loc;
             pending := None
         in
@@ -874,9 +897,27 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
             pending := Some (src, p)
           end else begin
             last_src := src;
-            process_action ~src p;
+            if !unit_start_uuid = None then
+              unit_start_uuid := Some (EcCommands.uuid ());
+            (try process_action ~src p
+             with e -> failing_loc := Some loc; raise e);
             last_loc := Some loc
           end
+        in
+        (* One COMPLETE top-level parse unit: advance the sentence
+           counter and record its boundary uuid in the ledger. Not
+           counted in trace mode (execution is deferred there). *)
+        let unit_done () =
+          if not trace then begin
+            incr units_done;
+            let line =
+              match !last_loc with
+              | Some loc -> fst loc.EcLocation.loc_end
+              | None -> 0
+            in
+            load_ledger := (line, EcCommands.uuid ()) :: !load_ledger
+          end;
+          unit_start_uuid := None
         in
 
         if nosmt then EcCommands.pragma_check `WeakCheck;
@@ -887,20 +928,31 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           match EcLocation.unloc prog with
           | EP.P_Prog (commands, locterm) ->
             List.iter (step src) commands;
+            unit_done ();
             if locterm then raise Exit
           | EP.P_Undo i ->
             last_src := src;
-            EcCommands.undo i
+            EcCommands.undo i;
+            unit_done ()
           | EP.P_Exit ->
             raise Exit
           | EP.P_DocComment doc ->
             last_src := src;
-            EcCommands.doc_comment doc
+            EcCommands.doc_comment doc;
+            unit_done ()
         done with
         | Exit | End_of_file -> ()
         | e ->
           EcIo.finalize reader;
           if nosmt then EcCommands.pragma_check `Check;
+          (* Roll a HALF-EXECUTED unit back to its boundary so the
+             surviving state is exactly [units_done] complete
+             sentences (multi-command units only; a single-command
+             unit fails atomically and leaves nothing to undo). *)
+          (match !unit_start_uuid with
+           | Some u when EcCommands.uuid () > u ->
+             (try EcCommands.undo u with _ -> ())
+           | _ -> ());
           raise e
         end;
 
@@ -1019,7 +1071,23 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Failure s ->
         Wire.reply_error ~tag:" [restarted]" s
       | e ->
-        Wire.reply_error ~tag:" [restarted]" ~exn:e
+        (* Structured stop report (field report B15): the generic
+           per-exception ERROR-JSON plus the loader's own knowledge —
+           the failing sentence's top-file parser location and how
+           much of the file REMAINS LOADED (complete sentences +
+           their last line). The session state IS that prefix, so a
+           client may keep it and fix in place instead of
+           re-deriving the position by cold-compiling. *)
+        let loaded_line =
+          match !last_loc with
+          | Some loc -> fst loc.EcLocation.loc_end
+          | None -> 0
+        in
+        let error_json =
+          EcLlmJson.load_error_json ~exn:e ~fail_loc:!failing_loc
+            ~loaded_sentences:!units_done ~loaded_line ()
+        in
+        Wire.reply_error ~tag:" [restarted]" ~exn:e ~error_json
           (Goals.format_error ~src:!last_src e)
   end in
 
@@ -1049,6 +1117,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Load       of string   (* raw arg tail; Load.handle parses *)
       | Ec         of string   (* fall-through: raw EasyCrypt input *)
       | Goals_json             (* machine profile: GOALS-JSON *)
+      | Ledger_json            (* machine profile: LEDGER-JSON *)
       | Parse_file   of string (* machine profile: PARSE-JSON "file" *)
       | Analyze_file of string (* machine profile: ANALYZE-JSON "file" *)
       | Exec_json    of string (* machine profile: EXEC-JSON <payload> *)
@@ -1141,6 +1210,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
         | "GOALS"     -> Goals `One
         | "GOALS ALL" -> Goals `All
         | "GOALS-JSON"-> Goals_json
+        | "LEDGER-JSON" -> Ledger_json
         | "TREE"      -> Tree `One
         | "TREE ALL"  -> Tree `All
         | "COMMIT"    -> Commit
@@ -1364,6 +1434,18 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Goals_json   ->
         Buffer.clear notices;
         Wire.reply_ok (EcLlmJson.goals_to_json ())
+      | Ledger_json  ->
+        (* Per-sentence (end_line, uuid) rows of the most recent
+           LOAD, in execution order — the client's document-position
+           → uuid map for O(1) rewinds (field report B18). *)
+        Buffer.clear notices;
+        Wire.reply_ok
+          ("[" ^
+           String.concat ","
+             (List.rev_map
+                (fun (line, uuid) -> Printf.sprintf "[%d,%d]" line uuid)
+                !load_ledger)
+           ^ "]")
       | Parse_file a ->
         do_json_file EcLlmJson.parse_to_json "PARSE-JSON" a
       | Analyze_file a ->

@@ -25,6 +25,19 @@ val analyze_to_json :
    [fallback]. *)
 val error_json_line : ?exn:exn -> fallback:string -> unit -> string
 
+(* LOAD-failure ERROR-JSON (field report B15): the generic
+   per-exception payload plus the loader's own knowledge — the
+   failing sentence's top-file parser location (used when the
+   exception carries none) and a "load" object with how much of the
+   top file remains loaded (complete sentences / last line), so
+   clients can keep the stopped session and resume at the boundary. *)
+val load_error_json :
+  exn:exn ->
+  fail_loc:EcLocation.t option ->
+  loaded_sentences:int ->
+  loaded_line:int ->
+  unit -> string
+
 (* Protocol-level ERROR-JSON with an explicit code (EXEC-JSON's
    MalformedExecJson / UnsupportedExecJson). *)
 val protocol_error_json : code:string -> detail:string -> string
