@@ -460,11 +460,28 @@ let error_of_json (raw : string) : Error.t =
     let open Yojson.Safe.Util in
     let code = try json |> member "code" |> to_string with _ -> "Internal" in
     let detail = try json |> member "detail" |> to_string with _ -> raw in
-    (match code with
-     | "ParseError"    -> Error.Parse_error    { detail }
-     | "TypeError"     -> Error.Type_error     { detail }
-     | "TacticFailure" -> Error.Tactic_failure { detail }
-     | _               -> Error.Internal       { detail })
+    (* A "load" object marks a stopped document LOAD (field report
+       B15): the reply carries the failing position AND how much of
+       the top file remains loaded — surface it structurally instead
+       of flattening to a position-less detail string. *)
+    (match member "load" json with
+     | `Assoc _ as load ->
+       let geti j k = match member k j with `Int n -> n | _ -> 0 in
+       let loc = member "location" json in
+       Error.Load_stopped {
+         file = (match member "file" loc with `String s -> s | _ -> "");
+         line = geti loc "start_line";
+         col = geti loc "start_col";
+         loaded_sentences = geti load "sentences";
+         loaded_line = geti load "line";
+         detail;
+       }
+     | _ ->
+       (match code with
+        | "ParseError"    -> Error.Parse_error    { detail }
+        | "TypeError"     -> Error.Type_error     { detail }
+        | "TacticFailure" -> Error.Tactic_failure { detail }
+        | _               -> Error.Internal       { detail }))
 
 (* Send an input line (appends newline) and read the next reply. *)
 let send_and_read t (line : string) : reply option =
@@ -875,6 +892,13 @@ let raw_command t (line : string) =
       t.cancelled <- true;
       Error (Error.Session_restarted { reason = "subprocess EOF" })
     | Some r when r.status = `Error ->
+      (* The uuid on an ERROR header is the session's live uuid all
+         the same (a failed LOAD, for instance, restarts and then
+         stops at the last complete sentence — field report B15).
+         Track it, and honor [restarted] on errors too, so the
+         mirror stays truthful when the caller keeps the session. *)
+      t.uuid <- r.uuid;
+      if has_tag r "restarted" then t.executed_list <- [];
       (match r.error_json with
        | Some raw -> Error (error_of_json raw)
        | None ->
@@ -883,6 +907,25 @@ let raw_command t (line : string) =
       t.uuid <- r.uuid;
       if has_tag r "restarted" then t.executed_list <- [];
       Ok (String.concat "\n" r.body, r.notices)
+
+(* Per-sentence (end_line, uuid) rows of the backend's most recent
+   LOAD, in execution order (LEDGER-JSON, field report B18) — the raw
+   material for document-position → uuid rewinds. [Ok []] when the
+   backend predates the command or the payload doesn't parse. *)
+let load_ledger t : ((int * int) list, Error.t) result =
+  match raw_command t "LEDGER-JSON" with
+  | Error e -> Error e
+  | Ok (body, _notices) ->
+    (match Yojson.Safe.from_string body with
+     | exception _ -> Ok []
+     | `List rows ->
+       Ok
+         (List.filter_map
+            (function
+              | `List [ `Int line; `Int uuid ] -> Some (line, uuid)
+              | _ -> None)
+            rows)
+     | _ -> Ok [])
 
 (* ---------------------------------------------------------------- *)
 (* Parsing a document via the addition-1 PARSE-BEGIN/PARSE-DONE frame *)

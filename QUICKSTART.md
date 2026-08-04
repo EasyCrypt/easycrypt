@@ -77,7 +77,23 @@ The 30-second digest you must not violate:
 - On `call`-generated many-goal states: `goal_detail: "full"` +
   `max_chars: 60` is the working default (structure intact,
   formulas capped); the `tree`'s `#N` indices are the subgoal
-  order, the tree layout is only shape.
+  order, the tree layout is only shape. The payload axes
+  (`goal_scope`/`goal_detail`/`max_chars`) work uniformly on
+  every state-bearing tool — open_file and revert included — and
+  a server budget keeps every reply deliverable (`payload_note`
+  says when it degraded one; unknown arguments are refused, not
+  ignored).
+- `open_file` on a file with a failing sentence = a **partial
+  open** (`partial: true` + `stopped_at` position/lemma), session
+  LIVE at the last good sentence — fix with `exec` or edit +
+  `resync_file`; never cold-compile just to find the line.
+- Backwards repositioning is cheap now: `resync_file` with an
+  earlier target REVERTs to a recorded snapshot (`rewind: true`)
+  instead of reloading the prefix.
+- A `no session` error distinguishes never-opened (server start
+  time listed; opened before that = server restarted, reopen)
+  from closed/replaced/died (reason + your authored sentences
+  handed back for replay).
 - No cancellation yet: keep exploration cheap (`nosmt` prefixes,
   small candidates, `smt_timeout: 1` while probing).
 - Repeating a long formula across calls? `define {name, text}`

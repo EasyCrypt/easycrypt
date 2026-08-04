@@ -98,11 +98,37 @@ type entry = {
      to the bound text before parsing (round 4 — long invariants are
      sent once, referenced everywhere). *)
   mutable defines : (string * string) list;
+  (* Every authored sentence exec/exec_in COMMITTED, newest first —
+     the recovery record when a session dies (field report B17): the
+     tombstone replays it back to the caller. *)
+  mutable authored_log : string list;
+  (* Document-position → uuid snapshots, (sentence_count, uuid),
+     newest/largest first: state after the first [sentence_count]
+     file sentences. Seeded from the backend's LOAD ledger and from
+     per-sentence resync replays; a backwards reposition REVERTs to
+     the nearest snapshot instead of re-running the prefix (field
+     report B18). Cleared on backend restarts; pruned below any
+     revert target and beyond the core-equal prefix on edits. *)
+  mutable uuid_ledger : (int * int) list;
+}
+
+(* A closed/replaced/dead session's headstone (field report B17):
+   "no session" errors distinguish never-existed from no-longer-
+   exists, say why and when, and hand back the authored sentences so
+   lost work is a replay, not a loss. *)
+type tomb = {
+  tb_at       : float;
+  tb_reason   : string;
+  tb_file     : string;
+  tb_uuid     : int;
+  tb_authored : string list;  (* newest first *)
 }
 
 type t = {
-  sw       : Eio.Switch.t;
-  sessions : (string, entry) Hashtbl.t;
+  sw         : Eio.Switch.t;
+  sessions   : (string, entry) Hashtbl.t;
+  tombstones : (string, tomb) Hashtbl.t;
+  started_at : float;
 }
 
 let default_label = "main"
@@ -112,16 +138,72 @@ let label_of_args args =
   | `String s when s <> "" -> s
   | _ -> default_label
 
+let hms at =
+  let tm = Unix.localtime at in
+  Printf.sprintf "%02d:%02d:%02d" tm.Unix.tm_hour tm.Unix.tm_min
+    tm.Unix.tm_sec
+
+let bury t label (e : entry) ~reason =
+  Hashtbl.replace t.tombstones label
+    { tb_at = Unix.gettimeofday (); tb_reason = reason;
+      tb_file = e.file;
+      tb_uuid = Ec_llm_session.current_uuid e.session;
+      tb_authored = e.authored_log }
+
+(* The authored-sentence tail of a tombstone, bounded (last 30
+   sentences / 4000 chars) — enough to replay a working session. *)
+let tomb_recovery tb =
+  match tb.tb_authored with
+  | [] -> ""
+  | l ->
+    let n = List.length l in
+    let tail = List.filteri (fun i _ -> i < 30) l in
+    let txt = String.concat "\n" (List.rev tail) in
+    let txt =
+      if String.length txt > 4000 then
+        "…" ^ String.sub txt (String.length txt - 4000) 4000
+      else txt
+    in
+    Printf.sprintf
+      " Its %d authored sentence(s) are retained — reopen with \
+       open_file, reposition (resync_file {at_lemma}), then replay:\n\
+       %s" n txt
+
+let no_session_error t label =
+  match Hashtbl.find_opt t.tombstones label with
+  | Some tb ->
+    Printf.sprintf
+      "session '%s' no longer exists: %s at %s (file %s, last uuid \
+       %d).%s"
+      label tb.tb_reason (hms tb.tb_at)
+      (Filename.basename tb.tb_file) tb.tb_uuid (tomb_recovery tb)
+  | None ->
+    let live =
+      Hashtbl.fold (fun l _ acc -> l :: acc) t.sessions []
+      |> List.sort compare
+    in
+    Printf.sprintf
+      "no session '%s' — never opened in this server process \
+       (started %s; live sessions: %s). If you DID open it earlier, \
+       the server restarted and every session was lost — reopen with \
+       open_file and reposition/replay. Otherwise call open_file \
+       first (optionally with a {\"session\": \"<label>\"} argument \
+       to run parallel sessions)."
+      label (hms t.started_at)
+      (if live = [] then "none" else String.concat ", " live)
+
 let find_session t args =
   let label = label_of_args args in
   match Hashtbl.find_opt t.sessions label with
+  | Some e when not (Ec_llm_session.is_alive e.session) ->
+    (* The EC subprocess is gone but the entry lingered: convert it
+       to a tombstone NOW so the error says what happened and hands
+       the authored work back (field report B17). *)
+    bury t label e ~reason:"backend subprocess died";
+    Hashtbl.remove t.sessions label;
+    Error (no_session_error t label)
   | Some e -> Ok (label, e)
-  | None ->
-    Error
-      (Printf.sprintf
-         "no session '%s' — call open_file first (optionally with a \
-          {\"session\": \"<label>\"} argument to run parallel \
-          sessions)" label)
+  | None -> Error (no_session_error t label)
 
 (* ---------------------------------------------------------------- *)
 (* Small JSON helpers                                                 *)
@@ -208,6 +290,69 @@ let sentence_class_of (s : Ec_llm_session.parsed_sentence) =
   | `Doc_comment -> Some `Doc_comment
   | `Meta -> None
 
+(* ----------------------------------------------------------------
+   Document-position → uuid ledger (field report B18). A snapshot
+   (k, u) means: [REVERT u] lands the session EXACTLY at the state
+   after the file's first k sentences — EC's undo keeps every uuid,
+   so a backwards reposition is a revert plus a short replay, not a
+   prefix reload. Soundness rules: snapshots survive forward work
+   (authored or replayed — reverting past it erases it, which is
+   resync's documented contract); they die on backend restarts
+   (uuid epoch change), below nothing (any revert prunes entries
+   ABOVE its target), and beyond the core-equal prefix when the
+   file changes (their positions no longer exist in the new text). *)
+
+let ledger_record (e : entry) k uuid =
+  e.uuid_ledger <-
+    (k, uuid) :: List.filter (fun (k', _) -> k' <> k) e.uuid_ledger
+
+let ledger_prune_uuid (e : entry) ~max_uuid =
+  e.uuid_ledger <-
+    List.filter (fun (_, u) -> u <= max_uuid) e.uuid_ledger
+
+let ledger_prune_count (e : entry) ~max_count =
+  e.uuid_ledger <-
+    List.filter (fun (k, _) -> k <= max_count) e.uuid_ledger
+
+(* Largest snapshot at or before position [at_most]. *)
+let ledger_best (e : entry) ~at_most =
+  List.fold_left
+    (fun best (k, u) ->
+       if k <= at_most then
+         match best with
+         | Some (bk, _) when bk >= k -> best
+         | _ -> Some (k, u)
+       else best)
+    None e.uuid_ledger
+
+(* Replace the ledger from the backend's per-sentence LOAD ledger:
+   the i-th row is the i-th executed top-level sentence, so index
+   maps to document position directly; keep only the prefix whose
+   end_lines agree with OUR parse (self-checking alignment — a class
+   or packing mismatch stops the seed instead of skewing it), and
+   always include the load-boundary belief (n_target, current). *)
+let ledger_seed (e : entry)
+    (parsed : Ec_llm_session.parsed_sentence array) ~n_target =
+  let rows =
+    match Ec_llm_session.load_ledger e.session with
+    | Ok rows -> rows
+    | Error _ -> []
+  in
+  let rec zip i acc = function
+    | [] -> acc
+    | (line, uuid) :: rest ->
+      if i < Array.length parsed
+         && (parsed.(i) : Ec_llm_session.parsed_sentence).end_line
+            = line
+      then zip (i + 1) ((i + 1, uuid) :: acc) rest
+      else acc
+  in
+  let acc = zip 0 [] rows in
+  let boundary = (n_target, Ec_llm_session.current_uuid e.session) in
+  e.uuid_ledger <-
+    (if List.mem_assoc (fst boundary) acc then acc
+     else boundary :: acc)
+
 (* True when the session has no open goal (proof closed or no active
    proof) — the `closes` verdict for candidate scripts. *)
 let goals_closed session =
@@ -251,12 +396,15 @@ let subgoal_hash sub =
   Digest.to_hex
     (Digest.string (Yojson.Safe.to_string (`List [ h; c ])))
 
-(* One-line goal digest: the pp's FIRST LINE (EC's own break points
-   beat a mid-token cut), then a token-boundary trim if that line is
-   still oversized (round 4 nit). *)
-let one_line_concl sub =
+(* One-line goal digest, [cap] chars: the pp flattened to a single
+   line (EC's own breaks + indent runs collapse to one space), then a
+   token-boundary trim. The default cap keeps entry fields and
+   `counts` rows skimmable; `counts` payloads widen it with
+   max_chars (field report B21) — the middle setting between a
+   40-char teaser and a full-detail gamble. *)
+let one_line_concl ?(cap = 80) sub =
   let open Yojson.Safe.Util in
-  let rec flat j =
+  let flat j =
     match member "kind" j with
     | `String "pp" ->
       (match member "text" j with `String s -> s | _ -> "")
@@ -264,20 +412,32 @@ let one_line_concl sub =
     | _ -> ""
   in
   let s = flat (member "conclusion" sub) in
-  let (line, more) =
-    match String.index_opt s '\n' with
-    | Some i -> (String.sub s 0 i, true)
-    | None -> (s, false)
-  in
-  if String.length line <= 80 then
-    (if more then line ^ " …" else line)
+  let b = Buffer.create (min (String.length s) (cap + 16)) in
+  let pending_ws = ref false in
+  (try
+     String.iter
+       (fun c ->
+          match c with
+          | ' ' | '\t' | '\n' | '\r' -> pending_ws := true
+          | c ->
+            if !pending_ws && Buffer.length b > 0 then
+              Buffer.add_char b ' ';
+            pending_ws := false;
+            Buffer.add_char b c;
+            (* hard stop well past the cap — no point flattening a
+               50 kB invariant to trim it to 80 chars *)
+            if Buffer.length b > cap + 16 then raise Exit)
+       s
+   with Exit -> ());
+  let line = Buffer.contents b in
+  if String.length line <= cap then line
   else
     let cut =
-      match String.rindex_from_opt line 79 ' ' with
+      match String.rindex_from_opt line (cap - 1) ' ' with
       | Some i when i > 0 -> i
       | _ ->
         (* no token boundary in reach — cut at a UTF-8 boundary *)
-        let n = ref 79 in
+        let n = ref (cap - 1) in
         while !n > 0 && Char.code line.[!n] land 0xC0 = 0x80 do
           decr n
         done;
@@ -460,7 +620,8 @@ let apply_goal_scope scope (j : Yojson.Safe.t) : Yojson.Safe.t =
      | _ -> j)
   | `Focused, _ -> j
 
-let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
+let apply_goal_detail ?concl_cap detail (j : Yojson.Safe.t)
+  : Yojson.Safe.t =
   match detail with
   | `Full -> j
   | `Shape -> elide_stmts j
@@ -478,7 +639,10 @@ let apply_goal_detail detail (j : Yojson.Safe.t) : Yojson.Safe.t =
           | `Int n -> `Int n
           | _ -> `Int (List.length subs));
          "conclusions",
-         `List (List.map (fun s -> `String (one_line_concl s)) subs);
+         `List
+           (List.map
+              (fun s -> `String (one_line_concl ?cap:concl_cap s))
+              subs);
        ]
      | _ -> j)
 
@@ -506,16 +670,131 @@ let rec truncate_pp max (j : Yojson.Safe.t) : Yojson.Safe.t =
   | `List l -> `List (List.map (truncate_pp max) l)
   | x -> x
 
+(* ----------------------------------------------------------------
+   THE goal-payload renderer (field report rounds 4–14). Every byte
+   of goal/state text in EVERY reply flows through [render_goals]:
+   no tool embeds raw GOALS-JSON or raw pp text on its own — that is
+   how open_file/revert grew unbounded payloads (B16/B19/B20) while
+   the routed tools stayed bounded. Pipeline: scope (WHICH goals) →
+   detail (HOW MUCH structure; `counts` one-liners widen with
+   max_chars, B21) → max_chars (formula-text cap) → budget net.
+
+   The budget net is NOT an axis — it is the server-side guarantee
+   that a reply is deliverable AT ALL. A payload that blows the
+   client's tool-result token cap is lost end-to-end (B19/B20: the
+   call took effect, the reply didn't arrive): an honest degraded
+   payload strictly dominates a perfect undeliverable one. Over
+   budget, deterministically: (1) cap every long string at a fair
+   per-string share; (2) still over (structural bulk) → counts
+   view; (3) still over → first 40 conclusions. The reply says what
+   was done in "payload_note" and names the axes that narrow it. *)
+
+let payload_budget = 20_000
+
+let rec cap_long_strings max (j : Yojson.Safe.t) : Yojson.Safe.t =
+  match j with
+  | `String s when String.length s > max ->
+    let n = ref max in
+    while !n > 0 && Char.code s.[!n] land 0xC0 = 0x80 do decr n done;
+    `String (String.sub s 0 !n ^ "…")
+  | `Assoc kvs ->
+    `Assoc (List.map (fun (k, v) -> (k, cap_long_strings max v)) kvs)
+  | `List l -> `List (List.map (cap_long_strings max) l)
+  | x -> x
+
+(* (count, total length) of string VALUES longer than 64 chars — the
+   compressible mass; everything else is structural overhead. *)
+let rec long_string_stats (j : Yojson.Safe.t) =
+  match j with
+  | `String s when String.length s > 64 -> (1, String.length s)
+  | `Assoc kvs ->
+    List.fold_left
+      (fun (c, l) (_, v) ->
+         let (c', l') = long_string_stats v in
+         (c + c', l + l'))
+      (0, 0) kvs
+  | `List xs ->
+    List.fold_left
+      (fun (c, l) v ->
+         let (c', l') = long_string_stats v in
+         (c + c', l + l'))
+      (0, 0) xs
+  | _ -> (0, 0)
+
+let with_payload_note note (j : Yojson.Safe.t) =
+  match j with
+  | `Assoc kvs -> `Assoc (kvs @ [ "payload_note", `String note ])
+  | other -> other
+
+let enforce_budget (j : Yojson.Safe.t) : Yojson.Safe.t =
+  let size = String.length (Yojson.Safe.to_string j) in
+  if size <= payload_budget then j
+  else begin
+    let (nlong, total_long) = long_string_stats j in
+    let overhead = size - total_long in
+    let per =
+      if nlong = 0 then 0
+      else max 64 ((payload_budget - overhead) / nlong)
+    in
+    let capped = if per > 0 then cap_long_strings per j else j in
+    let csize = String.length (Yojson.Safe.to_string capped) in
+    if csize <= payload_budget + 2048 then
+      with_payload_note
+        (Printf.sprintf
+           "goal payload was %d chars — over the %d-char reply \
+            budget; every formula capped at %d chars. Narrow with \
+            goal_scope:\"focused\", goal_detail:\"counts\", or \
+            max_chars."
+           size payload_budget per)
+        capped
+    else begin
+      (* Structural bulk (very many goals/hypotheses): counts view,
+         at most 40 one-liners. *)
+      let counts = apply_goal_detail ~concl_cap:120 `Counts j in
+      let counts =
+        match counts with
+        | `Assoc kvs ->
+          `Assoc
+            (List.map
+               (fun (k, v) ->
+                  match k, v with
+                  | "conclusions", `List l when List.length l > 40 ->
+                    (k,
+                     `List
+                       (List.filteri (fun i _ -> i < 40) l
+                        @ [ `String
+                              (Printf.sprintf "… %d more goals"
+                                 (List.length l - 40)) ]))
+                  | _ -> (k, v))
+               kvs)
+        | x -> x
+      in
+      with_payload_note
+        (Printf.sprintf
+           "goal payload was %d chars — far over the %d-char reply \
+            budget even after formula capping; degraded to a counts \
+            view. Use goal_scope:\"focused\" + goal_detail to \
+            inspect one goal at a time."
+           size payload_budget)
+        counts
+    end
+  end
+
 (* The standard goal-payload pipeline: scope (which goals), then
-   detail (how much of each), then the optional max_chars cap. *)
+   detail (how much of each; counts one-liners widen to max_chars),
+   then the optional max_chars formula cap, then the budget net. *)
 let render_goals args ~detail session_goals =
+  let mc =
+    match int_arg args "max_chars" with
+    | Some n when n > 0 -> Some n
+    | _ -> None
+  in
   let j =
-    apply_goal_detail detail
+    apply_goal_detail ?concl_cap:mc detail
       (apply_goal_scope (goal_scope_of args) session_goals)
   in
-  match int_arg args "max_chars" with
-  | Some n when n > 0 -> truncate_pp n j
-  | _ -> j
+  let j = match mc with Some n -> truncate_pp n j | None -> j in
+  enforce_budget j
 
 (* Entry transparency for the state-restoring loop tools (round 10,
    B12/F11): the reply says WHAT the candidate ran against — the
@@ -935,9 +1214,12 @@ let tool_open_file t args =
       | Error e -> Error e
       | Ok wanted ->
         (* Replace an existing session under this label — its locks
-           release with it (even on a failed re-open). *)
+           release with it (even on a failed re-open), and it leaves
+           a tombstone naming the replacement (field report B17). *)
         (match Hashtbl.find_opt t.sessions label with
          | Some e ->
+           bury t label e
+             ~reason:"replaced by a new open_file under this label";
            (try Ec_llm_session.close e.session with _ -> ());
            Hashtbl.remove t.sessions label
          | None -> ());
@@ -1007,14 +1289,115 @@ let tool_open_file t args =
                       Printf.sprintf "LOAD \"%s\"%s%s" path upto nosmt
                     in
                     let t0 = Unix.gettimeofday () in
+                    (* Register the entry (shared by the full and the
+                       PARTIAL open) positioned after [synced]
+                       document sentences, seed its uuid ledger from
+                       the backend's LOAD ledger, and build the
+                       common reply prefix. `load_output` is GONE:
+                       the entering state is GOALS and flows through
+                       the one renderer like every other reply — the
+                       raw pp dump was redundant with `goals` and
+                       unboundable by any knob (B19). *)
+                    let register ~synced =
+                      let e =
+                        { session; file = path; mode; text;
+                          hash = Digest.string text; parsed;
+                          synced_upto = synced;
+                          subclaim = None; defines = [];
+                          authored_log = []; uuid_ledger = [] }
+                      in
+                      ledger_seed e parsed ~n_target:synced;
+                      Hashtbl.replace t.sessions label e;
+                      [
+                        "session", `String label;
+                        "file", `String path;
+                        "mode", `String (mode_label mode);
+                        "claims", claims_json mode;
+                        "uuid",
+                        `Int (Ec_llm_session.current_uuid session);
+                        "parse_error",
+                        (match file_perr with
+                         | None -> `Null
+                         | Some s -> json_or_string s);
+                        "load_time_ms", `Int (ms_since t0);
+                        "synced_upto", `Int synced;
+                        "goals",
+                        render_goals args
+                          ~detail:(goal_detail_of args
+                                     ~default:`Shape)
+                          (goals_json session);
+                      ]
+                    in
                     (match
                        Ec_llm_session.raw_command session load_cmd
                      with
+                     | Error
+                         (Error.Load_stopped
+                            { file = err_file; line; col;
+                              loaded_sentences; loaded_line = _;
+                              detail })
+                       when loaded_sentences <= Array.length parsed
+                       ->
+                       (* PARTIAL OPEN (field report B15): the load
+                          stopped at a failing sentence, but the
+                          backend state is the complete-sentence
+                          prefix before it — keep the session LIVE
+                          there instead of destroying it and making
+                          the caller re-derive the position by
+                          cold-compiling. *)
+                       let k = loaded_sentences in
+                       let lemma =
+                         let rec go i =
+                           if i < 0 || i >= Array.length parsed
+                           then `Null
+                           else
+                             match
+                               (parsed.(i)
+                                : Ec_llm_session.parsed_sentence)
+                                 .name
+                             with
+                             | Some n -> `String n
+                             | None -> go (i - 1)
+                         in
+                         go (min k (Array.length parsed - 1))
+                       in
+                       let base = register ~synced:k in
+                       Ok (`Assoc (base @ [
+                         "partial", `Bool true;
+                         "error", `String detail;
+                         "stopped_at", `Assoc ([
+                           "line", `Int line;
+                           "col", `Int col;
+                           "sentence_index", `Int k;
+                           "lemma", lemma;
+                         ] @ (if err_file <> ""
+                                 && Filename.basename err_file
+                                    <> Filename.basename path
+                              then [ "file", `String err_file ]
+                              else [])
+                           @ (if k < Array.length parsed then
+                                [ "sentence",
+                                  `String
+                                    (src_preview
+                                       (parsed.(k)
+                                        : Ec_llm_session
+                                          .parsed_sentence)
+                                         .src) ]
+                              else []));
+                         "note",
+                         `String
+                           "LOAD stopped at the reported sentence; \
+                            the session is LIVE at the last \
+                            complete sentence before it (goals = \
+                            the entering state). Fix in place with \
+                            exec and continue, or edit the file \
+                            and resync_file.";
+                       ]))
                      | Error e ->
                        fail
                          (Printf.sprintf "open_file: LOAD failed: %s"
                             (Error.to_string e))
-                     | Ok (body, _notices) ->
+                     | Ok (_body, _notices) ->
                        let synced0 =
                          match int_arg args "upto_line" with
                          | None -> Array.length parsed
@@ -1027,26 +1410,7 @@ let tool_open_file t args =
                              parsed;
                            !c
                        in
-                       Hashtbl.replace t.sessions label
-                         { session; file = path; mode; text;
-                           hash = Digest.string text; parsed;
-                           synced_upto = synced0;
-                           subclaim = None; defines = [] };
-                       Ok (`Assoc [
-                         "session", `String label;
-                         "file", `String path;
-                         "mode", `String (mode_label mode);
-                         "claims", claims_json mode;
-                         "uuid",
-                         `Int (Ec_llm_session.current_uuid session);
-                         "parse_error",
-                   (match file_perr with
-                    | None -> `Null
-                    | Some s -> json_or_string s);
-                   "load_time_ms", `Int (ms_since t0);
-                         "load_output", `String body;
-                         "goals", goals_json session;
-                       ]))))))
+                       Ok (`Assoc (register ~synced:synced0)))))))
     end
 
 let tool_exec t args =
@@ -1105,6 +1469,7 @@ let tool_exec t args =
                      with
                      | Ok ok ->
                        incr executed;
+                       e.authored_log <- s.src :: e.authored_log;
                        (match adm with
                         | Some (g, h) ->
                           admitted :=
@@ -1143,6 +1508,9 @@ let tool_exec t args =
                ss
            with Exit -> ());
           if !executed > 0 then e.synced_upto <- -1;
+          (* A backend restart changes the uuid epoch: every
+             document-position snapshot is void. *)
+          if !restarted then e.uuid_ledger <- [];
           let base = [
             "session", `String label;
             "ok", `Bool (not !failed);
@@ -1298,7 +1666,10 @@ let tool_focus t args =
        Ok (`Assoc [
          "session", `String label;
          "uuid", `Int (Ec_llm_session.current_uuid e.session);
-         "goals", goals_json e.session;
+         "goals",
+         render_goals args
+           ~detail:(goal_detail_of args ~default:`Shape)
+           (goals_json e.session);
        ]))
 
 (* Exploration cost knob (round 4): a transactional `timeout N.`
@@ -1565,11 +1936,23 @@ let tool_revert t args =
        (match Ec_llm_session.revert_to_uuid e.session ~target with
         | Error err -> Error (Error.to_string err)
         | Ok () ->
-          e.synced_upto <- -1;
+          (* Snapshots above the target are gone with the states
+             they named; landing EXACTLY on one restores the
+             document-position knowledge a plain revert loses. *)
+          ledger_prune_uuid e ~max_uuid:target;
+          (match
+             List.find_opt (fun (_, u) -> u = target) e.uuid_ledger
+           with
+           | Some (k, _) -> e.synced_upto <- k
+           | None -> e.synced_upto <- -1);
           Ok (`Assoc [
             "session", `String label;
             "uuid", `Int (Ec_llm_session.current_uuid e.session);
-            "goals", goals_json e.session;
+            "synced_upto", `Int e.synced_upto;
+            "goals",
+            render_goals args
+              ~detail:(goal_detail_of args ~default:`Shape)
+              (goals_json e.session);
           ])))
 
 (* Round 10 (F9): a 2,430-line restatement produced 201 diagnostics
@@ -1701,7 +2084,21 @@ let tool_list_sessions t _args =
          ] :: acc)
       t.sessions []
   in
-  Ok (`Assoc ([ "sessions", `List rows ]
+  let tombs =
+    Hashtbl.fold
+      (fun label tb acc ->
+         `Assoc [
+           "session", `String label;
+           "gone", `String tb.tb_reason;
+           "at", `String (hms tb.tb_at);
+           "authored_sentences",
+           `Int (List.length tb.tb_authored);
+         ] :: acc)
+      t.tombstones []
+  in
+  Ok (`Assoc ([ "sessions", `List rows;
+                "server_started_at", `String (hms t.started_at) ]
+              @ (if tombs = [] then [] else [ "gone", `List tombs ])
               @ (if rows = [] then
                    [ "note",
                      `String
@@ -1718,6 +2115,7 @@ let tool_close_session t args =
   match Hashtbl.find_opt t.sessions label with
   | None -> Error (Printf.sprintf "close_session: no session '%s'" label)
   | Some e ->
+    bury t label e ~reason:"closed by close_session";
     (try Ec_llm_session.close e.session with _ -> ());
     Hashtbl.remove t.sessions label;
     Ok (`Assoc [ "closed", `String label ])
@@ -1794,7 +2192,8 @@ let tool_define t args =
    state with no reload. The changed/executed tail is always
    full-checked; only the reloaded prefix honors [nosmt]. *)
 let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
-    ~at_lemma ~goal_detail =
+    ~at_lemma ~args =
+  let goal_detail = goal_detail_of args ~default:`Shape in
   match read_file e.file with
   | exception Sys_error m -> Error (Printf.sprintf "resync_file: %s" m)
   | text ->
@@ -2028,12 +2427,17 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                    snapshot updated, session position and state \
                    preserved — nothing executable changed";
                 "goals",
-                apply_goal_detail goal_detail (goals_json e.session);
+                render_goals args ~detail:goal_detail
+                  (goals_json e.session);
               ] @ claims_warning))
             end
             else begin
             let corr = Correlation.of_client "mcp-resync" in
             let admitted = ref [] in
+            (* Snapshots beyond the core-equal prefix name positions
+               that no longer exist in the edited text. *)
+            if not unchanged then
+              ledger_prune_count e ~max_count:core_prefix;
             let exec_range lo hi =
               let err = ref None in
               let cnt = ref 0 in
@@ -2043,7 +2447,9 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                      parsed_all.(i)
                    in
                    match sentence_class_of s with
-                   | None -> ()
+                   | None ->
+                     ledger_record e (i + 1)
+                       (Ec_llm_session.current_uuid e.session)
                    | Some cls ->
                      let adm =
                        if is_admit_sentence s then
@@ -2054,8 +2460,17 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                         Ec_llm_session.exec e.session ~document:true
                           ~corr ~sentence_class:cls ~source:s.src
                       with
-                      | Ok _ ->
+                      | Ok okr ->
                         incr cnt;
+                        (* Per-sentence snapshots make any replayed
+                           region rewind-addressable; a restarted
+                           reply changes the uuid epoch instead —
+                           void everything and record nothing. *)
+                        if okr.Session.restarted then
+                          e.uuid_ledger <- []
+                        else
+                          ledger_record e (i + 1)
+                            okr.Session.replied_uuid;
                         (match adm with
                          | Some (g, h) ->
                            admitted :=
@@ -2112,9 +2527,37 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
               if fast then begin
                 let t1 = Unix.gettimeofday () in
                 let (c, er) = exec_range e.synced_upto m_eff in
-                Ok (true, 0, ms_since t1, c, er)
+                Ok (`Fast, 0, ms_since t1, c, er)
               end
               else begin
+                (* Backwards/diverged reposition (field report B18):
+                   when the prefix is core-valid up to the target,
+                   REVERT to the nearest at-or-before uuid snapshot
+                   and replay only the gap — the engine has been
+                   through those sentences and undo keeps every
+                   uuid, so a rewind is near-free. Falls back to the
+                   full prefix reload when no snapshot applies. *)
+                let rewound =
+                  if core_prefix < m_eff then None
+                  else
+                    match ledger_best e ~at_most:m_eff with
+                    | None -> None
+                    | Some (kk, u) ->
+                      (match
+                         Ec_llm_session.revert_to_uuid e.session
+                           ~target:u
+                       with
+                       | Ok () ->
+                         ledger_prune_uuid e ~max_uuid:u;
+                         Some kk
+                       | Error _ -> None)
+                in
+                match rewound with
+                | Some kk ->
+                  let t1 = Unix.gettimeofday () in
+                  let (c, er) = exec_range kk m_eff in
+                  Ok (`Rewind, 0, ms_since t1, c, er)
+                | None ->
                 (* Back the prefix boundary off shared end-lines so
                    the line-granular LOAD cannot overshoot past the
                    sentence-granular target (B2). *)
@@ -2145,20 +2588,43 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                 let t0 = Unix.gettimeofday () in
                 match Ec_llm_session.raw_command e.session load_cmd with
                 | Error err ->
+                  (* The reload restarted the child — the entry must
+                     reflect reality even on failure. A structured
+                     stop (B15) leaves the child at the NEW file's
+                     k-sentence prefix: swap the snapshot and keep
+                     the session usable there; anything else leaves
+                     the position unknown. *)
+                  (match err with
+                   | Error.Load_stopped { loaded_sentences = sk; _ }
+                     when sk <= n_all ->
+                     e.text <- text;
+                     e.hash <- Digest.string text;
+                     e.parsed <- parsed_all;
+                     e.subclaim <- None;
+                     e.synced_upto <- sk;
+                     ledger_seed e parsed_all ~n_target:sk;
+                     ignore (remap_claims ())
+                   | _ ->
+                     e.synced_upto <- -1;
+                     e.uuid_ledger <- []);
                   Error
                     (Printf.sprintf
                        "resync_file: prefix reload failed: %s"
                        (Error.to_string err))
                 | Ok _ ->
+                  (* Fresh uuid epoch: replace the ledger with the
+                     backend's per-sentence LOAD ledger. *)
+                  ledger_seed e parsed_all ~n_target:j;
                   let pms = ms_since t0 in
                   let t1 = Unix.gettimeofday () in
                   let (c, er) = exec_range j m_eff in
-                  Ok (false, pms, ms_since t1, c, er)
+                  Ok (`Reload, pms, ms_since t1, c, er)
               end
             in
             (match run () with
              | Error msg -> Error msg
-             | Ok (fast_forward, prefix_ms, tail_ms, executed, err_opt) ->
+             | Ok (how, prefix_ms, tail_ms, executed, err_opt) ->
+               let fast_forward = (how = `Fast) in
                e.text <- text;
                e.hash <- Digest.string text;
                e.parsed <- parsed_all;
@@ -2181,6 +2647,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                     | Some s -> json_or_string s);
                    "classification", `String classification;
                    "fast_forward", `Bool fast_forward;
+                   "rewind", `Bool (how = `Rewind);
                    "common_prefix_sentences", `Int core_prefix;
                    "target_sentences", `Int m;
                    "tail_executed", `Int executed;
@@ -2215,7 +2682,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                      @ [
                          "ok", `Bool true;
                          "goals",
-                         apply_goal_detail goal_detail
+                         render_goals args ~detail:goal_detail
                            (goals_json e.session);
                        ]))
                 | Some (i, s, er) ->
@@ -2226,7 +2693,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                             "ok", `Bool false;
                             "error", `String (Error.to_string er);
                             "goals_at_failure",
-                            apply_goal_detail goal_detail
+                            render_goals args ~detail:goal_detail
                               (goals_json e.session);
                             "failed_sentence",
                             `Assoc [
@@ -2835,6 +3302,8 @@ let tool_exec_in t args =
                            er (Error.to_string rer)))
                  | None ->
                    e.synced_upto <- -1;
+                   e.authored_log <-
+                     !executed @ e.authored_log;
                    sc.sc_remaining <- !remaining;
                    sc.sc_transcript <-
                      List.rev_append !executed sc.sc_transcript;
@@ -2950,7 +3419,7 @@ let tool_resync_file t args =
     resync_impl ~label e ~nosmt ~upto_line:(int_arg args "upto_line")
       ~upto_sentence:(int_arg args "upto_sentence")
       ~at_lemma:(str_arg args "at_lemma")
-      ~goal_detail:(goal_detail_of args ~default:`Shape)
+      ~args
 
 (* Verified in-place proof replacement: splice [script] over the
    claimed lemma's proof-body lines, resync (weak prefix +
@@ -3040,7 +3509,7 @@ let write_body_verified ~label (e : entry) (c : claim) ~script ~nosmt =
   let candidate = String.concat "\n" (pre @ script_lines @ post) in
   let resync () =
     resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None
-      ~at_lemma:None ~goal_detail:`Shape
+      ~at_lemma:None ~args:(`Assoc [])
   in
   match write_file e.file candidate with
   | exception Sys_error m -> Error (Printf.sprintf "write failed: %s" m)
@@ -3426,11 +3895,11 @@ let tool_replace_proof t args =
                | exception Sys_error m ->
                  Error (Printf.sprintf "replace_proof: %s" m)
                | () ->
-                 (match resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~goal_detail:`Shape with
+                 (match resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~args:(`Assoc []) with
                   | Error m ->
                     (try write_file e.file orig with _ -> ());
                     ignore
-                      (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~goal_detail:`Shape);
+                      (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~args:(`Assoc []));
                     Error
                       (Printf.sprintf
                          "replace_proof: verification could not run \
@@ -3457,7 +3926,7 @@ let tool_replace_proof t args =
                     else begin
                       (try write_file e.file orig with _ -> ());
                       ignore
-                        (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~goal_detail:`Shape);
+                        (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~args:(`Assoc []));
                       Ok (`Assoc ([
                         "ok", `Bool false;
                         "lemma", `String lemma;
@@ -3567,8 +4036,8 @@ let goal_detail_prop =
   ("goal_detail", "string",
    "Goal payload size: \"full\" | \"shape\" (program bodies elided \
     to instruction counts) | \"counts\" (subgoal count + one-line \
-    conclusions). Defaults: full on goals, shape on try_tactic and \
-    the loop tools.")
+    conclusions; the one-liners widen to max_chars when given). \
+    Defaults: full on goals, shape everywhere else.")
 
 let smt_timeout_prop =
   ("smt_timeout", "integer",
@@ -3586,11 +4055,15 @@ let goal_scope_prop =
 
 let max_chars_prop =
   ("max_chars", "integer",
-   "Hard cap on each pretty-printed formula in goal payloads \
+   "Cap on each pretty-printed formula in goal payloads \
     (UTF-8-safe, trailing … marks the cut). The third size axis: \
     goal_scope picks WHICH goals, goal_detail HOW MUCH structure, \
     max_chars how much FORMULA text — up-to-bad conclusions \
-    duplicate whole invariants and dwarf everything else.")
+    duplicate whole invariants and dwarf everything else. With \
+    goal_detail:\"counts\" it also WIDENS the one-line conclusions \
+    past their 80-char default. Independent of all three, a \
+    server-side budget keeps every reply deliverable (degraded \
+    payloads say so in payload_note).")
 
 let tools :
   (string * string * Yojson.Safe.t
@@ -3600,15 +4073,21 @@ let tools :
    subprocess with its working directory at the file's directory \
    (easycrypt.project is honored) and loads the file, optionally \
    only up to a line. Use nosmt=true to weak-check the prefix fast \
-   (safe when the prefix is already verified). Sessions declare an \
-   EDIT MODE: mode=statement (the default) may change declarations \
-   and therefore needs EXCLUSIVE access to the file — it is refused \
-   while any other session has the file open; mode=proof edits \
-   proof bodies only and parallelizes freely, but must claim its \
-   target lemmas via 'lemmas' — overlapping claims (or an active \
-   statement session) are refused, and the reply reports each \
-   claim's document region. Replaces any existing session under \
-   the same label, releasing its locks.",
+   (safe when the prefix is already verified). If a sentence FAILS \
+   during the load, the reply is a PARTIAL OPEN (partial:true), \
+   not an error: stopped_at reports the failing position/lemma, \
+   and the session is LIVE at the last complete sentence before it \
+   — fix in place with exec, or edit and resync_file. Sessions \
+   declare an EDIT MODE: mode=statement (the default) may change \
+   declarations and therefore needs EXCLUSIVE access to the file — \
+   it is refused while any other session has the file open; \
+   mode=proof edits proof bodies only and parallelizes freely, but \
+   must claim its target lemmas via 'lemmas' — overlapping claims \
+   (or an active statement session) are refused, and the reply \
+   reports each claim's document region. Replaces any existing \
+   session under the same label, releasing its locks. The reply's \
+   entering state is the standard `goals` payload (all three \
+   payload axes honored).",
   schema ~required:[ "path" ] [
     ("path", "string", "Path to the .ec/.eca file.");
     ("mode", "string",
@@ -3624,6 +4103,9 @@ let tools :
       (1-based). Omit to load the whole file.");
     ("nosmt", "boolean",
      "Weak-check the loaded prefix (skip SMT). Default false.");
+    goal_scope_prop;
+    max_chars_prop;
+    goal_detail_prop;
     session_prop;
   ],
   tool_open_file;
@@ -3723,6 +4205,9 @@ let tools :
   schema [
     ("path", "string",
      "Dotted path from `tree`, or \"next\" (default).");
+    goal_scope_prop;
+    max_chars_prop;
+    goal_detail_prop;
     session_prop;
   ],
   tool_focus;
@@ -3789,6 +4274,13 @@ let tools :
     ("script", "string",
      "EasyCrypt sentences ('.'-terminated, newline-separated), \
       e.g. \"proof.\\nsplit.\\ntrivial.\\nqed.\"");
+    ("on_close", "string",
+     "\"commit\" — when the candidate PASSES and CLOSES the proof, \
+      land it into the claimed lemma in the same call (requires \
+      'lemma'; verified write, file restored on failure). Default: \
+      report only.");
+    ("lemma", "string",
+     "The claimed lemma on_close=\"commit\" lands into.");
     goal_scope_prop;
     max_chars_prop;
     smt_timeout_prop;
@@ -3911,9 +4403,15 @@ let tools :
 
   "revert",
   "Revert the session to an earlier uuid (as reported by exec / \
-   goals).",
+   goals). The cheap rewind primitive: reverting to a uuid the \
+   session knows as a document-position snapshot also restores \
+   synced_upto. Replies carry the standard `goals` payload (all \
+   three payload axes honored).",
   schema ~required:[ "uuid" ] [
     ("uuid", "integer", "Target uuid to revert to.");
+    goal_scope_prop;
+    max_chars_prop;
+    goal_detail_prop;
     session_prop;
   ],
   tool_revert;
@@ -3957,8 +4455,13 @@ let tools :
    unchanged tail BELOW the edit is skipped (tail_skipped) and the \
    session lands at the edited lemma's end — resync again or hop \
    forward to load more; statement-changing edits re-check \
-   everything downstream and are warned in proof mode. Run this \
-   after ANY on-disk edit (replies carry stale=true until you do). \
+   everything downstream and are warned in proof mode. BACKWARDS \
+   repositioning (earlier upto_line / at_lemma / upto_sentence) is \
+   near-free when the prefix is unchanged: the session REVERTs to \
+   a recorded document-position snapshot and replays only the gap \
+   (rewind:true in the reply) instead of reloading the prefix. Run \
+   this after ANY on-disk edit (replies carry stale=true until \
+   you do). \
    Note: on any executing resync the session state becomes exactly \
    the file's state; interactive work not in the file is dropped.",
   schema [
@@ -3977,6 +4480,8 @@ let tools :
      "Position just inside this lemma's proof (after its proof. \
       sentence) — sentence-granular, works on packed lines where \
       upto_line cannot.");
+    goal_scope_prop;
+    max_chars_prop;
     goal_detail_prop;
     session_prop;
   ],
@@ -4068,11 +4573,62 @@ let respond_error ~stdout ~id code message =
        "error", `Assoc [ "code", `Int code; "message", `String message ];
      ])
 
+(* Reply-level exit net: EVERY tool result serializes through here,
+   so this is where "no reply is undeliverable" becomes an invariant
+   rather than per-field luck. The goal renderer's budget keeps
+   normal payloads shaped; this net catches whatever else grows
+   (admitted arrays, transcripts, query output) with the same
+   fair-share string capping, and an extreme structural overload
+   degrades to a marked head-truncation — an honest partial reply
+   still beats a client-side token-cap error that delivers NOTHING
+   while the call's effect stands (B19/B20). *)
+let reply_budget = 36_000
+
+let bounded_reply (j : Yojson.Safe.t) : Yojson.Safe.t =
+  let size = String.length (Yojson.Safe.to_string j) in
+  if size <= reply_budget then j
+  else begin
+    let (nlong, total_long) = long_string_stats j in
+    let overhead = size - total_long in
+    let per =
+      if nlong = 0 then 0
+      else max 48 ((reply_budget - overhead) / nlong)
+    in
+    let capped = if per > 0 then cap_long_strings per j else j in
+    let csize = String.length (Yojson.Safe.to_string capped) in
+    if csize <= reply_budget + 4096 then
+      with_payload_note
+        (Printf.sprintf
+           "reply was %d chars — over the %d-char budget; long \
+            strings capped at %d chars (… marks cuts). Use the \
+            payload axes / views to request less."
+           size reply_budget per)
+        capped
+    else
+      `Assoc [
+        "reply_truncated", `Bool true;
+        "original_chars", `Int size;
+        "note",
+        `String
+          "reply far exceeded the deliverable budget even after \
+           string capping; this is a structural overload — request \
+           a narrower view (goal_scope, goal_detail, max_chars, \
+           analyze_file views, limits)";
+        "head",
+        `String (String.sub (Yojson.Safe.to_string j) 0 8_000);
+      ]
+  end
+
 let tool_result_json payload ~is_error : Yojson.Safe.t =
   let text =
     match payload with
-    | `String s -> s
-    | j -> Yojson.Safe.to_string j
+    | `String s ->
+      if String.length s <= reply_budget then s
+      else
+        String.sub s 0 reply_budget
+        ^ Printf.sprintf "… [truncated: %d chars total]"
+            (String.length s)
+    | j -> Yojson.Safe.to_string (bounded_reply j)
   in
   `Assoc [
     "content",
@@ -4095,13 +4651,47 @@ let handle_tools_call t ~stdout ~id params =
   | None ->
     respond_error ~stdout ~id (-32602)
       (Printf.sprintf "unknown tool: %s" name)
-  | Some (_, _, _, handler) ->
+  | Some (_, _, sch, handler) ->
+    (* The schema is the CONTRACT (field report B16): an argument a
+       tool does not declare is refused up front, never silently
+       ignored — a typo'd or misplaced payload axis must fail loud,
+       not return 200× the intended payload. Underscore-prefixed
+       keys pass (client-side metadata escape hatch). *)
+    let declared =
+      match Yojson.Safe.Util.member "properties" sch with
+      | `Assoc props -> List.map fst props
+      | _ -> []
+    in
+    let unknown =
+      match args with
+      | `Assoc kvs ->
+        List.filter_map
+          (fun (k, _) ->
+             if List.mem k declared
+                || (String.length k > 0 && k.[0] = '_')
+             then None
+             else Some k)
+          kvs
+      | _ -> []
+    in
     let result =
-      try handler t args
-      with exn ->
+      if unknown <> [] then
         Error
-          (Printf.sprintf "internal error in tool %s: %s" name
-             (Printexc.to_string exn))
+          (Printf.sprintf
+             "%s: unknown argument%s %s — nothing ran. This tool \
+              accepts: %s. (The payload axes goal_scope / \
+              goal_detail / max_chars exist only on state-bearing \
+              tools, and only where declared.)"
+             name
+             (if List.length unknown > 1 then "s" else "")
+             (String.concat ", " unknown)
+             (String.concat ", " declared))
+      else
+        try handler t args
+        with exn ->
+          Error
+            (Printf.sprintf "internal error in tool %s: %s" name
+               (Printexc.to_string exn))
     in
     (match result with
      | Ok payload ->
@@ -4177,7 +4767,9 @@ let handle_message t ~stdout (msg : Yojson.Safe.t) =
 (* ---------------------------------------------------------------- *)
 
 let run ~sw ~stdin ~stdout =
-  let t = { sw; sessions = Hashtbl.create 4 } in
+  let t = { sw; sessions = Hashtbl.create 4;
+            tombstones = Hashtbl.create 4;
+            started_at = Unix.gettimeofday () } in
   let buf = Eio.Buf_read.of_flow ~max_size:(1 lsl 24) stdin in
   let rec loop () =
     match Eio.Buf_read.line buf with

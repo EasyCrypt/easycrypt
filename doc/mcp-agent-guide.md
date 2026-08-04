@@ -50,6 +50,21 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
    checked under exactly the rules the file sets for itself,
    `pragma +strict_bullets` included — what passes here is what
    compiles cold.
+9. **One renderer, one contract, always deliverable.** Every goal
+   payload in every reply flows through one renderer with three
+   uniform axes — `goal_scope` (WHICH goals), `goal_detail` (HOW
+   MUCH structure; `counts` one-liners widen with `max_chars`),
+   `max_chars` (formula-text cap) — honored wherever declared
+   (open_file, goals, exec, exec_in, try_tactic, try_script,
+   check_script, check_skeleton, focus, revert, resync_file) and
+   REFUSED where not declared (an unknown argument is a loud
+   error, never silently ignored). Independent of the axes, a
+   server-side budget guarantees every reply is deliverable: an
+   over-budget payload degrades deterministically (fair-share
+   formula capping, then a counts view) and says so in
+   `payload_note` — you always get an honest partial payload, not
+   a client-side token-cap error that eats the reply while the
+   call's effect stands.
 
 ## Tools by workflow
 
@@ -67,6 +82,13 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   (the region moves as one block), while `decl_end_line` is always
   the declaration's own last line — target that for positioning.
   Re-opening a label replaces that session and releases its locks.
+  If a sentence FAILS during the load you get a **partial open**
+  (`partial: true`), not an error: `stopped_at` reports the
+  failing line/col + enclosing lemma + sentence, `synced_upto`
+  says how much loaded, and the session is LIVE at the last
+  complete sentence before the failure with `goals` showing the
+  entering state — fix in place with `exec`, or edit the file and
+  `resync_file`. No cold recompile needed to learn the position.
 - `goals {session?}` — structured proof state (GOALS-JSON):
   subgoal count, hypotheses (name/kind/pp), conclusion tree (PHL
   judgments carry structured program statements). Parse it; never
@@ -89,10 +111,21 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   count, the reply carries the compact `tree` — the subgoal ORDER
   a `call (_: I)` or `split` produced, with no extra round trip;
   read it before probing the "first" goal.
-- `revert {uuid}` — go back to an earlier uuid.
+- `revert {uuid}` — go back to an earlier uuid. The cheap rewind
+  primitive: replies carry the standard rendered `goals` (all
+  three axes) plus `synced_upto`, which is RESTORED when the
+  target uuid is a known document-position snapshot — a revert to
+  a position the session has been through re-enables resync
+  fast-forwarding from there.
 - `list_sessions` / `close_session {session}` — inventory (with
-  modes + claims) and teardown. Close sessions you are done with:
-  each one is an OS process, and your locks release with it.
+  modes + claims, `server_started_at`, and a `gone` list of
+  closed/replaced/died sessions) and teardown. Close sessions you
+  are done with: each one is an OS process, and your locks
+  release with it. A `no session` error tells you WHICH case you
+  are in: never opened (server start time + live labels given —
+  if you opened it before that time, the server restarted) vs no
+  longer exists (reason + timestamp + the session's authored
+  sentences handed back for replay).
 
 ### Reading and searching
 
@@ -211,6 +244,13 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   whenever your executed prefix is still valid against the new
   text, including after an edit BELOW your position, not just on
   unchanged files.
+  BACKWARDS repositioning (an earlier `upto_line` / `at_lemma` /
+  `upto_sentence`) is near-free when the prefix is unchanged:
+  `rewind: true` means the session REVERTed to a recorded
+  document-position snapshot (EC's undo keeps every uuid) and
+  replayed only the gap — `revert` yourself and `resync_file`
+  both use the same ledger, so hopping backwards to inspect and
+  forwards again no longer pays the prefix reload each way.
 
 ### Strategy layer (refactoring at proof-structure level)
 
@@ -385,15 +425,20 @@ session ≡ file. If the session itself is wedged (rare), re-run
   byte-identical to what you typed. Diff-review the FILE, not
   your transcript memory.
 - When a goal embeds a whole `main`, reach for `tree` (one line
-  per goal) or `goal_detail: "shape" | "counts"` — loop tools
-  default to `shape` (program bodies elided to instruction
-  counts); full dumps are what `goals {goal_detail: "full"}` is
-  for. On MANY-goal states (a `call (_: I)` dispatch), add
-  `goal_scope: "focused"` — only the focused subgoal ships,
-  `subgoal_count` still reports the true total; use `tree` for
-  the order, focused `goals` for the content. Every reply carries
-  exactly ONE terminal-state field (`goals`/`goals_at_end` on
-  success, `goals_at_failure` on failure).
+  per goal) or `goal_detail: "shape" | "counts"` — everything
+  except `goals` defaults to `shape` (program bodies elided to
+  instruction counts); full dumps are what `goals {goal_detail:
+  "full"}` is for. On MANY-goal states (a `call (_: I)`
+  dispatch), add `goal_scope: "focused"` — only the focused
+  subgoal ships, `subgoal_count` still reports the true total;
+  use `tree` for the order, focused `goals` for the content. The
+  middle setting on huge conclusions: `goal_detail: "counts"` +
+  `max_chars: N` widens the one-liners to N chars. Every reply
+  carries exactly ONE terminal-state field (`goals`/
+  `goals_at_end` on success, `goals_at_failure` on failure), and
+  a `payload_note` field means the server budget degraded an
+  over-size payload rather than lose the reply — narrow with the
+  axes it names.
 - `admit` is allowed and visible (profile counts it; skeleton
   treats it as a hole). Never leave one in text you hand back
   without saying so.
@@ -456,7 +501,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 174/174).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 192/192).
 
 ## Known limits (v1, honest)
 

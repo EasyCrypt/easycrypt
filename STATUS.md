@@ -57,8 +57,32 @@
 > long hint lists (8+) are a fragility marker with per-sentence
 > smt_hint_max, <=1-branch proofs carry the per-sentence table;
 > warm-pool timing (A/B-only) + nosmt-prefix timing recipe
-> documented;
-> `run_mcp_smoke` 174/174).
+> documented; round 12′: smt counting moved to RUNTIME truth — a
+> monotone gstate counter bumped at `EcSmt.check` (the single
+> prover choke point: by-closers, `/#`, tacticals count by
+> construction), per-phrase deltas in OK-JSON /
+> `Session.exec_ok.smt_calls`, lexical counter deleted; round 13
+> (report 0s: B15-B22, the solver-gap sweep): failing LOADs are
+> PARTIAL OPENS (structured stop position via ERROR-JSON "load" +
+> location — the ~20-cold-compile position hunt is gone; session
+> LIVE at the last complete sentence, REPL rolls half units back
+> to the boundary), ONE goal renderer behind every reply
+> (open_file's raw load_output deleted, revert/focus/resync
+> routed, axes uniform + refused where undeclared — the gate
+> immediately caught check_script's undeclared on_close/lemma),
+> counts one-liners widen with max_chars, a 20k server budget
+> degrades oversize goal payloads deterministically
+> (payload_note) + a 36k reply-level exit net at tool_result_json
+> makes "no reply is undeliverable" an invariant, session
+> lifecycle is observable (tombstones with reason/time + authored
+> sentences handed back; never-opened vs no-longer-exists
+> distinguished, server_started_at in list_sessions), and
+> backwards repositioning is a REVERT-based rewind over a
+> document-position→uuid ledger (REPL LOAD ledger + LEDGER-JSON,
+> per-sentence resync snapshots; rewind:true, zero re-execution
+> on exact boundaries; revert restores synced_upto on ledger
+> hits);
+> `run_mcp_smoke` 192/192).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

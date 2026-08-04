@@ -557,8 +557,13 @@ let () =
      (* round 4: completing a previously-open proof ADDS the lemma
         to the environment — that is additive, not body-only. *)
      && member "classification" rs = `String "additive"
+     (* round 14 (B18): the earlier revert landed exactly on a
+        document-position snapshot, restoring synced_upto = 7 — so
+        this resync FAST-FORWARDS from there (4 sentences, no
+        prefix reload) instead of reloading the prefix to run 3. *)
      && (match member "tail_executed" rs with
-         | `Int 3 -> true | _ -> false)
+         | `Int 4 -> true | _ -> false)
+     && member "fast_forward" rs = `Bool true
      && member "tail_skipped" rs = `Int 0
      && member "ok" rs = `Bool true)
     (Yojson.Safe.to_string rs);
@@ -2280,6 +2285,260 @@ let () =
     call fd_in fd_out "close_session" (`Assoc [ "session", `String "wp" ])
   in
   check "close wp" (not err) "";
+
+  (* ---------------------------------------------------------------
+     Round 14 (report 0s): B15 partial opens, B16–B22 unified
+     payload control + budget net, B17 lifecycle tombstones, B18
+     revert-based rewinds. *)
+  let r14_has sub s =
+    try
+      ignore (Str.search_forward (Str.regexp_string sub) s 0);
+      true
+    with Not_found -> false
+  in
+  let keys = function `Assoc kvs -> List.map fst kvs | _ -> [] in
+
+  (* B15: a failing sentence mid-LOAD → PARTIAL open with position,
+     session LIVE at the last complete sentence. *)
+  let stopf = Filename.concat fixture_dir "stop.ec" in
+  let oc = open_out stopf in
+  output_string oc
+    "require import AllCore.\n\
+     lemma good : 1 = 1.\n\
+     proof. trivial. qed.\n\
+     lemma bad : 2 = 2.\n\
+     proof.\n\
+     smt(nonexistent_hint_xyz).\n\
+     qed.\n\
+     lemma after : 3 = 3.\n\
+     proof. trivial. qed.\n";
+  close_out oc;
+  let (err, po) =
+    call fd_in fd_out "open_file"
+      (`Assoc [ "path", `String stopf; "session", `String "ws" ])
+  in
+  check "B15: failing LOAD = PARTIAL open with stop position"
+    ((not err)
+     && member "partial" po = `Bool true
+     && member "synced_upto" po = `Int 7
+     && (let sa = member "stopped_at" po in
+         member "line" sa = `Int 6
+         && member "lemma" sa = `String "bad"
+         && member "sentence_index" sa = `Int 7)
+     && not (List.mem "load_output" (keys po)))
+    (Yojson.Safe.to_string po);
+  check "B15: reply goals = the entering state of the failing sentence"
+    (r14_has "2 = 2" (Yojson.Safe.to_string (member "goals" po)))
+    (Yojson.Safe.to_string (member "goals" po));
+  let (err, fx) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "by trivial.\nqed.";
+         "session", `String "ws";
+       ])
+  in
+  check "B15: session is LIVE — fix lands in place with exec"
+    ((not err) && member "ok" fx = `Bool true)
+    (Yojson.Safe.to_string fx);
+  (* Repair the file the same way and resync: full recovery. *)
+  let oc = open_out stopf in
+  output_string oc
+    "require import AllCore.\n\
+     lemma good : 1 = 1.\n\
+     proof. trivial. qed.\n\
+     lemma bad : 2 = 2.\n\
+     proof.\n\
+     by trivial.\n\
+     qed.\n\
+     lemma after : 3 = 3.\n\
+     proof. trivial. qed.\n";
+  close_out oc;
+  let (err, rsx) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "ws" ])
+  in
+  check "B15: repaired file resyncs clean (proof-body-only)"
+    ((not err)
+     && member "ok" rsx = `Bool true
+     && member "classification" rsx = `String "proof-body-only")
+    (Yojson.Safe.to_string rsx);
+
+  (* B18: backwards reposition = revert to a document-position
+     snapshot + replay of nothing (exact boundary hit). *)
+  let rwf = Filename.concat fixture_dir "rw.ec" in
+  let oc = open_out rwf in
+  output_string oc
+    "require import AllCore.\n\
+     lemma a : 1 = 1.\n\
+     proof. trivial. qed.\n\
+     lemma b : 2 = 2.\n\
+     proof. trivial. qed.\n\
+     lemma c : 3 = 3.\n\
+     proof. trivial. qed.\n";
+  close_out oc;
+  let (err, ro) =
+    call fd_in fd_out "open_file"
+      (`Assoc [ "path", `String rwf; "session", `String "wr" ])
+  in
+  check "B18: rw fixture open (13 sentences)"
+    ((not err) && member "synced_upto" ro = `Int 13)
+    (Yojson.Safe.to_string ro);
+  let (err, rw1) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wr"; "at_lemma", `String "b" ])
+  in
+  check "B18: backwards at_lemma = REWIND (revert, zero re-execution)"
+    ((not err)
+     && member "ok" rw1 = `Bool true
+     && member "rewind" rw1 = `Bool true
+     && member "classification" rw1 = `String "reposition"
+     && member "tail_executed" rw1 = `Int 0
+     && member "prefix_time_ms" rw1 = `Int 0
+     && member "synced_upto" rw1 = `Int 7
+     && r14_has "2 = 2"
+          (Yojson.Safe.to_string (member "goals" rw1)))
+    (Yojson.Safe.to_string rw1);
+  let (err, rw2) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wr" ])
+  in
+  check "B18: forward hop after a rewind fast-forwards"
+    ((not err)
+     && member "ok" rw2 = `Bool true
+     && member "fast_forward" rw2 = `Bool true
+     && member "tail_executed" rw2 = `Int 6)
+    (Yojson.Safe.to_string rw2);
+
+  (* B16/B19: open_file honors the payload axes; load_output is gone
+     (the entering state is the standard goals payload). *)
+  let (err, ro2) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String rwf; "session", `String "wr";
+         "upto_line", `Int 4; "goal_detail", `String "counts";
+       ])
+  in
+  let ro2_goals = member "goals" ro2 in
+  check "B16: open_file goal_detail=counts honored (no subgoals key)"
+    ((not err)
+     && List.mem "conclusions" (keys ro2_goals)
+     && not (List.mem "subgoals" (keys ro2_goals))
+     && not (List.mem "load_output" (keys ro2)))
+    (Yojson.Safe.to_string ro2);
+  (* B20: revert carries the axes and restores document-position
+     knowledge when it lands on a snapshot. *)
+  let open_uuid =
+    match member "uuid" ro2 with `Int u -> u | _ -> -1
+  in
+  let (err, _) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "trivial."; "session", `String "wr" ])
+  in
+  check "B20 setup: exec advances" (not err) "";
+  let (err, rv) =
+    call fd_in fd_out "revert"
+      (`Assoc [
+         "uuid", `Int open_uuid; "session", `String "wr";
+         "goal_detail", `String "counts";
+       ])
+  in
+  check "B20: revert honors goal_detail and restores synced_upto"
+    ((not err)
+     && List.mem "conclusions" (keys (member "goals" rv))
+     && member "synced_upto" rv = `Int 6)
+    (Yojson.Safe.to_string rv);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wr" ])
+  in
+  check "close wr" (not err) "";
+
+  (* B21 + budget net: a goal too big for any reply stays
+     DELIVERABLE (payload_note), and counts one-liners widen with
+     max_chars. *)
+  let bigf = Filename.concat fixture_dir "big.ec" in
+  let oc = open_out bigf in
+  output_string oc "require import AllCore.\nlemma big :\n";
+  for _ = 1 to 4000 do
+    output_string oc "  (1 = 1) /\\\n"
+  done;
+  output_string oc "  (2 = 2).\nproof.\n";
+  close_out oc;
+  let (err, bo) =
+    call fd_in fd_out "open_file"
+      (`Assoc [ "path", `String bigf; "session", `String "wb2" ])
+  in
+  let bo_str = Yojson.Safe.to_string bo in
+  check "B19: giant entering goal — reply still deliverable + noted"
+    ((not err)
+     && String.length bo_str < 45_000
+     && r14_has "payload_note" bo_str)
+    (Printf.sprintf "reply chars: %d" (String.length bo_str));
+  let concl0 j =
+    match member "conclusions" (member "goals" j) with
+    | `List (`String s :: _) -> s
+    | _ -> ""
+  in
+  let (err, gc) =
+    call fd_in fd_out "goals"
+      (`Assoc [
+         "session", `String "wb2"; "goal_detail", `String "counts";
+       ])
+  in
+  let short = concl0 gc in
+  let (err2, gw) =
+    call fd_in fd_out "goals"
+      (`Assoc [
+         "session", `String "wb2"; "goal_detail", `String "counts";
+         "max_chars", `Int 300;
+       ])
+  in
+  let wide = concl0 gw in
+  check "B21: counts one-liner is capped by default, WIDENS with max_chars"
+    ((not err) && (not err2)
+     && String.length short <= 90
+     && String.length wide > 150
+     && String.length wide <= 310)
+    (Printf.sprintf "short=%d wide=%d" (String.length short)
+       (String.length wide));
+  (* B16 hardening: an undeclared argument is refused loudly. *)
+  let (err, ua) =
+    call fd_in fd_out "goals"
+      (`Assoc [
+         "session", `String "wb2"; "goal_details", `String "counts";
+       ])
+  in
+  check "B16: unknown argument refused, accepted keys listed"
+    (err
+     && r14_has "unknown argument" (Yojson.Safe.to_string ua)
+     && r14_has "goal_detail" (Yojson.Safe.to_string ua))
+    (Yojson.Safe.to_string ua);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wb2" ])
+  in
+  check "close wb2" (not err) "";
+
+  (* B17: a gone session says WHY it is gone and hands the authored
+     work back; a never-opened label says it never existed. *)
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "ws" ])
+  in
+  check "close ws" (not err) "";
+  let (err, tg) =
+    call fd_in fd_out "goals" (`Assoc [ "session", `String "ws" ])
+  in
+  let tg_str = Yojson.Safe.to_string tg in
+  check "B17: closed session distinguished + authored work returned"
+    (err
+     && r14_has "no longer exists" tg_str
+     && r14_has "close_session" tg_str
+     && r14_has "by trivial." tg_str)
+    tg_str;
+  let (err, tn) =
+    call fd_in fd_out "goals" (`Assoc [ "session", `String "nvr" ])
+  in
+  check "B17: never-opened label says so (server start time given)"
+    (err
+     && r14_has "never opened in this server process"
+          (Yojson.Safe.to_string tn))
+    (Yojson.Safe.to_string tn);
 
   (* -- empty listing explains per-process locks (F7) --------------- *)
   let (err, _) =

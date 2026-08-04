@@ -13,6 +13,20 @@ type t =
   | Unknown_sentence_id of { id : string }
   | Overlay_conflict of { names : string list }
   | Session_restarted of { reason : string }
+  | Load_stopped of {
+      (* A document LOAD stopped at a failing sentence (field report
+         B15). [file]/[line]/[col] is the error's reported position —
+         [file] may be a require'd file. [loaded_sentences]/
+         [loaded_line]: how much of the TOP file remains loaded; the
+         session state IS that prefix, so callers may keep the
+         session and resume at the boundary. *)
+      file : string;
+      line : int;
+      col : int;
+      loaded_sentences : int;
+      loaded_line : int;
+      detail : string;
+    }
   | Pool_exhausted of { kind : [ `Lsp | `Mcp | `Spec ] }
   | Protocol_mismatch of { detail : string }
   | Internal of { detail : string }
