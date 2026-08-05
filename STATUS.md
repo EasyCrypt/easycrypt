@@ -82,7 +82,18 @@
 > per-sentence resync snapshots; rewind:true, zero re-execution
 > on exact boundaries; revert restores synced_upto on ledger
 > hits);
-> `run_mcp_smoke` 192/192).
+> round 13′ (user): the `progress` tactic is FORBIDDEN at the MCP
+> door as an explicit development-wide rule (message says so, so
+> the rule cannot be read as a tool quirk to route around):
+> authored inputs are vetted post-$-expansion at one seam
+> (expand_and_vet; comment/string-blind, ident boundaries) and
+> refused atomically; an executing resync refuses OUTRIGHT when
+> the file GAINED uses vs the synced snapshot (count-based — the
+> offending sentence is textually identical to legacy ones, so
+> identity can't tell new from old; transactional, nothing runs);
+> pre-existing uses load as warned legacy debt and keep replaying
+> (proof_profile flags them);
+> `run_mcp_smoke` 206/206).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

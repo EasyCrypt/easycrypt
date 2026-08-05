@@ -2515,6 +2515,156 @@ let () =
   in
   check "close wb2" (not err) "";
 
+  (* Round 13′: `progress` is forbidden — a DEVELOPMENT rule the
+     server enforces at every door: authored inputs refuse
+     atomically (post-$-expansion, comment/string-blind, ident
+     boundaries), the FILE door refuses sentences that are NEW
+     relative to the synced snapshot, and pre-existing uses load
+     as warned legacy debt (and still replay). *)
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String rwf; "session", `String "wpg";
+         "upto_line", `Int 4;
+       ])
+  in
+  check "policy fixture open (wpg, inside b's proof)" (not err) "";
+  let (err, pr) =
+    call fd_in fd_out "exec"
+      (`Assoc [ "text", `String "progress."; "session", `String "wpg" ])
+  in
+  let pr_str = Yojson.Safe.to_string pr in
+  check "policy: exec progress refused as a GENERAL rule"
+    (err
+     && r14_has "GENERALLY FORBIDDEN" pr_str
+     && r14_has "not a restriction of this tool" pr_str
+     && r14_has "NOTHING was executed" pr_str)
+    pr_str;
+  let (err, ok1) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "have progression : 1 = 1 by trivial.";
+         "session", `String "wpg";
+       ])
+  in
+  check "policy: identifier `progression` is NOT the tactic"
+    ((not err) && member "ok" ok1 = `Bool true)
+    (Yojson.Safe.to_string ok1);
+  let (err, tt) =
+    call fd_in fd_out "try_tactic"
+      (`Assoc [
+         "tactic", `String "by progress."; "session", `String "wpg";
+       ])
+  in
+  check "policy: mid-sentence use caught (by progress.)"
+    (err && r14_has "GENERALLY FORBIDDEN" (Yojson.Safe.to_string tt))
+    (Yojson.Safe.to_string tt);
+  let (err, cm) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "(* progress *) trivial.";
+         "session", `String "wpg";
+       ])
+  in
+  check "policy: the word in a COMMENT is not a use"
+    ((not err) && member "ok" cm = `Bool true)
+    (Yojson.Safe.to_string cm);
+  let (err, _) =
+    call fd_in fd_out "define"
+      (`Assoc [
+         "name", `String "pp"; "text", `String "progress.";
+         "session", `String "wpg";
+       ])
+  in
+  check "policy setup: define binds" (not err) "";
+  let (err, sm) =
+    call fd_in fd_out "check_script"
+      (`Assoc [ "script", `String "$pp"; "session", `String "wpg" ])
+  in
+  check "policy: $-smuggled use caught post-expansion"
+    (err && r14_has "GENERALLY FORBIDDEN" (Yojson.Safe.to_string sm))
+    (Yojson.Safe.to_string sm);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wpg" ])
+  in
+  check "close wpg" (not err) "";
+
+  (* The FILE door: legacy debt loads (warned) and replays; NEW
+     uses written directly into the file refuse at resync. *)
+  let pgf = Filename.concat fixture_dir "pg.ec" in
+  let pg_base =
+    "require import AllCore.\n\
+     lemma p1 : 1 = 1 /\\ 2 = 2.\n\
+     proof.\n\
+     progress.\n\
+     qed.\n"
+  in
+  let oc = open_out pgf in
+  output_string oc pg_base;
+  close_out oc;
+  let (err, lg) =
+    call fd_in fd_out "open_file"
+      (`Assoc [ "path", `String pgf; "session", `String "wlg" ])
+  in
+  let lg_str = Yojson.Safe.to_string lg in
+  check "policy: pre-existing use LOADS, warned as legacy debt"
+    ((not err)
+     && member "partial" lg = `Null
+     && r14_has "policy_warning" lg_str
+     && r14_has "LEGACY DEBT" lg_str)
+    lg_str;
+  let oc = open_out pgf in
+  output_string oc
+    (pg_base
+     ^ "lemma p2 : forall (a : bool), a => a.\n\
+        proof.\n\
+        progress.\n\
+        qed.\n");
+  close_out oc;
+  let (err, nr) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wlg" ])
+  in
+  let nr_str = Yojson.Safe.to_string nr in
+  check "policy: NEW use via direct file edit refused at resync"
+    (err
+     && r14_has "GAINED" nr_str
+     && r14_has "GENERALLY FORBIDDEN" nr_str
+     && r14_has "executed NOTHING" nr_str)
+    nr_str;
+  let oc = open_out pgf in
+  output_string oc
+    (pg_base
+     ^ "lemma p2 : forall (a : bool), a => a.\n\
+        proof.\n\
+        by move => a h.\n\
+        qed.\n");
+  close_out oc;
+  let (err, fr) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wlg" ])
+  in
+  check "policy: explicit replacement resyncs clean"
+    ((not err) && member "ok" fr = `Bool true)
+    (Yojson.Safe.to_string fr);
+  (* Precision: the SAME tactic in a pre-existing sentence still
+     replays — rewind before p1's progress, then forward again. *)
+  let (err, rb) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "wlg"; "at_lemma", `String "p1" ])
+  in
+  check "policy: rewind lands before the legacy use"
+    ((not err) && member "ok" rb = `Bool true)
+    (Yojson.Safe.to_string rb);
+  let (err, ff) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wlg" ])
+  in
+  check "policy: legacy use REPLAYS through the gate (old core)"
+    ((not err) && member "ok" ff = `Bool true)
+    (Yojson.Safe.to_string ff);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wlg" ])
+  in
+  check "close wlg" (not err) "";
+
   (* B17: a gone session says WHY it is gone and hands the authored
      work back; a never-opened label says it never existed. *)
   let (err, _) =

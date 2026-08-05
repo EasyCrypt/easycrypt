@@ -132,8 +132,17 @@ any step fails, report it verbatim and stop.
 
 ## 6. Proof-writing house rules
 
-- Avoid the `progress` tactic (unstable across runs); prefer
-  explicit alternatives.
+- The `progress` tactic is **generally forbidden in this proof
+  development** — a project-wide rule (its behavior is unstable
+  across runs), which the tools ENFORCE: any input using it is
+  refused atomically, and a file that gained new uses refuses to
+  resync. This is not an MCP quirk to route around — writing
+  `progress` via direct file edits violates the same rule, fails
+  at resync, and fails review. Use explicit alternatives (intro
+  patterns `move => ...`, `split`, `case`, `rewrite`, `subst`,
+  `smt()`, `by []`). Pre-existing uses in legacy files load as
+  warned debt and keep replaying; clean them up when you touch
+  those proofs.
 - Never leave an `admit` in anything you hand back without
   flagging it loudly — and you cannot miss one: every executing
   reply carries an `admitted` array (the goal each admit

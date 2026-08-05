@@ -442,6 +442,19 @@ session ≡ file. If the session itself is wedged (rare), re-run
 - `admit` is allowed and visible (profile counts it; skeleton
   treats it as a hole). Never leave one in text you hand back
   without saying so.
+- `progress` is **generally forbidden in this proof development**
+  — a project-wide rule (unstable across runs), enforced by the
+  server, not invented by it: every EC input is vetted
+  post-$-expansion (comments/strings exempt, identifier
+  boundaries — `progression` is fine) and refused atomically; a
+  file that GAINED uses refuses to resync (transactional —
+  nothing executes), so writing it via direct file edits is not a
+  workaround, it just fails one door later and then fails review.
+  Pre-existing uses are legacy debt: they load (open_file warns),
+  replay, and `proof_profile` marks them fragile — clean them up
+  when you touch those proofs. Alternatives: `move => ...` intro
+  patterns, `split`, `case`, `rewrite`, `subst`, `smt()`,
+  `by []`.
 - Long `smt()` calls block the session (no cancel yet). In
   exploration, keep candidates small; rely on `nosmt` prefixes and
   `smt_timeout` (1 s to probe, 30 s to confirm); full-strength
@@ -501,7 +514,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 192/192).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 206/206).
 
 ## Known limits (v1, honest)
 

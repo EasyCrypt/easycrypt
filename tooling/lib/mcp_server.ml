@@ -557,6 +557,127 @@ let expand_defines (e : entry) (s : string) :
 let src_expanded_field expanded text =
   if expanded then [ "src_expanded", `String text ] else []
 
+(* ----------------------------------------------------------------
+   Proof-style policy: tactics forbidden in this development.
+
+   The rule is a rule OF THE DEVELOPMENT, not of this tool — the
+   refusal says so explicitly, because the only correct reaction is
+   "use an explicit alternative", never "author the text through a
+   different door": text written around the tools is caught anyway
+   (a resync replay refuses forbidden-tactic sentences that are NEW
+   relative to the synced snapshot), and would fail human review
+   regardless. Pre-existing uses in a file are legacy debt: they
+   load and replay normally (open_file warns; proof_profile marks
+   them fragile) so old developments stay workable while no new use
+   can enter. Matching is code-only (comments and strings are
+   skipped) on identifier boundaries — `progression` is not
+   `progress`. *)
+
+let forbidden_tactics = [ "progress" ]
+
+(* First code-position, ident-boundary occurrence of a forbidden
+   tactic in [s]: Some (tactic, 1-based line). *)
+let find_forbidden_tactic (s : string) : (string * int) option =
+  let n = String.length s in
+  let line = ref 1 in
+  let found = ref None in
+  let i = ref 0 in
+  while !found = None && !i < n do
+    match s.[!i] with
+    | '\n' -> incr line; incr i
+    | '(' when !i + 1 < n && s.[!i + 1] = '*' ->
+      let j = ref (!i + 2) in
+      let depth = ref 1 in
+      while !depth > 0 && !j < n do
+        if s.[!j] = '\n' then begin incr line; incr j end
+        else if !j + 1 < n && s.[!j] = '(' && s.[!j + 1] = '*' then begin
+          incr depth; j := !j + 2
+        end
+        else if !j + 1 < n && s.[!j] = '*' && s.[!j + 1] = ')' then begin
+          decr depth; j := !j + 2
+        end
+        else incr j
+      done;
+      i := !j
+    | '"' ->
+      let j = ref (!i + 1) in
+      while !j < n && s.[!j] <> '"' do
+        if s.[!j] = '\n' then incr line;
+        if s.[!j] = '\\' && !j + 1 < n then j := !j + 2 else incr j
+      done;
+      i := (if !j < n then !j + 1 else n)
+    | c when is_ident_start c ->
+      let j = ref !i in
+      while !j < n && is_ident_char s.[!j] do incr j done;
+      let word = String.sub s !i (!j - !i) in
+      if List.mem word forbidden_tactics then
+        found := Some (word, !line);
+      i := !j
+    | _ -> incr i
+  done;
+  !found
+
+let forbidden_refusal (tac, line) =
+  Printf.sprintf
+    "input uses `%s` (line %d) — NOTHING was executed. The `%s` \
+     tactic is GENERALLY FORBIDDEN in this proof development — a \
+     project-wide rule, not a restriction of this tool: its \
+     behavior is unstable across runs and prover versions, so \
+     proofs built on it break later. The rule covers all proof \
+     text however it is produced — writing it into the file \
+     directly or through any other channel violates the same rule, \
+     will be refused when the file re-syncs, and will not pass \
+     review. Use explicit alternatives instead: intro patterns \
+     (move => ...), split, case, rewrite, subst, smt(), by []."
+    tac line tac
+
+(* The single authored-input seam: $-expansion, then policy. Every
+   tool that accepts EC text goes through here — a forbidden
+   tactic anywhere in the (expanded) input refuses atomically,
+   define-smuggling included. *)
+let expand_and_vet (e : entry) (s : string) :
+  (string * bool, string) result =
+  match expand_defines e s with
+  | Error _ as err -> err
+  | Ok (text, expanded) ->
+    (match find_forbidden_tactic text with
+     | Some hit -> Error (forbidden_refusal hit)
+     | None -> Ok (text, expanded))
+
+(* Pre-existing forbidden-tactic uses in a parsed document —
+   surfaced as a warning on open_file (legacy debt is visible, not
+   blocking). *)
+let policy_warning_fields
+    (parsed : Ec_llm_session.parsed_sentence array) =
+  let hits = ref [] in
+  Array.iter
+    (fun (s : Ec_llm_session.parsed_sentence) ->
+       match find_forbidden_tactic s.src with
+       | Some (tac, _) -> hits := (tac, s.start_line) :: !hits
+       | None -> ())
+    parsed;
+  match List.rev !hits with
+  | [] -> []
+  | hits ->
+    let lines =
+      String.concat ", "
+        (List.map (fun (_, l) -> string_of_int l)
+           (List.filteri (fun i _ -> i < 10) hits))
+    in
+    [ "policy_warning",
+      `String
+        (Printf.sprintf
+           "%d pre-existing use(s) of `%s` (line(s) %s%s). The \
+            tactic is GENERALLY FORBIDDEN in this development \
+            (unstable across runs) — these load as LEGACY DEBT \
+            (proof_profile marks them fragile) and NEW uses are \
+            refused on every path. Clean them up when you touch \
+            those proofs."
+           (List.length hits)
+           (fst (List.hd hits))
+           lines
+           (if List.length hits > 10 then ", …" else "")) ]
+
 (* ---------------------------------------------------------------- *)
 (* Bounded goal payloads (field report F5): ONE transform, ONE
    parameter, applied wherever goals are emitted.
@@ -1327,6 +1448,7 @@ let tool_open_file t args =
                                      ~default:`Shape)
                           (goals_json session);
                       ]
+                      @ policy_warning_fields parsed
                     in
                     (match
                        Ec_llm_session.raw_command session load_cmd
@@ -1420,7 +1542,7 @@ let tool_exec t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       (match expand_defines e text with
+       (match expand_and_vet e text with
         | Error m -> Error ("exec: " ^ m)
         | Ok (text, expanded) ->
        (* Strict per-sentence execution (field report B5): the input
@@ -1560,7 +1682,7 @@ let tool_query t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       (match expand_defines e text with
+       (match expand_and_vet e text with
         | Error m -> Error ("query: " ^ m)
         | Ok (text, expanded) ->
        let corr = Correlation.of_client "mcp-query" in
@@ -1705,7 +1827,7 @@ let tool_try_tactic t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       (match expand_defines e tactic with
+       (match expand_and_vet e tactic with
         | Error m -> Error ("try_tactic: " ^ m)
         | Ok (tactic, expanded) ->
        (* Single-sentence by contract (round 11, F15): refuse
@@ -1801,7 +1923,7 @@ let tool_try_script t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       (match expand_defines e script with
+       (match expand_and_vet e script with
         | Error m -> Error ("try_script: " ^ m)
         | Ok (script, expanded) ->
        (match Ec_llm_session.parse_source e.session script with
@@ -2389,6 +2511,56 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                         ^ " — previous claim regions kept; locks \
                            still held by name") ])
             in
+            (* Forbidden-tactic policy over the FILE door: an
+               executing resync refuses OUTRIGHT when the file has
+               MORE forbidden-tactic sentences than the synced
+               snapshot — new uses cannot enter on ANY path, direct
+               file edits included. Count-based on purpose: the
+               offending sentence is usually the bare tactic word,
+               textually identical to every legacy use, so sentence
+               identity cannot tell new from old — the NET COUNT
+               can. Untouched legacy uses keep replaying (counts
+               balance); the refusal is transactional (nothing
+               executed, session unchanged). *)
+            let forbidden_gain =
+              let uses arr =
+                Array.fold_left
+                  (fun acc (s : Ec_llm_session.parsed_sentence) ->
+                     match find_forbidden_tactic s.src with
+                     | Some (tac, _) -> (tac, s.start_line) :: acc
+                     | None -> acc)
+                  [] arr
+                |> List.rev
+              in
+              let o = uses old and n = uses parsed_all in
+              if List.length n > List.length o then Some (o, n)
+              else None
+            in
+            match forbidden_gain with
+            | Some (o, n) ->
+              Error
+                (Printf.sprintf
+                   "resync_file: the file GAINED `%s` uses — %d \
+                    now vs %d in the synced snapshot (use lines \
+                    now: %s). The `%s` tactic is GENERALLY \
+                    FORBIDDEN in this proof development — a \
+                    project-wide rule, not a restriction of this \
+                    tool (its behavior is unstable across runs): \
+                    new uses cannot enter on ANY path, direct \
+                    file edits included, and will not pass \
+                    review. This resync executed NOTHING and the \
+                    session is unchanged — replace the new use(s) \
+                    with explicit alternatives (move => intro \
+                    patterns, split, case, rewrite, subst, smt(), \
+                    by []) and resync again. Pre-existing uses \
+                    are legacy debt and keep replaying."
+                   (fst (List.hd n))
+                   (List.length n) (List.length o)
+                   (String.concat ", "
+                      (List.map
+                         (fun (_, l) -> string_of_int l) n))
+                   (fst (List.hd n)))
+            | None ->
             if formatting_equiv && at_lemma = None && upto_line = None
                && upto_sentence = None
             then begin
@@ -3026,7 +3198,7 @@ let tool_check_skeleton t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       (match expand_defines e script with
+       (match expand_and_vet e script with
         | Error m -> Error ("check_skeleton: " ^ m)
         | Ok (script, expanded) ->
        (match Ec_llm_session.parse_source e.session script with
@@ -3202,7 +3374,7 @@ let tool_exec_in t args =
             (Printf.sprintf
                "exec_in: subtree %s is already closed" sc.sc_path)
         | Some sc ->
-          (match expand_defines e text with
+          (match expand_and_vet e text with
            | Error m -> Error ("exec_in: " ^ m)
            | Ok (text, expanded) ->
           (match Ec_llm_session.parse_source e.session text with
@@ -3609,7 +3781,7 @@ let tool_check_script t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       (match expand_defines e script with
+       (match expand_and_vet e script with
         | Error m -> Error ("check_script: " ^ m)
         | Ok (script, expanded) ->
        (match Ec_llm_session.parse_source e.session script with
@@ -3835,7 +4007,7 @@ let tool_replace_proof t args =
     (match find_session t args with
      | Error e -> Error e
      | Ok (label, e) ->
-       (match expand_defines e script with
+       (match expand_and_vet e script with
         | Error m -> Error ("replace_proof: " ^ m)
         | Ok (script, s_expanded) ->
        if stale_flag e then
