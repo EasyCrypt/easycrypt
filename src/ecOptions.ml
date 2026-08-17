@@ -545,7 +545,7 @@ let prv_options_of_values ini values =
       end;
       prvo_checkall   = get_flag "check-all" values;
       prvo_profile    = get_flag "profile" values;
-      prvo_why3server = get_string "why3server" values;
+      prvo_why3server = get_string "server" values;
     }
 
 let cli_options_of_values ini values =
