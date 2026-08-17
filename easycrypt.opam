@@ -10,7 +10,7 @@ depends: [
   "dune-site"
   "markdown"
   "pcre2" {>= "8"}
-  "why3" {>= "1.8.0" & < "1.9"}
+  "why3" {>= "1.8.2" & < "1.9"}
   "yojson"
   "zarith" {>= "1.10"}
   "odoc" {with-doc}
@@ -39,6 +39,10 @@ dev-repo: "git+https://github.com/EasyCrypt/easycrypt.git"
 authors: "EasyCrypt Development Team <team@easycrypt.info>"
 maintainer: "pierre-yves@strub.nu"
 license: "CeCILL-C"
+
+pin-depends: [
+  ["why3.1.8.2" "git+https://github.com/EasyCrypt/why3.git#53f8c40faacfca3ad01edf1071017b4e7fa29688"]
+]
 
 synopsis: "EasyCrypt: Computer-Aided Cryptographic Proofs"
 description: """
