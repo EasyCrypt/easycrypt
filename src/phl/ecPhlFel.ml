@@ -126,7 +126,6 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"
   in
 
-  let pr_m  = oget (Memory.byid pr.pr_mem env) in
   let f  = NormMp.norm_xfun env pr.pr_fun in
   let ev = pr.pr_event in
 
@@ -161,7 +160,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   (* we must quantify over memories *)
   let post_goal =
     let lev = map_ss_inv2 f_and f_event (map_ss_inv1 (fun cnt -> f_int_le cnt q) cntr) in
-    let m = (EcIdent.create "&hr", snd pr_m) in
+    let m = EcEnv.Fun.prF_memenv ev.m f env in
     let lev = EcSubst.ss_inv_rebind lev (fst m) in
     let ev = EcSubst.ss_inv_rebind ev (fst m) in
     let inv = EcSubst.ss_inv_rebind inv (fst m) in

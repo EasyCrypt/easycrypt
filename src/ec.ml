@@ -227,8 +227,9 @@ let main () =
       Option.bind (projfile path) (fun conffile ->
         Option.map
           (fun ini -> {
-             inic_ini  = ini;
-             inic_root = Some (Filename.dirname conffile);
+             inic_ini   = ini;
+             inic_root  = Some (Filename.dirname conffile);
+             inic_scope = `Project;
           })
           (read_ini_file conffile)
       ) in
@@ -238,7 +239,11 @@ let main () =
         List.filter_map
           (fun conffile ->
             Option.map
-              (fun ini -> { inic_ini = ini; inic_root = None; })
+              (fun ini -> {
+                 inic_ini   = ini;
+                 inic_root  = None;
+                 inic_scope = `Config;
+              })
               (read_ini_file conffile))
           conffiles
       in
@@ -310,6 +315,11 @@ let main () =
             |> omap (fun server -> ["-server"; server])
             |> odfl [] in
 
+          let sockpair =
+            if input.runo_provers.prvo_sockpair then
+              ["-why3-socketpair"]
+            else [] in
+
           let why3 =
             options.o_options.o_why3
             |> omap (fun why3 -> ["-why3"; why3])
@@ -347,7 +357,7 @@ let main () =
           List.flatten [
             maxjobs; timeout; cpufactor; ppwidth;
             provers; quorum ; pragmas  ; checkall;
-            profile; why3srv  ; why3    ;
+            profile; why3srv; sockpair ; why3    ;
             reloc  ; noevict; boot     ; stdlib  ; idirs   ;
           ]
         in
@@ -613,7 +623,8 @@ let main () =
           prvo_ppwidth = None;
           prvo_checkall = false;
           prvo_profile = false;
-          prvo_why3server = None; }
+          prvo_why3server = None;
+          prvo_sockpair = false; }
         in
 
         let terminal =
@@ -719,6 +730,9 @@ let main () =
 
   (* Initialize PRNG *)
   Random.self_init ();
+
+  (* Communicate with the local Why3 server over a socketpair if requested *)
+  EcProvers.why3server_sockpair := state.prvopts.prvo_sockpair;
 
   (* Connect to external Why3 server if requested *)
   state.prvopts.prvo_why3server |> oiter (fun server ->

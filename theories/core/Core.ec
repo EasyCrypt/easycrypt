@@ -150,6 +150,14 @@ proof. by move=> fK gK x y; rewrite -{1}[y]gK; apply (can_eq f g). qed.
 lemma inj_idfun: injective (idfun<:'a>).
 proof. by []. qed.
 
+lemma comp_idfunL ['a 'b] (f : 'a -> 'b) : idfun \o f = f.
+proof. by []. qed.
+
+lemma comp_idfunR ['a 'b] (f : 'a -> 'b) : f \o idfun = f.
+proof. by []. qed.
+
+hint simplify comp_idfunL, comp_idfunR.
+
 lemma inj_can_sym (f:'a -> 'b) f':
   cancel f f' => injective f' => cancel f' f.
 proof. by move=> fK injf' x; apply injf'; rewrite fK. qed.

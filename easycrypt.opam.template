@@ -7,6 +7,10 @@ authors: "EasyCrypt Development Team <team@easycrypt.info>"
 maintainer: "pierre-yves@strub.nu"
 license: "CeCILL-C"
 
+pin-depends: [
+  ["why3.1.8.2" "git+https://github.com/EasyCrypt/why3.git#53f8c40faacfca3ad01edf1071017b4e7fa29688"]
+]
+
 synopsis: "EasyCrypt: Computer-Aided Cryptographic Proofs"
 description: """
 EasyCrypt is a toolset for reasoning about relational properties
