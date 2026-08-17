@@ -81,6 +81,11 @@ val initialize :
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
+(* Opt-in: spawn why3server connected through a socketpair(2) instead of a
+   named Unix socket, for sandboxes where bind(2) is forbidden. Must be set
+   before the first call to [maybe_start_why3_server]. *)
+val why3server_sockpair : bool ref
+
 val maybe_start_why3_server : prover_infos -> unit
 
 val execute_task : ?notify:notify -> prover_infos -> Why3.Task.task -> bool option

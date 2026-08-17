@@ -431,8 +431,57 @@ let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
 (* -------------------------------------------------------------------- *)
-let maybe_start_why3_server_ (pi : prover_infos) =
-  if not (Prove_client.is_connected ()) then begin
+(* Opt-in: spawn why3server connected through a socketpair(2) instead of a
+   named Unix socket, for sandboxes where bind(2) is forbidden. *)
+let why3server_sockpair : bool ref = ref false
+
+(* -------------------------------------------------------------------- *)
+let start_why3_server_sockpair (pi : prover_infos) =
+  let exec = Filename.concat (Whyconf.libdir (Config.main ())) "why3server" in
+  let sv, cl = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+  let pid = ref (-1) in
+
+  begin
+    let rd, wr = Unix.pipe ~cloexec:true () in
+
+    EcUtils.try_finally (fun () ->
+      pid := Unix.fork ();
+
+      if !pid = 0 then begin
+        Unix.close rd;
+        Unix.close cl;
+        EUnix.setpgid 0 0;
+        Unix.chdir (Filename.get_temp_dir_name ());
+        try
+          Unix.execvp exec [|
+            exec; "--client-fd"; string_of_int (EUnix.int_of_filedescr sv);
+            "-j"; string_of_int pi.pr_maxprocs
+          |]
+        with _ -> Unix._exit 127
+      end else begin
+        Unix.close wr;
+        (* wait for the child to exec (closing [wr]) or die *)
+        ignore (Unix.select [rd] [] [] (-1.0))
+      end)
+    (fun () ->
+      (try Unix.close rd with Unix.Unix_error _ -> ());
+      (try Unix.close wr with Unix.Unix_error _ -> ()))
+  end;
+
+  Unix.close sv;
+
+  match Unix.waitpid [Unix.WNOHANG] !pid with
+  | 0, _ ->
+      Unix.set_close_on_exec cl;
+      Prove_client.connect_external_fd cl
+  | _ ->
+      Unix.close cl;
+      raise (Prove_client.ConnectionError
+               "cannot start why3server (socketpair mode)")
+
+(* -------------------------------------------------------------------- *)
+let start_why3_server_socket (pi : prover_infos) =
+  begin
     let sockname = Filename.temp_file "easycrypt.why3server." ".socket" in
     let exec = Filename.concat (Whyconf.libdir (Config.main ())) "why3server" in
     let pid = ref (-1) in
@@ -488,6 +537,14 @@ let maybe_start_why3_server_ (pi : prover_infos) =
 
     if not !connected then
       raise (Prove_client.ConnectionError "cannot start & connect to why3server")
+  end
+
+(* -------------------------------------------------------------------- *)
+let maybe_start_why3_server_ (pi : prover_infos) =
+  if not (Prove_client.is_connected ()) then begin
+    if !why3server_sockpair
+    then start_why3_server_sockpair pi
+    else start_why3_server_socket pi
   end
 
 (* -------------------------------------------------------------------- *)

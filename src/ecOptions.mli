@@ -62,6 +62,7 @@ and prv_options = {
   prvo_checkall   : bool;
   prvo_profile    : bool;
   prvo_why3server : string option;
+  prvo_sockpair   : bool;
 }
 
 and ldr_options = {
@@ -78,20 +79,26 @@ and glb_options = {
 
 (* -------------------------------------------------------------------- *)
 type ini_options = {
-  ini_ppwidth  : int option;
-  ini_why3     : string option;
-  ini_ovrevict : string list;
-  ini_provers  : string list;
-  ini_quorum   : int option;
-  ini_timeout  : int option;
-  ini_idirs    : (string option * string) list;
-  ini_rdirs    : (string option * string) list;
-  ini_pragmas  : string list;
+  ini_ppwidth    : int option;
+  ini_why3       : string option;
+  ini_why3server : string option;
+  ini_sockpair   : bool option;
+  ini_ovrevict   : string list;
+  ini_provers    : string list;
+  ini_quorum     : int option;
+  ini_timeout    : int option;
+  ini_idirs      : (string option * string) list;
+  ini_rdirs      : (string option * string) list;
+  ini_pragmas    : string list;
 }
 
+(* The [`Config | `Project] scope restricts machine-local settings (how to
+   talk to the Why3 server) to configuration files: they are ignored when
+   they come from a project file *)
 type ini_context = {
-  inic_ini  : ini_options;
-  inic_root : string option;
+  inic_ini   : ini_options;
+  inic_root  : string option;
+  inic_scope : [`Config | `Project];
 }
 
 (* -------------------------------------------------------------------- *)

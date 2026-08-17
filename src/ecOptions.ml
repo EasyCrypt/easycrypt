@@ -66,6 +66,7 @@ and prv_options = {
   prvo_checkall   : bool;
   prvo_profile    : bool;
   prvo_why3server : string option;
+  prvo_sockpair   : bool;
 }
 
 and ldr_options = {
@@ -82,20 +83,23 @@ and glb_options = {
 
 (* -------------------------------------------------------------------- *)
 type ini_options = {
-  ini_ppwidth  : int option;
-  ini_why3     : string option;
-  ini_ovrevict : string list;
-  ini_provers  : string list;
-  ini_quorum   : int option;
-  ini_timeout  : int option;
-  ini_idirs    : (string option * string) list;
-  ini_rdirs    : (string option * string) list;
-  ini_pragmas  : string list;
+  ini_ppwidth    : int option;
+  ini_why3       : string option;
+  ini_why3server : string option;
+  ini_sockpair   : bool option;
+  ini_ovrevict   : string list;
+  ini_provers    : string list;
+  ini_quorum     : int option;
+  ini_timeout    : int option;
+  ini_idirs      : (string option * string) list;
+  ini_rdirs      : (string option * string) list;
+  ini_pragmas    : string list;
 }
 
 type ini_context = {
-  inic_ini  : ini_options;
-  inic_root : string option;
+  inic_ini   : ini_options;
+  inic_root  : string option;
+  inic_scope : [`Config | `Project];
 }
 
 (* -------------------------------------------------------------------- *)
@@ -104,6 +108,10 @@ module Ini : sig
   val get_ppwidth : ini_context -> int option
 
   val get_why3 : ini_context -> string option
+
+  val get_why3server : ini_context -> string option
+
+  val get_sockpair : ini_context -> bool option
 
   val get_ovrevict : ini_context -> string list
 
@@ -123,6 +131,10 @@ module Ini : sig
   val get_all_ppwidth : ini_context list -> int option
 
   val get_all_why3 : ini_context list -> string option
+
+  val get_all_why3server : ini_context list -> string option
+
+  val get_all_sockpair : ini_context list -> bool option
 
   val get_all_ovrevict : ini_context list -> string list
 
@@ -157,6 +169,18 @@ end = struct
       (absolute ?root:ini.inic_root)
       (ini.inic_ini.ini_why3)
 
+  (* How this machine talks to the Why3 server is a machine-local setting:
+     honored from configuration files only, never from a project file *)
+  let get_why3server (ini : ini_context) =
+    match ini.inic_scope with
+    | `Project -> None
+    | `Config  -> ini.inic_ini.ini_why3server
+
+  let get_sockpair (ini : ini_context) =
+    match ini.inic_scope with
+    | `Project -> None
+    | `Config  -> ini.inic_ini.ini_sockpair
+
   let get_ovrevict (ini : ini_context) =
     ini.inic_ini.ini_ovrevict
 
@@ -188,6 +212,12 @@ end = struct
 
   let get_all_why3 (ini : ini_context list) =
     List.find_map_opt get_why3 ini
+
+  let get_all_why3server (ini : ini_context list) =
+    List.find_map_opt get_why3server ini
+
+  let get_all_sockpair (ini : ini_context list) =
+    List.find_map_opt get_sockpair ini
 
   let get_all_ovrevict (ini : ini_context list) =
     List.flatten (List.map get_ovrevict ini)
@@ -421,6 +451,8 @@ let specs = {
       `Spec ("pp-width"   , `Int   , "pretty-printing width");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations");
       `Spec ("server"     , `String, "Connect to an external Why3 server");
+      `Spec ("why3-socketpair", `Flag,
+             "Communicate with the local Why3 server over a socketpair (no bind)");
     ]);
 
     ("loader", "Options related to loader", [
@@ -545,7 +577,14 @@ let prv_options_of_values ini values =
       end;
       prvo_checkall   = get_flag "check-all" values;
       prvo_profile    = get_flag "profile" values;
-      prvo_why3server = get_string "server" values;
+      prvo_why3server = begin
+        match get_string "server" values with
+        | None -> Ini.get_all_why3server ini
+        | Some _ as s -> s
+      end;
+      prvo_sockpair   =
+        get_flag "why3-socketpair" values
+        || odfl false (Ini.get_all_sockpair ini);
     }
 
 let cli_options_of_values ini values =
@@ -745,6 +784,13 @@ let read_ini_file (filename : string) =
     | Inifiles.Invalid_element _
     | Failure _ -> None
 
+  and trybool name =
+    try  Some (bool_of_string (ini#getval sec name))
+    with
+    | Inifiles.Invalid_section _
+    | Inifiles.Invalid_element _
+    | Invalid_argument _ -> None
+
   and trylist name =
     try  ini#getaval sec name
     with
@@ -752,22 +798,26 @@ let read_ini_file (filename : string) =
     | Inifiles.Invalid_element _ -> [] in
 
   let ini =
-    { ini_ppwidth  = tryint  "pp-width";
-      ini_why3     = tryget  "why3conf";
-      ini_ovrevict = trylist "no-evict";
-      ini_provers  = trylist "provers" ;
-      ini_quorum   = tryint  "quorum"  ;
-      ini_timeout  = tryint  "timeout" ;
-      ini_idirs    = List.map parse_idir (trylist "idirs");
-      ini_rdirs    = List.map parse_idir (trylist "rdirs");
-      ini_pragmas  = trylist "pragmas"; } in
+    { ini_ppwidth    = tryint  "pp-width";
+      ini_why3       = tryget  "why3conf";
+      ini_why3server = tryget  "why3server";
+      ini_sockpair   = trybool "why3-socketpair";
+      ini_ovrevict   = trylist "no-evict";
+      ini_provers    = trylist "provers" ;
+      ini_quorum     = tryint  "quorum"  ;
+      ini_timeout    = tryint  "timeout" ;
+      ini_idirs      = List.map parse_idir (trylist "idirs");
+      ini_rdirs      = List.map parse_idir (trylist "rdirs");
+      ini_pragmas    = trylist "pragmas"; } in
 
-  { ini_ppwidth  = ini.ini_ppwidth;
-    ini_why3     = omap expand ini.ini_why3;
-    ini_ovrevict = ini.ini_ovrevict;
-    ini_provers  = ini.ini_provers;
-    ini_quorum   = ini.ini_quorum;
-    ini_timeout  = ini.ini_timeout;
-    ini_idirs    = ini.ini_idirs;
-    ini_rdirs    = ini.ini_rdirs;
-    ini_pragmas  = ini.ini_pragmas; }
+  { ini_ppwidth    = ini.ini_ppwidth;
+    ini_why3       = omap expand ini.ini_why3;
+    ini_why3server = omap expand ini.ini_why3server;
+    ini_sockpair   = ini.ini_sockpair;
+    ini_ovrevict   = ini.ini_ovrevict;
+    ini_provers    = ini.ini_provers;
+    ini_quorum     = ini.ini_quorum;
+    ini_timeout    = ini.ini_timeout;
+    ini_idirs      = ini.ini_idirs;
+    ini_rdirs      = ini.ini_rdirs;
+    ini_pragmas    = ini.ini_pragmas; }
