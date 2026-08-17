@@ -44,6 +44,8 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   let prvopts = llmopts.llmo_provers in
   Random.self_init ();
 
+  EcProvers.why3server_sockpair := prvopts.prvo_sockpair;
+
   prvopts.prvo_why3server |> oiter (fun server ->
     try
       Why3.Prove_client.connect_external server
