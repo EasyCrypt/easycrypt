@@ -10,6 +10,7 @@ module Low : sig
   val t_ehoare_rcond  : bool -> codepos1 -> backward
   val t_bdhoare_rcond : bool -> codepos1 -> backward
   val t_equiv_rcond   : side -> bool -> codepos1 -> backward
+  val t_aequiv_rcond  : side -> bool -> codepos1 -> backward
 end
 
 (* -------------------------------------------------------------------- *)

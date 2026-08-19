@@ -125,6 +125,11 @@ let process_exists_intro ~(elim : bool) fs tc =
         Inv_ts {ml=ef.ef_ml; mr=ef.ef_mr; inv=f_true}
     | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps, 
         Inv_ts {ml=(fst es.es_ml); mr=(fst es.es_mr); inv=f_true}
+    | FaequivF aef ->
+        fst (LDecl.equivF aef.aef_ml aef.aef_mr aef.aef_fl aef.aef_fr hyps),
+        Inv_ts {ml=aef.aef_ml; mr=aef.aef_mr; inv=f_true}
+    | FaequivS aes -> LDecl.push_all [aes.aes_ml; aes.aes_mr] hyps,
+        Inv_ts {ml=(fst aes.aes_ml); mr=(fst aes.aes_mr); inv=f_true}
     | _ -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   in
 

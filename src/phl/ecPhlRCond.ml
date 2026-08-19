@@ -96,10 +96,38 @@ module Low = struct
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
+  let t_aequiv_rcond_r side b at_pos tc =
+    let env = FApi.tc1_env tc in
+    let aes = tc1_as_aequivS tc in
+    let m,mo,s =
+      match side with
+      | `Left  -> aes.aes_ml,aes.aes_mr, aes.aes_sl
+      | `Right -> aes.aes_mr,aes.aes_ml, aes.aes_sr in
+    let ts_inv_lower_side2 = sideif side ts_inv_lower_left2 ts_inv_lower_right2 in
+    let ss_inv_generalize_other = sideif side ss_inv_generalize_right ss_inv_generalize_left in
+    let hd,_,e,s = gen_rcond (!!tc, env) b (fst m) at_pos s in
+    let e = ss_inv_generalize_other e (fst mo) in
+    let concl1 =
+      EcSubst.f_forall_mems_ss_inv (EcIdent.create "&m", snd mo)
+        (ts_inv_lower_side2 (fun pr po ->
+          let mhs = EcIdent.create "&hr" in
+          let pr = ss_inv_rebind pr mhs in
+          let po = ss_inv_rebind po mhs in
+          let po = POE.lift po in
+          f_hoareS (snd m) pr hd po) (aes_pr aes) e) in
+    let sl,sr = match side with `Left -> s, aes.aes_sr | `Right -> aes.aes_sl, s in
+    let concl2 =
+      f_aequivS (snd aes.aes_ml) (snd aes.aes_mr)
+        ~ep:(aes_ep aes) ~dp:(aes_dp aes)
+        (aes_pr aes) sl sr (aes_po aes) in
+    FApi.xmutate1 tc `RCond [concl1; concl2]
+
+  (* ------------------------------------------------------------------ *)
   let t_hoare_rcond   = FApi.t_low2 "hoare-rcond"   t_hoare_rcond_r
   let t_ehoare_rcond  = FApi.t_low2 "ehoare-rcond"  t_ehoare_rcond_r
   let t_bdhoare_rcond = FApi.t_low2 "bdhoare-rcond" t_bdhoare_rcond_r
   let t_equiv_rcond   = FApi.t_low3 "equiv-rcond"   t_equiv_rcond_r
+  let t_aequiv_rcond  = FApi.t_low3 "aequiv-rcond"  t_aequiv_rcond_r
 end
 
 (* -------------------------------------------------------------------- *)
@@ -113,6 +141,8 @@ let t_rcond side b at_pos tc =
     Low.t_hoare_rcond b at_pos tc
   | None ->
     Low.t_ehoare_rcond b at_pos tc
+  | Some side when is_aequivS concl ->
+    Low.t_aequiv_rcond side b at_pos tc
   | Some side ->
     Low.t_equiv_rcond side b at_pos tc
 

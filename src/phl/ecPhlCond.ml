@@ -121,6 +121,63 @@ let rec t_equiv_cond side tc =
           tc
 
 (* -------------------------------------------------------------------- *)
+let rec t_aequiv_cond side tc =
+  let hyps = FApi.tc1_hyps tc in
+  let aes  = tc1_as_aequivS tc in
+  let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+
+  match side with
+  | Some s ->
+      let e =
+        match s with
+        | `Left ->
+          let (e,_,_) = fst (tc1_first_if tc aes.aes_sl) in
+          ss_inv_generalize_right (ss_inv_of_expr ml e) mr
+        | `Right ->
+          let (e,_,_) = fst (tc1_first_if tc aes.aes_sr) in
+          ss_inv_generalize_left (ss_inv_of_expr mr e) ml
+      in LowInternal.t_gen_cond side (Inv_ts e) tc
+
+  | None ->
+      let el,_,_ = fst (tc1_first_if tc aes.aes_sl) in
+      let er,_,_ = fst (tc1_first_if tc aes.aes_sr) in
+      let el     = ss_inv_generalize_right (ss_inv_of_expr ml el) mr in
+      let er     = ss_inv_generalize_left (ss_inv_of_expr mr er) ml in
+      let fiff   =
+        EcSubst.f_forall_mems_ts_inv aes.aes_ml aes.aes_mr
+          (map_ts_inv2 f_imp (aes_pr aes) (map_ts_inv2 f_iff el er)) in
+
+      let fresh = ["hiff";"&m1";"&m2";"h";"h";"h"] in
+      let fresh = LDecl.fresh_ids hyps fresh in
+
+      let hiff,m1,m2,h,h1,h2 = as_seq6 fresh in
+
+      let t_aux =
+        let rwpt =
+          EcCoreGoal.ptlocal
+            ~args:[PAMemory m1; PAMemory m2; PASub None]
+            hiff in
+
+        FApi.t_seqs [t_intros_i [m1]    ; EcPhlSkip.t_skip;
+                     t_intros_i [m2; h] ; t_elim_hyp h;
+                     t_intros_i [h1; h2];
+                     FApi.t_seqsub
+                       (t_rewrite rwpt (`RtoL, None))
+                       [t_apply_hyp h1; t_apply_hyp h2]]
+      in
+        FApi.t_on1seq 1 (t_cut fiff)
+          (t_intros_i_seq [hiff]
+             (FApi.t_seqsub
+                (t_aequiv_cond (Some `Left))
+                [FApi.t_seqsub
+                   (EcPhlRCond.Low.t_aequiv_rcond `Right true EcMatching.Position.cpos1_first)
+                   [t_aux; t_clear hiff];
+                 FApi.t_seqsub
+                   (EcPhlRCond.Low.t_aequiv_rcond `Right false EcMatching.Position.cpos1_first)
+                   [t_aux; t_clear hiff]]))
+          tc
+
+(* -------------------------------------------------------------------- *)
 module LowMatchInternal : sig
   val t_gen_match : side option -> FApi.backward
 end = struct

@@ -884,7 +884,7 @@ let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s)
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
   with InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
-let t_code_transform (side : oside) cpos tr tx tc =
+let t_code_transform (side : oside) ?(aequiv = false) cpos tr tx tc =
   let pf = FApi.tc1_penv tc in
 
   match side with
@@ -924,21 +924,48 @@ let t_code_transform (side : oside) cpos tr tx tc =
   end
 
   | Some side ->
-      let hyps      = FApi.tc1_hyps tc in
-      let es        = tc1_as_equivS tc in
-      let pre, post = es_pr es, es_po es in
-      let me, stmt     =
-        match side with
-        | `Left  -> (es.es_ml, es.es_sl)
-        | `Right -> (es.es_mr, es.es_sr) in
-      let (_, mt), stmt, cs = tx (pf, hyps) cpos (pre.inv, post.inv) (me, stmt) in
-      let concl =
-        match side with
-        | `Left  -> f_equivS mt (snd es.es_mr) (es_pr es) stmt es.es_sr (es_po es)
-        | `Right -> f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl stmt (es_po es)
-      in
+      let (hyps, concl) = FApi.tc1_flat tc in
 
-      FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])
+      match concl.f_node with
+      | FequivS es -> begin
+          let pre, post = es_pr es, es_po es in
+          let me, stmt     =
+            match side with
+            | `Left  -> (es.es_ml, es.es_sl)
+            | `Right -> (es.es_mr, es.es_sr) in
+          let (_, mt), stmt, cs = tx (pf, hyps) cpos (pre.inv, post.inv) (me, stmt) in
+          let concl =
+            match side with
+            | `Left  -> f_equivS mt (snd es.es_mr) (es_pr es) stmt es.es_sr (es_po es)
+            | `Right -> f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl stmt (es_po es)
+          in
+
+          FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])
+        end
+
+      | FaequivS aes when aequiv -> begin
+          let pre, post = aes_pr aes, aes_po aes in
+          let me, stmt     =
+            match side with
+            | `Left  -> (aes.aes_ml, aes.aes_sl)
+            | `Right -> (aes.aes_mr, aes.aes_sr) in
+          let (_, mt), stmt, cs = tx (pf, hyps) cpos (pre.inv, post.inv) (me, stmt) in
+          let mk mtl mtr sl sr =
+            f_aequivS mtl mtr ~ep:(aes_ep aes) ~dp:(aes_dp aes)
+              (aes_pr aes) sl sr (aes_po aes) in
+          let concl =
+            match side with
+            | `Left  -> mk mt (snd aes.aes_mr) stmt aes.aes_sr
+            | `Right -> mk (snd aes.aes_ml) mt aes.aes_sl stmt
+          in
+
+          FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])
+        end
+
+      | _ ->
+        match aequiv with
+        | true  -> tc_error_noXhl ~kinds:[`Equiv `Stmt; `AEquiv `Stmt] pf
+        | false -> tc_error_noXhl ~kinds:[`Equiv `Stmt] pf
 
 (* -------------------------------------------------------------------- *)
 let get_single tc = function

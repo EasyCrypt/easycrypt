@@ -50,6 +50,18 @@ let t_equiv_case_r ?(simplify = true) f tc =
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)
+let t_aequiv_case_r ?(simplify = true) f tc =
+  let fand = if simplify then f_and_simpl else f_and in
+  let aes = tc1_as_aequivS tc in
+  let mtl, mtr = snd aes.aes_ml, snd aes.aes_mr in
+  let mk pre =
+    f_aequivS mtl mtr ~ep:(aes_ep aes) ~dp:(aes_dp aes)
+      pre aes.aes_sl aes.aes_sr (aes_po aes) in
+  let concl1 = mk (map_ts_inv2 fand (aes_pr aes) f) in
+  let concl2 = mk (map_ts_inv2 fand (aes_pr aes) (map_ts_inv1 f_not f)) in
+  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
+
+(* --------------------------------------------------------------------- *)
 let t_hoare_case ?simplify =
   FApi.t_low1 "hoare-case" (t_hoare_case_r ?simplify)
 
@@ -61,6 +73,9 @@ let t_bdhoare_case ?simplify =
 
 let t_equiv_case ?simplify =
   FApi.t_low1 "equiv-case" (t_equiv_case_r ?simplify)
+
+let t_aequiv_case ?simplify =
+  FApi.t_low1 "aequiv-case" (t_aequiv_case_r ?simplify)
 
 (* --------------------------------------------------------------------- *)
 let t_hl_case_r ?simplify f tc =
@@ -80,6 +95,7 @@ let t_hl_case_r ?simplify f tc =
       ~teh:err
       ~tbh:err
       ~te:(t_equiv_case ?simplify f)
+      ~tae:(t_aequiv_case ?simplify f)
       tc
   | _ -> assert false
 

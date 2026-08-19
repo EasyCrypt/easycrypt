@@ -256,28 +256,59 @@ module TacInternal = struct
     let sr = EcModules.stmt (s_hdr @ s_wpr) in
     let concl = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr {ml;mr;inv=post} in
     FApi.xmutate1 tc `Wp [concl]
+
+  let t_aequiv_wp ?(uselet=true) (ij : (codegap1 * codegap1) option) tc =
+    let hyps = FApi.tc1_hyps tc in
+    let env = EcEnv.LDecl.toenv hyps in
+    let aes = tc1_as_aequivS tc in
+    let ml, mr = (fst aes.aes_ml), (fst aes.aes_mr) in
+    let i = omap fst ij and j = omap snd ij in
+    let s_hdl,s_wpl = o_split env i aes.aes_sl in
+    let s_hdr,s_wpr = o_split env j aes.aes_sr in
+    let meml, s_wpl = aes.aes_ml, EcModules.stmt s_wpl in
+    let memr, s_wpr = aes.aes_mr, EcModules.stmt s_wpr in
+    let post = aes_po aes in
+    let s_wpl, post =
+      wp ~mc:(ml,mr) ~uselet hyps meml s_wpl (POE.empty post.inv)
+    in
+    let s_wpr, post =
+      wp ~mc:(ml,mr) ~uselet hyps memr s_wpr (POE.empty post)
+    in
+    check_wp_progress tc i aes.aes_sl s_wpl;
+    check_wp_progress tc j aes.aes_sr s_wpr;
+    let sl = EcModules.stmt (s_hdl @ s_wpl) in
+    let sr = EcModules.stmt (s_hdr @ s_wpr) in
+    let concl =
+      f_aequivS (snd aes.aes_ml) (snd aes.aes_mr)
+        ~ep:(aes_ep aes) ~dp:(aes_dp aes)
+        (aes_pr aes) sl sr {ml;mr;inv=post} in
+    FApi.xmutate1 tc `Wp [concl]
 end
 
 (* -------------------------------------------------------------------- *)
 let t_wp_r ?(uselet=true) k g =
   let module T = TacInternal in
 
-  let (th, teh, tbh, te) =
+  let (th, teh, tbh, te, tae) =
     match k with
     | None -> (Some (T.t_hoare_wp ~uselet None),
                Some (T.t_ehoare_wp  ~uselet None),
                Some (T.t_bdhoare_wp ~uselet None),
-               Some (T.t_equiv_wp   ~uselet None))
+               Some (T.t_equiv_wp   ~uselet None),
+               Some (T.t_aequiv_wp  ~uselet None))
 
     | Some (Single i) -> (Some (T.t_hoare_wp   ~uselet (Some i)),
                           Some (T.t_ehoare_wp  ~uselet (Some i)),
                           Some (T.t_bdhoare_wp ~uselet (Some i)),
+                          None (* ------------------- *),
                           None (* ------------------- *))
 
     | Some (Double (i, j)) ->
-        (None, None, None, Some (T.t_equiv_wp ~uselet (Some (i, j)))) in
+        (None, None, None,
+         Some (T.t_equiv_wp ~uselet (Some (i, j))),
+         Some (T.t_aequiv_wp ~uselet (Some (i, j)))) in
 
-  t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te g
+  t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te ?tae g
 
 let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)
 

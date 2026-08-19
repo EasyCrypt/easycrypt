@@ -17,7 +17,8 @@ let process_cond (info : EcParsetree.pcond_info) tc =
       ~th:t_hoare_cond
       ~teh:t_ehoare_cond
       ~tbh:t_bdhoare_cond
-      ~te:(t_equiv_cond side) tc
+      ~te:(t_equiv_cond side)
+      ~tae:(t_aequiv_cond side) tc
 
   | `Seq (side, (i1, i2), f) ->
     let es = tc1_as_equivS tc in
