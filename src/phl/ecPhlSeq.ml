@@ -121,7 +121,7 @@ let t_bdhoare_seq = FApi.t_low2 "bdhoare-seq" t_bdhoare_seq_r
 (* -------------------------------------------------------------------- *)
 (* [seq] for ahoare: the given bound applies to the tail, the head gets
    the remainder. *)
-let t_ahoare_seq_r i b1 phi tc =
+let t_ahoare_seq_r dir i b1 phi tc =
   let env = FApi.tc1_env tc in
   let ahs = tc1_as_ahoareS tc in
   let m = fst ahs.ahs_m in
@@ -129,16 +129,20 @@ let t_ahoare_seq_r i b1 phi tc =
   let b1 = ss_inv_rebind b1 m in
   let s1, s2 = s_split env i ahs.ahs_s in
   let b2 = map_ss_inv2 f_real_sub_simpl (ahs_b ahs) b1 in
-  let a = f_ahoareS (snd ahs.ahs_m) ~b:b2 (ahs_pr ahs) (stmt s1) phi in
-  let b = f_ahoareS (snd ahs.ahs_m) ~b:b1 phi (stmt s2) (ahs_po ahs) in
+  let bhd, btl =
+    match dir with
+    | Backs -> (b2, b1)
+    | Fwds  -> (b1, b2) in
+  let a = f_ahoareS (snd ahs.ahs_m) ~b:bhd (ahs_pr ahs) (stmt s1) phi in
+  let b = f_ahoareS (snd ahs.ahs_m) ~b:btl phi (stmt s2) (ahs_po ahs) in
   FApi.xmutate1 tc `HlApp [a; b]
 
-let t_ahoare_seq = FApi.t_low3 "ahoare-seq" t_ahoare_seq_r
+let t_ahoare_seq dir = FApi.t_low3 "ahoare-seq" (t_ahoare_seq_r dir)
 
 (* -------------------------------------------------------------------- *)
 (* [seq] for aequiv: the given (eps, delta) applies to the head, the
    tail gets the remainder. *)
-let t_aequiv_seq (i, j) (ep, dp) phi tc =
+let t_aequiv_seq dir (i, j) (ep, dp) phi tc =
   let env = FApi.tc1_env tc in
   let aes = tc1_as_aequivS tc in
   let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
@@ -149,12 +153,16 @@ let t_aequiv_seq (i, j) (ep, dp) phi tc =
   let sr1, sr2 = s_split env j aes.aes_sr in
   let ep' = map_ts_inv2 f_real_sub_simpl (aes_ep aes) ep in
   let dp' = map_ts_inv2 f_real_sub_simpl (aes_dp aes) dp in
+  let (ephd, dphd), (eptl, dptl) =
+    match dir with
+    | Backs -> ((ep , dp ), (ep', dp'))
+    | Fwds  -> ((ep', dp'), (ep , dp )) in
   let mtl, mtr = snd aes.aes_ml, snd aes.aes_mr in
   let a =
-    f_aequivS mtl mtr ~ep ~dp
+    f_aequivS mtl mtr ~ep:ephd ~dp:dphd
       (aes_pr aes) (stmt sl1) (stmt sr1) phi in
   let b =
-    f_aequivS mtl mtr ~ep:ep' ~dp:dp'
+    f_aequivS mtl mtr ~ep:eptl ~dp:dptl
       phi (stmt sl2) (stmt sr2) (aes_po aes) in
   FApi.xmutate1 tc `HlApp [a; b]
 
@@ -258,7 +266,7 @@ let process_phl_bd_info bd_info tc =
       tc_error !!tc "this bound information only applies to aprhl goals"
 
 (* -------------------------------------------------------------------- *)
-let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
+let process_seq ((side, dir, k, phi, bd_info) : seq_info) (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
 
   let get_single phi =
@@ -270,15 +278,22 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
     if EcUtils.is_some side then
       tc_error !!tc "seq: no side information expected" in
 
+  let check_dir () =
+    match dir with
+    | Backs -> ()
+    | Fwds  -> tc_error !!tc "seq: direction only applies to aprhl goals" in
+
   match k, bd_info with
   | Single i, PSeqNone when is_hoareS concl ->
     check_side side;
+    check_dir ();
     let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
     let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
     t_hoare_seq i phi tc
 
   | Single i, PSeqNone when is_eHoareS concl ->
     check_side side;
+    check_dir ();
     let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
     let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
     t_ehoare_seq i phi tc
@@ -300,6 +315,7 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
 
   | Single i, _ when is_bdHoareS concl ->
       check_side side;
+    check_dir ();
       let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info bd_info tc in
       let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
@@ -307,6 +323,7 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
 
   | Double (i, j), PSeqNone when is_equivS concl ->
       check_side side;
+    check_dir ();
       let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
       let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, i) in
       let j = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, j) in
@@ -325,7 +342,7 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
       let phi = TTC.tc1_process_aprhl_formula tc (get_single phi) in
       let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, i) in
       let j = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, j) in
-      t_aequiv_seq (i, j)
+      t_aequiv_seq dir (i, j)
         ({ml; mr; inv = ep}, {ml; mr; inv = dp}) {ml; mr; inv = phi} tc
 
   | Single i, (PSeqNone | PSeqAcc _) when is_ahoareS concl ->
@@ -338,7 +355,7 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
       let m = fst ahs.ahs_m in
       let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
       let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
-      t_ahoare_seq i {m; inv = b} phi tc
+      t_ahoare_seq dir i {m; inv = b} phi tc
 
   | Single _, PSeqNone
   | Double _, PSeqNone ->

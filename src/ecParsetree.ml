@@ -710,8 +710,10 @@ type fun_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type tac_dir = Backs | Fwds
+
 type seq_info =
-  oside * pcodegap1 doption * pformula doption * p_seq_xt_info
+  oside * tac_dir * pcodegap1 doption * pformula doption * p_seq_xt_info
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [

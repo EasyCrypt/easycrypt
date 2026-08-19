@@ -265,8 +265,11 @@ let tc1_get_stmt side tc =
       tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
   | Some `Left, FequivS es   -> es.es_ml, es.es_sl
   | Some `Right, FequivS es  -> es.es_mr, es.es_sr
-  | None, FequivS _ ->
-      tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
+  | None, FahoareS ahs -> ahs.ahs_m, ahs.ahs_s
+  | Some `Left, FaequivS aes  -> aes.aes_ml, aes.aes_sl
+  | Some `Right, FaequivS aes -> aes.aes_mr, aes.aes_sr
+  | None, (FequivS _ | FaequivS _) ->
+      tc_error_noXhl ~kinds:[`Equiv `Stmt; `AEquiv `Stmt] !!tc
   | _            ->
       tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
 

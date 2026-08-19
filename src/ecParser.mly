@@ -398,6 +398,7 @@
 %token AWHILE
 %token AXIOM
 %token AXIOMATIZED
+%token BACKS
 %token BACKSLASH
 %token BETA
 %token BW
@@ -468,6 +469,7 @@
 %token FORALL
 %token FROM
 %token FUN
+%token FWDS
 %token FUSION
 %token GEN
 %token GLOB
@@ -2897,6 +2899,11 @@ dbhint:
 | UNDERSCORE f2=sform { (None   , Some f2) }
 | f1=sform UNDERSCORE { (Some f1, None   ) }
 
+tac_dir:
+| BACKS { Backs }
+| FWDS  { Fwds }
+| empty { Backs }
+
 app_bd_info:
 | empty
     { PSeqNone }
@@ -3171,8 +3178,8 @@ direction:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ s=side? pos=s_codegap1_0before COLON p=form_or_double_form f=app_bd_info
-   { Pseq (s, pos, p, f) }
+| SEQ s=side? d=tac_dir pos=s_codegap1_0before COLON p=form_or_double_form f=app_bd_info
+   { Pseq (s, d, pos, p, f) }
 
 | WP n=s_codegap1_0before?
    { Pwp n }

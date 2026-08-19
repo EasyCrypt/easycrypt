@@ -528,6 +528,29 @@ let cond_equivS_notmod ?(mk_other=false) (tc : tcenv1) (cond : ts_inv) =
     else [] in
   cond, bmem, bother
 
+(* aequivS notmod: like equivS_notmod, on approximate goals. *)
+let cond_aequivS_notmod (tc : tcenv1) (cond : ts_inv) =
+  let env = FApi.tc1_env tc in
+  let aes = tc1_as_aequivS tc in
+  let sl, sr = aes.aes_sl, aes.aes_sr in
+  let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+  assert (ml = cond.ml && mr = cond.mr);
+  let modil, modir = s_write env sl, s_write env sr in
+  let cond, _, _ = generalize_mod_right_ env modir cond in
+  let cond, _, _ = generalize_mod_left_ env modil cond in
+  f_forall_mems_ts_inv aes.aes_ml aes.aes_mr
+    (map_ts_inv2 f_imp (aes_pr aes) cond)
+
+let t_aequivS_notmod (post : ts_inv) (tc : tcenv1) =
+  let aes = tc1_as_aequivS tc in
+  let post = ts_inv_rebind post (fst aes.aes_ml) (fst aes.aes_mr) in
+  let cond1 = cond_aequivS_notmod tc (map_ts_inv2 f_imp post (aes_po aes)) in
+  let cond2 =
+    f_aequivS (snd aes.aes_ml) (snd aes.aes_mr)
+      ~ep:(aes_ep aes) ~dp:(aes_dp aes)
+      (aes_pr aes) aes.aes_sl aes.aes_sr post in
+  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
+
 (* equivS notmod rule: same as equivF_notmod but for statements
  * (no result variable generalization needed). *)
 let t_equivS_notmod (post : ts_inv) (tc : tcenv1) =
@@ -711,6 +734,7 @@ let t_equivF_conseq_nm   = gen_conseq_nm t_equivF_notmod   t_equivF_conseq
 let t_equivS_conseq_nm   = gen_conseq_nm t_equivS_notmod   t_equivS_conseq
 let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
+let t_aequivS_conseq_nm  = gen_conseq_nm t_aequivS_notmod  t_aequivS_conseq
 
 (* -------------------------------------------------------------------- *)
 (* Concavity / Jensen's inequality for ehoare.
@@ -1126,6 +1150,37 @@ let t_equivS_conseq_conj
   let concl1 = f_hoareS mtl pre1 es.es_sl post1 in
   let concl2 = f_hoareS mtr pre2 es.es_sr post2 in
   let concl3 = f_equivS mtl mtr pre' es.es_sl es.es_sr post' in
+  FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
+
+(* aequivS conjunction rule: conjoin one-sided hoare facts into an
+   approximate equivalence. *)
+let t_aequivS_conseq_conj
+    (pre1  : ss_inv)
+    (post1 : ss_inv)
+    (pre2  : ss_inv)
+    (post2 : ss_inv)
+    (pre'  : ts_inv)
+    (post' : ts_inv)
+    (tc    : tcenv1)
+=
+  let (_, hyps, _) = FApi.tc1_eflat tc in
+  let aes = tc1_as_aequivS tc in
+  let (ml, mtl), (mr, mtr) = aes.aes_ml, aes.aes_mr in
+  let pre1' = ss_inv_generalize_as_left pre1 ml mr in
+  let post1' = ss_inv_generalize_as_left post1 ml mr in
+  let pre2' = ss_inv_generalize_as_right pre2 ml mr in
+  let post2' = ss_inv_generalize_as_right post2 ml mr in
+  if not (ts_inv_alpha_eq hyps (aes_pr aes) (map_ts_inv f_ands [pre';pre1';pre2'])) then
+    tc_error !!tc "invalid pre-condition";
+  if not (ts_inv_alpha_eq hyps (aes_po aes) (map_ts_inv f_ands [post';post1';post2'])) then
+    tc_error !!tc "invalid post-condition";
+  let post1 = empty_hs post1 in
+  let post2 = empty_hs post2 in
+  let concl1 = f_hoareS mtl pre1 aes.aes_sl post1 in
+  let concl2 = f_hoareS mtr pre2 aes.aes_sr post2 in
+  let concl3 =
+    f_aequivS mtl mtr ~ep:(aes_ep aes) ~dp:(aes_dp aes)
+      pre' aes.aes_sl aes.aes_sr post' in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -2007,6 +2062,73 @@ let rec t_hi_conseq_equivF
 (* goal's formula node type.                                             *)
 (* -------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------- *)
+(* aequivS consequence dispatcher.                                       *)
+let rec t_hi_conseq_aequivS
+    (notmod : bool)
+    (f1     : hi_arg)
+    (f2     : hi_arg)
+    (f3     : hi_arg)
+    (tc     : tcenv1)
+=
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* aequivS / aequivS / bot / bot *)
+  | Some ((_, {f_node = FaequivS aes}) as nf1), None, None ->
+    let tac = if notmod then t_aequivS_conseq_nm else t_aequivS_conseq in
+    t_hi_on1 2 (t_hi_apply_r nf1) (tac (aes_pr aes) (aes_po aes) tc)
+
+  (* aequivS / aequivS / hoareS / hoareS *)
+  | Some ((_, {f_node = FaequivS aes}) as nf1),
+    Some ((_, f2) as nf2),
+    Some ((_, f3) as nf3)
+    ->
+    let hs2    = pf_as_hoareS !!tc f2 in
+    let hs3    = pf_as_hoareS !!tc f3 in
+    let (ml, mr) = (fst aes.aes_ml, fst aes.aes_mr) in
+
+    if not (POE.is_empty (hs_po hs2).hsi_inv) then
+      tc_error !!tc "exception are not supported";
+    let post2 = POE.lower (hs_po hs2) in
+    if not (POE.is_empty (hs_po hs3).hsi_inv) then
+      tc_error !!tc "exception are not supported";
+    let post3 = POE.lower (hs_po hs3) in
+
+    let hs2_pr = ss_inv_generalize_as_left (hs_pr hs2) ml mr in
+    let hs2_po = ss_inv_generalize_as_left post2 ml mr in
+    let hs3_pr = ss_inv_generalize_as_right (hs_pr hs3) ml mr in
+    let hs3_po = ss_inv_generalize_as_right post3 ml mr in
+
+    let pre    = map_ts_inv f_ands [aes_pr aes; hs2_pr; hs3_pr] in
+    let post   = map_ts_inv f_ands [aes_po aes; hs2_po; hs3_po] in
+    let tac    = if notmod then t_aequivS_conseq_nm else t_aequivS_conseq in
+
+    t_hi_on1seq 2 (tac pre post)
+      (FApi.t_seqsub
+         (t_aequivS_conseq_conj
+            (hs_pr hs2) post2 (hs_pr hs3) post3 (aes_pr aes) (aes_po aes))
+         [t_hi_apply_r nf2; t_hi_apply_r nf3; t_hi_apply_r nf1])
+      tc
+
+  (* aequivS / ? / ? / bot: synthesize missing f3 *)
+  | Some _, Some _, None ->
+    let aes = pf_as_aequivS !!tc concl in
+    let m = EcIdent.create "&hr" in
+    let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
+    let f3 = f_hoareS (snd aes.aes_mr) {m;inv=f_true} aes.aes_sr post in
+    t_hi_conseq_aequivS notmod f1 f2 (Some (None, f3)) tc
+
+  (* aequivS / ? / bot / ?: synthesize missing f2 *)
+  | Some _, None, Some _ ->
+    let aes = pf_as_aequivS !!tc concl in
+    let m = EcIdent.create "&hr" in
+    let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
+    let f2 = f_hoareS (snd aes.aes_ml) {m;inv=f_true} aes.aes_sl post in
+    t_hi_conseq_aequivS notmod f1 (Some (None, f2)) f3 tc
+
+  | _ -> t_hi_error concl f1 f2 f3 tc
+
+(* -------------------------------------------------------------------- *)
 let t_hi_conseq
     (notmod : bool)
     (f1     : hi_arg)
@@ -2024,6 +2146,7 @@ let t_hi_conseq
   | FbdHoareF _ -> t_hi_conseq_bdHoareF  notmod f1 f2 f3 tc
   | FequivS   _ -> t_hi_conseq_equivS    notmod f1 f2 f3 tc
   | FequivF   _ -> t_hi_conseq_equivF   notmod f1 f2 f3 tc
+  | FaequivS  _ -> t_hi_conseq_aequivS   notmod f1 f2 f3 tc
   | _           -> t_hi_error concl f1 f2 f3 tc
 
 (* -------------------------------------------------------------------- *)
@@ -2149,6 +2272,14 @@ let process_conseq_ss
           f_equivS (snd es.es_ml) (snd es.es_mr) pre es.es_sl es.es_sr post
         in (env, env, Inv_ts (es_pr es), Inv_ts (es_po es), tbool, lift_ts_inv2 fmake)
 
+      | FaequivS aes ->
+        let env = LDecl.push_active_ts aes.aes_ml aes.aes_mr hyps in
+        let fmake pre post c_or_bd =
+          ensure_none c_or_bd;
+          f_aequivS (snd aes.aes_ml) (snd aes.aes_mr)
+            ~ep:(aes_ep aes) ~dp:(aes_dp aes) pre aes.aes_sl aes.aes_sr post
+        in (env, env, Inv_ts (aes_pr aes), Inv_ts (aes_po aes), tbool, lift_ts_inv2 fmake)
+
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
@@ -2244,6 +2375,29 @@ let process_conseq_ss
           | _, Some (PCI_bd (cmp,bd)) ->
             let cmp = odfl FHeq cmp in
             f_bdHoareS (snd m) pre f post cmp bd in
+        let f_true = {m=fst m; inv=f_true} in
+        (env, env, Inv_ss f_true, Inv_ss f_true, tbool, lift_ss_inv2 fmake)
+
+      | FaequivF aef ->
+        let f = sideif side aef.aef_fl aef.aef_fr in
+        let m = sideif side aef.aef_ml aef.aef_mr in
+        let penv, qenv = LDecl.hoareF m f hyps in
+        let fmake pre post c_or_bd =
+          let post = empty_hs post in
+          ensure_none c_or_bd; f_hoareF pre f post
+        in
+        let f_true = {m; inv=f_true} in
+        (penv, qenv, Inv_ss f_true, Inv_ss f_true, tbool, lift_ss_inv2 fmake)
+
+      | FaequivS aes ->
+        let f = sideif side aes.aes_sl aes.aes_sr in
+        let m = sideif side aes.aes_ml aes.aes_mr in
+        let m = (EcIdent.create "&hr", snd m) in
+        let env = LDecl.push_active_ss m hyps in
+        let fmake pre post c_or_bd =
+          ensure_none c_or_bd;
+          let post = empty_hs post in
+          f_hoareS (snd m) pre f post in
         let f_true = {m=fst m; inv=f_true} in
         (env, env, Inv_ss f_true, Inv_ss f_true, tbool, lift_ss_inv2 fmake)
 

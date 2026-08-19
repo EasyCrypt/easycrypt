@@ -265,6 +265,8 @@
     (":="  , (CEQ              , true ));
     ("/"   , (SLASH            , true ));
     ("\\"  , (BACKSLASH        , true ));
+    ("<<"  , (BACKS            , false));
+    (">>"  , (FWDS             , false));
     ("<-"  , (LARROW           , true ));
     ("->"  , (RARROW           , true ));
     ("<<-" , (LLARROW          , true ));

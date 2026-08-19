@@ -339,7 +339,7 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
   in
 
   FApi.t_seqs [ (fun tc ->
-    FApi.t_onselect (fun i -> i = 5 || i = 6)
+    FApi.t_onselect (fun i -> i = 6 || i = 7)
       (EcLowGoal.t_simplify_with_info
         { EcReduction.no_red with
             EcReduction.delta_p = (fun p ->
