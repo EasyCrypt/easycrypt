@@ -56,6 +56,9 @@ val tc1_process_prhl_form_opt: tcenv1 -> ty option -> pformula -> ts_inv
 val tc1_process_prhl_form    : tcenv1 -> ty -> pformula -> ts_inv
 val tc1_process_prhl_formula : tcenv1 -> pformula -> ts_inv
 
+val tc1_process_aprhl_form    : tcenv1 -> ty -> pformula -> form
+val tc1_process_aprhl_formula : tcenv1 -> pformula -> form
+
 val tc1_process_prhl_stmt :
      ?map:EcTyping.ismap -> tcenv1 -> side -> pstmt -> stmt
 

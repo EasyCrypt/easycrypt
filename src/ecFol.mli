@@ -13,6 +13,13 @@ val f_bind_mod : f_subst -> EcIdent.t -> EcPath.mpath -> EcEnv.env -> f_subst
 
 (* -------------------------------------------------------------------- *)
 val f_losslessF: xpath -> form
+val f_losslessS: EcMemory.memenv -> stmt -> form
+
+module CList : sig
+  val tlist : ty -> ty
+  val size : ty -> form -> form
+  val mem  : ty -> form -> form -> form
+end
 
 val f_eqparams:
      EcTypes.ty -> ovariable list -> memory
@@ -47,6 +54,7 @@ val ts_inv_eqglob:
 (* soft-constructors - ordering *)
 val f_int_le  : form -> form -> form
 val f_int_lt  : form -> form -> form
+val f_int_abs : form -> form
 
 (* soft-constructors - reals *)
 val f_rint : zint -> form
@@ -67,6 +75,11 @@ val f_real_inv : form -> form
 val f_real_div : form -> form -> form
 val f_real_abs : form -> form
 val f_decimal  : zint * (int * zint) -> form
+
+val f_real_exp  : form -> form
+val f_real_ln   : form -> form
+val f_real_rpow : form -> form -> form
+val f_real_sqrt : form -> form
 
 (* soft-constructor - xreal *)
 val f_xreal_le : form -> form -> form
@@ -230,10 +243,14 @@ type sform =
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS
+  | SFahoareF  of ahoareF
+  | SFahoareS  of ahoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
   | SFequivS   of equivS
+  | SFaequivF  of aequivF
+  | SFaequivS  of aequivS
   | SFpr       of pr
 
   | SFother of form

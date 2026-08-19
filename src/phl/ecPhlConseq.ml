@@ -350,6 +350,19 @@ let t_equivS_conseq (pre : ts_inv) (post : ts_inv) (tc : tcenv1) =
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
+let t_aequivS_conseq (pre : ts_inv) (post : ts_inv) (tc : tcenv1) =
+  let aes = tc1_as_aequivS tc in
+  let pre = ts_inv_rebind pre (fst aes.aes_ml) (fst aes.aes_mr) in
+  let post = ts_inv_rebind post (fst aes.aes_ml) (fst aes.aes_mr) in
+  let cond1, cond2 = conseq_cond_ts (aes_pr aes) (aes_po aes) pre post in
+  let concl1 = f_forall_mems_ts_inv aes.aes_ml aes.aes_mr cond1 in
+  let concl2 = f_forall_mems_ts_inv aes.aes_ml aes.aes_mr cond2 in
+  let concl3 =
+    f_aequivS (snd aes.aes_ml) (snd aes.aes_mr)
+      ~ep:(aes_ep aes) ~dp:(aes_dp aes) pre aes.aes_sl aes.aes_sr post in
+  FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
+
+(* -------------------------------------------------------------------- *)
 let t_conseq (pre : inv) (post : inv) (tc : tcenv1) =
   match (FApi.tc1_goal tc).f_node, pre, post with
   | FhoareF hf, Inv_ss pre, Inv_ss post ->
@@ -373,7 +386,55 @@ let t_conseq (pre : inv) (post : inv) (tc : tcenv1) =
   | FequivF _  , Inv_ts pre, Inv_ts post -> t_equivF_conseq pre post tc
   | FequivS _  , Inv_ts pre, Inv_ts post -> t_equivS_conseq pre post tc
   | FeagerF _  , Inv_ts pre, Inv_ts post -> t_eagerF_conseq pre post tc
+  | FaequivS _ , Inv_ts pre, Inv_ts post -> t_aequivS_conseq pre post tc
   | _           -> tc_error_noXhl !!tc
+
+(* -------------------------------------------------------------------- *)
+(* Conseq on the epsilon/delta bounds of an approximate judgment.        *)
+let cond_conseq_aprhl ml mr (pr : ts_inv) (ae, ad) (ep, dp) =
+  f_forall_mems_ts_inv ml mr
+    (map_ts_inv (function [pr; ae; ad; ep; dp] ->
+         f_imp pr (f_and (f_real_le ep ae) (f_real_le dp ad))
+       | _ -> assert false)
+       [pr; ae; ad; ep; dp])
+
+let t_conseq_aprhl ((ep, dp) : form pair) tc =
+  let concl = FApi.tc1_goal tc in
+  let concl1, concl2 =
+    match concl.f_node with
+    | FaequivS aes ->
+      let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+      let ep = {ml; mr; inv = ep} in
+      let dp = {ml; mr; inv = dp} in
+      let concl1 =
+        cond_conseq_aprhl aes.aes_ml aes.aes_mr (aes_pr aes)
+          (aes_ep aes, aes_dp aes) (ep, dp) in
+      let concl2 =
+        f_aequivS (snd aes.aes_ml) (snd aes.aes_mr) ~ep ~dp
+          (aes_pr aes) aes.aes_sl aes.aes_sr (aes_po aes) in
+      concl1, concl2
+    | FaequivF aef ->
+      let env = FApi.tc1_env tc in
+      let ml, mr = aef.aef_ml, aef.aef_mr in
+      let ep = {ml; mr; inv = ep} in
+      let dp = {ml; mr; inv = dp} in
+      let concl1 =
+        let (mel, mer), _ =
+          EcEnv.Fun.equivF_memenv ml mr aef.aef_fl aef.aef_fr env in
+        cond_conseq_aprhl mel mer (aef_pr aef)
+          (aef_ep aef, aef_dp aef) (ep, dp) in
+      let concl2 =
+        f_aequivF ~ep ~dp (aef_pr aef) aef.aef_fl aef.aef_fr (aef_po aef) in
+      concl1, concl2
+    | _ ->
+      tc_error !!tc "expecting a goal of the form: aequiv" in
+
+  FApi.xmutate1 tc `Conseq [concl1; concl2]
+
+let process_conseq_aprhl ((e, d) : pformula pair) tc =
+  let dp = TTC.tc1_process_form tc treal d in
+  let ep = TTC.tc1_process_form tc treal e in
+  t_conseq_aprhl (ep, dp) tc
 
 (* -------------------------------------------------------------------- *)
 (* Non-modification (notmod) variants.                                   *)

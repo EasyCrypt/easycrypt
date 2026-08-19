@@ -109,6 +109,7 @@ module CI_Int = struct
   let p_int_pow   = EcPath.extend p_top ["Ring"; "IntID"; "exp"]
   let p_int_le    = _Int "le"
   let p_int_lt    = _Int "lt"
+  let p_int_abs   = _Int "absz"
   let p_int_edivz = _IntDiv "edivz"
   let p_int_max   = _IntDiv "max"
   let p_iteri     = EcPath.extend p_top ["Int"; "IterOp"; "iteri"]
@@ -202,6 +203,21 @@ module CI_Real = struct
   let real_order_lemma name =
     EcPath.pqname p_RealOrder name
 
+  let p_RealExp = EcPath.pqname p_top "RealExp"
+
+  let p_real_exp  = EcPath.pqname p_RealExp "exp"
+  let p_real_ln   = EcPath.pqname p_RealExp "ln"
+  let p_real_rpow = EcPath.pqname p_RealExp "^"
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Aprhl = struct
+  let i_Aprhl = "Aprhl"
+  let p_Aprhl = EcPath.pqname p_top i_Aprhl
+
+  let _Aprhl = fun x -> EcPath.pqname p_Aprhl x
+
+  let p_lap = _Aprhl "lap"
 end
 
 (* -------------------------------------------------------------------- *)

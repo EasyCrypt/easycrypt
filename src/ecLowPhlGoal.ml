@@ -23,8 +23,10 @@ type hlform = [`Any | `Pred | `Stmt]
 type hlkind = [
   | `Hoare  of hlform
   | `EHoare of hlform
+  | `AHoare of hlform
   | `PHoare of hlform
   | `Equiv  of hlform
+  | `AEquiv of hlform
   | `Eager
 ]
 
@@ -48,8 +50,10 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
       match kind with
       | `Hoare  fm -> ("hoare" , fm)
       | `EHoare fm -> ("ehoare", fm)
+      | `AHoare fm -> ("ahoare", fm)
       | `PHoare fm -> ("phoare", fm)
       | `Equiv  fm -> ("equiv" , fm)
+      | `AEquiv fm -> ("aequiv", fm)
       | `Eager     -> ("eager" , `Any)
     in
       Printf.sprintf "%s%s" kind (fm |> string_of_form)
@@ -78,6 +82,14 @@ let s_last proj s =
       try  let i = proj i in Some (i, stmt (List.rev r))
       with Not_found -> None
 
+let s_intr proj s =
+  match s.s_node with
+  | [i] -> begin
+      try  let i = proj i in Some i
+      with Not_found -> None
+    end
+  | _ -> None
+
 (* -------------------------------------------------------------------- *)
 let pf_first_gen _kind proj pe s =
   match s_first proj s with
@@ -89,6 +101,34 @@ let pf_last_gen _kind proj pe s =
   | None   -> tc_error pe "invalid last instruction"
   | Some x -> x
 
+let pf_instr_gen _kind proj pe s =
+  match s_intr proj s with
+  | None   -> tc_error pe "invalid single instruction"
+  | Some x -> x
+
+(* -------------------------------------------------------------------- *)
+let get_rnd_lap (i : instr) =
+  match i.i_node with
+  | Srnd (LvVar (pv, ty), e) -> begin
+     match e.e_node with
+     | Eapp ({ e_node = Eop (p, []) }, [e; x])
+         when EcPath.p_equal EcCoreLib.CI_Aprhl.p_lap p
+       -> Some ((pv, ty), (e, x))
+     | _ -> None
+    end
+  | _ -> None
+
+let destr_lap i =
+  oget ~exn:Not_found (get_rnd_lap i)
+
+let get_rnd1 (i : instr) =
+  match i.i_node with
+  | Srnd (LvVar (pv, ty), e) -> Some ((pv, ty), e)
+  | _ -> None
+
+let destr_rnd1 i =
+  oget ~exn:Not_found (get_rnd1 i)
+
 (* -------------------------------------------------------------------- *)
 let pf_first_asgn   pe st = pf_first_gen  "asgn"   destr_asgn   pe st
 let pf_first_rnd    pe st = pf_first_gen  "rnd"    destr_rnd    pe st
@@ -97,6 +137,7 @@ let pf_first_if     pe st = pf_first_gen  "if"     destr_if     pe st
 let pf_first_match  pe st = pf_first_gen  "match"  destr_match  pe st
 let pf_first_while  pe st = pf_first_gen  "while"  destr_while  pe st
 let pf_first_raise  pe st = pf_first_gen  "raise"  destr_raise  pe st
+let pf_first_lap    pe st = pf_first_gen  "rnd-lap" destr_lap   pe st
 
 (* -------------------------------------------------------------------- *)
 let pf_last_asgn   pe st = pf_last_gen  "asgn"   destr_asgn   pe st
@@ -106,6 +147,13 @@ let pf_last_if     pe st = pf_last_gen  "if"     destr_if     pe st
 let pf_last_match  pe st = pf_last_gen  "match"  destr_match  pe st
 let pf_last_while  pe st = pf_last_gen  "while"  destr_while  pe st
 let pf_last_raise  pe st = pf_last_gen  "raise"  destr_raise  pe st
+let pf_last_lap    pe st = pf_last_gen  "rnd-lap" destr_lap    pe st
+
+(* -------------------------------------------------------------------- *)
+let pf_instr_while pe st = pf_instr_gen "while"   destr_while  pe st
+let pf_instr_lap   pe st = pf_instr_gen "rnd-lap" destr_lap    pe st
+let pf_instr_rnd   pe st = pf_instr_gen "rnd"     destr_rnd    pe st
+let pf_instr_rnd1  pe st = pf_instr_gen "rnd1"    destr_rnd1   pe st
 
 (* -------------------------------------------------------------------- *)
 let tc1_first_asgn   tc st = pf_first_asgn   !!tc st
@@ -115,6 +163,7 @@ let tc1_first_if     tc st = pf_first_if     !!tc st
 let tc1_first_match  tc st = pf_first_match  !!tc st
 let tc1_first_while  tc st = pf_first_while  !!tc st
 let tc1_first_raise  tc st = pf_first_raise  !!tc st
+let tc1_first_lap    tc st = pf_first_lap    !!tc st
 
 (* -------------------------------------------------------------------- *)
 let tc1_last_asgn   tc st = pf_last_asgn   !!tc st
@@ -124,6 +173,13 @@ let tc1_last_if     tc st = pf_last_if     !!tc st
 let tc1_last_match  tc st = pf_last_match  !!tc st
 let tc1_last_while  tc st = pf_last_while  !!tc st
 let tc1_last_raise  tc st = pf_last_raise  !!tc st
+let tc1_last_lap    tc st = pf_last_lap    !!tc st
+
+(* -------------------------------------------------------------------- *)
+let tc1_instr_while tc st = pf_instr_while !!tc st
+let tc1_instr_lap   tc st = pf_instr_lap   !!tc st
+let tc1_instr_rnd   tc st = pf_instr_rnd   !!tc st
+let tc1_instr_rnd1  tc st = pf_instr_rnd1  !!tc st
 
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)
@@ -159,6 +215,10 @@ let pf_as_bdhoareF pe c = as_phl (`PHoare `Pred) (fun () -> destr_bdHoareF c) pe
 let pf_as_bdhoareS pe c = as_phl (`PHoare `Stmt) (fun () -> destr_bdHoareS c) pe
 let pf_as_equivF   pe c = as_phl (`Equiv  `Pred) (fun () -> destr_equivF   c) pe
 let pf_as_equivS   pe c = as_phl (`Equiv  `Stmt) (fun () -> destr_equivS   c) pe
+let pf_as_ahoareF  pe c = as_phl (`AHoare `Pred) (fun () -> destr_ahoareF  c) pe
+let pf_as_ahoareS  pe c = as_phl (`AHoare `Stmt) (fun () -> destr_ahoareS  c) pe
+let pf_as_aequivF  pe c = as_phl (`AEquiv `Pred) (fun () -> destr_aequivF  c) pe
+let pf_as_aequivS  pe c = as_phl (`AEquiv `Stmt) (fun () -> destr_aequivS  c) pe
 let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
 
 (* -------------------------------------------------------------------- *)
@@ -170,6 +230,10 @@ let tc1_as_bdhoareF tc = pf_as_bdhoareF !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareS tc = pf_as_bdhoareS !!tc (FApi.tc1_goal tc)
 let tc1_as_equivF   tc = pf_as_equivF   !!tc (FApi.tc1_goal tc)
 let tc1_as_equivS   tc = pf_as_equivS   !!tc (FApi.tc1_goal tc)
+let tc1_as_ahoareF  tc = pf_as_ahoareF  !!tc (FApi.tc1_goal tc)
+let tc1_as_ahoareS  tc = pf_as_ahoareS  !!tc (FApi.tc1_goal tc)
+let tc1_as_aequivF  tc = pf_as_aequivF  !!tc (FApi.tc1_goal tc)
+let tc1_as_aequivS  tc = pf_as_aequivS  !!tc (FApi.tc1_goal tc)
 let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 
 (* -------------------------------------------------------------------- *)
@@ -260,6 +324,10 @@ let get_pre f =
   | FbdHoareS hs -> Some (Inv_ss (bhs_pr hs))
   | FequivF ef   -> Some (Inv_ts (ef_pr ef))
   | FequivS es   -> Some (Inv_ts (es_pr es))
+  | FahoareF ahf -> Some (Inv_ss (ahf_pr ahf))
+  | FahoareS ahs -> Some (Inv_ss (ahs_pr ahs))
+  | FaequivF aef -> Some (Inv_ts (aef_pr aef))
+  | FaequivS aes -> Some (Inv_ts (aes_pr aes))
   | _            -> None
 
 let tc1_get_pre tc =
@@ -278,6 +346,10 @@ let get_post f =
   | FbdHoareS hs -> Some (Inv_ss (bhs_po hs))
   | FequivF ef   -> Some (Inv_ts (ef_po ef))
   | FequivS es   -> Some (Inv_ts (es_po es))
+  | FahoareF ahf -> Some (Inv_ss (ahf_po ahf))
+  | FahoareS ahs -> Some (Inv_ss (ahs_po ahs))
+  | FaequivF aef -> Some (Inv_ts (aef_po aef))
+  | FaequivS aes -> Some (Inv_ts (aes_po aes))
   | _            -> None
 
 let tc1_get_post tc =
@@ -313,6 +385,20 @@ let set_pre ~pre f =
  | FequivS es, Inv_ts pre   ->
     let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
     f_equivS (snd es.es_ml) (snd es.es_mr) pre es.es_sl es.es_sr (es_po es)
+ | FahoareF ahf, Inv_ss pre ->
+    let pre = ss_inv_rebind pre ahf.ahf_m in
+    f_ahoareF ~b:(ahf_b ahf) pre ahf.ahf_f (ahf_po ahf)
+ | FahoareS ahs, Inv_ss pre ->
+    let pre = ss_inv_rebind pre (fst ahs.ahs_m) in
+    f_ahoareS (snd ahs.ahs_m) ~b:(ahs_b ahs) pre ahs.ahs_s (ahs_po ahs)
+ | FaequivF aef, Inv_ts pre ->
+    let pre = ts_inv_rebind pre aef.aef_ml aef.aef_mr in
+    f_aequivF ~ep:(aef_ep aef) ~dp:(aef_dp aef)
+      pre aef.aef_fl aef.aef_fr (aef_po aef)
+ | FaequivS aes, Inv_ts pre ->
+    let pre = ts_inv_rebind pre (fst aes.aes_ml) (fst aes.aes_mr) in
+    f_aequivS (snd aes.aes_ml) (snd aes.aes_mr) ~ep:(aes_ep aes) ~dp:(aes_dp aes)
+      pre aes.aes_sl aes.aes_sr (aes_po aes)
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -427,27 +513,30 @@ let tc1_process_codegap tc (side, g) =
   EcTyping.trans_codegap env g
 
 (* -------------------------------------------------------------------- *)
-let t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te tc =
+let t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te ?tae tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareS  _ when EcUtils.is_some th  -> (oget th ) tc
   | FeHoareS  _ when EcUtils.is_some teh -> (oget teh) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
+  | FaequivS  _ when EcUtils.is_some tae -> (oget tae) tc
   | _ ->
     let kinds = List.flatten [
        if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
        if EcUtils.is_some teh then [`EHoare `Stmt] else [];
        if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
-       if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
+       if EcUtils.is_some te  then [`Equiv  `Stmt] else [];
+       if EcUtils.is_some tae then [`AEquiv `Stmt] else []]
     in tc_error_noXhl ~kinds !!tc
 
-let t_hF_or_bhF_or_eF ?th ?teh ?tbh ?te ?teg tc =
+let t_hF_or_bhF_or_eF ?th ?teh ?tbh ?te ?tae ?teg tc =
   let texn tc =
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Pred] else [];
          if EcUtils.is_some teh then [`EHoare `Pred] else [];
          if EcUtils.is_some tbh then [`PHoare `Pred] else [];
          if EcUtils.is_some te  then [`Equiv  `Pred] else [];
+         if EcUtils.is_some tae then [`AEquiv `Pred] else [];
          if EcUtils.is_some teg then [`Eager       ] else []]
     in tc_error_noXhl ~kinds !!tc in
   let tx f tc =
@@ -456,6 +545,7 @@ let t_hF_or_bhF_or_eF ?th ?teh ?tbh ?te ?teg tc =
     | FeHoareF  _ when EcUtils.is_some teh -> (oget teh) tc
     | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
     | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
+    | FaequivF  _ when EcUtils.is_some tae -> (oget tae) tc
     | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
     | _ -> raise EcProofTyping.NoMatch in
   EcLowGoal.t_lazy_match ~texn tx tc

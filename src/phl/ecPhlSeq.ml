@@ -119,6 +119,46 @@ let t_bdhoare_seq_r i info tc =
 let t_bdhoare_seq = FApi.t_low2 "bdhoare-seq" t_bdhoare_seq_r
 
 (* -------------------------------------------------------------------- *)
+(* [seq] for ahoare: the given bound applies to the tail, the head gets
+   the remainder. *)
+let t_ahoare_seq_r i b1 phi tc =
+  let env = FApi.tc1_env tc in
+  let ahs = tc1_as_ahoareS tc in
+  let m = fst ahs.ahs_m in
+  let phi = ss_inv_rebind phi m in
+  let b1 = ss_inv_rebind b1 m in
+  let s1, s2 = s_split env i ahs.ahs_s in
+  let b2 = map_ss_inv2 f_real_sub_simpl (ahs_b ahs) b1 in
+  let a = f_ahoareS (snd ahs.ahs_m) ~b:b2 (ahs_pr ahs) (stmt s1) phi in
+  let b = f_ahoareS (snd ahs.ahs_m) ~b:b1 phi (stmt s2) (ahs_po ahs) in
+  FApi.xmutate1 tc `HlApp [a; b]
+
+let t_ahoare_seq = FApi.t_low3 "ahoare-seq" t_ahoare_seq_r
+
+(* -------------------------------------------------------------------- *)
+(* [seq] for aequiv: the given (eps, delta) applies to the head, the
+   tail gets the remainder. *)
+let t_aequiv_seq (i, j) (ep, dp) phi tc =
+  let env = FApi.tc1_env tc in
+  let aes = tc1_as_aequivS tc in
+  let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+  let phi = ts_inv_rebind phi ml mr in
+  let ep = ts_inv_rebind ep ml mr in
+  let dp = ts_inv_rebind dp ml mr in
+  let sl1, sl2 = s_split env i aes.aes_sl in
+  let sr1, sr2 = s_split env j aes.aes_sr in
+  let ep' = map_ts_inv2 f_real_sub_simpl (aes_ep aes) ep in
+  let dp' = map_ts_inv2 f_real_sub_simpl (aes_dp aes) dp in
+  let mtl, mtr = snd aes.aes_ml, snd aes.aes_mr in
+  let a =
+    f_aequivS mtl mtr ~ep ~dp
+      (aes_pr aes) (stmt sl1) (stmt sr1) phi in
+  let b =
+    f_aequivS mtl mtr ~ep:ep' ~dp:dp'
+      phi (stmt sl2) (stmt sr2) (aes_po aes) in
+  FApi.xmutate1 tc `HlApp [a; b]
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_seq (i, j) phi tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
@@ -214,6 +254,9 @@ let process_phl_bd_info bd_info tc =
 
       (phi, f1, f2, g1, g2)
 
+  | PSeqDiff _ | PSeqAcc _ ->
+      tc_error !!tc "this bound information only applies to aprhl goals"
+
 (* -------------------------------------------------------------------- *)
 let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
@@ -268,6 +311,34 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
       let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, i) in
       let j = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, j) in
       t_equiv_seq (i, j) phi tc
+
+  | Double (i, j), (PSeqNone | PSeqDiff _) when is_aequivS concl ->
+      check_side side;
+      let ep, dp =
+        match bd_info with
+        | PSeqDiff (e, d) ->
+          (TTC.tc1_process_form tc treal e,
+           TTC.tc1_process_form tc treal d)
+        | _ -> (f_r0, f_r0) in
+      let aes = tc1_as_aequivS tc in
+      let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+      let phi = TTC.tc1_process_aprhl_formula tc (get_single phi) in
+      let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, i) in
+      let j = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, j) in
+      t_aequiv_seq (i, j)
+        ({ml; mr; inv = ep}, {ml; mr; inv = dp}) {ml; mr; inv = phi} tc
+
+  | Single i, (PSeqNone | PSeqAcc _) when is_ahoareS concl ->
+      check_side side;
+      let b =
+        match bd_info with
+        | PSeqAcc b -> TTC.tc1_process_form tc treal b
+        | _ -> f_r0 in
+      let ahs = tc1_as_ahoareS tc in
+      let m = fst ahs.ahs_m in
+      let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+      let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
+      t_ahoare_seq i {m; inv = b} phi tc
 
   | Single _, PSeqNone
   | Double _, PSeqNone ->

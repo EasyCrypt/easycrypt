@@ -111,6 +111,7 @@ module CI_Int : sig
   val p_int_mul   : path
   val p_int_le    : path
   val p_int_lt    : path
+  val p_int_abs   : path
   val p_int_pow   : path
   val p_int_edivz : path
   val p_iteri     : path
@@ -155,6 +156,17 @@ module CI_Real : sig
   val real_lemma    : string -> path
   val real_order_lemma : string -> path
 
+  val p_RealExp   : path
+  val p_real_exp  : path
+  val p_real_ln   : path
+  val p_real_rpow : path
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Aprhl : sig
+  val i_Aprhl : symbol
+  val p_Aprhl : path
+  val p_lap   : path
 end
 
 (* -------------------------------------------------------------------- *)

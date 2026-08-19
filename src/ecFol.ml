@@ -84,9 +84,14 @@ let fop_real_opp   = f_op CI.CI_Real.p_real_opp  [] (toarrow [treal] treal)
 let fop_real_mul   = f_op CI.CI_Real.p_real_mul  [] (toarrow [treal; treal] treal)
 let fop_real_inv   = f_op CI.CI_Real.p_real_inv  [] (toarrow [treal]        treal)
 let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal)
+let fop_int_abs    = f_op CI.CI_Int .p_int_abs   [] (toarrow [tint]         tint )
+let fop_real_exp   = f_op CI.CI_Real.p_real_exp  [] (toarrow [treal]        treal)
+let fop_real_ln    = f_op CI.CI_Real.p_real_ln   [] (toarrow [treal]        treal)
+let fop_real_rpow  = f_op CI.CI_Real.p_real_rpow [] (toarrow [treal; treal] treal)
 
 let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
+let f_int_abs f    = f_app fop_int_abs [f]     tint
 
 (* -------------------------------------------------------------------- *)
 let f_real_le  f1 f2 = f_app fop_real_le  [f1; f2] tbool
@@ -102,6 +107,13 @@ let f_real_sub f1 f2 =
 
 let f_real_div f1 f2 =
   f_real_mul f1 (f_real_inv f2)
+
+let f_real_exp  f   = f_app fop_real_exp  [f] treal
+let f_real_ln   f   = f_app fop_real_ln   [f] treal
+let f_real_rpow f a = f_app fop_real_rpow [f; a] treal
+
+let f_real_sqrt f =
+  f_real_rpow f (f_real_inv (f_rint (BI.of_int 2)))
 
 let f_decimal (n, (l, f)) =
   if   EcBigInt.equal f EcBigInt.zero
@@ -228,9 +240,29 @@ let f_dlet tya tyb d f =
   f_app (fop_dlet tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
-let f_losslessF f = 
+let f_losslessF f =
   let m = EcIdent.create "&hr" in
   f_bdHoareF {m;inv=f_true} f {m;inv=f_true} FHeq {m;inv=f_r1}
+
+let f_losslessS (me : memenv) s =
+  let m = fst me in
+  f_bdHoareS (snd me) {m;inv=f_true} s {m;inv=f_true} FHeq {m;inv=f_r1}
+
+(* -------------------------------------------------------------------- *)
+module CList = struct
+  let tlist lty =
+    tconstr EcCoreLib.CI_List.p_list [lty]
+
+  let size lty f =
+    let sz = toarrow [tlist lty] tint in
+    let sz = f_op EcCoreLib.CI_List.p_size [lty] sz in
+    f_app sz [f] tint
+
+  let mem lty s x =
+    let mm = toarrow [tlist lty; lty] tbool in
+    let mm = f_op EcCoreLib.CI_List.p_mem [lty] mm in
+    f_app mm [s; x] tbool
+end
 
 (* -------------------------------------------------------------------- *)
 let f_identity ?(name = "x") ty =
@@ -858,10 +890,14 @@ type sform =
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS
+  | SFahoareF  of ahoareF
+  | SFahoareS  of ahoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
   | SFequivS   of equivS
+  | SFaequivF  of aequivF
+  | SFaequivS  of aequivS
   | SFpr       of pr
 
   | SFother of form
@@ -898,10 +934,14 @@ let rec sform_of_form fp =
 
   | FhoareF  hf -> SFhoareF  hf
   | FhoareS  hs -> SFhoareS  hs
+  | FahoareF ahf -> SFahoareF ahf
+  | FahoareS ahs -> SFahoareS ahs
   | FbdHoareF hf -> SFbdHoareF hf
   | FbdHoareS hs -> SFbdHoareS hs
   | FequivF   ef -> SFequivF   ef
   | FequivS   es -> SFequivS   es
+  | FaequivF  aef -> SFaequivF aef
+  | FaequivS  aes -> SFaequivS aes
   | Fpr       pr -> SFpr       pr
 
   | Fop (op, ty) ->

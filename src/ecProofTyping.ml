@@ -145,6 +145,7 @@ let tc1_process_prhl_form_opt tc oty pf =
   let ml, mr, (pr, po) =
     match concl.f_node with
     | FequivS es -> (es.es_ml, es.es_mr, (es_pr es, es_po es))
+    | FaequivS aes -> (aes.aes_ml, aes.aes_mr, (aes_pr aes, aes_po aes))
     | _ -> assert false
   in
 
@@ -155,6 +156,22 @@ let tc1_process_prhl_form_opt tc oty pf =
   {ml;mr;inv=f}
 
 let tc1_process_prhl_form tc ty pf = tc1_process_prhl_form_opt tc (Some ty) pf
+
+(* ------------------------------------------------------------------ *)
+(* Type-check a formula in an [aequiv] goal, with both memories in
+   scope, returning the raw form (not memory-wrapped). *)
+let tc1_process_aprhl_form tc ty pf =
+  let hyps, concl = FApi.tc1_flat tc in
+  let ml, mr =
+    match concl.f_node with
+    | FaequivS aes -> (aes.aes_ml, aes.aes_mr)
+    | _ -> assert false
+  in
+  let hyps = LDecl.push_active_ts ml mr hyps in
+  pf_process_form !!tc hyps ty pf
+
+let tc1_process_aprhl_formula tc pf =
+  tc1_process_aprhl_form tc tbool pf
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_prhl_formula tc pf =
@@ -174,6 +191,7 @@ let tc1_process_prhl_stmt ?map tc side c =
   let concl = FApi.tc1_goal tc in
   let ml, mr = match concl.f_node with
     | FequivS {es_ml=ml; es_mr=mr} -> (ml, mr)
+    | FaequivS {aes_ml=ml; aes_mr=mr} -> (ml, mr)
     | FeagerF {eg_ml=ml; eg_mr=mr} ->
         EcMemory.abstract ml, EcMemory.abstract mr
     | _ -> assert false in

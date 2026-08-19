@@ -225,6 +225,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Prndsem (red, side, pos)  -> EcPhlRnd.process_rndsem ~reduce:red side pos
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
     | Pconseqauto cm            -> process_conseqauto cm
+    | Pconseq_aprhl (e, d)      -> EcPhlConseq.process_conseq_aprhl (e, d)
     | Pconcave info             -> EcPhlConseq.process_concave info
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
     | Phrex_intro (fs, b)       -> EcPhlExists.process_exists_intro ~elim:b fs
@@ -250,6 +251,16 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv
     | Plossless                 -> EcPhlHiAuto.t_lossless
+
+    | Paprhl Atoequiv           -> EcPhlAequiv.t_toequiv
+    | Paprhl Aofequiv           -> EcPhlAequiv.t_ofequiv
+    | Paprhl Atohoare           -> EcPhlAequiv.t_tohoare
+    | Paprhl (Alap mode)        -> EcPhlAequiv.t_lap mode
+    | Paprhl (Awhile infos)     -> EcPhlAequiv.t_while infos
+    | Paprhl (AwhileAc infos)   -> EcPhlAequiv.t_while_ac infos
+    | Paprhl (APwEq infos)      -> EcPhlAequiv.t_pweq infos
+    | Paprhl (AUtbL infos)      -> EcPhlAequiv.t_utb_l infos
+    | Paprhl (Abw infos)        -> EcPhlAequiv.t_bw infos
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
     | Pprocrewriteat (x, f)     -> EcPhlRewrite.process_rewrite_at x f
