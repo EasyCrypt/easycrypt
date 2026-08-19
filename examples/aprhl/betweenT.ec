@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import Option Int Real RealExp Ring.
+require import Int Real RealExp Ring.
 require import Distr List Aprhl StdRing StdOrder StdBigop.
 (*---*) import IntID IntOrder RField RealOrder.
 
@@ -77,7 +77,7 @@ pred suffix ['a] (p s : 'a list) =
 
 lemma suffixI ['a] (p1 p2 s : 'a list) :
   suffix p1 s => suffix p2 s => size p1 = size p2 => p1 = p2.
-proof. by case=> [n1 [ge0_n1 <-]] [n2 [ge0_n2 <-]] eq_sz; smt(). qed.
+proof. by case=> [n1 [ge0_n1 <-]] [n2 [ge0_n2 <-]] eq_sz; smt(size_drop size_eq0 size_ge0 drop_oversize). qed.
 
 lemma suffix_refl ['a] (s : 'a list) : suffix s s.
 proof. by exists 0; rewrite drop0. qed.

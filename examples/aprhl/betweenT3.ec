@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import Option Int Real RealExp Ring.
+require import Int Real RealExp Ring.
 require import Distr List Aprhl StdRing StdOrder StdBigop RealFun.
 (*---*) import IntID IntOrder RField RealOrder.
 

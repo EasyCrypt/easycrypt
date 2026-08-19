@@ -30,15 +30,15 @@ module AboveTs = {
   proc aboveTs(d : db, qs : query list, Ts : int list) : int = {
     var i, ret, noise, tnoise, ans : int;
     
-    noise =$ lap eps 0;
-    ret = -1;
+    noise <$ lap eps 0;
+    ret <- -1;
     
-    i = 0;
+    i <- 0;
     while (i < size qs) {
-      ans =$ lap eps (evalQ (nth nullQ qs i) d);
-      tnoise = (nth 0 Ts i) + noise;
-      ret = (tnoise < ans && ret = -1) ? i : ret;
-      i = i + 1;
+      ans <$ lap eps (evalQ (nth nullQ qs i) d);
+      tnoise <- (nth 0 Ts i) + noise;
+      ret <- (tnoise < ans && ret = -1) ? i : ret;
+      i <- i + 1;
     }
     
     return ret;
@@ -53,24 +53,24 @@ module LargeMargin = {
     var sorted, tests : query list;
     var filter : bool list;
 
-    sorted = sort (fun (q q' : query) => evalQ q' d <= evalQ q d) qs;
-    m =$ lap eps (evalQ (head nullQ sorted)  d);
-    tests = map (fun (q : query) => fun (d : db) => m - evalQ q d) qs;
-    cutoff = AboveTs.aboveTs(d,drop 1 tests,Ts);
+    sorted <- sort (fun (q q' : query) => evalQ q' d <= evalQ q d) qs;
+    m <$ lap eps (evalQ (head nullQ sorted)  d);
+    tests <- map (fun (q : query) => fun (d : db) => m - evalQ q d) qs;
+    cutoff <@ AboveTs.aboveTs(d,drop 1 tests,Ts);
 
-    filter = map (fun (q : query) => (mem (take cutoff sorted) q)) qs;
+    filter <- map (fun (q : query) => (mem (take cutoff sorted) q)) qs;
 
-    maxInd = -1;
-    maxScore = 0;
-    i = 0;
+    maxInd <- -1;
+    maxScore <- 0;
+    i <- 0;
     while (i < size qs) {
       if (nth true filter i) {
-        ans =$ lap eps (evalQ (nth nullQ qs i) d);
-        update = (maxScore < ans || maxInd = -1);
-        maxInd = update ? i : maxInd;
-        maxScore = update ? ans : maxScore;
+        ans <$ lap eps (evalQ (nth nullQ qs i) d);
+        update <- (maxScore < ans || maxInd = -1);
+        maxInd <- update ? i : maxInd;
+        maxScore <- update ? ans : maxScore;
       }
-      i = i + 1;
+      i <- i + 1;
     }
 
     return (nth nullQ qs maxInd);
