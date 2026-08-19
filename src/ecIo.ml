@@ -209,10 +209,18 @@ let lex_single_token (name : string) =
   | _ | exception EcLexer.LexicalError _ -> None
 
 (* -------------------------------------------------------------------- *)
+(* The aPRHL keywords double as ordinary identifiers (the parser
+   recovers them in [_lident]); accept them anywhere a plain symbol
+   name is validated. *)
+let is_weak_keyword = function
+  | EcParser.AC  | EcParser.BW  | EcParser.INT | EcParser.LAP -> true
+  | _ -> false
+
 let is_sym_ident x =
   match lex_single_token x with
   | Some (EcParser.LIDENT _) -> true
   | Some (EcParser.UIDENT _) -> true
+  | Some tk -> is_weak_keyword tk
   | _ -> false
 
 let is_op_ident x =
@@ -220,6 +228,7 @@ let is_op_ident x =
   | Some (EcParser.LIDENT _) -> true
   | Some (EcParser.UIDENT _) -> true
   | Some (EcParser.NOP _) -> true
+  | Some tk -> is_weak_keyword tk
   | _ -> false
 
 let is_mem_ident x =

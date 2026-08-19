@@ -138,20 +138,46 @@ let t_equivF_fun_def_r tc =
   let concl' = f_equivS (snd menvl) (snd menvr) pre fdefl.f_body fdefr.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
+(* ------------------------------------------------------------------ *)
+let t_aequivF_fun_def_r tc =
+  let env = FApi.tc1_env tc in
+  let aef = tc1_as_aequivF tc in
+  let ml, mr = aef.aef_ml, aef.aef_mr in
+  let fl = NormMp.norm_xfun env aef.aef_fl in
+  let fr = NormMp.norm_xfun env aef.aef_fr in
+  check_concrete !!tc env fl; check_concrete !!tc env fr;
+  let (menvl, eqsl, menvr, eqsr, env) = Fun.equivS ml mr fl fr env in
+  let (fsigl, fdefl) = eqsl in
+  let (fsigr, fdefr) = eqsr in
+  let fresl = odfl {m=ml;inv=f_tt} (omap (ss_inv_of_expr ml) fdefl.f_ret) in
+  let fresr = odfl {m=mr;inv=f_tt} (omap (ss_inv_of_expr mr) fdefr.f_ret) in
+  let s = PVM.add env pv_res ml fresl.inv PVM.empty in
+  let s = PVM.add env pv_res mr fresr.inv s in
+  let post = map_ts_inv1 (PVM.subst env s) (aef_po aef) in
+  let s = subst_pre env fsigl ml PVM.empty in
+  let s = subst_pre env fsigr mr s in
+  let pre = map_ts_inv1 (PVM.subst env s) (aef_pr aef) in
+  let concl' =
+    f_aequivS (snd menvl) (snd menvr) ~ep:(aef_ep aef) ~dp:(aef_dp aef)
+      pre fdefl.f_body fdefr.f_body post in
+  FApi.xmutate1 tc `FunDef [concl']
+
 (* -------------------------------------------------------------------- *)
 let t_hoareF_fun_def   = FApi.t_low0 "hoare-fun-def"   t_hoareF_fun_def_r
 let t_ehoareF_fun_def  = FApi.t_low0 "ehoare-fun-def"  t_ehoareF_fun_def_r
 let t_bdhoareF_fun_def = FApi.t_low0 "bdhoare-fun-def" t_bdhoareF_fun_def_r
 let t_equivF_fun_def   = FApi.t_low0 "equiv-fun-def"   t_equivF_fun_def_r
+let t_aequivF_fun_def  = FApi.t_low0 "aequiv-fun-def"  t_aequivF_fun_def_r
 
 (* -------------------------------------------------------------------- *)
 let t_fun_def_r tc =
   let th  = t_hoareF_fun_def
   and teh = t_ehoareF_fun_def
   and tbh = t_bdhoareF_fun_def
-  and te  = t_equivF_fun_def in
+  and te  = t_equivF_fun_def
+  and tae = t_aequivF_fun_def in
 
-  t_hF_or_bhF_or_eF ~th ~teh ~tbh ~te tc
+  t_hF_or_bhF_or_eF ~th ~teh ~tbh ~te ~tae tc
 
 let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 

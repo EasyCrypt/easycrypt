@@ -45,6 +45,7 @@ val t_equivF_abs   : ts_inv -> FApi.backward
 val t_hoareF_fun_def   : FApi.backward
 val t_bdhoareF_fun_def : FApi.backward
 val t_equivF_fun_def   : FApi.backward
+val t_aequivF_fun_def  : FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_equivF_abs_upto : bool option -> ss_inv -> ts_inv -> ts_inv -> FApi.backward
