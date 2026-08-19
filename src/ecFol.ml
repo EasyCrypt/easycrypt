@@ -1155,6 +1155,10 @@ let rec dump_f f =
      ^ "; BD = " ^ dump_f (bhs_bd hs).inv ^ "]"
   | FeHoareS _ -> "eHoareS"
   | FeHoareF _ -> "eHoareF"
+  | FahoareF _ -> "ahoareF"
+  | FahoareS _ -> "ahoareS"
+  | FaequivF _ -> "aequivF"
+  | FaequivS _ -> "aequivS"
   | FequivF _ -> "equivF"
   | FequivS ({es_ml = (ml, _); es_mr = (mr, _)} as es) ->
      "equivS [ ML = " ^ EcIdent.tostring_internal ml

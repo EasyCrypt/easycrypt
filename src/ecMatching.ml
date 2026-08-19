@@ -1580,10 +1580,28 @@ module FPosition = struct
               let mr = ef.ef_mr in
               f_equivF {ml;mr;inv=ef_pr} ef.ef_fl ef.ef_fr {ml;mr;inv=ef_po}
 
+          | FahoareF ahf ->
+              let sub = doit p [(ahf_b ahf).inv; (ahf_pr ahf).inv; (ahf_po ahf).inv] in
+              let (ahf_b, ahf_pr, ahf_po) = as_seq3 sub in
+              let m = ahf.ahf_m in
+              f_ahoareF ~b:{m;inv=ahf_b} {m;inv=ahf_pr} ahf.ahf_f {m;inv=ahf_po}
+
+          | FaequivF aef ->
+              let sub =
+                doit p [(aef_pr aef).inv; (aef_po aef).inv;
+                        (aef_ep aef).inv; (aef_dp aef).inv] in
+              let (aef_pr, aef_po, aef_ep, aef_dp) = as_seq4 sub in
+              let ml = aef.aef_ml in
+              let mr = aef.aef_mr in
+              f_aequivF ~ep:{ml;mr;inv=aef_ep} ~dp:{ml;mr;inv=aef_dp}
+                {ml;mr;inv=aef_pr} aef.aef_fl aef.aef_fr {ml;mr;inv=aef_po}
+
           | FhoareS   _ -> raise InvalidPosition
           | FeHoareS  _ -> raise InvalidPosition
+          | FahoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
+          | FaequivS  _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition
       end
 

@@ -481,6 +481,22 @@ module Fsubst = struct
       let hs_po   = f_subst ~tx s (ehs_po hs).inv in
       f_eHoareS mt {m;inv=hs_pr} hs_s {m;inv=hs_po}
 
+    | FahoareF ahf ->
+      let ahf_f  = x_subst s ahf.ahf_f in
+      let (s, m) = add_m_binding s ahf.ahf_m in
+      let ahf_b  = f_subst ~tx s (ahf_b ahf).inv in
+      let ahf_pr = f_subst ~tx s (ahf_pr ahf).inv in
+      let ahf_po = f_subst ~tx s (ahf_po ahf).inv in
+      f_ahoareF ~b:{m;inv=ahf_b} {m;inv=ahf_pr} ahf_f {m;inv=ahf_po}
+
+    | FahoareS ahs ->
+      let ahs_s = s_subst s ahs.ahs_s in
+      let s, (m, mt) = add_me_binding s ahs.ahs_m in
+      let ahs_b  = f_subst ~tx s (ahs_b ahs).inv in
+      let ahs_pr = f_subst ~tx s (ahs_pr ahs).inv in
+      let ahs_po = f_subst ~tx s (ahs_po ahs).inv in
+      f_ahoareS mt ~b:{m;inv=ahs_b} {m;inv=ahs_pr} ahs_s {m;inv=ahs_po}
+
     | FbdHoareF hf ->
       let hf_f  = x_subst s hf.bhf_f in
       let (s, m) = add_m_binding s hf.bhf_m in
@@ -515,6 +531,30 @@ module Fsubst = struct
       let es_pr = f_subst ~tx s (es_pr es).inv in
       let es_po = f_subst ~tx s (es_po es).inv in
       f_equivS mlt mrt {ml;mr;inv=es_pr} es_sl es_sr {ml;mr;inv=es_po}
+
+    | FaequivF aef ->
+      let aef_fl = x_subst s aef.aef_fl in
+      let aef_fr = x_subst s aef.aef_fr in
+      let (s, ml) = add_m_binding s aef.aef_ml in
+      let (s, mr) = add_m_binding s aef.aef_mr in
+      let aef_pr = f_subst ~tx s (aef_pr aef).inv in
+      let aef_po = f_subst ~tx s (aef_po aef).inv in
+      let aef_ep = f_subst ~tx s (aef_ep aef).inv in
+      let aef_dp = f_subst ~tx s (aef_dp aef).inv in
+      f_aequivF ~ep:{ml;mr;inv=aef_ep} ~dp:{ml;mr;inv=aef_dp}
+        {ml;mr;inv=aef_pr} aef_fl aef_fr {ml;mr;inv=aef_po}
+
+    | FaequivS aes ->
+      let aes_sl = s_subst s aes.aes_sl in
+      let aes_sr = s_subst s aes.aes_sr in
+      let s, (ml, mlt) = add_me_binding s aes.aes_ml in
+      let s, (mr, mrt) = add_me_binding s aes.aes_mr in
+      let aes_pr = f_subst ~tx s (aes_pr aes).inv in
+      let aes_po = f_subst ~tx s (aes_po aes).inv in
+      let aes_ep = f_subst ~tx s (aes_ep aes).inv in
+      let aes_dp = f_subst ~tx s (aes_dp aes).inv in
+      f_aequivS mlt mrt ~ep:{ml;mr;inv=aes_ep} ~dp:{ml;mr;inv=aes_dp}
+        {ml;mr;inv=aes_pr} aes_sl aes_sr {ml;mr;inv=aes_po}
 
     | FeagerF eg ->
       let eg_fl = x_subst s eg.eg_fl in

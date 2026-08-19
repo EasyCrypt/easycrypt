@@ -119,6 +119,10 @@ let hash_memo (memo : (int, int) Hashtbl.t) (f0 : form) : int =
     | FequivS _ -> 108
     | FeagerF _ -> 109
     | Fpr _ -> 110
+    | FahoareF _ -> 111
+    | FahoareS _ -> 112
+    | FaequivF _ -> 113
+    | FaequivS _ -> 114
   in
   hash empty_env f0
 

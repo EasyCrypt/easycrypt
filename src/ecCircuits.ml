@@ -664,7 +664,8 @@ let circuit_of_form (st : state) (hyps : hyps) (f_ : EcAst.form) : circuit =
           let comps = List.map (circuit_of_node isubst st) comps in
           (circuit_tuple_of_circuits comps :> circuit)
         | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _ | FeHoareF _
-        | FeHoareS _ | FequivF _ | FequivS _ | FeagerF _ | Fpr _ ->
+        | FeHoareS _ | FahoareF _ | FahoareS _ | FequivF _ | FequivS _
+        | FaequivF _ | FaequivS _ | FeagerF _ | Fpr _ ->
           circ_error (CantConvertToCirc `Hoare)
       end
     with CircError e ->

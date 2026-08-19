@@ -193,8 +193,14 @@ and f_node =
   | FeHoareF of eHoareF (* $hr / $hr *)
   | FeHoareS of eHoareS
 
+  | FahoareF of ahoareF (* $hr / $hr *)
+  | FahoareS of ahoareS
+
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS
+
+  | FaequivF of aequivF (* $left,$right / $left,$right *)
+  | FaequivS of aequivS
 
   | FeagerF of eagerF
 
@@ -238,6 +244,36 @@ and equivS = {
   [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
 }
 
+and aequivF = {
+  aef_ml : memory;
+  aef_mr : memory;
+  aef_ep : form;
+  [@alert priv_pl "Use the accessor function `aef_ep` instead of the field"]
+  aef_dp : form;
+  [@alert priv_pl "Use the accessor function `aef_dp` instead of the field"]
+  aef_pr : form;
+  [@alert priv_pl "Use the accessor function `aef_pr` instead of the field"]
+  aef_fl : EcPath.xpath;
+  aef_fr : EcPath.xpath;
+  aef_po : form;
+  [@alert priv_pl "Use the accessor function `aef_po` instead of the field"]
+}
+
+and aequivS = {
+  aes_ml : memenv;
+  aes_mr : memenv;
+  aes_ep : form;
+  [@alert priv_pl "Use the accessor function `aes_ep` instead of the field"]
+  aes_dp : form;
+  [@alert priv_pl "Use the accessor function `aes_dp` instead of the field"]
+  aes_pr : form;
+  [@alert priv_pl "Use the accessor function `aes_pr` instead of the field"]
+  aes_sl : stmt;
+  aes_sr : stmt;
+  aes_po : form;
+  [@alert priv_pl "Use the accessor function `aes_po` instead of the field"]
+}
+
 and sHoareF = {
   hf_m : memory;
   hf_pr : form;
@@ -272,6 +308,28 @@ and eHoareS = {
   ehs_s   : stmt;
   ehs_po  : form;
   [@alert priv_pl "Use the accessor function `ehs_po` instead of the field"]
+}
+
+and ahoareF = {
+  ahf_m  : memory;
+  ahf_b  : form;
+  [@alert priv_pl "Use the accessor function `ahf_b` instead of the field"]
+  ahf_pr : form;
+  [@alert priv_pl "Use the accessor function `ahf_pr` instead of the field"]
+  ahf_f  : EcPath.xpath;
+  ahf_po : form;
+  [@alert priv_pl "Use the accessor function `ahf_po` instead of the field"]
+}
+
+and ahoareS = {
+  ahs_m  : memenv;
+  ahs_b  : form;
+  [@alert priv_pl "Use the accessor function `ahs_b` instead of the field"]
+  ahs_pr : form;
+  [@alert priv_pl "Use the accessor function `ahs_pr` instead of the field"]
+  ahs_s  : stmt;
+  ahs_po : form;
+  [@alert priv_pl "Use the accessor function `ahs_po` instead of the field"]
 }
 
 and bdHoareF = {
@@ -459,6 +517,20 @@ val bhf_bd : bdHoareF -> ss_inv
 val bhs_pr : bdHoareS -> ss_inv
 val bhs_po : bdHoareS -> ss_inv
 val bhs_bd : bdHoareS -> ss_inv
+val ahf_b  : ahoareF -> ss_inv
+val ahf_pr : ahoareF -> ss_inv
+val ahf_po : ahoareF -> ss_inv
+val ahs_b  : ahoareS -> ss_inv
+val ahs_pr : ahoareS -> ss_inv
+val ahs_po : ahoareS -> ss_inv
+val aef_pr : aequivF -> ts_inv
+val aef_po : aequivF -> ts_inv
+val aef_ep : aequivF -> ts_inv
+val aef_dp : aequivF -> ts_inv
+val aes_pr : aequivS -> ts_inv
+val aes_po : aequivS -> ts_inv
+val aes_ep : aequivS -> ts_inv
+val aes_dp : aequivS -> ts_inv
 
 (* -------------------------------------------------------------------- *)
 
@@ -601,6 +673,18 @@ val ef_hash   : equivF hash
 
 val eqs_equal : equivS equality
 val es_hash   : equivS hash
+
+val ahf_equal : ahoareF equality
+val ahf_hash  : ahoareF hash
+
+val ahs_equal : ahoareS equality
+val ahs_hash  : ahoareS hash
+
+val aeqf_equal : aequivF equality
+val aef_hash   : aequivF hash
+
+val aeqs_equal : aequivS equality
+val aes_hash   : aequivS hash
 
 val egf_equal : eagerF equality
 val eg_hash   : eagerF hash

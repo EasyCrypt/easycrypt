@@ -199,8 +199,14 @@ and f_node =
   | FeHoareF of eHoareF (* $hr / $hr *)
   | FeHoareS of eHoareS
 
+  | FahoareF of ahoareF (* $hr / $hr *)
+  | FahoareS of ahoareS
+
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS
+
+  | FaequivF of aequivF (* $left,$right / $left,$right *)
+  | FaequivS of aequivS
 
   | FeagerF of eagerF
 
@@ -234,6 +240,28 @@ and equivS = {
   es_sr  : stmt;
   es_po  : form; }
 
+and aequivF = {
+  aef_ml : memory;
+  aef_mr : memory;
+  aef_ep : form;
+  aef_dp : form;
+  aef_pr : form;
+  aef_fl : EcPath.xpath;
+  aef_fr : EcPath.xpath;
+  aef_po : form;
+}
+
+and aequivS = {
+  aes_ml : memenv;
+  aes_mr : memenv;
+  aes_ep : form;
+  aes_dp : form;
+  aes_pr : form;
+  aes_sl : stmt;
+  aes_sr : stmt;
+  aes_po : form;
+}
+
 and sHoareF = {
   hf_m  : memory;
   hf_pr : form;
@@ -260,6 +288,22 @@ and eHoareS = {
   ehs_pr  : form;
   ehs_s   : stmt;
   ehs_po  : form;
+}
+
+and ahoareF = {
+  ahf_m  : memory;
+  ahf_b  : form;
+  ahf_pr : form;
+  ahf_f  : EcPath.xpath;
+  ahf_po : form;
+}
+
+and ahoareS = {
+  ahs_m  : memenv;
+  ahs_b  : form;
+  ahs_pr : form;
+  ahs_s  : stmt;
+  ahs_po : form;
 }
 
 and bdHoareF = {
@@ -707,6 +751,24 @@ let bhs_pr bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_pr}
 let bhs_po bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_po}
 let bhs_bd bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_bd}
 
+let ahf_b  ahf = {m=ahf.ahf_m; inv=ahf.ahf_b}
+let ahf_pr ahf = {m=ahf.ahf_m; inv=ahf.ahf_pr}
+let ahf_po ahf = {m=ahf.ahf_m; inv=ahf.ahf_po}
+
+let ahs_b  ahs = {m=fst ahs.ahs_m; inv=ahs.ahs_b}
+let ahs_pr ahs = {m=fst ahs.ahs_m; inv=ahs.ahs_pr}
+let ahs_po ahs = {m=fst ahs.ahs_m; inv=ahs.ahs_po}
+
+let aef_pr aef = {ml=aef.aef_ml; mr=aef.aef_mr; inv=aef.aef_pr}
+let aef_po aef = {ml=aef.aef_ml; mr=aef.aef_mr; inv=aef.aef_po}
+let aef_ep aef = {ml=aef.aef_ml; mr=aef.aef_mr; inv=aef.aef_ep}
+let aef_dp aef = {ml=aef.aef_ml; mr=aef.aef_mr; inv=aef.aef_dp}
+
+let aes_pr aes = {ml=fst aes.aes_ml; mr=fst aes.aes_mr; inv=aes.aes_pr}
+let aes_po aes = {ml=fst aes.aes_ml; mr=fst aes.aes_mr; inv=aes.aes_po}
+let aes_ep aes = {ml=fst aes.aes_ml; mr=fst aes.aes_mr; inv=aes.aes_ep}
+let aes_dp aes = {ml=fst aes.aes_ml; mr=fst aes.aes_mr; inv=aes.aes_dp}
+
 (* ----------------------------------------------------------------- *)
 (* Equality, hash, and fv                                            *)
 (* ----------------------------------------------------------------- *)
@@ -1073,6 +1135,20 @@ let ehs_equal hs1 hs2 =
   && s_equal hs1.ehs_s hs2.ehs_s
   && me_equal hs1.ehs_m hs2.ehs_m
 
+let ahf_equal ahf1 ahf2 =
+     f_equal ahf1.ahf_b  ahf2.ahf_b
+  && f_equal ahf1.ahf_pr ahf2.ahf_pr
+  && f_equal ahf1.ahf_po ahf2.ahf_po
+  && EcPath.x_equal ahf1.ahf_f ahf2.ahf_f
+  && mem_equal ahf1.ahf_m ahf2.ahf_m
+
+let ahs_equal ahs1 ahs2 =
+     f_equal ahs1.ahs_b  ahs2.ahs_b
+  && f_equal ahs1.ahs_pr ahs2.ahs_pr
+  && f_equal ahs1.ahs_po ahs2.ahs_po
+  && s_equal ahs1.ahs_s ahs2.ahs_s
+  && me_equal ahs1.ahs_m ahs2.ahs_m
+
 let bhf_equal bhf1 bhf2 =
      f_equal bhf1.bhf_pr bhf2.bhf_pr
   && f_equal bhf1.bhf_po bhf2.bhf_po
@@ -1104,6 +1180,26 @@ let eqs_equal es1 es2 =
   && s_equal es1.es_sr es2.es_sr
   && me_equal es1.es_ml es2.es_ml
   && me_equal es1.es_mr es2.es_mr
+
+let aeqf_equal ef1 ef2 =
+     f_equal ef1.aef_pr ef2.aef_pr
+  && f_equal ef1.aef_po ef2.aef_po
+  && f_equal ef1.aef_ep ef2.aef_ep
+  && f_equal ef1.aef_dp ef2.aef_dp
+  && EcPath.x_equal ef1.aef_fl ef2.aef_fl
+  && EcPath.x_equal ef1.aef_fr ef2.aef_fr
+  && mem_equal ef1.aef_ml ef2.aef_ml
+  && mem_equal ef1.aef_mr ef2.aef_mr
+
+let aeqs_equal es1 es2 =
+     f_equal es1.aes_pr es2.aes_pr
+  && f_equal es1.aes_po es2.aes_po
+  && f_equal es1.aes_ep es2.aes_ep
+  && f_equal es1.aes_dp es2.aes_dp
+  && s_equal es1.aes_sl es2.aes_sl
+  && s_equal es1.aes_sr es2.aes_sr
+  && me_equal es1.aes_ml es2.aes_ml
+  && me_equal es1.aes_mr es2.aes_mr
 
 let egf_equal eg1 eg2 =
      f_equal eg1.eg_pr eg2.eg_pr
@@ -1159,6 +1255,16 @@ let ehs_hash hs =
     (s_hash hs.ehs_s)
     (me_hash hs.ehs_m)
 
+let ahf_hash ahf =
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine (EcPath.x_hash ahf.ahf_f) (mem_hash ahf.ahf_m))
+    [ahf.ahf_b; ahf.ahf_pr; ahf.ahf_po]
+
+let ahs_hash ahs =
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine (s_hash ahs.ahs_s) (me_hash ahs.ahs_m))
+    [ahs.ahs_b; ahs.ahs_pr; ahs.ahs_po]
+
 let bhf_hash bhf =
   Why3.Hashcons.combine_list f_hash
     (Why3.Hashcons.combine2 (hcmp_hash bhf.bhf_cmp) (EcPath.x_hash bhf.bhf_f) (mem_hash bhf.bhf_m))
@@ -1186,6 +1292,18 @@ let es_hash es =
        (me_hash es.es_mr)
        (me_hash es.es_ml)
        (s_hash es.es_sr))
+
+let aef_hash ef =
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine3 (EcPath.x_hash ef.aef_fl) (EcPath.x_hash ef.aef_fr)
+      (mem_hash ef.aef_ml) (mem_hash ef.aef_mr))
+    [ef.aef_pr; ef.aef_po; ef.aef_ep; ef.aef_dp]
+
+let aes_hash es =
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine3 (s_hash es.aes_sl) (s_hash es.aes_sr)
+      (me_hash es.aes_ml) (me_hash es.aes_mr))
+    [es.aes_pr; es.aes_po; es.aes_ep; es.aes_dp]
 
 let eg_hash eg =
   Why3.Hashcons.combine_list f_hash
@@ -1426,10 +1544,14 @@ module Hsform = Why3.Hashcons.Make (struct
     | FhoareS  hs1 , FhoareS  hs2  -> hs_equal hs1 hs2
     | FeHoareF  hf1 , FeHoareF  hf2  -> ehf_equal hf1 hf2
     | FeHoareS  hs1 , FeHoareS  hs2  -> ehs_equal hs1 hs2
+    | FahoareF  hf1 , FahoareF  hf2  -> ahf_equal hf1 hf2
+    | FahoareS  hs1 , FahoareS  hs2  -> ahs_equal hs1 hs2
     | FbdHoareF   bhf1, FbdHoareF   bhf2 -> bhf_equal bhf1 bhf2
     | FbdHoareS   bhs1, FbdHoareS   bhs2 -> bhs_equal bhs1 bhs2
     | FequivF     eqf1, FequivF     eqf2 -> eqf_equal eqf1 eqf2
     | FequivS     eqs1, FequivS     eqs2 -> eqs_equal eqs1 eqs2
+    | FaequivF    eqf1, FaequivF    eqf2 -> aeqf_equal eqf1 eqf2
+    | FaequivS    eqs1, FaequivS    eqs2 -> aeqs_equal eqs1 eqs2
     | FeagerF     eg1 , FeagerF     eg2  -> egf_equal eg1 eg2
     | Fpr         pr1 , Fpr         pr2  -> pr_equal pr1 pr2
 
@@ -1480,10 +1602,14 @@ module Hsform = Why3.Hashcons.Make (struct
     | FhoareS  hs   -> hs_hash hs
     | FeHoareF  hf  -> ehf_hash hf
     | FeHoareS  hs  -> ehs_hash hs
+    | FahoareF  hf  -> ahf_hash hf
+    | FahoareS  hs  -> ahs_hash hs
     | FbdHoareF   bhf  -> bhf_hash bhf
     | FbdHoareS   bhs  -> bhs_hash bhs
     | FequivF     ef   -> ef_hash ef
     | FequivS     es   -> es_hash es
+    | FaequivF    ef   -> aef_hash ef
+    | FaequivS    es   -> aes_hash es
     | FeagerF     eg   -> eg_hash eg
     | Fpr         pr   -> pr_hash pr
 
@@ -1540,6 +1666,14 @@ module Hsform = Why3.Hashcons.Make (struct
       let fv = fv_union (f_fv hs.ehs_pr) (f_fv hs.ehs_po) in
       fv_union (s_fv hs.ehs_s) (Mid.remove (fst hs.ehs_m) fv)
 
+    | FahoareF ahf ->
+      let fv = union f_fv [ahf.ahf_b; ahf.ahf_pr; ahf.ahf_po] in
+      EcPath.x_fv (Mid.remove ahf.ahf_m fv) ahf.ahf_f
+
+    | FahoareS ahs ->
+      let fv = union f_fv [ahs.ahs_b; ahs.ahs_pr; ahs.ahs_po] in
+      fv_union (s_fv ahs.ahs_s) (Mid.remove (fst ahs.ahs_m) fv)
+
     | FbdHoareF bhf ->
       let fv =
         fv_union (f_fv bhf.bhf_pr)
@@ -1563,6 +1697,18 @@ module Hsform = Why3.Hashcons.Make (struct
         let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
         fv_union fv
           (fv_union (s_fv es.es_sl) (s_fv es.es_sr))
+
+    | FaequivF aef ->
+        let fv = union f_fv [aef.aef_pr; aef.aef_po; aef.aef_ep; aef.aef_dp] in
+        let fv = fv_diff fv (fv_mlr aef.aef_ml aef.aef_mr) in
+        EcPath.x_fv (EcPath.x_fv fv aef.aef_fl) aef.aef_fr
+
+    | FaequivS aes ->
+        let fv = union f_fv [aes.aes_pr; aes.aes_po; aes.aes_ep; aes.aes_dp] in
+        let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+        let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
+        fv_union fv
+          (fv_union (s_fv aes.aes_sl) (s_fv aes.aes_sr))
 
     | FeagerF eg ->
         let fv = fv_union (f_fv eg.eg_pr) (f_fv eg.eg_po) in

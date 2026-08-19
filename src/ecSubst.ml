@@ -577,6 +577,44 @@ let rec subst_form (s : subst) (f : form) =
      let ehs_po = map_ss_inv1 (subst_form s) (ehs_po ehs) in
      f_eHoareS mt ehs_pr ehs_s ehs_po
 
+  | FahoareF ahf ->
+     let ahf_f  = subst_xpath s ahf.ahf_f in
+     let s = add_memory s ahf.ahf_m ahf.ahf_m in
+     let ahf_b  = map_ss_inv1 (subst_form s) (ahf_b ahf) in
+     let ahf_pr = map_ss_inv1 (subst_form s) (ahf_pr ahf) in
+     let ahf_po = map_ss_inv1 (subst_form s) (ahf_po ahf) in
+     f_ahoareF ~b:ahf_b ahf_pr ahf_f ahf_po
+
+  | FahoareS ahs ->
+     let ahs_s = subst_stmt s ahs.ahs_s in
+     let s, (_,mt) = subst_memtype s ahs.ahs_m in
+     let ahs_b  = map_ss_inv1 (subst_form s) (ahs_b ahs) in
+     let ahs_pr = map_ss_inv1 (subst_form s) (ahs_pr ahs) in
+     let ahs_po = map_ss_inv1 (subst_form s) (ahs_po ahs) in
+     f_ahoareS mt ~b:ahs_b ahs_pr ahs_s ahs_po
+
+  | FaequivF aef ->
+     let aef_fl = subst_xpath s aef.aef_fl in
+     let aef_fr = subst_xpath s aef.aef_fr in
+     let s = add_memory s aef.aef_ml aef.aef_ml in
+     let s = add_memory s aef.aef_mr aef.aef_mr in
+     let aef_pr = map_ts_inv1 (subst_form s) (aef_pr aef) in
+     let aef_po = map_ts_inv1 (subst_form s) (aef_po aef) in
+     let aef_ep = map_ts_inv1 (subst_form s) (aef_ep aef) in
+     let aef_dp = map_ts_inv1 (subst_form s) (aef_dp aef) in
+     f_aequivF ~ep:aef_ep ~dp:aef_dp aef_pr aef_fl aef_fr aef_po
+
+  | FaequivS aes ->
+     let aes_sl = subst_stmt s aes.aes_sl in
+     let aes_sr = subst_stmt s aes.aes_sr in
+     let s, (_,mtl) = subst_memtype s aes.aes_ml in
+     let s, (_,mtr) = subst_memtype s aes.aes_mr in
+     let aes_pr = map_ts_inv1 (subst_form s) (aes_pr aes) in
+     let aes_po = map_ts_inv1 (subst_form s) (aes_po aes) in
+     let aes_ep = map_ts_inv1 (subst_form s) (aes_ep aes) in
+     let aes_dp = map_ts_inv1 (subst_form s) (aes_dp aes) in
+     f_aequivS mtl mtr ~ep:aes_ep ~dp:aes_dp aes_pr aes_sl aes_sr aes_po
+
   | FequivF ef ->
      let ef_fl = subst_xpath s ef.ef_fl in
      let ef_fr = subst_xpath s ef.ef_fr in

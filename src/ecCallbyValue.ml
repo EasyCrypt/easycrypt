@@ -194,9 +194,11 @@ and norm_lambda (st : state) (f : form) =
   | Fglob   _ | Fpvar   _ | Fop       _
 
   | FhoareF _   | FhoareS _
+  | FahoareF _  | FahoareS _
   | FbdHoareF _ | FbdHoareS _
   | FeHoareF _ | FeHoareS _
   | FequivF _   | FequivS _
+  | FaequivF _  | FaequivS _
   | FeagerF   _ | Fpr _
 
     -> f
@@ -515,6 +517,26 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let (m,mt)   = norm_me s hs.ehs_m in
     f_eHoareS mt {m;inv=ehs_pr} ehs_s {m;inv=ehs_po}
 
+  | FahoareF ahf ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s ahf.ahf_m));
+    let ahf_b  = norm st s (ahf_b ahf).inv in
+    let ahf_pr = norm st s (ahf_pr ahf).inv in
+    let ahf_po = norm st s (ahf_po ahf).inv in
+    let ahf_f  = norm_xfun st s ahf.ahf_f in
+    let (m,_) = norm_me s (abstract ahf.ahf_m) in
+    f_ahoareF ~b:{m;inv=ahf_b} {m;inv=ahf_pr} ahf_f {m;inv=ahf_po}
+
+  | FahoareS ahs ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s (fst ahs.ahs_m)));
+    let ahs_b  = norm st s (ahs_b ahs).inv in
+    let ahs_pr = norm st s (ahs_pr ahs).inv in
+    let ahs_po = norm st s (ahs_po ahs).inv in
+    let ahs_s  = norm_stmt s ahs.ahs_s in
+    let (m,mt) = norm_me s ahs.ahs_m in
+    f_ahoareS mt ~b:{m;inv=ahs_b} {m;inv=ahs_pr} ahs_s {m;inv=ahs_po}
+
   | FbdHoareF hf ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s hf.bhf_m));
@@ -558,6 +580,36 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let (ml,mlt)  = norm_me s es.es_ml in
     let (mr,mrt)  = norm_me s es.es_mr in
     f_equivS mlt mrt {ml;mr;inv=es_pr} es_sl es_sr {ml;mr;inv=es_po}
+
+  | FaequivF aef ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s aef.aef_ml));
+    assert (not (Subst.has_mem s aef.aef_mr));
+    let aef_pr = norm st s (aef_pr aef).inv in
+    let aef_po = norm st s (aef_po aef).inv in
+    let aef_ep = norm st s (aef_ep aef).inv in
+    let aef_dp = norm st s (aef_dp aef).inv in
+    let aef_fl = norm_xfun st s aef.aef_fl in
+    let aef_fr = norm_xfun st s aef.aef_fr in
+    let (ml,_) = norm_me s (abstract aef.aef_ml) in
+    let (mr,_) = norm_me s (abstract aef.aef_mr) in
+    f_aequivF ~ep:{ml;mr;inv=aef_ep} ~dp:{ml;mr;inv=aef_dp}
+      {ml;mr;inv=aef_pr} aef_fl aef_fr {ml;mr;inv=aef_po}
+
+  | FaequivS aes ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s (fst aes.aes_ml)));
+    assert (not (Subst.has_mem s (fst aes.aes_mr)));
+    let aes_pr = norm st s (aes_pr aes).inv in
+    let aes_po = norm st s (aes_po aes).inv in
+    let aes_ep = norm st s (aes_ep aes).inv in
+    let aes_dp = norm st s (aes_dp aes).inv in
+    let aes_sl = norm_stmt s aes.aes_sl in
+    let aes_sr = norm_stmt s aes.aes_sr in
+    let (ml,mlt) = norm_me s aes.aes_ml in
+    let (mr,mrt) = norm_me s aes.aes_mr in
+    f_aequivS mlt mrt ~ep:{ml;mr;inv=aes_ep} ~dp:{ml;mr;inv=aes_dp}
+      {ml;mr;inv=aes_pr} aes_sl aes_sr {ml;mr;inv=aes_po}
 
   | FeagerF eg ->
     assert (Args.isempty args);

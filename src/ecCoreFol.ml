@@ -26,6 +26,10 @@ type f_node   = EcAst.f_node
 type eagerF   = EcAst.eagerF
 type equivF   = EcAst.equivF
 type equivS   = EcAst.equivS
+type aequivF  = EcAst.aequivF
+type aequivS  = EcAst.aequivS
+type ahoareF  = EcAst.ahoareF
+type ahoareS  = EcAst.ahoareS
 type sHoareF  = EcAst.sHoareF
 type sHoareS  = EcAst.sHoareS
 type eHoareF  = EcAst.eHoareF
@@ -310,6 +314,20 @@ let f_eHoare ehf_pr ehf_f ehf_po =
   f_eHoareF_r { ehf_m=ehf_pr.m; ehf_pr=ehf_pr.inv; ehf_f; ehf_po=ehf_po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
+let f_ahoareS_r ahs = mk_form (FahoareS ahs) tbool
+let f_ahoareF_r ahf = mk_form (FahoareF ahf) tbool
+
+let f_ahoareS ahs_mt ~(b : ss_inv) ahs_pr ahs_s ahs_po =
+  assert (ahs_pr.m = ahs_po.m && b.m = ahs_po.m);
+  f_ahoareS_r { ahs_m=(ahs_pr.m, ahs_mt); ahs_b=b.inv; ahs_pr=ahs_pr.inv; ahs_s;
+    ahs_po=ahs_po.inv; } [@alert "-priv_pl"]
+
+let f_ahoareF ~(b : ss_inv) ahf_pr ahf_f ahf_po =
+  assert (ahf_pr.m = ahf_po.m && b.m = ahf_po.m);
+  f_ahoareF_r { ahf_m=ahf_pr.m; ahf_b=b.inv; ahf_pr=ahf_pr.inv; ahf_f;
+    ahf_po=ahf_po.inv; } [@alert "-priv_pl"]
+
+(* -------------------------------------------------------------------- *)
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) tbool
 let f_bdHoareF_r bhf = mk_form (FbdHoareF bhf) tbool
 
@@ -339,6 +357,25 @@ let f_equivS es_mtl es_mtr es_pr es_sl es_sr es_po =
 let f_equivF pr ef_fl ef_fr po =
   assert (pr.ml = po.ml && pr.mr = po.mr);
   f_equivF_r { ef_ml=pr.ml; ef_mr=pr.mr; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; } [@alert "-priv_pl"]
+
+(* -------------------------------------------------------------------- *)
+let f_aequivS_r aes = mk_form (FaequivS aes) tbool
+let f_aequivF_r aef = mk_form (FaequivF aef) tbool
+
+let f_aequivS aes_mtl aes_mtr ~(ep : ts_inv) ~(dp : ts_inv) aes_pr aes_sl aes_sr aes_po =
+  assert (aes_pr.ml = aes_po.ml && aes_pr.mr = aes_po.mr);
+  assert (ep.ml = aes_pr.ml && ep.mr = aes_pr.mr);
+  assert (dp.ml = aes_pr.ml && dp.mr = aes_pr.mr);
+  let aes_ml, aes_mr = (aes_pr.ml, aes_mtl), (aes_pr.mr, aes_mtr) in
+  f_aequivS_r { aes_ml; aes_mr; aes_ep=ep.inv; aes_dp=dp.inv; aes_pr=aes_pr.inv;
+                aes_sl; aes_sr; aes_po=aes_po.inv; } [@alert "-priv_pl"]
+
+let f_aequivF ~(ep : ts_inv) ~(dp : ts_inv) pr aef_fl aef_fr po =
+  assert (pr.ml = po.ml && pr.mr = po.mr);
+  assert (ep.ml = pr.ml && ep.mr = pr.mr);
+  assert (dp.ml = pr.ml && dp.mr = pr.mr);
+  f_aequivF_r { aef_ml=pr.ml; aef_mr=pr.mr; aef_ep=ep.inv; aef_dp=dp.inv;
+                aef_pr=pr.inv; aef_fl; aef_fr; aef_po=po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool
@@ -505,6 +542,18 @@ let f_map gt g fp =
       let po' = map_ss_inv1 g (ehs_po hs) in
         f_eHoareS (snd hs.ehs_m) pr' hs.ehs_s po'
 
+  | FahoareF ahf ->
+      let b'  = map_ss_inv1 g (ahf_b ahf) in
+      let pr' = map_ss_inv1 g (ahf_pr ahf) in
+      let po' = map_ss_inv1 g (ahf_po ahf) in
+        f_ahoareF ~b:b' pr' ahf.ahf_f po'
+
+  | FahoareS ahs ->
+      let b'  = map_ss_inv1 g (ahs_b ahs) in
+      let pr' = map_ss_inv1 g (ahs_pr ahs) in
+      let po' = map_ss_inv1 g (ahs_po ahs) in
+        f_ahoareS (snd ahs.ahs_m) ~b:b' pr' ahs.ahs_s po'
+
   | FbdHoareF bhf ->
       let pr' = map_ss_inv1 g (bhf_pr bhf) in
       let po' = map_ss_inv1 g (bhf_po bhf) in
@@ -526,6 +575,21 @@ let f_map gt g fp =
       let pr' = map_ts_inv1 g (es_pr es) in
       let po' = map_ts_inv1 g (es_po es) in
         f_equivS (snd es.es_ml) (snd es.es_mr) pr' es.es_sl es.es_sr po'
+
+  | FaequivF aef ->
+      let ep' = map_ts_inv1 g (aef_ep aef) in
+      let dp' = map_ts_inv1 g (aef_dp aef) in
+      let pr' = map_ts_inv1 g (aef_pr aef) in
+      let po' = map_ts_inv1 g (aef_po aef) in
+        f_aequivF ~ep:ep' ~dp:dp' pr' aef.aef_fl aef.aef_fr po'
+
+  | FaequivS aes ->
+      let ep' = map_ts_inv1 g (aes_ep aes) in
+      let dp' = map_ts_inv1 g (aes_dp aes) in
+      let pr' = map_ts_inv1 g (aes_pr aes) in
+      let po' = map_ts_inv1 g (aes_po aes) in
+        f_aequivS (snd aes.aes_ml) (snd aes.aes_mr) ~ep:ep' ~dp:dp'
+          pr' aes.aes_sl aes.aes_sr po'
 
   | FeagerF eg ->
       let pr' = map_ts_inv1 g (eg_pr eg) in
@@ -556,6 +620,10 @@ let f_fold (tx : 'a -> form -> 'a) (state : 'a) (f : form) =
 
   | FhoareF  hf   -> POE.fold tx (tx state (hf_pr hf).inv) (hf_po hf).hsi_inv
   | FhoareS  hs   -> POE.fold tx (tx state (hs_pr hs).inv) (hs_po hs).hsi_inv
+  | FahoareF ahf  -> List.fold_left tx state [(ahf_b ahf).inv; (ahf_pr ahf).inv; (ahf_po ahf).inv]
+  | FahoareS ahs  -> List.fold_left tx state [(ahs_b ahs).inv; (ahs_pr ahs).inv; (ahs_po ahs).inv]
+  | FaequivF aef  -> List.fold_left tx state [(aef_pr aef).inv; (aef_po aef).inv; (aef_ep aef).inv; (aef_dp aef).inv]
+  | FaequivS aes  -> List.fold_left tx state [(aes_pr aes).inv; (aes_po aes).inv; (aes_ep aes).inv; (aes_dp aes).inv]
   | FeHoareF  hf  -> List.fold_left tx state [(ehf_pr hf).inv; (ehf_po hf).inv]
   | FeHoareS  hs  -> List.fold_left tx state [(ehs_pr hs).inv; (ehs_po hs).inv]
   | FbdHoareF bhf -> List.fold_left tx state [(bhf_pr bhf).inv; (bhf_po bhf).inv; (bhf_bd bhf).inv]
@@ -588,6 +656,10 @@ let form_exists g f =
 
   | FhoareF   hf -> g (hf_pr hf).inv   || POE.exists g (hf_po hf).hsi_inv
   | FhoareS   hs -> g (hs_pr hs).inv   || POE.exists g (hs_po hs).hsi_inv
+  | FahoareF  ahf -> List.exists g [(ahf_b ahf).inv; (ahf_pr ahf).inv; (ahf_po ahf).inv]
+  | FahoareS  ahs -> List.exists g [(ahs_b ahs).inv; (ahs_pr ahs).inv; (ahs_po ahs).inv]
+  | FaequivF  aef -> List.exists g [(aef_pr aef).inv; (aef_po aef).inv; (aef_ep aef).inv; (aef_dp aef).inv]
+  | FaequivS  aes -> List.exists g [(aes_pr aes).inv; (aes_po aes).inv; (aes_ep aes).inv; (aes_dp aes).inv]
   | FeHoareF  hf  -> g (ehf_pr hf).inv || g (ehf_po hf).inv
   | FeHoareS  hs  -> g (ehs_pr hs).inv || g (ehs_po hs).inv
   | FbdHoareF bhf -> g (bhf_pr bhf).inv || g (bhf_po bhf).inv
@@ -616,6 +688,10 @@ let form_forall g f =
 
   | FhoareF  hf  -> g (hf_pr hf).inv  && POE.forall g (hf_po hf).hsi_inv
   | FhoareS  hs  -> g (hs_pr hs).inv  && POE.forall g (hs_po hs).hsi_inv
+  | FahoareF ahf -> List.for_all g [(ahf_b ahf).inv; (ahf_pr ahf).inv; (ahf_po ahf).inv]
+  | FahoareS ahs -> List.for_all g [(ahs_b ahs).inv; (ahs_pr ahs).inv; (ahs_po ahs).inv]
+  | FaequivF aef -> List.for_all g [(aef_pr aef).inv; (aef_po aef).inv; (aef_ep aef).inv; (aef_dp aef).inv]
+  | FaequivS aes -> List.for_all g [(aes_pr aes).inv; (aes_po aes).inv; (aes_ep aes).inv; (aes_dp aes).inv]
   | FbdHoareF bhf -> g (bhf_pr bhf).inv && g (bhf_po bhf).inv
   | FbdHoareS bhs -> g (bhs_pr bhs).inv && g (bhs_po bhs).inv
   | FequivF   ef  -> g (ef_pr ef).inv   && g (ef_po ef).inv
@@ -718,6 +794,16 @@ let destr_equivF f =
   | FequivF es -> es
   | _ -> destr_error "equivF"
 
+let destr_aequivS f =
+  match f.f_node with
+  | FaequivS es -> es
+  | _ -> destr_error "aequivS"
+
+let destr_aequivF f =
+  match f.f_node with
+  | FaequivF ef -> ef
+  | _ -> destr_error "aequivF"
+
 let destr_eagerF f =
   match f.f_node with
   | FeagerF eg -> eg
@@ -743,6 +829,16 @@ let destr_eHoareF f =
   | FeHoareF es -> es
   | _ -> destr_error "eHoareF"
 
+let destr_ahoareS f =
+  match f.f_node with
+  | FahoareS ahs -> ahs
+  | _ -> destr_error "ahoareS"
+
+let destr_ahoareF f =
+  match f.f_node with
+  | FahoareF ahf -> ahf
+  | _ -> destr_error "ahoareF"
+
 let destr_bdHoareS f =
   match f.f_node with
   | FbdHoareS es -> es
@@ -762,11 +858,17 @@ let destr_programS side f =
   match side, f.f_node with
   | None  , FhoareS   hs  -> (hs.hs_m, hs.hs_s)
   | None  , FeHoareS  ehs -> (ehs.ehs_m, ehs.ehs_s)
+  | None  , FahoareS  ahs -> (ahs.ahs_m, ahs.ahs_s)
   | None  , FbdHoareS bhs -> (bhs.bhs_m, bhs.bhs_s)
   | Some b, FequivS   es  -> begin
       match b with
       | `Left  -> (es.es_ml, es.es_sl)
       | `Right -> (es.es_mr, es.es_sr)
+  end
+  | Some b, FaequivS  aes -> begin
+      match b with
+      | `Left  -> (aes.aes_ml, aes.aes_sl)
+      | `Right -> (aes.aes_mr, aes.aes_sr)
   end
   | _, _ -> destr_error "programS"
 
@@ -904,6 +1006,10 @@ let is_exists    f = is_from_destr destr_exists1   f
 let is_lambda    f = is_from_destr destr_lambda    f
 let is_let       f = is_from_destr destr_let1      f
 let is_equivF    f = is_from_destr destr_equivF    f
+let is_aequivF   f = is_from_destr destr_aequivF   f
+let is_aequivS   f = is_from_destr destr_aequivS   f
+let is_ahoareF   f = is_from_destr destr_ahoareF   f
+let is_ahoareS   f = is_from_destr destr_ahoareS   f
 let is_equivS    f = is_from_destr destr_equivS    f
 let is_eagerF    f = is_from_destr destr_eagerF    f
 let is_hoareS    f = is_from_destr destr_hoareS    f
@@ -1030,8 +1136,10 @@ let expr_of_ss_inv f =
     | Fglob     _
     | FhoareF   _ | FhoareS   _
     | FeHoareF  _ | FeHoareS  _
+    | FahoareF  _ | FahoareS  _
     | FbdHoareF _ | FbdHoareS _
     | FequivF   _ | FequivS   _
+    | FaequivF  _ | FaequivS  _
     | FeagerF   _ | Fpr       _ -> raise CannotTranslate
 
   and auxbd ((x, bd) : binding) =
@@ -1067,8 +1175,10 @@ let expr_of_form f =
     | Fpvar     _ | Fglob     _
     | FhoareF   _ | FhoareS   _
     | FeHoareF  _ | FeHoareS  _
+    | FahoareF  _ | FahoareS  _
     | FbdHoareF _ | FbdHoareS _
     | FequivF   _ | FequivS   _
+    | FaequivF  _ | FaequivS  _
     | FeagerF   _ | Fpr       _ -> raise CannotTranslate
 
   and auxbd ((x, bd) : binding) =

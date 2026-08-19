@@ -362,6 +362,22 @@ module PV = struct
       | FeHoareS hs ->
           in_mem_scope env fv [fst hs.ehs_m] [(ehs_pr hs).inv; (ehs_po hs).inv]
 
+      | FahoareF ahf ->
+          in_mem_scope env fv [ahf.ahf_m]
+            [(ahf_b ahf).inv; (ahf_pr ahf).inv; (ahf_po ahf).inv]
+
+      | FahoareS ahs ->
+          in_mem_scope env fv [fst ahs.ahs_m]
+            [(ahs_b ahs).inv; (ahs_pr ahs).inv; (ahs_po ahs).inv]
+
+      | FaequivF aef ->
+          in_mem_scope env fv [aef.aef_ml; aef.aef_mr]
+            [(aef_pr aef).inv; (aef_po aef).inv; (aef_ep aef).inv; (aef_dp aef).inv]
+
+      | FaequivS aes ->
+          in_mem_scope env fv [fst aes.aes_ml; fst aes.aes_mr]
+            [(aes_pr aes).inv; (aes_po aes).inv; (aes_ep aes).inv; (aes_dp aes).inv]
+
       | FbdHoareF bhf ->
           in_mem_scope env fv [bhf.bhf_m] [(bhf_pr bhf).inv; (bhf_po bhf).inv; (bhf_bd bhf).inv]
 

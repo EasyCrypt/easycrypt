@@ -23,6 +23,10 @@ type f_node   = EcAst.f_node
 type eagerF   = EcAst.eagerF
 type equivF   = EcAst.equivF
 type equivS   = EcAst.equivS
+type aequivF  = EcAst.aequivF
+type aequivS  = EcAst.aequivS
+type ahoareF  = EcAst.ahoareF
+type ahoareS  = EcAst.ahoareS
 type sHoareF  = EcAst.sHoareF
 type sHoareS  = EcAst.sHoareS
 type eHoareF  = EcAst.eHoareF
@@ -123,6 +127,13 @@ val f_eHoareS_r : eHoareS -> form
 val f_eHoareF : ss_inv -> xpath -> ss_inv -> form
 val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
 
+(* soft-constructors - ahoare *)
+val f_ahoareF_r : ahoareF -> form
+val f_ahoareS_r : ahoareS -> form
+
+val f_ahoareF : b:ss_inv -> ss_inv -> xpath -> ss_inv -> form
+val f_ahoareS : memtype -> b:ss_inv -> ss_inv -> stmt -> ss_inv -> form
+
 (* soft-constructors - eager *)
 
 (* soft-constructors - bd hoare *)
@@ -140,6 +151,15 @@ val f_equivS_r : equivS -> form
 
 val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
 val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
+
+(* soft-constructors - aequiv *)
+val f_aequivF_r : aequivF -> form
+val f_aequivS_r : aequivS -> form
+
+val f_aequivF : ep:ts_inv -> dp:ts_inv -> ts_inv -> xpath -> xpath -> ts_inv -> form
+val f_aequivS :
+  memtype -> memtype -> ep:ts_inv -> dp:ts_inv
+  -> ts_inv -> stmt -> stmt -> ts_inv -> form
 
 (* soft-constructors - eager *)
 val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form
@@ -273,6 +293,10 @@ val destr_let       : form -> lpattern * form * form
 val destr_let1      : form -> EcIdent.t * ty * form * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
+val destr_aequivF   : form -> aequivF
+val destr_aequivS   : form -> aequivS
+val destr_ahoareF   : form -> ahoareF
+val destr_ahoareS   : form -> ahoareS
 val destr_eagerF    : form -> eagerF
 val destr_hoareF    : form -> sHoareF
 val destr_hoareS    : form -> sHoareS
@@ -307,6 +331,10 @@ val is_pvar      : form -> bool
 val is_proj      : form -> bool
 val is_equivF    : form -> bool
 val is_equivS    : form -> bool
+val is_aequivF   : form -> bool
+val is_aequivS   : form -> bool
+val is_ahoareF   : form -> bool
+val is_ahoareS   : form -> bool
 val is_eagerF    : form -> bool
 val is_hoareF    : form -> bool
 val is_hoareS    : form -> bool
