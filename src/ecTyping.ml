@@ -1802,7 +1802,9 @@ let top_is_mem_binding pf = match pf with
       ) bds
 
   | PFhoareF   _
+  | PFahoareF  _
   | PFequivF   _
+  | PFaequivF  _
   | PFeagerF   _
   | PFprob     _
   | PFBDhoareF _
@@ -3628,6 +3630,42 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail penv ue pre.pl_loc  ~expct:txreal pre'.f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:txreal post'.f_ty;
           f_eHoareF {m;inv=pre'} fpath {m;inv=post'}
+
+    | PFahoareF (m, b, (pre, gp, post)) ->
+        if mode <> `Form then
+          tyerror f.pl_loc env (NotAnExpression `Logic);
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
+        let fpath = trans_gamepath env gp in
+        let penv, qenv = EcEnv.Fun.hoareF m fpath env in
+        let pre'  = transf penv pre in
+        let post' = transf qenv post in
+        let b'    = transf env b in
+          unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
+          unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
+          unify_or_fail  env ue b.pl_loc    ~expct:treal b'   .f_ty;
+          f_ahoareF ~b:{m;inv=b'} {m;inv=pre'} fpath {m;inv=post'}
+
+    | PFaequivF aef ->
+        if mode <> `Form then
+          tyerror f.pl_loc env (NotAnExpression `Logic);
+        let ml = odfl "&1" (omap unloc (fst aef.paf_mem)) in
+        let ml = EcIdent.create ml in
+        let mr = odfl "&2" (omap unloc (snd aef.paf_mem)) in
+        let mr = EcIdent.create mr in
+        let fpath1 = trans_gamepath env (fst aef.paf_pth) in
+        let fpath2 = trans_gamepath env (snd aef.paf_pth) in
+        let ep = transf env (fst aef.paf_bds) in
+        let dp = transf env (snd aef.paf_bds) in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
+        let pr = transf penv (fst aef.paf_cds) in
+        let po = transf qenv (snd aef.paf_cds) in
+          unify_or_fail penv ue (fst aef.paf_cds).pl_loc ~expct:tbool pr.f_ty;
+          unify_or_fail qenv ue (snd aef.paf_cds).pl_loc ~expct:tbool po.f_ty;
+          unify_or_fail  env ue (fst aef.paf_bds).pl_loc ~expct:treal ep.f_ty;
+          unify_or_fail  env ue (snd aef.paf_bds).pl_loc ~expct:treal dp.f_ty;
+          f_aequivF ~ep:{ml;mr;inv=ep} ~dp:{ml;mr;inv=dp}
+            {ml;mr;inv=pr} fpath1 fpath2 {ml;mr;inv=po}
 
     | PFBDhoareF (m, pre, gp, post, hcmp, bd) ->
         if mode <> `Form then

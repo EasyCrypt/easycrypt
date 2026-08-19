@@ -380,8 +380,11 @@
 %token ABORT
 %token ABBREV
 %token ABSTRACT
+%token AC
 %token ADMIT
 %token ADMITTED
+%token AEQUIV
+%token AHOARE
 %token ALGNORM
 %token ALIAS
 %token AMP
@@ -392,10 +395,12 @@
 %token ASYNC
 %token AT
 %token AUTO
+%token AWHILE
 %token AXIOM
 %token AXIOMATIZED
 %token BACKSLASH
 %token BETA
+%token BW
 %token BITSTRING
 %token BIND
 %token BY
@@ -485,9 +490,11 @@
 %token INLINE
 %token INTERLEAVE
 %token INSTANCE
+%token INT
 %token IOTA
 %token IS
 %token KILL
+%token LAP
 %token LARROW
 %token LAST
 %token LBRACE
@@ -514,6 +521,7 @@
 %token NOT
 %token NOTATION
 %token OF
+%token OFEQUIV
 %token OP
 %token OUTLINE
 %token PCENT
@@ -533,6 +541,8 @@
 %token PROGRESS
 %token PROOF
 %token PROVER
+%token PWEQ
+%token UTB
 %token QED
 %token QUESTION
 %token RAISE
@@ -596,6 +606,8 @@
 %token TILD
 %token TIME
 %token TIMEOUT
+%token TOEQUIV
+%token TOHOARE
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
@@ -690,6 +702,10 @@ _lident:
 | EDIT       { "edit"       }
 | FIX        { "fix"        }
 | GLOBAL     { "global"     }
+| INT        { "int"        }
+| LAP        { "lap"        }
+| AC         { "ac"         }
+| BW         { "bw"         }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -1139,7 +1155,11 @@ sform_u(P):
 
 | EHOARE LBRACKET hb=ehoare_body(P) RBRACKET { hb }
 
+| AHOARE LBRACKET hb=ahoare_body(P) RBRACKET { hb }
+
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
+
+| AEQUIV LBRACKET eb=aequiv_body(P) RBRACKET { eb }
 
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
@@ -1276,6 +1296,21 @@ equiv_body(P):
   mp1=loc(fident) ml=brace(mident)? TILD mp2=loc(fident) mr=brace(mident)?
   COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFequivF (ml, mr, pre, (mp1, mp2), post) }
+
+ahoare_body(P):
+  LBRACKET bp=sform_r(P) RBRACKET mp=loc(fident) m=brace(mident)?
+  COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFahoareF (m, bp, (pre, mp, post)) }
+
+aequiv_body(P):
+  LBRACKET ep=sform_r(P) AMP dp=sform_r(P) RBRACKET
+  mp1=loc(fident) ml=brace(mident)? TILD mp2=loc(fident) mr=brace(mident)?
+  COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFaequivF
+        { paf_mem = (ml, mr);
+          paf_bds = (ep, dp);
+          paf_cds = (pre, post);
+          paf_pth = (mp1, mp2); } }
 
 eager_body(P):
 | s1=stmt COMMA  mp1=loc(fident) ml=brace(mident)? TILD mp2=loc(fident) COMMA s2=stmt mr=brace(mident)?
@@ -2016,7 +2051,9 @@ axiom:
     { mk_axiom ~locality:l d ao }
 
 | l=locality  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
+| l=locality AEQUIV x=ident pd=pgtybindings? COLON p=loc(aequiv_body(none)) ao=axiom_tc
 | l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
+| l=locality AHOARE x=ident pd=pgtybindings? COLON p=loc(ahoare_body(none)) ao=axiom_tc
 | l=locality EHOARE x=ident pd=pgtybindings? COLON p=loc( ehoare_body(none)) ao=axiom_tc
 | l=locality PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
     { mk_axiom ~locality:l (x, None, None, pd, p) ao }
@@ -2870,6 +2907,12 @@ app_bd_info:
 | f=prod_form g=prod_form s=sform?
     { PSeqMult (s, fst f, snd f, fst g, snd g) }
 
+| LT LBRACKET e=sform AMP d=sform RBRACKET GT
+    { PSeqDiff (e, d) }
+
+| LT LBRACKET b=sform GT
+    { PSeqAcc b }
+
 revert:
 | cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
   { { pr_clear = odfl [] cl; pr_genp = gp; } }
@@ -3272,6 +3315,9 @@ direction:
 | CONSEQ cq=cqoptions?
     { Pconseq (odfl [] cq, (None, None, None)) }
 
+| CONSEQ LT LBRACKET e=sform AMP d=sform RBRACKET GT
+     { Pconseq_aprhl (e, d) }
+
 | CONSEQ cq=cqoptions? info1=gpterm(conseq_xt)
     { Pconseq (odfl [] cq, (Some info1, None, None)) }
 
@@ -3379,6 +3425,50 @@ direction:
 
 | LOSSLESS
     { Plossless }
+
+  (* aPRHL *)
+| TOEQUIV
+    { Paprhl Atoequiv }
+
+| OFEQUIV
+    { Paprhl Aofequiv }
+
+| TOHOARE
+    { Paprhl Atohoare }
+
+| LAP k=sform
+    { Paprhl (Alap (`Null k)) }
+
+| LAP k1=sform k2=sform
+    { Paprhl (Alap (`Gen (k1, k2))) }
+
+| INT LAP
+    LBRACKET p=sform COMMA q=sform RBRACKET
+    LBRACKET r=sform COMMA s=sform RBRACKET
+    n=sexpr AMP sg=sexpr AMP k=sexpr
+    { Paprhl (Alap (`Int (((p, q), (r, s)), (n, sg), k))) }
+
+| AWHILE
+    LBRACKET ef=sexpr AMP df=sexpr RBRACKET
+    n=sexpr
+    LBRACKET v=form RBRACKET inv=sform
+    { Paprhl (Awhile ((ef, df), (v, inv), n)) }
+
+| AWHILE AC w=sexpr
+    LBRACKET ef=sexpr AMP df=sexpr RBRACKET
+    LBRACKET v=sform AMP bN=sexpr RBRACKET inv=sform
+    { Paprhl (AwhileAc ((ef, df), (v, inv), (bN, w))) }
+
+| PWEQ LPAREN e1=sform COMMA e2=sform RPAREN
+    { Paprhl (APwEq (e1, e2)) }
+
+| UTB LPAREN e1=sform COMMA e2=sform RPAREN COLON
+    LBRACKET bad=sform COMMA delta=sform RBRACKET
+    { Paprhl (AUtbL ((e1, e2), (bad, delta))) }
+
+| BW LBRACKET f=sexpr COMMA g=sexpr RBRACKET
+    LPAREN p=sform LONGARROW q=sform RPAREN
+    { Paprhl (Abw ((f, g), (p, q))) }
 
 | PROC CHANGE side=side? pos=codepos_or_range COLON b=option(bracket(ptybindings)) s=brace(stmt)
     { Pchangestmt (side, b, PosOrRange pos, s) }

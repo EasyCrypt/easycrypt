@@ -254,10 +254,19 @@ and pformula_r =
   | PFscope   of pqsymbol * pformula
   | PFhoareF   of psymbol option * pformula * pgamepath * phoare_post
   | PFehoareF  of psymbol option * pformula * pgamepath * pformula
+  | PFahoareF  of psymbol option * pformula * (pformula * pgamepath * pformula)
   | PFequivF   of psymbol option * psymbol option * pformula * (pgamepath * pgamepath) * pformula
+  | PFaequivF  of paequiv
   | PFeagerF   of psymbol option * psymbol option * pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of psymbol option * pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of psymbol option * pformula * pgamepath * pformula * phoarecmp * pformula
+
+and paequiv = {
+  paf_mem : psymbol option * psymbol option;
+  paf_bds : pformula * pformula;
+  paf_cds : pformula * pformula;
+  paf_pth : pgamepath * pgamepath;
+}
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
@@ -630,6 +639,8 @@ type p_seq_xt_info =
   | PSeqNone
   | PSeqSingle of pformula
   | PSeqMult   of (pformula option) tuple5
+  | PSeqDiff   of pformula pair
+  | PSeqAcc    of pformula
 
 type ('a, 'b, 'c) rnd_tac_info =
   | PNoRndParams
@@ -879,6 +890,7 @@ type phltactic =
   | Psetmatch      of (oside * pcodepos * psymbol * pformula)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Pconseqauto    of crushmode
+  | Pconseq_aprhl  of pformula * pformula
   | Pconcave       of (pformula option tuple2 gppterm * pformula)
   | Phrex_elim
   | Phrex_intro    of (pformula list * bool)
@@ -911,6 +923,9 @@ type phltactic =
     (* Relation between logic *)
   | Pbd_equiv of (side * pformula * pformula)
 
+    (* aPRHL *)
+  | Paprhl of paprhl
+
     (* Automation *)
   | Pauto
   | Plossless
@@ -924,6 +939,23 @@ type phltactic =
 and rwprgm = [
   | `IdAssign of pcodepos * pqsymbol
   | `Change   of pcodepos * ptybindings option * int * pstmt
+]
+
+and paprhl =
+  | Atoequiv
+  | Aofequiv
+  | Atohoare
+  | APwEq    of (pformula pair)
+  | AUtbL    of (pformula pair * pformula pair)
+  | Alap     of lap_mode
+  | Awhile   of (pexpr pair * pformula pair * pexpr)
+  | AwhileAc of (pexpr pair * pformula pair * pexpr pair)
+  | Abw      of (pexpr pair * pformula pair)
+
+and lap_mode = [
+  | `Gen  of pformula pair
+  | `Null of pformula
+  | `Int  of (pformula pair pair * pexpr pair * pexpr)
 ]
 
 and circuit_mode = [
