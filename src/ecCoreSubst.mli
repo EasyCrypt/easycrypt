@@ -28,6 +28,8 @@ val f_subst_init :
        ?freshen:bool
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
+    -> ?idx:tindex Mid.t
+    -> ?iu:tindex Muid.t
     -> ?esloc:expr Mid.t
     -> unit
     -> f_subst
@@ -43,6 +45,14 @@ module Tuni : sig
 end
 
 (* -------------------------------------------------------------------- *)
+(* Freshen a body's declaration parameters of both kinds; idxvars are
+   renamed in BOTH namespaces (tindex positions and int-typed
+   formula-local occurrences). Returns (body, fresh idxvars, fresh
+   tyvars). *)
+val f_freshen_tparams :
+  EcIdent.t list -> EcIdent.t list -> form
+  -> form * EcIdent.t list * EcIdent.t list
+
 module Tvar : sig
   val init      : EcIdent.t list -> ty list -> ty Mid.t
   val subst1    : (EcIdent.t * ty) -> ty -> ty
@@ -56,8 +66,10 @@ val add_elocal  : (EcIdent.t * ty) subst_binder
 val add_elocals : (EcIdent.t * ty) list subst_binder
 val bind_elocal : f_subst -> EcIdent.t -> expr -> f_subst
 
-
 (* -------------------------------------------------------------------- *)
+val targs_subst  : targs  substitute
+val tindex_subst : tindex substitute
+
 val ty_subst : ty substitute
 val e_subst  : expr substitute
 val s_subst  : stmt substitute
@@ -71,6 +83,8 @@ module Fsubst : sig
        ?freshen:bool
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
+    -> ?idx:tindex Mid.t
+    -> ?iu:tindex Muid.t
     -> ?esloc:expr Mid.t
     -> unit -> f_subst
 

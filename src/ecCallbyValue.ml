@@ -14,26 +14,24 @@ module BI = EcBigInt
 (* Per-run caches. Operator lookups, and the instantiation of operator
    bodies (which [Tvar.f_subst ~freshen:true] otherwise rebuilds - and
    re-hashconses - at every single unfolding), are keyed by path and type
-   instance. Sharing one freshened body across unfoldings is sound: cbv
+   instance, indices included: [f[:3]] and [f[:5]] are distinct instances. Sharing one freshened body across unfoldings is sound: cbv
    never substitutes eagerly under the binders it has not consumed, and
    [Fsubst] is capture-avoiding, so reusing binder names across nested
    unfoldings cannot capture. *)
 module InstKey = struct
-  type t = EcPath.path * ty list
+  type t = EcPath.path * targs
 
-  let equal ((p1, tys1) : t) ((p2, tys2) : t) =
-       EcPath.p_equal p1 p2
-    && List.length tys1 = List.length tys2
-    && List.for_all2 ty_equal tys1 tys2
+  let equal ((p1, ta1) : t) ((p2, ta2) : t) =
+    EcPath.p_equal p1 p2 && targs_equal ta1 ta2
 
-  let hash ((p, tys) : t) =
-    Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) tys
+  let hash ((p, ta) : t) =
+    targ_hash (EcPath.p_hash p) ta
 end
 
 module HInst = Hashtbl.Make(InstKey)
 
 module FixKey = struct
-  type t = EcPath.path * ty list * int list
+  type t = EcPath.path * targs * int list
 
   let equal ((p1, tys1, idx1) : t) ((p2, tys2, idx2) : t) =
        InstKey.equal (p1, tys1) (p2, tys2)
@@ -141,6 +139,12 @@ let rec f_eq_simpl st f1 f2 =
   if f_equal f1 f2 then f_true else
 
   match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
+  (* Ignoring the ctor targs (types AND indices) is sound only because
+     datatypes are NON-REFINING: a ctor's result type is the datatype
+     at its own binders, so same-typed ctor applications have
+     canonically equal targs (f1/f2 share a type here). A refining-
+     datatype extension must revisit this and the parallel case in
+     EcReduction.reduce_logic. *)
   | (Fop (p1, _), args1), (Fop (p2, _), args2)
       when is_dtype_ctor st p1
            && is_dtype_ctor st p2 ->
@@ -307,7 +311,7 @@ and betared st s bd f args =
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_record_projection
-  (st : state) ((p, _tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, _tys) : EcPath.path * targs) (args : args)
 =
   let exception Bailout in
 
@@ -335,7 +339,7 @@ and try_reduce_record_projection
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_fixdef
-  (st : state) ((p, tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, tys) : EcPath.path * targs) (args : args)
 =
   let exception Bailout in
 
@@ -394,7 +398,10 @@ and try_reduce_fixdef
       | Some body -> body
       | None ->
         let body = EcFol.form_of_expr body in
-        let body = Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+        let body =
+          EcFol.f_subst_tparams ~freshen:true
+            op.EcDecl.op_tparams.idxvars op.EcDecl.op_tparams.tyvars
+            tys body in
         HFix.add st.st_cache.c_fix key body; body
     in
 
@@ -457,7 +464,9 @@ and reduce_user_delta st f1 p tys args =
             | None ->
               let op = oget (oper st p) in
               let f =
-                Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+                EcFol.f_subst_tparams ~freshen:true
+                  op.EcDecl.op_tparams.idxvars op.EcDecl.op_tparams.tyvars
+                  tys body in
               HInst.add st.st_cache.c_plain key f; f
           in
           cbv st Subst.subst_id f args

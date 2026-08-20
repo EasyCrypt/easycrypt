@@ -41,8 +41,12 @@ op bad_result : int = h 0.
 expect fail "operator `Top.List.filter' cannot be applied to arguments of type:
   [1]: int -> int
   [2]: int list
+its type is
+  ('a -> bool) -> 'a list -> 'a list
+where the type parameters were inferred as:
+  'a = int
 its #1 argument is expected to have type
-  #a -> bool
+  int -> bool
 but is applied to a value of type
   int -> int"
 op bad_arg (s : int list) : int list =
@@ -288,3 +292,43 @@ expect fail "no matching operator, named `List.frobnicate', for the following pa
 op unknown (s : int list) : int list =
   List.frobnicate s.
 
+(* --- explicit index / type-parameter instantiations ---------------- *)
+
+type {k} 'a ivec.
+
+op ixop {n m} ['a, 'b] : 'a -> 'b -> bool.
+op ivcat {n m} ['a] : 'a ivec<:n> -> 'a ivec<:m> -> 'a ivec<:n+m>.
+
+expect fail "operator `Top.ixop' cannot be applied:
+it takes 2 index parameter(s) but is given 1"
+op b1 = ixop[:3]<:int, real>.
+
+expect fail "operator `Top.ixop' cannot be applied:
+it has no index parameter named `p'"
+op b2 = ixop[:p = 3]<:int, real>.
+
+expect fail "operator `Top.ixop' cannot be applied:
+it has no type parameter named `'c'"
+op b3 = ixop<:'c = int>.
+
+expect fail "operator `Top.ixop' cannot be applied:
+it takes 2 type parameter(s) but is given 1"
+op b4 = ixop[:3, 4]<:int>.
+
+(* inferred index parameters are reported on application failures *)
+expect fail "operator `Top.ivcat' cannot be applied to arguments of type:
+  [1]: int ivec<:3>
+  [2]: int ivec<:5>
+its type is
+  'a ivec<:n> -> 'a ivec<:m> -> 'a ivec<:n + m>
+where the index parameters were inferred as:
+  n = 3
+  m = 5
+where the type parameters were inferred as:
+  'a = int
+it returns a value of type
+  int ivec<:3 + 5>
+but a value of type
+  int ivec<:9>
+was expected"
+op b5 (u : int ivec<:3>) (v : int ivec<:5>) : int ivec<:9> = ivcat u v.

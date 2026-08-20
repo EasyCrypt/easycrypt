@@ -19,6 +19,21 @@ lemma intind (p:int -> bool):
 proof. exact/CoreInt.intind. qed.
 
 (* -------------------------------------------------------------------- *)
+(* Index expressions range over the NATURALS, and the system enforces
+   that discipline at every entry point: the surface index grammar has
+   no negative literals, index arithmetic (addition, multiplication)
+   is closed over the naturals, the affine index solver refuses
+   solutions that could go negative, and the proof-term bridge
+   ([propagate_idx_link]) only instantiates an index variable with
+   indices built from the goal's own index variables.  This axiom
+   makes the enforced invariant available as a fact — e.g.
+   [ge0_index[:n]] inside a [declare index {n}] section.  Every
+   reachable instantiation satisfies it; breaking any of the entry
+   points above re-opens the derivations of [false] pinned by
+   tests/indexed-nonneg.ec. *)
+axiom ge0_index {k} : 0 <= k.
+
+(* -------------------------------------------------------------------- *)
 lemma addzA     : forall x y z, x + (y + z) = (x + y) + z    by smt().
 lemma addzC     : forall x y, x + y = y + x                  by smt().
 lemma addz0     : forall x, x + 0 = x                        by smt().

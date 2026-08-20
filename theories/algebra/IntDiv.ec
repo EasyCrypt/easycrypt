@@ -1461,6 +1461,24 @@ qed.
 *)
 
 (* -------------------------------------------------------------------- *)
+(* Range facts packaging [edivzP]/[ltz_divLR] in the forms bit-level
+   developments consume (cf. IWord). *)
+lemma gt0_pow2 (k : int) : 0 < 2 ^ k.
+proof. by rewrite expr_gt0. qed.
+
+lemma dvd2_pow2 (m : int) : 1 <= m => 2 %| 2 ^ m.
+proof. by move=> hm; rewrite -{1}expr1 dvdz_exp2l /#. qed.
+
+lemma modz_cmp (m d : int) : 0 < d => 0 <= m %% d < d.
+proof. smt(edivzP). qed.
+
+lemma divz_cmp (d i m : int) : 0 < d => 0 <= i < m * d => 0 <= i %/ d < m.
+proof. by move=> hd [hi1 hi2]; rewrite divz_ge0 // hi1 /= ltz_divLR. qed.
+
+lemma bound_abs (i j : int) : 0 <= i < j => 0 <= i < `|j|.
+proof. smt(). qed.
+
+(* -------------------------------------------------------------------- *)
 require import Real.
 
 lemma fromint_div (x y : int) : y %| x => (x %/ y)%r = x%r / y%r.

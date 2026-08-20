@@ -112,7 +112,13 @@ let process_local_hint (hint : plocalhint) (tc : tcenv1) =
         let simpl =
           List.fold_left (fun simpl lemma ->
             let path = EcEnv.Ax.lookup_path (unloc lemma) env in
-            let rules = EcReduction.User.compile ~opts ~prio:0 env path in
+            let rules =
+              try EcReduction.User.compile ~opts ~prio:0 env path
+              with EcReduction.User.InvalidUserRule e ->
+                tc_error !!tc ~loc:lemma.pl_loc
+                  "invalid rewrite rule `%s': %s"
+                  (EcSymbols.string_of_qsymbol (unloc lemma))
+                  (EcReduction.User.string_of_error e) in
             EcEnv.SimplifyContext.add_rules
               (List.map (fun rule -> (path, rule)) rules) simpl)
             simpl h.ph_lemmas
@@ -199,7 +205,13 @@ let process_simplify_info ri (tc : tcenv1) =
     let opts = EcTheory.{ ur_delta = false; ur_eqtrue = false; } in
     List.fold_left (fun simpl lemma ->
       let path = EcEnv.Ax.lookup_path (unloc lemma) env in
-      let rules = EcReduction.User.compile ~opts ~prio:0 env path in
+      let rules =
+        try EcReduction.User.compile ~opts ~prio:0 env path
+        with EcReduction.User.InvalidUserRule e ->
+          tc_error !!tc ~loc:lemma.pl_loc
+            "invalid rewrite rule `%s': %s"
+            (EcSymbols.string_of_qsymbol (unloc lemma))
+            (EcReduction.User.string_of_error e) in
       EcEnv.SimplifyContext.add_rules
         (List.map (fun rule -> (path, rule)) rules) simpl
     ) simpl hint.ph_lemmas
@@ -693,6 +705,25 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
     tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
+let process_exacttype qs (tc : tcenv1) =
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let p =
+    try EcEnv.Ax.lookup_path (EcLocation.unloc qs) env
+    with LookupFailure cause ->
+      tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
+  in
+  let tys =
+    List.map (fun a -> EcTypes.tvar a)
+      (EcEnv.LDecl.tohyps hyps).h_tvar.tyvars in
+  let pt = ptglobal ~tys p in
+
+  try
+    EcLowGoal.t_apply pt tc
+  with InvalidGoalShape ->
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    tc_error !!tc "cannot apply %a@." (EcPrinting.pp_axname ppe) p
+
+(* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
   let module E = struct exception NoInstance end in
 
@@ -854,11 +885,15 @@ let process_delta ?(rigid = false) ?target ((s :rwside), o, p) tc =
     end
 
     | SFlocal x when LDecl.can_unfold x hyps ->
-        ([], [], LDecl.unfold x hyps, [], None)
+        ({ indices = []; types = [] },
+         { EcDecl.idxvars = []; EcDecl.tyvars = [] },
+         LDecl.unfold x hyps, [], None)
 
     | SFother { f_node = Fapp ({ f_node = Flocal x }, args) }
         when LDecl.can_unfold x hyps ->
-        ([], [], LDecl.unfold x hyps, args, None)
+        ({ indices = []; types = [] },
+         { EcDecl.idxvars = []; EcDecl.tyvars = [] },
+         LDecl.unfold x hyps, args, None)
 
     | _ -> tc_error !!tc "not headed by an operator/predicate"
 
@@ -904,14 +939,17 @@ let process_delta ?(rigid = false) ?target ((s :rwside), o, p) tc =
             match sform_of_form fp with
             | SFop ((_, tvi), []) -> begin
               (* FIXME: TC HOOK *)
-              let body  = Tvar.f_subst ~freshen:true tparams tvi body in
+              let body  =
+                EcFol.f_subst_tparams ~freshen:true
+                  tparams.EcDecl.idxvars tparams.EcDecl.tyvars tvi body in
               let body  = f_app body args topfp.f_ty in
                 try  EcReduction.h_red EcReduction.beta_red hyps body
                 with EcEnv.NotReducible -> body
             end
 
             | SFlocal _ -> begin
-                assert (tparams = []);
+                assert (   List.is_empty tparams.EcDecl.tyvars
+                        && List.is_empty tparams.EcDecl.idxvars);
                 let body = f_app body args topfp.f_ty in
                   try  EcReduction.h_red EcReduction.beta_red hyps body
                   with EcEnv.NotReducible -> body
@@ -927,7 +965,9 @@ let process_delta ?(rigid = false) ?target ((s :rwside), o, p) tc =
   | `RtoL ->
     let fp =
       (* FIXME: TC HOOK *)
-      let body  = Tvar.f_subst ~freshen:true tparams tvi body in
+      let body  =
+        EcFol.f_subst_tparams ~freshen:true
+          tparams.EcDecl.idxvars tparams.EcDecl.tyvars tvi body in
       let fp    = f_app body args p.f_ty in
         try  EcReduction.h_red EcReduction.beta_red hyps fp
         with EcEnv.NotReducible -> fp

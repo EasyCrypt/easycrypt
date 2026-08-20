@@ -29,7 +29,7 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
       let ty = EcTyping.transty EcTyping.tp_tydecl env ue ty in
       assert (EcUnify.UniEnv.closed ue);
       let ty = 
-        let subst = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
+        let subst = EcUnify.UniEnv.close_subst ue in
         EcCoreSubst.ty_subst subst ty in
       let x = Option.map EcLocation.unloc (EcLocation.unloc x) in
       let vr = EcAst.{ ov_name = x; ov_type = ty; } in
@@ -50,7 +50,7 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
     if not (EcUnify.UniEnv.closed ue) 
     then tc_error !!tc "Failed to infer all types for type variables"; 
 
-    let sb = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
+    let sb = EcUnify.UniEnv.close_subst ue in
     EcCoreSubst.s_subst sb s in
 
   let zp = Zpr.zipper_of_cpos env cpos hs.hs_s in

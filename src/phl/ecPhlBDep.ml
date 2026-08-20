@@ -199,7 +199,7 @@ let t_bdep_solve (tc : tcenv1) =
   | _ -> begin
     try
       let ctxt = tohyps hyps in
-      assert (ctxt.h_tvar = []);
+      assert (ctxt.h_tvar.tyvars = [] && ctxt.h_tvar.idxvars = []);
       let st = circuit_state_of_hyps hyps in
       let cgoal = circuit_of_form st hyps goal |> state_close_circuit st in
       if circ_valid cgoal then FApi.close !@tc VBdep
@@ -301,11 +301,11 @@ let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
 
   let goals =
     match sform_of_form (tc1_goal tc), v with
-    | SFop ((p, [tp]), [fpred; flist]), None
+    | SFop ((p, { indices = []; types = [tp] }), [fpred; flist]), None
       when EcPath.p_equal p EcCoreLib.CI_List.p_all && tp = tint ->
       begin
         match sform_of_form flist with
-        | SFop ((p, []), [fstart; flen])
+        | SFop ((p, { indices = []; types = [] }), [fstart; flen])
           when EcPath.p_equal p EcCoreLib.CI_List.p_iota ->
           let start =
             match sform_of_form fstart with

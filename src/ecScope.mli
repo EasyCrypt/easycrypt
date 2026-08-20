@@ -155,6 +155,11 @@ module Mod : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Index : sig
+  val declare : scope -> psymbol list -> scope
+end
+
+(* -------------------------------------------------------------------- *)
 module ModType : sig
   val add : ?src:string -> scope -> pinterface -> scope
 end
