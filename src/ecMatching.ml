@@ -828,7 +828,7 @@ module MEV = struct
     v
 
   let assubst ue ev env =
-    let subst = f_subst_init ~tu:(EcUnify.UniEnv.assubst ue) () in
+    let subst = EcUnify.UniEnv.as_subst ue in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
     let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
     let seen  = ref Sid.empty in
@@ -1048,7 +1048,38 @@ let f_match_core ?(conv_ri = EcReduction.full_compat) opts hyps (ue, ev) f1 f2 =
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
             failure ();
-          try  List.iter2 (EcUnify.unify env ue) tys1 tys2
+          if List.compare_lengths tys1.indices tys2.indices <> 0 then
+            failure ();
+          if List.compare_lengths tys1.types tys2.types <> 0 then
+            failure ();
+          (* Index unification on Fop heads: when BOTH sides are
+             univar-free the indices are ground data -- a mismatch is
+             a definitive match failure (tolerating it used to leak
+             ill-matched instances into InvalidGoalShape anomalies
+             downstream). With univars involved, unification is
+             best-effort: a polynomial-against-polynomial with
+             multiple univars (e.g. [bits[:?u_m + ?u_n]] vs
+             [bits[:m + n]]) is genuinely ambiguous in isolation, so
+             defer to arg matching, which typically constrains the
+             individual univars first. Type unification of
+             [tys1.types] is still mandatory. *)
+          let ground ti =
+            let rec go = function
+              | EcAst.TIUnivar _ -> false
+              | EcAst.TIVar _ | EcAst.TIConst _ -> true
+              | EcAst.TIAdd (a, b) | EcAst.TIMul (a, b) -> go a && go b
+            in go ti in
+          List.iter2 (fun i1 i2 ->
+            let i1 = EcUnify.UniEnv.repr_tindex ue i1 in
+            let i2 = EcUnify.UniEnv.repr_tindex ue i2 in
+            if ground i1 && ground i2 then begin
+              if not (EcAst.tindex_equal i1 i2) then failure ()
+            end else
+              try  EcUnify.unify_idx env ue i1 i2
+              with EcUnify.UnificationFailure _ -> ())
+            tys1.indices tys2.indices;
+          try
+            List.iter2 (EcUnify.unify env ue) tys1.types tys2.types
           with EcUnify.UnificationFailure _ -> failure ()
       end
 
@@ -1291,7 +1322,7 @@ let f_match ?conv_ri opts hyps (ue, ev) f1 f2 =
     if not (MEV.filled ev) then
       raise MatchFailure;
     let clue =
-      try  EcUnify.UniEnv.close ue
+      try  EcUnify.UniEnv.close_subst ue
       with EcUnify.UninstantiateUni -> raise MatchFailure
     in
       (ue, clue, ev)

@@ -247,12 +247,11 @@ module PPEnv = struct
             | `Expr -> fun _ op -> not (EcDecl.is_pred op)
             | `Form -> fun _ _  -> true
           in
-          let tvi = Some (EcUnify.TVIunamed typ) in
+          let tvi = Some (EcUnify.TVIunamed (EcUnify.IXunamed [], typ)) in
 
         fun sm ->
           check_for_local sm;
-
-          let by_current ((p, _), _, _, _) =
+          let by_current ((p, _, _), _, _, _) =
             let env = ppe.ppe_env in
             EcPath.isprefix ~prefix:(oget (EcPath.prefix p)) ~path:(EcEnv.root env) in
 
@@ -261,7 +260,7 @@ module PPEnv = struct
           let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
 
           match ops with
-          | [(p1, _), _, _, _] -> p1
+          | [(p1, _, _), _, _, _] -> p1
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
 
     let exists sm =
@@ -805,6 +804,37 @@ let is_pstop name =
   String.length name > 0 && name.[0] = '%'
 
 (* -------------------------------------------------------------------- *)
+(* Pretty-print a tindex polynomial. Precedence: `*` binds tighter
+   than `+`. Atoms (variables, constants, parenthesised expressions)
+   never need parentheses; sums and products inherit their level. *)
+let rec pp_tindex_atom (ppe : PPEnv.t) fmt (ti : tindex) =
+  match ti with
+  | TIVar id   -> Format.fprintf fmt "%s" (PPEnv.local_symb ppe id)
+  | TIUnivar u -> Format.fprintf fmt "?#%d" u
+  | TIConst n  -> Format.fprintf fmt "%s" (EcBigInt.to_string n)
+  | TIAdd _ | TIMul _ ->
+      Format.fprintf fmt "(%a)" (pp_tindex_sum ppe) ti
+
+and pp_tindex_prod (ppe : PPEnv.t) fmt (ti : tindex) =
+  match ti with
+  | TIMul (l, r) ->
+      Format.fprintf fmt "%a * %a"
+        (pp_tindex_prod ppe) l
+        (pp_tindex_atom ppe) r
+  | _ -> pp_tindex_atom ppe fmt ti
+
+and pp_tindex_sum (ppe : PPEnv.t) fmt (ti : tindex) =
+  match ti with
+  | TIAdd (l, r) ->
+      Format.fprintf fmt "%a + %a"
+        (pp_tindex_sum ppe) l
+        (pp_tindex_prod ppe) r
+  | _ -> pp_tindex_prod ppe fmt ti
+
+let pp_tindex (ppe : PPEnv.t) fmt (ti : tindex) =
+  pp_tindex_sum ppe fmt ti
+
+(* -------------------------------------------------------------------- *)
 let rec pp_type_r
   (ppe   : PPEnv.t)
   (outer : opprec * iassoc)
@@ -824,23 +854,30 @@ let rec pp_type_r
         maybe_paren outer t_prio_tpl pp fmt tys
 
   | Tconstr (name, tyargs) -> begin
-      let pp fmt (name, tyargs) =
-        match tyargs with
+      let pp_idx fmt =
+        match tyargs.indices with
+        | [] -> ()
+        | is ->
+            Format.fprintf fmt "<:%a>"
+              (pp_list ",@ " (pp_tindex ppe)) is
+      in
+      let pp fmt (name, tys) =
+        match tys with
         | [] ->
-            pp_tyname ppe fmt name
+            Format.fprintf fmt "%a%t" (pp_tyname ppe) name pp_idx
 
         | [x] ->
-            Format.fprintf fmt "%a %a"
+            Format.fprintf fmt "%a %a%t"
               (pp_type_r ppe (t_prio_name, `Left)) x
-              (pp_tyname ppe) name
+              (pp_tyname ppe) name pp_idx
 
         | xs ->
             let subpp = pp_type_r ppe (min_op_prec, `NonAssoc) in
-              Format.fprintf fmt "%a %a"
+              Format.fprintf fmt "%a %a%t"
                 (pp_paren (pp_list ",@ " subpp)) xs
-                (pp_tyname ppe) name
+                (pp_tyname ppe) name pp_idx
       in
-        maybe_paren outer t_prio_name pp fmt (name, tyargs)
+        maybe_paren outer t_prio_name pp fmt (name, tyargs.types)
     end
 
   | Tfun (t1, t2) ->
@@ -931,17 +968,24 @@ let pp_opname (fmt : Format.formatter) ((nm, op) : symbol list * symbol) =
 
 (* -------------------------------------------------------------------- *)
 let pp_opname_with_tvi
-  (ppe           : PPEnv.t)
-  (fmt           : Format.formatter)
-  ((nm, op, tvi) : symbol list * symbol * ty list option)
+  (ppe                : PPEnv.t)
+  (fmt                : Format.formatter)
+  ((nm, op, ixi, tvi) : symbol list * symbol * tindex list option * ty list option)
 =
+  let pp_ix fmt =
+    match ixi with
+    | None -> ()
+    | Some ixs ->
+        Format.fprintf fmt "[:%a]"
+          (pp_list ",@ " (pp_tindex ppe)) ixs
+  in
   match tvi with
   | None ->
-      pp_opname fmt (nm, op)
+      Format.fprintf fmt "%a%t" pp_opname (nm, op) pp_ix
 
   | Some tvi ->
-      Format.fprintf fmt "%a<:%a>"
-        pp_opname (nm, op)
+      Format.fprintf fmt "%a%t<:%a>"
+        pp_opname (nm, op) pp_ix
         (pp_list ",@ " (pp_type ppe)) tvi
 
 (* -------------------------------------------------------------------- *)
@@ -1104,7 +1148,47 @@ let tvi_dominated (env : EcEnv.env) (op : EcPath.path) (nargs : int) : bool =
       List.fold_left
         (fun acc ty -> Sid.union acc (EcTypes.Tvar.fv ty))
         Sid.empty arg_tys in
-    List.for_all (fun id -> Sid.mem id covered) tparams
+    List.for_all (fun id -> Sid.mem id covered) tparams.tyvars
+
+(* Index variables RECOVERABLE from a type: an idxvar counts as
+   displayed information only when some index determines it -- i.e.
+   the (normalized) index is affine in exactly that one variable with
+   unit coefficient ([vec<:n>], [vec<:n + 1>]), matching the
+   unifier's invertible fragment. [vec<:n + m>] or [vec<:2 * n>]
+   determine nothing. *)
+let recoverable_idxvar (ti : EcAst.tindex) : EcIdent.t option =
+  match EcAst.tindex_normalize ti with
+  | EcAst.TIVar v -> Some v
+  | EcAst.TIAdd (EcAst.TIConst _, EcAst.TIVar v) -> Some v
+  | _ -> None
+
+let rec ty_idxfv_rec (acc : Sid.t) (ty : ty) : Sid.t =
+  let acc =
+    match ty.ty_node with
+    | Tconstr (_, ta) ->
+        List.fold_left
+          (fun acc ti ->
+            match recoverable_idxvar ti with
+            | Some id -> Sid.add id acc
+            | None    -> acc)
+          acc ta.indices
+    | _ -> acc
+  in
+  ty_fold ty_idxfv_rec acc ty
+
+(* Index counterpart of [tvi_dominated]: all index parameters of [op]
+   can be inferred from the types of the first [nargs] arguments. *)
+let ixs_dominated (env : EcEnv.env) (op : EcPath.path) (nargs : int) : bool =
+  match EcEnv.Op.by_path_opt op env with
+  | None -> false
+  | Some opdecl ->
+    let dom, _ = tyfun_flat opdecl.op_ty in
+    let arg_tys = List.take nargs dom in
+    let covered =
+      List.fold_left ty_idxfv_rec Sid.empty arg_tys in
+    List.for_all
+      (fun id -> Sid.mem id covered)
+      opdecl.op_tparams.idxvars
 
 (* -------------------------------------------------------------------- *)
 let pp_opapp
@@ -1120,6 +1204,7 @@ let pp_opapp
   (fmt      : Format.formatter)
   ((pred    : [`Expr | `Form]),
   (op       : EcPath.path),
+  (ixs      : EcAst.tindex list),
   (tvi      : EcTypes.ty list),
   (es       : 'a list),
   (tyopt    : ty option))
@@ -1189,14 +1274,23 @@ let pp_opapp
           then None else Some tvi
       in
 
+      let ixs_opt =
+        if List.is_empty ixs then None
+        else
+          let dominated =
+            ixs_dominated ppe.PPEnv.ppe_env op (List.length es) in
+          if dominated && not ppe.PPEnv.ppe_showtvi
+          then None else Some ixs
+      in
+
       fun () ->
         match es with
         | [] ->
-            pp_opname_with_tvi ppe fmt (nm, opname, tvi_opt)
+            pp_opname_with_tvi ppe fmt (nm, opname, ixs_opt, tvi_opt)
 
         | _  ->
             let pp_first = fun _ _ fmt op ->
-              pp_opname_with_tvi ppe fmt (fst op, snd op, tvi_opt) in
+              pp_opname_with_tvi ppe fmt (fst op, snd op, ixs_opt, tvi_opt) in
             let pp fmt () = pp_app ppe ~pp_first ~pp_sub outer fmt ((nm, opname), es) in
             maybe_paren outer max_op_prec pp fmt ()
 
@@ -1555,7 +1649,7 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form) (opprec : 
         else l_l f2 e_bin_prio_rop4
     | Fapp ({f_node = Fop (op, tys)}, [f1; f2]) ->
         (let (_, opname) =
-           PPEnv.op_symb ppe op (Some (`Form, tys, (List.map t_ty [f1; f2], None))) in
+           PPEnv.op_symb ppe op (Some (`Form, tys.types, (List.map t_ty [f1; f2], None))) in
         match priority_of_binop opname with
         | None         -> None
         | Some opprec' ->
@@ -1723,7 +1817,7 @@ and try_pp_chained_orderings
     match match_pp_notations ~filter:(fun (p, _) -> is_ordering_op p) ppe f with
     | Some ((op, (tvi, _)), ue, ev, ov, [i1; i2]) -> begin
       let ti  = Tvar.subst ov in
-      let tvi = List.map (ti -| tvar) tvi in
+      let tvi = List.map (ti -| tvar) tvi.tyvars in
       let sb  = EcMatching.MEV.assubst ue ev ppe.ppe_env in
       let i1  = Fsubst.f_subst sb i1 in
       let i2  = Fsubst.f_subst sb i2 in
@@ -1734,7 +1828,7 @@ and try_pp_chained_orderings
     | _ -> begin
       match sform_of_form f with
       | SFop ((op, tvi), [i1; i2]) when is_ordering_op op ->
-        (op, tvi), (i1, i2)
+        (op, tvi.types), (i1, i2)
       | _ -> raise Bailout
     end
   in
@@ -1814,7 +1908,7 @@ and match_pp_notations
       let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
       let ue = EcUnify.UniEnv.create None in
       let ov = EcUnify.UniEnv.opentvi ue tv None in
-      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env { idxvars = []; tyvars = [] } in
       let bd = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
       | None -> form_of_expr nt.ont_body
       | Some m -> (ss_inv_of_expr m nt.ont_body).inv in
@@ -1861,12 +1955,12 @@ and try_pp_notations
   | Some ((p, (tv, nt)), ue, ev, ov, eargs) ->
     let ti   = Tvar.subst ov in
     let rty  = ti nt.ont_resty in
-    let tv   = List.map (ti -| tvar) tv in
+    let tv   = List.map (ti -| tvar) tv.tyvars in
     let args = List.map (curry f_local -| snd_map ti) nt.ont_args in
     let args =
       let subst = EcMatching.MEV.assubst ue ev ppe.ppe_env in
       List.map (Fsubst.f_subst subst) args in
-    let f    = f_app (f_op p tv rty) (args @ eargs) f.f_ty in
+    let f    = f_app (f_op p ~tyargs:tv rty) (args @ eargs) f.f_ty in
     pp_form_core_r ppe outer fmt f; true
 
 and pp_poe (ppe : PPEnv.t) (fmt : Format.formatter) (poe : form Mop.t) =
@@ -1879,7 +1973,7 @@ and pp_poe (ppe : PPEnv.t) (fmt : Format.formatter) (poe : form Mop.t) =
     let args = List.map doarg bd in
     let tys = List.map (fun (_, ty) -> EcFol.as_gtty ty) bd in
     let ty = EcTypes.toarrow tys EcTypes.texn in
-    let eargs = EcFol.f_app (EcFol.f_op e [] ty) args EcTypes.texn in
+    let eargs = EcFol.f_app (EcFol.f_op e ty) args EcTypes.texn in
     let ppe = PPEnv.add_locals ppe (List.map fst bd) in
     Format.fprintf fmt "@[<hov 2>| %a =>@ %a]" (pp_form ppe) eargs (pp_form ppe) br
   in
@@ -1930,7 +2024,7 @@ and pp_form_core_r
     in
       pp_opapp ppe f_ty
         (dt_sub, pp_form_r, is_trm, is_tuple, is_proj)
-        lower_left outer fmt (`Form, op, tys, es, tyopt)
+        lower_left outer fmt (`Form, op, tys.indices, tys.types, es, tyopt)
   in
 
   match f.f_node with
@@ -2351,19 +2445,29 @@ let pp_sform ppe fmt f =
 (* -------------------------------------------------------------------- *)
 let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   let ppe = PPEnv.enter_theory ppe (Option.get (EcPath.prefix x)) in
-  let ppe = PPEnv.add_locals ppe tyd.tyd_params in
+  let ppe = PPEnv.add_locals ppe tyd.tyd_params.idxvars in
+  let ppe = PPEnv.add_locals ppe tyd.tyd_params.tyvars in
   let name = P.basename x in
 
+  let pp_idxbinder fmt =
+    match tyd.tyd_params.idxvars with
+    | [] -> ()
+    | ids ->
+        Format.fprintf fmt "{%a} " (pp_list "@ " (pp_tyvar ppe)) ids
+  in
+
   let pp_prelude fmt =
-    match tyd.tyd_params with
+    match tyd.tyd_params.tyvars with
     | [] ->
-        Format.fprintf fmt "type %s" name
+        Format.fprintf fmt "type %t%s" pp_idxbinder name
 
     | [tx] ->
-        Format.fprintf fmt "type %a %s" (pp_tyvar ppe) tx name
+        Format.fprintf fmt "type %t%a %s"
+          pp_idxbinder (pp_tyvar ppe) tx name
 
     | txs ->
-        Format.fprintf fmt "type %a %s"
+        Format.fprintf fmt "type %t%a %s"
+          pp_idxbinder
           (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
 
   and pp_body fmt =
@@ -2395,10 +2499,33 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     Format.fprintf fmt "@[%a%t%t.@]" pp_locality tyd.tyd_loca pp_prelude pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: ty_param list) =
+let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: EcIdent.t list) =
   match ids with
   | []  -> ()
   | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
+
+(* Combined `{n} ['a]` binder annotation. Indices print in curly
+   braces (first), then type variables in square brackets. Each part
+   is omitted entirely when empty, and a single space is inserted
+   between them when both are present. *)
+let pp_paramsannot (ppe : PPEnv.t) fmt (idxvars, tyvars) =
+  let pp_idx fmt =
+    match idxvars with
+    | [] -> ()
+    | _  ->
+        Format.fprintf fmt "{%a}" (pp_list "@ " (pp_tyvar ppe)) idxvars
+  in
+  let pp_ty fmt =
+    match tyvars with
+    | [] -> ()
+    | _  ->
+        Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) tyvars
+  in
+  match idxvars, tyvars with
+  | [], [] -> ()
+  | _ , [] -> pp_idx fmt
+  | [], _  -> pp_ty fmt
+  | _ , _  -> Format.fprintf fmt "%t %t" pp_idx pp_ty
 
 let pp_pvar (ppe : PPEnv.t) fmt ids =
   match ids with
@@ -2508,7 +2635,11 @@ let pp_codegap_range (ppe: PPEnv.t) (fmt: Format.formatter) ((cpath, cp1r) : CP.
   Format.fprintf fmt "%a:[%a]" (pp_codepos_path ppe) cpath (pp_codegap1_range ppe) cp1r
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * ty_param list * ty * prbody option) =
+let pp_opdecl_pr (ppe : PPEnv.t) fmt
+  ((basename, tparams, ty, op)
+    : symbol * EcDecl.ty_params * ty * prbody option) =
+  let ts = tparams.tyvars in
+  let ppe = PPEnv.add_locals ppe tparams.idxvars in
   let ppe = PPEnv.add_locals ppe ts in
 
   let pp_body fmt =
@@ -2556,12 +2687,14 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * ty_param 
            pp_vds (pp_list "@\n" pp_ctor) pri.pri_ctors
   in
 
-  if List.is_empty ts then
+  if List.is_empty tparams.idxvars && List.is_empty ts then
     Format.fprintf fmt "@[<hov 2>pred %a %t.@]"
       pp_opname ([], basename) pp_body
   else
     Format.fprintf fmt "@[<hov 2>pred %a %a %t.@]"
-      pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+      pp_opname ([], basename)
+      (pp_paramsannot ppe) (tparams.idxvars, ts)
+      pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_exception_decl (ppe: PPEnv.t) fmt basename ty =
@@ -2574,7 +2707,11 @@ let pp_exception_decl (ppe: PPEnv.t) fmt basename ty =
     pp_opname ([], basename) pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
+let pp_opdecl_op (ppe : PPEnv.t) fmt
+    ((basename, tparams, ty, op)
+      : symbol * EcDecl.ty_params * ty * opbody option) =
+  let ts = tparams.tyvars in
+  let ppe = PPEnv.add_locals ppe tparams.idxvars in
   let ppe = PPEnv.add_locals ppe ts in
 
   let pp_body fmt =
@@ -2656,17 +2793,22 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
       Format.fprintf fmt "= < exception >"
   in
 
-  match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>op %a %t.@]"
-            pp_opname ([], basename) pp_body
-  | _  ->
-      Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
-      pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+  if List.is_empty tparams.idxvars && List.is_empty ts then
+    Format.fprintf fmt "@[<hov 2>op %a %t.@]"
+      pp_opname ([], basename) pp_body
+  else
+    Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
+      pp_opname ([], basename)
+      (pp_paramsannot ppe) (tparams.idxvars, ts)
+      pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_nt (ppe : PPEnv.t) fmt
-  ((basename, ts, _ty, nt) : symbol * ty_param list * ty * notation)
+  ((basename, tparams, _ty, nt)
+    : symbol * EcDecl.ty_params * ty * notation)
 =
+  let ts = tparams.tyvars in
+  let ppe = PPEnv.add_locals ppe tparams.idxvars in
   let ppe = PPEnv.add_locals ppe ts in
 
   let pp_body fmt =
@@ -2678,12 +2820,14 @@ let pp_opdecl_nt (ppe : PPEnv.t) fmt
         (pp_expr subppe) nt.ont_body
   in
 
-  match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>abbrev %a %t.@]"
+  if List.is_empty tparams.idxvars && List.is_empty ts then
+    Format.fprintf fmt "@[<hov 2>abbrev %a %t.@]"
       pp_opname ([], basename) pp_body
-  | _  ->
-      Format.fprintf fmt "@[<hov 2>abbrev %a %a %t.@]"
-        pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+  else
+    Format.fprintf fmt "@[<hov 2>abbrev %a %a %t.@]"
+      pp_opname ([], basename)
+      (pp_paramsannot ppe) (tparams.idxvars, ts)
+      pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl
@@ -2716,13 +2860,15 @@ let pp_opdecl
   in Format.fprintf fmt "@[<v>%a%a%a@]" pp_locality op.op_loca pp_name x pp_decl op
 
 let pp_added_op (ppe : PPEnv.t) fmt op =
-  let ppe = PPEnv.add_locals ppe op.op_tparams in
-  match op.op_tparams with
-  | [] -> Format.fprintf fmt ": @[<hov 2>%a@]"
-    (pp_type ppe) op.op_ty
-  | ts  ->
+  let ppe = PPEnv.add_locals ppe op.op_tparams.idxvars in
+  let ppe = PPEnv.add_locals ppe op.op_tparams.tyvars in
+  if List.is_empty op.op_tparams.idxvars
+  && List.is_empty op.op_tparams.tyvars then
+    Format.fprintf fmt ": @[<hov 2>%a@]" (pp_type ppe) op.op_ty
+  else
     Format.fprintf fmt "@[<hov 2>%a :@ %a.@]"
-      (pp_tyvarannot ppe) ts (pp_type ppe) op.op_ty
+      (pp_paramsannot ppe) (op.op_tparams.idxvars, op.op_tparams.tyvars)
+      (pp_type ppe) op.op_ty
 
 (* -------------------------------------------------------------------- *)
 let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
@@ -2738,16 +2884,20 @@ let tags_of_axkind = function
   | `Lemma -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
-  let ppe = PPEnv.add_locals ppe ax.ax_tparams in
+  let ppe = PPEnv.add_locals ppe ax.ax_tparams.idxvars in
+  let ppe = PPEnv.add_locals ppe ax.ax_tparams.tyvars in
   let basename = P.basename x in
 
   let pp_spec fmt =
     pp_form ppe fmt ax.ax_spec
 
   and pp_name fmt =
-    match ax.ax_tparams with
-    | [] -> Format.fprintf fmt "%s"    basename
-    | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
+    if List.is_empty ax.ax_tparams.idxvars
+    && List.is_empty ax.ax_tparams.tyvars then
+      Format.fprintf fmt "%s" basename
+    else
+      Format.fprintf fmt "%s %a" basename
+        (pp_paramsannot ppe) (ax.ax_tparams.idxvars, ax.ax_tparams.tyvars)
 
   and pp_tags fmt =
     let tags = tags_of_axkind ax.ax_kind in
@@ -3143,7 +3293,7 @@ let pp_poe (ppe : PPEnv.t) ?prpo (fmt: Format.formatter) poe =
     let args = List.map doarg bd in
     let tys = List.map (fun (_, ty) -> EcFol.as_gtty ty) bd in
     let ty = EcTypes.toarrow tys EcTypes.texn in
-    let eargs = EcFol.f_app (EcFol.f_op p [] ty) args EcTypes.texn in
+    let eargs = EcFol.f_app (EcFol.f_op p ty) args EcTypes.texn in
     let ppe = PPEnv.add_locals ppe (List.map fst bd) in
     pp_prpo ppe
       (pp_form ppe) eargs
@@ -3409,14 +3559,22 @@ module PPGoal = struct
     in (ppe, (id, pdk))
 
   let pp_goal1 ?(pphyps = true) ?prpo ?(idx) (ppe : PPEnv.t) fmt (hyps, concl) =
-    let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+    let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.idxvars in
+    let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.tyvars in
     let ppe, pps = List.map_fold pre_pp_hyp ppe (List.rev hyps.EcBaseLogic.h_local) in
 
     idx |> oiter (Format.fprintf fmt "Goal #%d@\n");
 
     if pphyps then begin
       begin
-        match hyps.EcBaseLogic.h_tvar with
+        match hyps.EcBaseLogic.h_tvar.idxvars with
+        | [] -> ()
+        | ix ->
+            Format.fprintf fmt "Index variables: %a@\n\n%!"
+              (pp_list ", " (pp_tyvar ppe)) ix
+      end;
+      begin
+        match hyps.EcBaseLogic.h_tvar.tyvars with
         | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
         | tv ->
             Format.fprintf fmt "Type variables: %a@\n\n%!"
@@ -3455,12 +3613,19 @@ end
 (* -------------------------------------------------------------------- *)
 let pp_hyps (ppe : PPEnv.t) fmt hyps =
   let hyps = EcEnv.LDecl.tohyps hyps in
-  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.idxvars in
+  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.tyvars in
   let ppe, pps =
     List.map_fold PPGoal.pre_pp_hyp ppe
                   (List.rev hyps.EcBaseLogic.h_local) in
 
-  begin match hyps.EcBaseLogic.h_tvar with
+  begin match hyps.EcBaseLogic.h_tvar.idxvars with
+  | [] -> ()
+  | ix ->
+      Format.fprintf fmt "Index variables: %a@\n\n%!"
+        (pp_list ", " (pp_tyvar ppe)) ix
+  end;
+  begin match hyps.EcBaseLogic.h_tvar.tyvars with
   | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
   | tv ->
       Format.fprintf fmt "Type variables: %a@\n\n%!"
@@ -3615,7 +3780,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
 
     let pp_branch fmt ((vars, s), (cname, _)) =
       let ptn = EcTypes.toarrow (List.snd vars) e.e_ty in
-      let ptn = f_op (EcPath.pqoname (EcPath.prefix p) cname) typ ptn in
+      let ptn = f_op (EcPath.pqoname (EcPath.prefix p) cname) ~tyargs:typ ptn in
       let ptn = f_app ptn (List.map (fun (x, ty) -> f_local x ty) vars) e.e_ty in
 
       Format.fprintf fmt "| %a => @[<hov 2>%a@]@ "
@@ -3753,16 +3918,16 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
   | CRBT_Type p ->
     Format.fprintf fmt "%s/ty:%a" item.name (pp_tyname ppe) p
   | CRBT_Op (tparams, { e_node = Eop (p, tys) })
-      when List.for_all2 ty_equal (List.map tvar tparams) tys
+      when List.for_all2 ty_equal (List.map tvar tparams.tyvars) tys.types
     ->
-    let ppe = PPEnv.add_locals ppe tparams in
+    let ppe = PPEnv.add_locals ppe tparams.tyvars in
     Format.fprintf fmt "%s/op: %a"
       item.name (pp_opname ppe) p
   | CRBT_Op (tparams, e) ->
-    let ppe = PPEnv.add_locals ppe tparams in
+    let ppe = PPEnv.add_locals ppe tparams.tyvars in
     Format.fprintf fmt "%s/op:[%a] %a"
       item.name
-      (pp_list ",@ " (pp_tyvar ppe)) tparams
+      (pp_list ",@ " (pp_tyvar ppe)) tparams.tyvars
       (pp_expr ppe) e
   | CRBT_Lemma p ->
     Format.fprintf fmt "%s/ax:%a" item.name (pp_axname ppe) p
@@ -3796,7 +3961,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
 
   | EcTheory.Th_instance ((typ, ty), tc, lc) -> begin
-      let ppe = PPEnv.add_locals ppe typ in (* FIXME *)
+      let ppe = PPEnv.add_locals ppe typ.tyvars in (* FIXME *)
 
       match tc with
       | (`Ring _ | `Field _) as tc -> begin
@@ -3836,7 +4001,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
               "%ainstance %s with [%a] %a@\n@[<hov 2>  %a@]"
               pp_locality lc
               name
-              (pp_paren (pp_list ",@ " (pp_tyvar ppe))) typ
+              (pp_paren (pp_list ",@ " (pp_tyvar ppe))) typ.tyvars
               (pp_type ppe) ty
               (pp_list "@\n"
                  (fun fmt (name, op) ->
@@ -4004,6 +4169,10 @@ let pp_by_theory
   ) tr
 
 (* -------------------------------------------------------------------- *)
+let pp_rp_indices (ppe : PPEnv.t) (fmt : Format.formatter) ixs =
+  if ixs <> [] then
+    Format.fprintf fmt "[:%a]" (pp_list ",@ " (pp_tindex ppe)) ixs
+
 let rec pp_rule_pattern
   (ppe  : PPEnv.t)
   (fmt  : Format.formatter)
@@ -4012,10 +4181,10 @@ let rec pp_rule_pattern
   match rule with
   | Rule (`Tuple, args) ->
     Format.fprintf fmt "(%a)" (pp_list ",@ " (pp_rule_pattern ppe)) args
-  | Rule (`Op (p, _), []) ->
-    Format.fprintf fmt "%a" (pp_opname ppe) p
-  | Rule (`Op (p, _), args) ->
-    Format.fprintf fmt "%a@ %a" (pp_opname ppe) p
+  | Rule (`Op (p, ixs, _), []) ->
+    Format.fprintf fmt "%a%a" (pp_opname ppe) p (pp_rp_indices ppe) ixs
+  | Rule (`Op (p, ixs, _), args) ->
+    Format.fprintf fmt "%a%a@ %a" (pp_opname ppe) p (pp_rp_indices ppe) ixs
     (pp_list "@ " (pp_paren (pp_rule_pattern ppe))) args
   | Rule (`Proj i, [arg]) ->
     Format.fprintf fmt "(%a)`.%d" (pp_rule_pattern ppe) arg i

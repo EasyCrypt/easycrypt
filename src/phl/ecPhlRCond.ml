@@ -143,7 +143,7 @@ module LowMatch = struct
           | Some (i, (cname, _cty)) ->
               let b = oget (List.nth_opt bs i) in
               let cname = EcPath.pqoname (EcPath.prefix typ) cname in
-              let tyinst = List.combine tydc.tyd_params tyinst in
+              let tyinst = List.combine tydc.tyd_params.tyvars tyinst in
               (e, ((typ, tyd, tyinst), cname), b)
         end
 
@@ -172,7 +172,7 @@ module LowMatch = struct
           in (x, xty)) cvars in
       let vars = List.map (curry f_local) names in
       let cty = toarrow (List.snd names) f.inv.f_ty in
-      let po = f_op cname (List.snd tyinst) cty in
+      let po = f_op cname ~tyargs:(List.snd tyinst) cty in
       let po = f_app po vars f.inv.f_ty in
       map_ss_inv1 (f_exists (List.map (snd_map gtty) names)) (map_ss_inv2 f_eq f {m;inv=po}) in
 
@@ -201,7 +201,7 @@ module LowMatch = struct
     let epr, asgn =
     if frame then begin
       let vars = List.map (fun (pv, ty) -> f_pvar pv ty (fst me)) pvs in
-      let epr = f_op cname (List.snd tyinst) f.inv.f_ty in
+      let epr = f_op cname ~tyargs:(List.snd tyinst) f.inv.f_ty in
       let epr = map_ss_inv ~m:f.m (fun vars -> f_app epr vars f.inv.f_ty) vars in
       Some (map_ss_inv2 f_eq f epr), []
     end else begin
@@ -210,7 +210,7 @@ module LowMatch = struct
           (* FIXME: factorize out *)
           let rty  = ttuple (List.snd cvars) in
           let proj = EcInductive.datatype_proj_path typ (EcPath.basename cname) in
-          let proj = e_op proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
+          let proj = e_op proj ~tyargs:(List.snd tyinst) (tfun e.e_ty (toption rty)) in
           let proj = e_app proj [e] (toption rty) in
           let proj = e_oget proj rty in
           i_asgn (lv, proj)) in

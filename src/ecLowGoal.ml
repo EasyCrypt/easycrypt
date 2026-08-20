@@ -165,10 +165,10 @@ module LowApply = struct
         with LDecl.LdeclError _ -> raise InvalidProofTerm
     end
 
-    | PTGlobal (p, tys) ->
+    | PTGlobal (p, idxs, tys) ->
         (* FIXME: poor API ==> poor error recovery *)
         let env = LDecl.toenv (hyps_of_ckenv tc) in
-        (pt, EcEnv.Ax.instantiate p tys env, subgoals)
+        (pt, EcEnv.Ax.instantiate ~idxs p tys env, subgoals)
 
     | PTTerm pt ->
       let pt, ax, subgoals = check_ `Elim pt subgoals tc in
@@ -691,7 +691,6 @@ let tt_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv) =
     (*
     let env = FApi.tc_env tc in
     let ppe = EcPrinting.PPEnv.ofenv env in
-    (* FIXME: add this to the exception *)
     Format.eprintf "%a@.should be convertible to:@.%a@.but is not@."
       (EcPrinting.pp_form ppe) ax
       (EcPrinting.pp_form ppe) concl;
@@ -727,10 +726,10 @@ let tt_apply_hyp (x : EcIdent.t) ?(args = []) ?(sk = 0) tc =
   tt_apply pt tc
 
 (* -------------------------------------------------------------------- *)
-let tt_apply_s (p : path) tys ?(args = []) ?(sk = 0) tc =
+let tt_apply_s (p : path) ?(idxs = []) tys ?(args = []) ?(sk = 0) tc =
   let pt =
     let args = (List.map paformula args) @ (List.make sk (PASub None)) in
-    ptglobal ~args ~tys p in
+    ptglobal ~args ~idxs ~tys p in
 
   tt_apply pt tc
 
@@ -755,8 +754,8 @@ let t_hyp (x : EcIdent.t) tc =
   t_apply_hyp x ~args:[] ~sk:0 tc
 
 (* -------------------------------------------------------------------- *)
-let t_apply_s (p : path) (tys : ty list) ?args ?sk tc =
-  tt_apply_s p tys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
+let t_apply_s (p : path) ?(idxs = []) (tys : ty list) ?args ?sk tc =
+  tt_apply_s p ~idxs tys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
 let t_apply_hd (hd : handle) ?args ?sk tc =
@@ -1439,7 +1438,9 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
 
       match EcEnv.Ty.scheme_of_ty mode ty env with
       | Some (p, typ) ->
-          let pt = ptglobal ~tys:typ p in (tc, pt, 0)
+          let pt =
+            ptglobal ~idxs:typ.indices ~tys:typ.types p in
+          (tc, pt, 0)
 
       | None ->
           match (EcEnv.ty_hnorm ty env).ty_node with
@@ -1525,7 +1526,7 @@ let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
 
          | _ -> raise InvalidGoalShape
 
-       in t_apply_s p tv ~args:(args @ [f2]) ~sk tc
+       in t_apply_s p ~idxs:tv.indices tv.types ~args:(args @ [f2]) ~sk tc
 
     | _ -> raise TTC.NoMatch
 
@@ -1706,7 +1707,7 @@ let t_split_prind ?reduce (tc : tcenv1) =
     | None -> raise InvalidGoalShape
     | Some (x, sk) ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s p tv.types ~args ~sk tc
 
   in t_lazy_match ?reduce t_split_r tc
 
@@ -1726,10 +1727,10 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
     match EcInductive.prind_is_iso_ors pri with
     | Some ((x, sk), _) when side = `Left ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s p tv.types ~args ~sk tc
     | Some (_, (x, sk)) when side = `Right ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s p tv.types ~args ~sk tc
     | _  -> raise InvalidGoalShape
 
   in t_lazy_match ?reduce t_split_r tc
@@ -1928,12 +1929,15 @@ module LowSubst = struct
     match aout with
     | None -> None
     | Some(side,v,f) ->
+      let idxvars =
+        Sid.of_list (LDecl.tohyps hyps).h_tvar.idxvars in
       let rec add fv x _ =
         if Sid.mem x fv then fv
         else
           (* check if x is a declared module *)
           let fv = Sid.add x fv in
           if EcEnv.Mod.by_mpath_opt (EcPath.mident x) env <> None then fv
+          else if Sid.mem x idxvars then fv
           else match LDecl.by_id x hyps with
           | LD_var (_, Some f) -> add_f fv f
           | _ -> fv

@@ -22,10 +22,27 @@ type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> 'a -> bool
 
 module EqTest_base = struct
-  let rec for_type env t1 t2 =
+  (* ------------------------------------------------------------------ *)
+  let rec for_targs (env : EcEnv.env) (ta1 : targs) (ta2 : targs) =
+    let exception NotEqual in
+
+    try
+      if List.compare_lengths ta1.types ta2.types <> 0 then
+        raise NotEqual;
+      if List.compare_lengths ta1.indices ta2.indices <> 0 then
+        raise NotEqual;
+      if not (List.all2 tindex_equal ta1.indices ta2.indices) then
+        raise NotEqual;
+      if not (List.all2 (for_type env) ta1.types ta2.types) then
+        raise NotEqual;
+      true
+
+    with NotEqual -> false
+
+  and for_type (env : EcEnv.env) (t1 : ty) (t2 : ty) =
     ty_equal t1 t2 || for_type_r env t1 t2
 
-  and for_type_r env t1 t2 =
+  and for_type_r (env : EcEnv.env) (t1 : ty) (t2 : ty) =
     match t1.ty_node, t2.ty_node with
     | Tunivar uid1, Tunivar uid2 -> EcUid.uid_equal uid1 uid2
 
@@ -40,14 +57,12 @@ module EqTest_base = struct
 
     | Tglob m1, Tglob m2 -> EcIdent.id_equal m1 m2
 
-    | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
-        if
-             List.length lt1 = List.length lt2
-          && List.all2 (for_type env) lt1 lt2
+    | Tconstr (p1, ta1), Tconstr (p2, ta2) when EcPath.p_equal p1 p2 ->
+        if   for_targs env ta1 ta2
         then true
         else
           if   Ty.defined p1 env
-          then for_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env)
+          then for_type env (Ty.unfold p1 ta1 env) (Ty.unfold p2 ta2 env)
           else false
 
     | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
@@ -136,8 +151,8 @@ module EqTest_base = struct
       | Evar p1, Evar p2 ->
           for_pv env ~norm p1 p2
 
-      | Eop(o1,ty1), Eop(o2,ty2) ->
-          p_equal o1 o2 && List.all2 (for_type env) ty1 ty2
+      | Eop(o1,ta1), Eop(o2,ta2) ->
+          p_equal o1 o2 && for_targs env ta1 ta2
 
       | Equant(q1,b1,e1), Equant(q2,b2,e2) when eqt_equal q1 q2 ->
           let alpha = check_bindings env alpha b1 b2 in
@@ -406,7 +421,10 @@ exception NotConv
 
 let ensure b = if b then () else raise NotConv
 
-let check_ty env subst ty1 ty2 =
+let check_targs (env : EcEnv.env) (subst : f_subst) (ta1 : targs) (ta2 : targs) =
+  ensure (EqTest_base.for_targs env ta1 (targs_subst subst ta2))
+
+let check_ty (env : EcEnv.env) (subst : f_subst) (ty1 : ty) (ty2 : ty) =
   ensure (EqTest_base.for_type env ty1 (ty_subst subst ty2))
 
 let add_local (env, subst) (x1, ty1) (x2, ty2) =
@@ -537,8 +555,8 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
       check_mem subst mem1 mem2;
       check_mod subst m1 m2
 
-    | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
-      List.iter2 (check_ty env subst) ty1 ty2
+    | Fop(p1, ta1), Fop(p2, ta2) when EcPath.p_equal p1 p2 ->
+      check_targs env subst ta1 ta2
 
     | Fapp(f1',args1), Fapp(f2',args2) when
         List.length args1 = List.length args2 ->
@@ -710,14 +728,20 @@ let reduce_local ri hyps x  =
   then try LDecl.unfold x hyps with NotReducible -> raise nohead
   else raise nohead
 
-let reduce_op ri env nargs p tys =
+let reduce_op
+  (ri    : reduction_info)
+  (env   : EcEnv.env)
+  (nargs : int)
+  (p     : EcPath.path)
+  (ta    : targs)
+=
   match ri.delta_p p with
   | `No ->
      raise nohead
 
   | #Op.redmode as mode ->
      try
-       Op.reduce ~mode ~nargs env p tys
+       Op.reduce ~mode ~nargs env p ta
      with NotReducible -> raise nohead
 
 let is_record env f =
@@ -740,6 +764,43 @@ let eta_expand bd f ty =
         | GTty ty -> f_local x ty
         | _      -> assert false) bd in
   (f_app f args ty)
+
+(* -------------------------------------------------------------------- *)
+(* Index patterns are matched WITHOUT the unification engine: a
+   normalized pattern index is a constant (compared canonically),
+   a bare idxvar (bound by assignment on first occurrence, checked
+   by canonical equality on repeats), or [b + k] (solved as
+   [k := term - b] when the term's canonical constant part is at
+   least [b]).  [tindex_of_canonical] puts the constant first, so
+   these three shapes are exactly the affine single-variable
+   fragment in normal form. *)
+type idx_pattern =
+  | IPconst
+  | IPaffine of EcIdent.t * EcBigInt.zint
+
+let classify_idx_pattern (ti : EcAst.tindex) : idx_pattern option =
+  match ti with
+  | TIConst _ -> Some IPconst
+  | TIVar k -> Some (IPaffine (k, EcBigInt.zero))
+  | TIAdd (TIConst b, TIVar k) -> Some (IPaffine (k, b))
+  | _ -> None
+
+(* [term - b] over the naturals, on canonical forms: defined iff the
+   canonical constant part of [term] is at least [b]. *)
+let subtract_const (ti : EcAst.tindex) (b : EcBigInt.zint) =
+  if EcBigInt.sign b = 0 then Some (EcAst.tindex_normalize ti) else
+  match EcAst.tindex_normalize ti with
+  | TIConst c ->
+      if EcBigInt.compare c b >= 0
+      then Some (EcAst.TIConst (EcBigInt.sub c b))
+      else None
+  | TIAdd (TIConst c, rest) ->
+      if EcBigInt.compare c b >= 0 then
+        let c = EcBigInt.sub c b in
+        Some (if EcBigInt.sign c = 0 then rest
+              else EcAst.TIAdd (TIConst c, rest))
+      else None
+  | _ -> None
 
 (* -------------------------------------------------------------------- *)
 let reduce_user_gen simplify ri env hyps f =
@@ -769,7 +830,7 @@ let reduce_user_gen simplify ri env hyps f =
       |> List.filter_map (fun ((_, rule) : EcEnv.Reduction.entry) ->
         let p' : EcEnv.Reduction.topsym =
           match rule.rl_ptn with
-          | Rule (`Op p, _)   -> `Path (fst p)
+          | Rule (`Op (p, _, _), _) -> `Path p
           | Rule (`Tuple, _)  -> `Tuple
           | Rule (`Proj i, _) -> `Proj i
           | Var _ | Int _     -> assert false
@@ -812,17 +873,39 @@ let reduce_user_gen simplify ri env hyps f =
         | None    -> pv := Mid.add x f !pv
         | Some f' -> check_alpha_eq f f' in
 
+      (* Index side: matcher-free (see [idx_pattern]).  A binding
+         seeds [pv] through [f_of_tindex] so that term-level
+         occurrences of the same idxvar are checked consistent by
+         [check_pv], in either binding order. *)
+      let iv = ref (Mid.empty : EcAst.tindex Mid.t) in
+      let match_index (ti : EcAst.tindex) (ptn : EcAst.tindex) =
+        match classify_idx_pattern ptn with
+        | None -> assert false (* enforced at compilation *)
+        | Some IPconst ->
+            if not (EcAst.tindex_equal ptn ti) then raise NotReducible
+        | Some (IPaffine (k, b)) ->
+            match subtract_const ti b with
+            | None -> raise NotReducible
+            | Some v ->
+                match Mid.find_opt k !iv with
+                | Some v' ->
+                    if not (EcAst.tindex_equal v v') then raise NotReducible
+                | None ->
+                    iv := Mid.add k v !iv;
+                    check_pv k (EcCoreFol.f_of_tindex v) in
+
+      (* Pattern types may mention idxvars bound at DEEPER nodes, so
+         their unification is deferred until the walk has built the
+         full index binding. *)
+      let deferred = ref ([] : (ty list * ty list) list) in
+
       let rec doit f ptn =
         match destr_app f, ptn with
-        | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
+        | ({ f_node = Fop (p, ta) }, args), R.Rule (`Op (p', ixs', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
-          let tys' = List.map (Tvar.subst tvi) tys' in
-
-          begin
-            try  List.iter2 (EcUnify.unify env ue) tys tys'
-            with EcUnify.UnificationFailure _ -> raise NotReducible end;
-
+          List.iter2 match_index ta.indices ixs';
+          deferred := (ta.types, tys') :: !deferred;
           List.iter2 doit args args'
 
         | ({ f_node = Ftuple args} , []), R.Rule (`Tuple, args')
@@ -842,16 +925,27 @@ let reduce_user_gen simplify ri env hyps f =
 
       doit f rule.R.rl_ptn;
 
+      let ivsubst = Fsubst.f_subst_init ~freshen:false ~idx:!iv () in
+
+      List.iter (fun (tys, tys') ->
+        let tys' = List.map (Tvar.subst tvi) tys' in
+        let tys' =
+          if Mid.is_empty !iv then tys'
+          else List.map (EcCoreSubst.ty_subst ivsubst) tys' in
+        try  List.iter2 (EcUnify.unify env ue) tys tys'
+        with EcUnify.UnificationFailure _ -> raise NotReducible)
+        !deferred;
+
       if not (EcUnify.UniEnv.closed ue) then
         raise NotReducible;
 
       let subst f =
-        let uidmap = EcUnify.UniEnv.assubst ue in
-        let ts = Tuni.subst uidmap in
+        let ts = EcUnify.UniEnv.as_subst ue in
 
         let subst   = ts in
         let subst   =
           Mid.fold (fun x f s -> Fsubst.f_bind_local s x f) !pv subst in
+        let f = if Mid.is_empty !iv then f else Fsubst.f_subst ivsubst f in
         Fsubst.f_subst subst (Fsubst.f_subst_tvar ~freshen:true tvi f)
       in
 
@@ -915,6 +1009,9 @@ let reduce_logic ri env hyps f p args =
     | Some (`Eq       ), [f1;f2] ->
       begin
         match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
+        (* Ignoring the ctor targs is sound only because datatypes are
+           NON-REFINING (same-typed ctor applications have canonically
+           equal targs); see the twin case in EcCallbyValue.f_eq_simpl. *)
         | (Fop (p1, _), args1), (Fop (p2, _), args2)
             when EcEnv.Op.is_dtype_ctor env p1
                  && EcEnv.Op.is_dtype_ctor env p2 ->
@@ -927,11 +1024,11 @@ let reduce_logic ri env hyps f p args =
           then f_false
           else f_ands (List.map2 f_eq args1 args2)
 
-        | (Fop (p1, tys1), args1), (Fop (p2, tys2), args2)
+        | (Fop (p1, ta1), args1), (Fop (p2, ta2), args2)
             when    EcPath.p_equal p1 p2
                  && EcEnv.Op.is_record_ctor env p1
                  && EcEnv.Op.is_record_ctor env p2
-                 && List.for_all2 (EqTest_i.for_type env) tys1 tys2 ->
+                 && EqTest_i.for_targs env ta1 ta2 ->
 
             f_ands (List.map2 f_eq args1 args2)
 
@@ -954,11 +1051,11 @@ let reduce_logic ri env hyps f p args =
 (* -------------------------------------------------------------------- *)
 let reduce_delta ri env _hyps f =
   match f.f_node with
-  | Fop (p, tys) when ri.delta_p p <> `No ->
-      reduce_op ri env 0 p tys
+  | Fop (p, ta) when ri.delta_p p <> `No ->
+      reduce_op ri env 0 p ta
 
-  | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p <> `No ->
-      let op = reduce_op ri env (List.length args) p tys in
+  | Fapp ({ f_node = Fop (p, ta) }, args) when ri.delta_p p <> `No ->
+      let op = reduce_op ri env (List.length args) p ta in
       f_app_simpl op args f.f_ty
 
   | _ -> raise nohead
@@ -1110,9 +1207,10 @@ let reduce_head simplify ri env hyps f =
           subst bds pargs in
 
       let body = EcFol.form_of_expr body in
-      (* FIXME subst-refact can we do both subst in once *)
       let body =
-        Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+        EcFol.f_subst_tparams ~freshen:true
+          op.EcDecl.op_tparams.idxvars op.EcDecl.op_tparams.tyvars
+          tys body in
 
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
@@ -1510,16 +1608,19 @@ let rec conv ri env f1 f2 stk =
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
-  | Fop(p1, ty1), Fop(p2,ty2)
-      when EcPath.p_equal p1 p2 && List.all2 (EqTest_i.for_type env) ty1 ty2 ->
+  | Fop(p1, ta1), Fop(p2,ta2)
+      when EcPath.p_equal p1 p2 && EqTest_i.for_targs env ta1 ta2 ->
     conv_next ri env f1 stk
 
   | Fapp(f1', args1), Fapp(f2', args2)
       when EqTest_i.for_type env f1'.f_ty f2'.f_ty
         && List.length args1 = List.length args2 -> begin
-    (* So that we do not unfold operators *)
+    (* So that we do not unfold operators. The heads count as equal
+       only at the SAME instantiation: comparing paths alone would
+       make [f[:3] x] and [f[:5] x] convertible. *)
     match f1'.f_node, f2'.f_node with
-    | Fop(p1, _), Fop(p2, _) when EcPath.p_equal p1 p2 ->
+    | Fop(p1, ta1), Fop(p2, ta2)
+        when EcPath.p_equal p1 p2 && EqTest_i.for_targs env ta1 ta2 ->
       conv_next ri env f1' (zapp args1 args2 f1.f_ty stk)
     | _, _ ->
       conv ri env f1' f2' (zapp args1 args2 f1.f_ty stk)
@@ -1774,26 +1875,55 @@ module User = struct
   type error =
     | MissingVarInLhs   of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
+    | MissingIdxVarInLhs of EcIdent.t
     | NotAnEq
     | NotFirstOrder
+    | IdxNotAffine
     | RuleDependsOnMemOrModule
     | HeadedByVar
 
   exception InvalidUserRule of error
 
+  let string_of_error = function
+    | MissingVarInLhs x ->
+        Printf.sprintf
+          "variable `%s' does not occur in the left-hand side"
+          (EcIdent.name x)
+    | MissingTyVarInLhs a ->
+        Printf.sprintf
+          "type variable `%s' does not occur in the left-hand side"
+          (EcIdent.name a)
+    | MissingIdxVarInLhs k ->
+        Printf.sprintf
+          "index variable `%s' is not bound by an index position of \
+           the left-hand side"
+          (EcIdent.name k)
+    | NotAnEq ->
+        "the lemma is not an (in)equation"
+    | NotFirstOrder ->
+        "the left-hand side is not a first-order pattern"
+    | IdxNotAffine ->
+        "index arguments in the left-hand side must be a constant, an \
+         index variable `k', or `k + b' with `b' a constant"
+    | RuleDependsOnMemOrModule ->
+        "the lemma depends on a memory or a module"
+    | HeadedByVar ->
+        "the left-hand side is headed by a variable"
+
   module R = EcTheory
 
   type rule = EcEnv.Reduction.rule
 
-  type compile_st = { cst_ty_vs : Sid.t; cst_f_vs : Sid.t; }
+  type compile_st =
+    { cst_ty_vs : Sid.t; cst_f_vs : Sid.t; cst_ix_vs : Sid.t; }
 
   let empty_cst : compile_st =
-    { cst_ty_vs = Sid.empty; cst_f_vs = Sid.empty; }
+    { cst_ty_vs = Sid.empty; cst_f_vs = Sid.empty; cst_ix_vs = Sid.empty; }
 
   let compile ~opts ~prio (env : EcEnv.env) p =
     let simp =
       if opts.EcTheory.ur_delta then
-        let hyps = EcEnv.LDecl.init env [] in
+        let hyps = EcEnv.LDecl.init env { idxvars = []; tyvars = [] } in
         fun f -> odfl f (h_red_opt delta hyps f)
       else fun f -> f in
 
@@ -1827,8 +1957,13 @@ module User = struct
     let rule =
       let rec rule (f : form) : EcTheory.rule_pattern =
         match EcFol.destr_app f with
-        | { f_node = Fop (p, tys) }, args ->
-            R.Rule (`Op (p, tys), List.map rule args)
+        | { f_node = Fop (p, ta) }, args ->
+            let ixs = List.map EcAst.tindex_normalize ta.indices in
+            List.iter (fun ti ->
+              if classify_idx_pattern ti = None then
+                raise (InvalidUserRule IdxNotAffine))
+              ixs;
+            R.Rule (`Op (p, ixs, ta.types), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)
         | { f_node = Fproj (target, i) }, [] ->
@@ -1849,23 +1984,31 @@ module User = struct
         | R.Int _ -> cst
 
         | R.Rule (op, args) ->
-            let ltyvars =
+            let ltyvars, lixvars =
               match op with
-              | `Op (_, tys) ->
-                List.fold_left (
-                    let rec doit ltyvars = function
-                      | { ty_node = Tvar a } -> Sid.add a ltyvars
-                      | _ as ty -> ty_fold doit ltyvars ty in doit)
-                  cst.cst_ty_vs tys
-              | `Tuple -> cst.cst_ty_vs
-              | `Proj _ -> cst.cst_ty_vs in
-            let cst = {cst with cst_ty_vs = ltyvars } in
+              | `Op (_, ixs, tys) ->
+                let ltyvars =
+                  List.fold_left (
+                      let rec doit ltyvars = function
+                        | { ty_node = Tvar a } -> Sid.add a ltyvars
+                        | _ as ty -> ty_fold doit ltyvars ty in doit)
+                    cst.cst_ty_vs tys in
+                let lixvars =
+                  List.fold_left (fun acc ti ->
+                    match classify_idx_pattern ti with
+                    | Some (IPaffine (k, _)) -> Sid.add k acc
+                    | _ -> acc)
+                    cst.cst_ix_vs ixs in
+                ltyvars, lixvars
+              | `Tuple -> cst.cst_ty_vs, cst.cst_ix_vs
+              | `Proj _ -> cst.cst_ty_vs, cst.cst_ix_vs in
+            let cst = {cst with cst_ty_vs = ltyvars; cst_ix_vs = lixvars } in
             List.fold_left doit cst args
 
       in doit empty_cst rule in
 
     let s_bds   = Sid.of_list (List.map fst bds)
-    and s_tybds = Sid.of_list ax.ax_tparams in
+    and s_tybds = Sid.of_list ax.ax_tparams.tyvars in
 
     (* Variables appearing in types and formulas are always, respectively,
      * type and formula variables.
@@ -1886,6 +2029,14 @@ module User = struct
       raise (InvalidUserRule (MissingVarInLhs (Sid.choose mvars)));
     if not (Sid.is_empty mtyvars) then
       raise (InvalidUserRule (MissingTyVarInLhs (Sid.choose mtyvars)));
+
+    (* Idxvars must be inferable from LHS index positions: an idxvar
+       occurring only as an int term (or only in types) cannot be
+       recovered by the matcher-free index matching. *)
+    let mixvars = Sid.diff (Sid.of_list ax.ax_tparams.idxvars) cst.cst_ix_vs in
+
+    if not (Sid.is_empty mixvars) then
+      raise (InvalidUserRule (MissingIdxVarInLhs (Sid.choose mixvars)));
 
     begin match rule with
     | R.Var _ -> raise (InvalidUserRule (HeadedByVar));
@@ -1937,7 +2088,7 @@ module EqTest = struct
       let f1 = convert e1 in
       let f2 = convert e2 in
 
-      is_conv (LDecl.init env []) f1 f2
+      is_conv (LDecl.init env { idxvars = []; tyvars = [] }) f1 f2
    end)
 
   let for_pv    = fun env ?(norm = true) -> for_pv    env ~norm

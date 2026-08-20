@@ -109,14 +109,40 @@ type pty_r =
   | PTtuple  of pty list
   | PTnamed  of pqsymbol
   | PTvar    of psymbol
-  | PTapp    of pqsymbol * pty list
+  | PTapp    of pqsymbol * pty list * pidxannot
   | PTfun    of pty * pty
   | PTglob   of pmsymbol located
 and pty = pty_r located
 
+(* Polynomial-fragment index expressions appearing inside `[ ... ]`
+   on type-constructor applications. The typechecker validates the
+   sub-grammar (only +, *, non-negative literals, and identifiers
+   bound as indices). *)
+and pindex_r =
+  | PIvar  of psymbol
+  | PIint  of zint
+  | PIadd  of pindex * pindex
+  | PImul  of pindex * pindex
+  (* `_` placeholder — let the system infer this index by
+     allocating a fresh [TIUnivar] at typecheck time. *)
+  | PIhole
+and pindex = pindex_r located
+
+(* Explicit index instantiation: positional (`f[:3, 4]` / `t<:3, 4>`)
+   or named (`f[:n = 3, m = 4]` / `t<:n = 3, m = 4>`). [IXunamed []]
+   means "no indices provided". Named instantiation may be partial:
+   unnamed indices are inferred. *)
+and pidxannot =
+  | IXunamed of pindex list
+  | IXnamed  of (psymbol * pindex) list
+
 type ptyannot_r =
-  | TVIunamed of pty list
-  | TVInamed  of (psymbol * pty) list
+  (* Explicit indices first, then explicit types. Either side may be
+     empty; when both are empty, no instantiation was provided. The
+     index and type sides are independent: each may be positional or
+     named. *)
+  | TVIunamed of pidxannot * pty list
+  | TVInamed  of pidxannot * (psymbol * pty) list
 
 and ptyannot  = ptyannot_r  located
 
@@ -148,9 +174,10 @@ type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
-  pty_name   : psymbol;
-  pty_tyvars : ptyparams;
-  pty_body   : ptydbody;
+  pty_name     : psymbol;
+  pty_idxvars  : psymbol list;
+  pty_tyvars   : ptyparams;
+  pty_body     : ptydbody;
   pty_locality : locality;
 }
 
@@ -472,6 +499,7 @@ type poperator = {
   po_name   : psymbol;
   po_aliases: psymbol list;
   po_tags   : psymbol list;
+  po_idxvars: psymbol list;
   po_tyvars : ptyvardecls option;
   po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
@@ -506,6 +534,7 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
+  pp_idxvars : psymbol list;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
   pp_tags   : psymbol list;
@@ -515,6 +544,7 @@ type ppredicate = {
 (* -------------------------------------------------------------------- *)
 type pnotation = {
   nt_name  : psymbol;
+  nt_idx   : psymbol list;
   nt_tv    : ptyvardecls option;
   nt_bd    : (psymbol * pty) list;
   nt_args  : (psymbol * (psymbol list * pty option)) list;
@@ -529,6 +559,7 @@ type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
   ab_name  : psymbol;
+  ab_idx   : psymbol list;
   ab_tv    : ptyvardecls option;
   ab_args  : ptybindings;
   ab_def   : pty * pexpr;
@@ -1230,13 +1261,14 @@ type paxiom_kind =
 type mempred_binding = PT_MemPred of psymbol list
 
 type paxiom = {
-  pa_name     : psymbol;
-  pa_pvars    : mempred_binding option;
-  pa_tyvars   : ptyparams option;
-  pa_vars     : pgtybindings option;
-  pa_formula  : pformula;
-  pa_kind     : paxiom_kind;
-  pa_locality : locality;
+  pa_name         : psymbol;
+  pa_pvars        : mempred_binding option;
+  pa_idxvars      : psymbol list;
+  pa_tyvars       : ptyparams option;
+  pa_vars         : pgtybindings option;
+  pa_formula      : pformula;
+  pa_kind         : paxiom_kind;
+  pa_locality     : locality;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1249,6 +1281,9 @@ type prealize = {
 type ptycinstance = {
   pti_name : pqsymbol;
   pti_as   : psymbol option;
+  (* Index binders of an index-parametric instance ([{n}] in
+     [instance ring [w] with {n} word<:n+1> ...]). *)
+  pti_idx  : psymbol list;
   pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
@@ -1378,19 +1413,22 @@ and 'a genoverride = [
 | `BySyntax of 'a
 ]
 
-and ty_override_def = psymbol list * pty
+(* (idxvars, tyvars, body) — both binder lists may be empty. *)
+and ty_override_def = psymbol list * psymbol list * pty
 
 and op_override_def = {
-  opov_tyvars : psymbol list option;
-  opov_args   : ptybinding list;
-  opov_retty  : pty;
-  opov_body   : pformula;
+  opov_idxvars : psymbol list;
+  opov_tyvars  : psymbol list option;
+  opov_args    : ptybinding list;
+  opov_retty   : pty;
+  opov_body    : pformula;
 }
 
 and pr_override_def = {
-  prov_tyvars : psymbol list option;
-  prov_args   : ptybinding list;
-  prov_body   : pformula;
+  prov_idxvars : psymbol list;
+  prov_tyvars  : psymbol list option;
+  prov_args    : ptybinding list;
+  prov_body    : pformula;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1485,6 +1523,7 @@ type global_action =
   | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
+  | Gdeclidx     of psymbol list
   | Gsubtype     of psubtype
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)

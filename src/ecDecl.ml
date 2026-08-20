@@ -11,9 +11,12 @@ module Ssym = EcSymbols.Ssym
 module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t
-type ty_params = ty_param list
-type ty_pctor  = [ `Int of int | `Named of ty_params ]
+type ty_params = {
+  idxvars : EcIdent.t list;
+  tyvars  : EcIdent.t list;
+}
+
+type ty_pctor = [ `Int of int | `Named of ty_params ]
 
 type ty_record =
   EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
@@ -55,16 +58,19 @@ let tydecl_as_record (td : tydecl) =
   match td.tyd_type with Record (x, y) -> Some (x, y) | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(params = `Int 0) lc =
-  let params =
+let abs_tydecl ?(params : ty_pctor = `Int 0) (lc : locality) =
+  let params : ty_params =
     match params with
     | `Named params ->
         params
+
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
-        List.map
-          (fun x -> (EcIdent.create x))
-          (EcUid.NameGen.bulk ~fmt n)
+        let tyvars =
+          List.map
+            (fun x -> EcIdent.create x)
+            (EcUid.NameGen.bulk ~fmt n)
+        in { tyvars; idxvars = []; }
   in
 
   { tyd_params   = params;
@@ -75,7 +81,7 @@ let abs_tydecl ?(params = `Int 0) lc =
 
 (* -------------------------------------------------------------------- *)
 let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = CS.Tvar.init params args in
+  let subst = CS.Tvar.init params.tyvars args in
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
@@ -282,7 +288,7 @@ let operator_as_exception (op : operator) =
 
 let operator_of_exception (ex: exception_) =
   let ty = EcTypes.toarrow ex.exn_dom EcTypes.texn in
-  mk_op ~opaque: optransparent [] ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
+  mk_op ~opaque: optransparent { idxvars = []; tyvars = [] } ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
 
 (* -------------------------------------------------------------------- *)
 let axiomatized_op 
@@ -293,11 +299,8 @@ let axiomatized_op
   (lc : locality)
   : axiom
 =
-  let axbd, axpm =
-    let bdpm = tparams in
-    let axpm = List.map EcIdent.fresh bdpm in
-      (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
-       axpm)
+  let axbd, axipm, axpm =
+    CS.f_freshen_tparams tparams.idxvars tparams.tyvars axbd
   in
 
   let args, axbd =
@@ -310,11 +313,14 @@ let axiomatized_op
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
   let tyargs = List.map EcTypes.tvar axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
+  let indices = List.map (fun id -> EcAst.TIVar id) axipm in
+  let op     =
+    f_op path ~indices ~tyargs
+      (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 
-  { ax_tparams = axpm;
+  { ax_tparams = { idxvars = axipm; tyvars = axpm };
     ax_spec    = axspec;
     ax_kind    = `Axiom (Ssym.empty, false);
     ax_loca    = lc;
@@ -338,6 +344,13 @@ type rkind = [
 type ring = {
   r_name  : EcSymbols.symbol option;
   r_type  : EcTypes.ty;
+  (* The ONE instantiation (index expressions and type arguments,
+     over the instance's binders) shared by every operator of the
+     instance: typed selection checks each operator resolves to
+     exactly it.  E.g. [{indices = [n+1]; types = []}] for the
+     boolean ring over [word<:n+1>], [{[]; ['a]}] for a ring over
+     ['a -> int]. *)
+  r_insts : EcAst.targs;
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
   r_add   : EcPath.path;
@@ -348,6 +361,31 @@ type ring = {
   r_embed : [ `Direct | `Embed of EcPath.path | `Default];
   r_kind  : rkind;
 }
+
+let targs_map (fty : EcTypes.ty -> EcTypes.ty) (fix : tindex -> tindex)
+      (ta : EcAst.targs) : EcAst.targs =
+  { indices = List.map fix ta.EcAst.indices;
+    types   = List.map fty ta.EcAst.types; }
+
+let ring_map (fp : EcPath.path -> EcPath.path)
+      (fty : EcTypes.ty -> EcTypes.ty) (fix : tindex -> tindex)
+      (r : ring) =
+  { r_name  = r.r_name;
+    r_type  = fty r.r_type;
+    r_insts = targs_map fty fix r.r_insts;
+    r_zero  = fp r.r_zero;
+    r_one   = fp r.r_one;
+    r_add   = fp r.r_add;
+    r_opp   = omap fp r.r_opp;
+    r_mul   = fp r.r_mul;
+    r_exp   = omap fp r.r_exp;
+    r_sub   = omap fp r.r_sub;
+    r_embed =
+      (match r.r_embed with
+       | `Direct  -> `Direct
+       | `Default -> `Default
+       | `Embed p -> `Embed (fp p));
+    r_kind  = r.r_kind; }
 
 let kind_equal k1 k2 =
   match k1, k2 with
@@ -360,8 +398,13 @@ let kind_equal k1 k2 =
 
   | _, _ -> false
 
+let targs_equal (t1 : EcAst.targs) (t2 : EcAst.targs) =
+     List.all2 tindex_equal t1.EcAst.indices t2.EcAst.indices
+  && List.all2 EcTypes.ty_equal t1.EcAst.types t2.EcAst.types
+
 let ring_equal r1 r2 =
      EcTypes.ty_equal r1.r_type r2.r_type
+  && targs_equal r1.r_insts r2.r_insts
   && EcPath.p_equal r1.r_zero r2.r_zero
   && EcPath.p_equal r1.r_one  r2.r_one
   && EcPath.p_equal r1.r_add  r2.r_add
@@ -382,6 +425,11 @@ type field = {
   f_inv  : EcPath.path;
   f_div  : EcPath.path option;
 }
+
+let field_map fp fty fix (f : field) =
+  { f_ring = ring_map fp fty fix f.f_ring;
+    f_inv  = fp f.f_inv;
+    f_div  = omap fp f.f_div; }
 
 let field_equal f1 f2 =
      ring_equal f1.f_ring f2.f_ring

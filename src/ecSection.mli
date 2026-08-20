@@ -15,6 +15,11 @@ val initial : env -> scenv
 
 val add_item     : ?override_locality:EcTypes.is_local option -> theory_item -> scenv -> scenv
 val add_decl_mod : EcIdent.t -> mty_mr -> scenv -> scenv
+val add_decl_index : EcIdent.t -> scenv -> scenv
+
+(* Free index variables of a formula (idents used inside index arguments,
+   or as int-typed formula locals). *)
+val form_idx_fv : form -> int EcIdent.Mid.t
 
 val enter_section : EcSymbols.symbol option -> scenv -> scenv
 val exit_section  : EcSymbols.symbol option -> scenv -> scenv

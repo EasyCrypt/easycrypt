@@ -278,6 +278,10 @@ end = struct
     | FreeTypeVariables ->
         msg "this expression contains free type variables"
 
+    | FreeIndexVariables ->
+        msg "cannot infer all index parameters in this expression; \
+             supply them explicitly (e.g. `f[:n = 3]')"
+
     | TypeVarNotAllowed ->
         msg "type variables not allowed"
 
@@ -332,8 +336,44 @@ end = struct
     | InvalidTypeAppl (name, _, _) ->
         msg "invalid type application: %a" pp_qsymbol name
 
+    | InvalidIndexAppl (name, expected, got) ->
+        msg "invalid index application for `%a': %d index argument(s) expected, %d given"
+          pp_qsymbol name expected got
+
+    | UnboundIndexVariable name ->
+        msg "unbound index variable: `%s'" name
+
+    | NegativeIndexLiteral n ->
+        msg "negative index literal `%s': indices range over the naturals"
+          (EcBigInt.to_string n)
+
+    | IndexMismatch (i1, i2) ->
+        let ground ti =
+          let rec go = function
+            | EcAst.TIUnivar _ -> false
+            | EcAst.TIVar _ | EcAst.TIConst _ -> true
+            | EcAst.TIAdd (a, b) | EcAst.TIMul (a, b) -> go a && go b
+          in go ti in
+        if ground i1 && ground i2 then
+          msg "incompatible index arguments: `%a' vs `%a'"
+            (EcPrinting.pp_tindex env) i1
+            (EcPrinting.pp_tindex env) i2
+        else
+          msg "cannot infer the index arguments: unifying `%a' with \
+               `%a' is outside the supported fragment (single-variable \
+               affine equations)"
+            (EcPrinting.pp_tindex env) i1
+            (EcPrinting.pp_tindex env) i2
+
     | DuplicatedTyVar ->
         msg "a type variable appear at least twice"
+
+    | DuplicatedIndexVar name ->
+        msg "an index variable appears at least twice: `%s'" name
+
+    | TypeHasNoIndexParam (tyname, x) ->
+        msg "type `%s' has no index parameter named `%s'"
+          (string_of_qsymbol tyname) x
 
     | DuplicatedLocal name ->
         msg "duplicated local/parameters name: `%s'" name
@@ -403,15 +443,41 @@ end = struct
               Format.fprintf fmt
                 "it is applied to %d argument(s) but takes at most %d"
                 provided atmost
+          | EcUnify.OF_idx_arity (expected, provided) ->
+              Format.fprintf fmt
+                "it takes %d index parameter(s) but is given %d"
+                expected provided
+          | EcUnify.OF_idx_unknown x ->
+              Format.fprintf fmt
+                "it has no index parameter named `%s'" x
+          | EcUnify.OF_tv_arity (expected, provided) ->
+              Format.fprintf fmt
+                "it takes %d type parameter(s) but is given %d"
+                expected provided
+          | EcUnify.OF_tv_unknown x ->
+              Format.fprintf fmt
+                "it has no type parameter named `%s'" x
+        in
+        let instance_is_empty instance =
+          List.is_empty instance.EcUnify.oi_tys
+          && List.is_empty instance.EcUnify.oi_ixs
         in
         let pp_instance fmt instance =
-          if not (List.is_empty instance) then begin
+          if not (List.is_empty instance.EcUnify.oi_ixs) then begin
+            Format.fprintf fmt "where the index parameters were inferred as:@\n";
+            List.iter
+              (fun (ip, ti) ->
+                Format.fprintf fmt "  @[%s = %a@]@\n"
+                  (EcIdent.name ip) (EcPrinting.pp_tindex env) ti)
+              instance.EcUnify.oi_ixs
+          end;
+          if not (List.is_empty instance.EcUnify.oi_tys) then begin
             Format.fprintf fmt "where the type parameters were inferred as:@\n";
             List.iter
               (fun (tp, ty) ->
                 Format.fprintf fmt "  @[%a = %a@]@\n"
                   pp_type (tvar tp) pp_type ty)
-              instance
+              instance.EcUnify.oi_tys
           end
         in
         let pp_kind fmt = function
@@ -425,7 +491,7 @@ end = struct
         let pp_details fmt (cand, fail) =
           begin match cand with
           | `Op (_, instance, declty) ->
-              if not (List.is_empty instance) then
+              if not (instance_is_empty instance) then
                 Format.fprintf fmt "its type is@\n  @[%a@]@\n%a"
                   pp_type declty pp_instance instance
           | `Pv (_, ty) | `Lc (_, ty) ->
@@ -477,8 +543,8 @@ end = struct
         msg "@\n";
 
         let pp_op fmt ((op, inst), subue) =
-          let uidmap = EcUnify.UniEnv.assubst subue in
-          let inst = Tuni.subst_dom uidmap inst in
+          let inst =
+            List.map (ty_subst (EcUnify.UniEnv.as_subst subue)) inst in
 
           begin match inst with
           | [] ->
@@ -494,8 +560,7 @@ end = struct
           let myuvars = List.fold_left Suid.union uvars myuvars in
           let myuvars = Suid.elements myuvars in
 
-          let uidmap = EcUnify.UniEnv.assubst subue in
-          let tysubst = ty_subst (Tuni.subst uidmap) in
+          let tysubst = ty_subst (EcUnify.UniEnv.as_subst subue) in
           let myuvars = List.pmap
             (fun uid ->
               match tysubst (tuni uid) with
@@ -523,8 +588,8 @@ end = struct
                ("local variable", Cb (id, EcPrinting.pp_local env))
             | `Proj (pv, _) ->
                ("variable proj.", Cb (pv, EcPrinting.pp_pv env))
-            | `Op op ->
-               ("operator", Cb ((op, ue), pp_op))
+            | `Op (p, _idxs, tys) ->
+               ("operator", Cb (((p, tys), ue), pp_op))
           in msg "  [%s]: %a@\n" title pp x) matches
     end
 
@@ -831,6 +896,9 @@ end = struct
     | NotSameNumberOfTyParam (exp, got) ->
         Format.fprintf fmt "contains %i type parameter instead of %i" got exp
 
+    | NotSameNumberOfIdxParam (exp, got) ->
+        Format.fprintf fmt "contains %i index parameter instead of %i" got exp
+
     | DifferentType (exp, got) ->
       let ppe = EcPrinting.PPEnv.ofenv env in
       Format.fprintf fmt "has type %a instead of %a"
@@ -877,6 +945,11 @@ end = struct
     | CE_TypeArgMism (kd, x) ->
         msg "type argument mismatch for %s `%s'"
           (string_of_ovkind kd) (string_of_qsymbol x)
+
+    | CE_IdxArgMism (kd, x) ->
+        msg "index argument mismatch for %s `%s'"
+          (string_of_ovkind kd) (string_of_qsymbol x)
+
 
     | CE_OpIncompatible (x, err) ->
         msg "operator `%s' body %a"
@@ -946,8 +1019,7 @@ end = struct
 
     | AE_InvalidArgForm (IAF_Mismatch (src, dst)) ->
        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
-       let uidmap = EcUnify.UniEnv.assubst ue in
-       let dst = ty_subst (Tuni.subst uidmap) dst in
+       let dst = ty_subst (EcUnify.UniEnv.as_subst ue) dst in
 
        msg "This expression has type@\n";
        msg "  @[<hov 2>%a@]@\n@\n" (EcPrinting.pp_type ppe) src;
