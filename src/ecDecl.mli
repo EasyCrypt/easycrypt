@@ -6,8 +6,11 @@ open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t
-type ty_params = ty_param list
+type ty_params = {
+  idxvars : EcIdent.t list;
+  tyvars  : EcIdent.t list;
+}
+
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type ty_record =
@@ -201,6 +204,9 @@ type rkind = [
 type ring = {
   r_name  : EcSymbols.symbol option;
   r_type  : EcTypes.ty;
+  (* The ONE instantiation (indices and types, over the instance's
+     binders) shared by every operator of the instance. *)
+  r_insts : EcAst.targs;
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
   r_add   : EcPath.path;
@@ -212,7 +218,14 @@ type ring = {
   r_kind  : rkind;
 }
 
+val targs_equal : EcAst.targs -> EcAst.targs -> bool
+
 val ring_equal : ring -> ring -> bool
+val ring_map :
+     (EcPath.path -> EcPath.path)
+  -> (EcTypes.ty -> EcTypes.ty)
+  -> (tindex -> tindex)
+  -> ring -> ring
 
 (* -------------------------------------------------------------------- *)
 type field = {
@@ -221,6 +234,11 @@ type field = {
   f_div  : EcPath.path option;
 }
 val field_equal : field -> field -> bool
+val field_map :
+     (EcPath.path -> EcPath.path)
+  -> (EcTypes.ty -> EcTypes.ty)
+  -> (tindex -> tindex)
+  -> field -> field
 
 (* -------------------------------------------------------------------- *)
 type binding_size = form * (int option)

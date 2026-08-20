@@ -33,12 +33,12 @@ let f_op_app
   if not (UE.closed ue) then
     assert false;
 
-  let subst = EcCoreSubst.Tuni.subst (UE.assubst ue) in
+  let subst = UE.as_subst ue in
   let rty   = EcCoreSubst.ty_subst subst rty in
   let opty  = EcCoreSubst.ty_subst subst opty in
   let tvars = List.map (EcCoreSubst.ty_subst subst) tvars in
 
-  f_app (f_op op tvars opty) args rty
+  f_app (f_op op ~tyargs:tvars opty) args rty
   
 (* -------------------------------------------------------------------- *)
 let f_app

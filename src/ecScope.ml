@@ -949,12 +949,28 @@ module Ax = struct
         sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma ?(strict = false) scope (cont, axflags) check ?name (axd, ctxt) =
+  let start_lemma ?(strict = false)
+      scope (cont, axflags) check ?name (axd, ctxt)
+  =
     let puc =
       match check with
       | false -> PSNoCheck
       | true  ->
-          let hyps  = EcEnv.LDecl.init (env scope) axd.ax_tparams in
+          (* Section-declared indices are natural numbers.  Those actually
+             used by this lemma are registered as int-typed idxvars in the
+             proof hypotheses (so tactics/SMT resolve them); generalization
+             re-adds a [{n}] binder on close.  Indices the lemma does not
+             mention are left out entirely.  Their non-negativity is NOT
+             injected automatically: proofs that need [0 <= n] obtain it
+             explicitly (e.g. from [Int.ge0_index]). *)
+          let used_idxs =
+            let fv = EcSection.form_idx_fv axd.ax_spec in
+            List.filter (fun id -> Mid.mem id fv)
+              (EcEnv.declared_indices (env scope)) in
+          let proof_tparams : ty_params =
+            { axd.ax_tparams with
+              idxvars = axd.ax_tparams.idxvars @ used_idxs } in
+          let hyps  = EcEnv.LDecl.init (env scope) proof_tparams in
           let proof = EcCoreGoal.start hyps axd.ax_spec in
           PSCheck proof
     in
@@ -979,7 +995,9 @@ module Ax = struct
 
     let env = env scope in
     let loc = ax.pl_loc and ax = ax.pl_desc in
-    let ue  = TT.transtyvars env (loc, ax.pa_tyvars) in
+    let ue  =
+      TT.transtyvars ~idxparams:ax.pa_idxvars env (loc, ax.pa_tyvars) in
+    let env = TT.bind_idx_locals env ue in
 
     let (pconcl, tintro) =
       match ax.pa_vars with
@@ -999,10 +1017,14 @@ module Ax = struct
     let concl = TT.trans_prop env ue pconcl in
 
     if not (EcUnify.UniEnv.closed ue) then
-      hierror "the formula contains free type variables";
+      if EcUnify.UniEnv.closed_tv ue then
+        hierror
+          "cannot infer all index parameters in the formula; \
+           supply them explicitly (e.g. `f[:n = 3]')"
+      else
+        hierror "the formula contains free type variables";
 
-    let uidmap = EcUnify.UniEnv.close ue in
-    let fs = Tuni.subst uidmap in
+    let fs      = EcUnify.UniEnv.close_subst ue in
     let concl   = Fsubst.f_subst fs concl in
     let tparams = EcUnify.UniEnv.tparams ue in
 
@@ -1114,7 +1136,10 @@ module Ax = struct
          (None, { scope with sc_env = puc.puc_init })
 
   (* ------------------------------------------------------------------ *)
-  and start_lemma_with_proof ?(strict = false) scope tintro pucflags (mode, tc) check ?name axd =
+  and start_lemma_with_proof
+      ?(strict = false)
+      scope tintro pucflags (mode, tc) check ?name axd
+  =
     let { pl_loc = loc; pl_desc = tc } = tc in
 
     let scope = start_lemma ~strict scope pucflags check ?name (axd, None) in
@@ -1283,7 +1308,9 @@ module Op = struct
 
     let op = op.pl_desc and loc = op.pl_loc in
     let eenv = env scope in
-    let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
+    let ue =
+      TT.transtyvars ~idxparams:op.po_idxvars eenv (loc, op.po_tyvars) in
+    let eenv = TT.bind_idx_locals eenv ue in
     let lc = op.po_locality in
     let args = fst op.po_args @ odfl [] (snd op.po_args) in
     let (ty, body, refts) =
@@ -1311,7 +1338,7 @@ module Op = struct
           let codom    = TT.transty TT.tp_relax eenv ue pty in
           let _env, xs = TT.trans_binding eenv ue args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
-          let opabs    = EcDecl.mk_op ~opaque:optransparent [] codom None lc in
+          let opabs    = EcDecl.mk_op ~opaque:optransparent { idxvars = []; tyvars = [] } codom None lc in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
           let openv    = EcEnv.Var.bind_locals xs openv in
           let reft     = TT.trans_prop openv ue reft in
@@ -1319,10 +1346,14 @@ module Op = struct
     in
 
     if not (EcUnify.UniEnv.closed ue) then
-      hierror ~loc "this operator type contains free type variables";
+      if EcUnify.UniEnv.closed_tv ue then
+        hierror ~loc
+          "cannot infer all index parameters of this operator; \
+           supply them explicitly (e.g. `f[:n = 3]')"
+      else
+        hierror ~loc "this operator type contains free type variables";
 
-    let uidmap  = EcUnify.UniEnv.close ue in
-    let ts      = Tuni.subst uidmap in
+    let ts      = EcUnify.UniEnv.close_subst ue in
     let fs      = Fsubst.f_subst ts in
     let ty      = ty_subst ts ty in
     let tparams = EcUnify.UniEnv.tparams ue in
@@ -1391,27 +1422,27 @@ module Op = struct
       List.fold_left (fun scope (rname, xs, ax, codom) ->
           let ax =
             let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
-            let opapp   = List.map tvar tparams in
-            let opapp   = e_app (e_op opname opapp ty) opargs codom in
+            let opidx   = List.map (fun id -> EcAst.TIVar id) tparams.idxvars in
+            let opapp   = List.map tvar tparams.tyvars in
+            let opapp   =
+              e_app (e_op opname ~indices:opidx ~tyargs:opapp ty)
+                opargs codom in
 
             let subst   = EcSubst.add_opdef EcSubst.empty opname ([], opapp) in
             let ax      = EcSubst.subst_form subst ax in
             let ax      = f_forall (List.map (snd_map gtty) xs) ax in
 
-            let uidmap  = EcUnify.UniEnv.close ue in
-            let subst   = Tuni.subst uidmap in
+            let subst   = EcUnify.UniEnv.close_subst ue in
             let ax      = Fsubst.f_subst subst ax in
 
             ax
           in
 
-          let ax, axpm =
-            let bdpm = tparams in
-            let axpm = List.map EcIdent.fresh bdpm in
-              (Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) ax,
-               axpm) in
+          let ax, axipm, axpm =
+            EcCoreSubst.f_freshen_tparams
+              tparams.idxvars tparams.tyvars ax in
           let ax =
-            { ax_tparams = axpm;
+            { ax_tparams = { idxvars = axipm; tyvars = axpm };
               ax_spec    = ax;
               ax_kind    = `Axiom (Ssym.empty, false);
               ax_loca    = lc;
@@ -1426,11 +1457,12 @@ module Op = struct
           hierror ~loc
             "multiple names are only allowed for non-refined abstract operators";
         let addnew scope name =
-          let nparams = List.map EcIdent.fresh tparams in
+          let nparams = List.map EcIdent.fresh tparams.tyvars in
           let subst = Tvar.init
-            tparams
+            tparams.tyvars
             (List.map tvar nparams) in
-          let rop = EcDecl.mk_op ~opaque:optransparent nparams (Tvar.subst subst ty) None lc in
+          let nparams_p = { idxvars = []; tyvars = nparams } in
+          let rop = EcDecl.mk_op ~opaque:optransparent nparams_p (Tvar.subst subst ty) None lc in
           bind scope (unloc name, rop)
         in List.fold_left addnew scope op.po_aliases
 
@@ -1446,8 +1478,8 @@ module Op = struct
          hierror "for tag %s, load Distr first" tag;
 
       let oppath   = EcPath.pqname (path scope) (unloc op.po_name) in
-      let nparams  = List.map EcIdent.fresh tyop.op_tparams in
-      let subst    = Tvar.init tyop.op_tparams (List.map tvar nparams) in
+      let nparams  = List.map EcIdent.fresh tyop.op_tparams.tyvars in
+      let subst    = Tvar.init tyop.op_tparams.tyvars (List.map tvar nparams) in
       let ty       = Tvar.subst subst tyop.op_ty in
       let aty, rty = EcTypes.tyfun_flat ty in
 
@@ -1458,13 +1490,13 @@ module Op = struct
       in
 
       let bds = List.combine (List.map EcTypes.fresh_id_of_ty aty) aty in
-      let ax  = EcFol.f_op oppath (List.map tvar nparams) ty in
+      let ax  = EcFol.f_op oppath ~tyargs:(List.map tvar nparams) ty in
       let ax  = EcFol.f_app ax (List.map (curry f_local) bds) rty in
-      let ax  = EcFol.f_app (EcFol.f_op pred [dty] (tfun rty tbool)) [ax] tbool in
+      let ax  = EcFol.f_app (EcFol.f_op pred ~tyargs:[dty] (tfun rty tbool)) [ax] tbool in
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
 
       let ax =
-        { ax_tparams = nparams;
+        { ax_tparams = { idxvars = []; tyvars = nparams };
           ax_spec    = ax;
           ax_kind    = `Axiom (Ssym.empty, false);
           ax_loca    = lc;
@@ -1557,7 +1589,7 @@ module Op = struct
     let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
     let opdecl = EcDecl.{
-      op_tparams  = [];
+      op_tparams  = { idxvars = []; tyvars = [] };
       op_ty       = aout.f_ty;
       op_kind     = OB_oper (Some (OP_Plain aout));
       op_loca     = op.ppo_locality;
@@ -1581,7 +1613,7 @@ module Op = struct
         let mu =
           let sem =
             f_app
-              (f_op oppath [] opdecl.op_ty)
+              (f_op oppath opdecl.op_ty)
               (List.map (fun (x, ty) -> f_local x ty) locs)
               (match mode with `Det -> sig_.fs_ret | `Distr -> tdistr sig_.fs_ret) in
 
@@ -1606,7 +1638,7 @@ module Op = struct
       in
 
       let prax = EcDecl.{
-        ax_tparams = [];
+        ax_tparams = { idxvars = []; tyvars = [] };
         ax_spec    = prax;
         ax_kind    = `Lemma;
         ax_loca    = op.ppo_locality;
@@ -1628,7 +1660,7 @@ module Op = struct
              f_eq
                res.inv
                (f_app
-                  (f_op oppath [] opdecl.op_ty)
+                  (f_op oppath opdecl.op_ty)
                   (List.map (fun (x, ty) -> f_local x ty) locs)
                   sig_.fs_ret)
            in
@@ -1643,7 +1675,7 @@ module Op = struct
          in
 
          let prax = EcDecl.{
-           ax_tparams = [];
+           ax_tparams = { idxvars = []; tyvars = [] };
            ax_spec    = hax;
            ax_kind    = `Lemma;
            ax_loca    = op.ppo_locality;
@@ -1677,7 +1709,7 @@ module Exception = struct
     let ue = TT.transtyvars eenv (loc, Some []) in
     let e_dom = transtys tp_nothing eenv ue pe.pe_dom in
     let tparams = EcUnify.UniEnv.tparams ue in
-    if tparams <> [] then
+    if tparams.tyvars <> [] || tparams.idxvars <> [] then
       hierror ~loc "Polymorphic expression are not allowed";
     let e   = EcDecl.mk_exception lc e_dom in
     let scope = bind scope (unloc pe.pe_name, e) in
@@ -1806,6 +1838,20 @@ module Mod = struct
     let m, _ = EcTyping.trans_msymbol (env scope) m in
     { scope with sc_env = EcSection.import_vars m scope.sc_env }
 
+end
+
+(* -------------------------------------------------------------------- *)
+(* Section-declared indices: [declare {n m}] introduces natural-number
+   index parameters, in scope for the rest of the section and generalized
+   back to [{n}] binders on section close. *)
+module Index = struct
+  let declare (scope : scope) (ns : psymbol list) : scope =
+    List.fold_left (fun scope n ->
+      if EcEnv.lookup_declared_index (unloc n) (env scope) <> None then
+        hierror ~loc:n.pl_loc "duplicate declared index: `%s'" (unloc n);
+      let id = EcIdent.create (unloc n) in
+      { scope with sc_env = EcSection.add_decl_index id scope.sc_env })
+      scope ns
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2105,7 +2151,12 @@ module Reduction = struct
         } in
 
         let red_info =
-          EcReduction.User.compile ~opts ~prio:idx (env scope) ax_p in
+          try EcReduction.User.compile ~opts ~prio:idx (env scope) ax_p
+          with EcReduction.User.InvalidUserRule e ->
+            hierror ~loc:name.pl_loc
+              "invalid rewrite rule `%s': %s"
+              (EcSymbols.string_of_qsymbol (unloc name))
+              (EcReduction.User.string_of_error e) in
         (ax_p, opts, Some red_info) in
 
       let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
@@ -2280,7 +2331,7 @@ module Ty = struct
 
     let loc = loc tyd in
 
-    let { pty_name = name; pty_tyvars = args;
+    let { pty_name = name; pty_idxvars = idxs; pty_tyvars = args;
           pty_body = body; pty_locality = tyd_loca } = unloc tyd in
 
     check_name_available scope name;
@@ -2288,16 +2339,19 @@ module Ty = struct
     let tyd_params, tyd_type =
       match body with
       | PTYD_Abstract ->
-        let ue = TT.transtyvars env (loc, Some args) in
+        let ue = TT.transtyvars ~idxparams:idxs env (loc, Some args) in
         EcUnify.UniEnv.tparams ue, Abstract
 
       | PTYD_Alias    bd ->
-        let ue     = TT.transtyvars env (loc, Some args) in
+        let ue     = TT.transtyvars ~idxparams:idxs env (loc, Some args) in
         let body   = transty tp_tydecl env ue bd in
         EcUnify.UniEnv.tparams ue, Concrete body
 
       | PTYD_Datatype dt -> (
-          let datatype = EHI.trans_datatype env (mk_loc loc (args, name)) dt in
+          let datatype =
+            EHI.trans_datatype ~idxparams:idxs env
+              (mk_loc loc (args, name)) dt
+          in
           let ty_from_ctor ctor = EcEnv.Ty.by_path ctor env in
           try
             ELI.check_positivity ty_from_ctor datatype;
@@ -2308,7 +2362,10 @@ module Ty = struct
             EHI.dterror loc env (EHI.DTE_NonPositive (symbol, ctx)))
 
       | PTYD_Record rt ->
-        let record  = EHI.trans_record env (mk_loc loc (args,name)) rt in
+        let record =
+          EHI.trans_record ~idxparams:idxs env
+            (mk_loc loc (args, name)) rt
+        in
         let scheme  = ELI.indsc_of_record record in
         record.ELI.rc_tparams, Record (scheme, record.ELI.rc_fields)
     in
@@ -2331,19 +2388,23 @@ module Ty = struct
       let ue = EcUnify.UniEnv.create None in
       let pred = EcTyping.trans_prop env ue (snd subtype.pst_pred) in
       if not (EcUnify.UniEnv.closed ue) then
-        hierror ~loc:(snd subtype.pst_pred).pl_loc
-          "the predicate contains free type variables";
-      if EcUnify.UniEnv.tparams ue <> [] then
+        if EcUnify.UniEnv.closed_tv ue then
+          hierror ~loc:(snd subtype.pst_pred).pl_loc
+            "cannot infer all index parameters in the predicate; \
+             supply them explicitly (e.g. `f[:n = 3]')"
+        else
+          hierror ~loc:(snd subtype.pst_pred).pl_loc
+            "the predicate contains free type variables";
+      if (EcUnify.UniEnv.tparams ue).tyvars <> [] || (EcUnify.UniEnv.tparams ue).idxvars <> [] then
         hierror ~loc:(snd subtype.pst_pred).pl_loc
           "Polymorphic predicates are not allowed. \
            Use clones if you want to make a polymorphic subtype.";
-      let uidmap = EcUnify.UniEnv.close ue in
-      let fs = Tuni.subst uidmap in
+      let fs = EcUnify.UniEnv.close_subst ue in
       f_lambda [(x, GTty carrier)] (Fsubst.f_subst fs pred) in
 
     let scope =
       let decl = EcDecl.{
-        tyd_params   = [];
+        tyd_params   = { idxvars = []; tyvars = [] };
         tyd_type     = Abstract;
         tyd_loca     = `Global;
         tyd_clinline = false;
@@ -2408,26 +2469,47 @@ module Ty = struct
           hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
 
         let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
+        (* Select against the REQUIRED type at the carrier: unification
+           instantiates the candidate's parameters of both kinds (an
+           index-parametric operator resolves at the carrier's index)
+           and disambiguates overloaded symbols.  The resolved
+           instantiation is RECORDED in the instance (each op is later
+           applied at its own recorded indices/types), so operators of
+           any index shape fit -- e.g. a predecessor-shaped
+           [exp {n} : t<:n+1> -> ...] at carrier [t<:wsz+1>] records
+           [ro_idxs = [wsz]]. *)
+        let expected = snd (Mstr.find (unloc x) rmap) in
         let selected =
           EcUnify.select_op ~filter:(fun _ -> EcDecl.is_oper)
-            (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue ([], None)
+            (Some (EcUnify.TVIunamed (EcUnify.IXunamed [], tvi)))
+            env (unloc op) ue ([], Some expected)
         in
         let op =
           match selected with
-          | [] -> hierror ~loc:op.pl_loc "unknown operator"
+          | [] ->
+              hierror ~loc:op.pl_loc
+                "unknown operator, or operator with invalid type"
           | op1::op2::_ ->
               hierror ~loc:op.pl_loc
                 "ambiguous operator (%s / %s)"
-                (EcPath.tostring (fst (proj4_1 op1)))
-                (EcPath.tostring (fst (proj4_1 op2)))
-          | [((p, _), _, _, _)] ->
-              let op   = EcEnv.Op.by_path p env in
-              let opty =
-                Tvar.subst
-                  (Tvar.init op.op_tparams tvi)
-                  op.op_ty
-              in
-                (p, opty)
+                (EcPath.tostring (proj3_1 (proj4_1 op1)))
+                (EcPath.tostring (proj3_1 (proj4_1 op2)))
+          | [((p, ixs, tys), _, subue, _)] ->
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+              if not (EcUnify.UniEnv.closed ue) then
+                hierror ~loc:op.pl_loc
+                  "cannot infer the instantiation of operator `%s' \
+                   from the carrier type"
+                  (EcPath.tostring p);
+              let ts  = EcUnify.UniEnv.as_subst ue in
+              let ixs =
+                List.map
+                  (fun ti ->
+                    EcAst.tindex_normalize
+                      (EcCoreSubst.tindex_subst ts ti))
+                  ixs in
+              let tys = List.map (ty_subst ts) tys in
+              (p, { EcAst.indices = ixs; types = tys })
 
         in
           Mstr.change
@@ -2444,18 +2526,37 @@ module Ty = struct
            if req && not (Mstr.mem x ops) then
              hierror "no definition for operator `%s'" x)
         reqs;
-      List.fold_left
-        (fun m (x, (_, ty)) ->
+
+      (* UNIFORMITY: all operators of an instance must resolve to ONE
+         shared instantiation (indices and types alike), recorded once
+         on the instance. *)
+      let insts =
+        Mstr.fold (fun x (loc, (p, i)) acc ->
+          match acc with
+          | None -> Some (x, p, i)
+          | Some (x0, p0, i0) ->
+              if not (EcDecl.targs_equal i0 i) then
+                hierror ~loc
+                  "operators `%s' (%s) and `%s' (%s) resolve to \
+                   different instantiations at the carrier: all \
+                   instance operators must share one"
+                  x0 (EcPath.tostring p0) x (EcPath.tostring p);
+              acc)
+          ops None in
+      let insts =
+        match insts with
+        | None -> { EcAst.indices = []; types = [] }
+        | Some (_, _, i) -> i in
+
+      (List.fold_left
+        (fun m (x, _) ->
            match Mstr.find_opt x ops with
            | None -> m
-           | Some (loc, (p, opty)) ->
-               if not (EcReduction.EqTest.for_type env ty opty) then
-                 hierror ~loc "invalid type for operator `%s'" x;
-               Mstr.add x p m)
-        Mstr.empty reqs
+           | Some (_, (p, _)) -> Mstr.add x p m)
+        Mstr.empty reqs), insts
 
   (* ------------------------------------------------------------------ *)
-  let check_tci_axioms scope mode axs reqs lc =
+  let check_tci_axioms scope mode ?(typ = { idxvars = []; tyvars = [] }) axs reqs lc =
     let rmap = Mstr.of_list reqs in
     let symbs, axs =
       List.map_fold
@@ -2472,7 +2573,7 @@ module Ty = struct
         (fun (x, req) ->
            if not (Mstr.mem x symbs) then
              let ax = {
-               ax_tparams = [];
+               ax_tparams = typ;
                ax_spec    = req;
                ax_kind    = `Lemma;
                ax_loca    = lc;
@@ -2487,7 +2588,7 @@ module Ty = struct
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = {
-              ax_tparams = [];
+              ax_tparams = typ;
               ax_spec    = f;
               ax_kind    = `Lemma;
               ax_smt     = false;
@@ -2515,9 +2616,10 @@ module Ty = struct
   let p_field   = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "Field"  ], "field"  )
 
   (* ------------------------------------------------------------------ *)
-  let ring_of_symmap ?name env ty kind symbols =
+  let ring_of_symmap ?name env ty kind (symbols, insts) =
     { r_name  = name;
       r_type  = ty;
+      r_insts = insts;
       r_zero  = oget (Mstr.find_opt "rzero" symbols);
       r_one   = oget (Mstr.find_opt "rone"  symbols);
       r_add   = oget (Mstr.find_opt "add"   symbols);
@@ -2537,21 +2639,25 @@ module Ty = struct
       hierror "load AlgTactic/Ring first";
 
     let ty =
-      let ue = TT.transtyvars env (loc, Some (fst tci.pti_type)) in
+      let ue = TT.transtyvars ~idxparams:tci.pti_idx env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl env ue (snd tci.pti_type) in
       assert (EcUnify.UniEnv.closed ue);
-      let uidmap = EcUnify.UniEnv.close ue in
-        (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
+      let fs = EcUnify.UniEnv.close_subst ue in
+        (EcUnify.UniEnv.tparams ue, ty_subst fs ty)
     in
-    if not (List.is_empty (fst ty)) then
-      hierror "ring instances cannot be polymorphic";
 
     let symbols = EcAlgTactic.ring_symbols env kind (snd ty) in
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
     let cr      = ring_of_symmap ?name:(omap unloc tci.pti_as) env (snd ty) kind symbols in
     let axioms  = EcAlgTactic.ring_axioms env cr in
+    (* [oner_neq0] is optional: required of nobody, but checked when a
+       proof clause supplies it (backward compatibility). *)
+    let axioms  =
+      if List.exists (fun (x, _) -> unloc x = "oner_neq0") tci.pti_axs
+      then EcAlgTactic.ring_axioms_1neq0 env cr @ axioms
+      else axioms in
     let lc      = (tci.pti_loca :> locality) in
-    let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
+    let inter   = check_tci_axioms scope mode ~typ:(fst ty) tci.pti_axs axioms lc in
     let add env p =
       let item = EcTheory.Th_instance (ty,`General p, tci.pti_loca) in
       let item = EcTheory.mkitem ~import item in
@@ -2561,7 +2667,7 @@ module Ty = struct
       { scope with sc_env =
           List.fold_left add
             (let item =
-               EcTheory.Th_instance (([], snd ty), `Ring cr, tci.pti_loca) in
+               EcTheory.Th_instance (ty, `Ring cr, tci.pti_loca) in
              let item = EcTheory.mkitem ~import item in
              EcSection.add_item item scope.sc_env)
             [p_zmod; p_ring; p_idomain] }
@@ -2569,8 +2675,8 @@ module Ty = struct
     in Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
-  let field_of_symmap ?name env ty symbols =
-    { f_ring = ring_of_symmap ?name env ty `Integer symbols;
+  let field_of_symmap ?name env ty ((symbols, _) as syi) =
+    { f_ring = ring_of_symmap ?name env ty `Integer syi;
       f_inv  = oget (Mstr.find_opt "inv" symbols);
       f_div  = Mstr.find_opt "div" symbols; }
 
@@ -2580,20 +2686,18 @@ module Ty = struct
       hierror "load AlgTactic/Ring first";
 
     let ty =
-      let ue = TT.transtyvars env (loc, Some (fst tci.pti_type)) in
+      let ue = TT.transtyvars ~idxparams:tci.pti_idx env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl env ue (snd tci.pti_type) in
       assert (EcUnify.UniEnv.closed ue);
-      let uidmap = EcUnify.UniEnv.close ue in
-        (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
+      let fs = EcUnify.UniEnv.close_subst ue in
+        (EcUnify.UniEnv.tparams ue, ty_subst fs ty)
     in
-    if not (List.is_empty (fst ty)) then
-      hierror "field instances cannot be polymorphic";
     let symbols = EcAlgTactic.field_symbols env (snd ty) in
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
     let cr      = field_of_symmap ?name:(omap unloc tci.pti_as) env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms env cr in
     let lc      = (tci.pti_loca :> locality) in
-    let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in
+    let inter   = check_tci_axioms scope mode ~typ:(fst ty) tci.pti_axs axioms lc; in
     let add env p =
       let item = EcTheory.Th_instance(ty,`General p, tci.pti_loca) in
       let item = EcTheory.mkitem ~import item in
@@ -2603,7 +2707,7 @@ module Ty = struct
         sc_env =
           List.fold_left add
             (let item =
-               EcTheory.Th_instance (([], snd ty), `Field cr, tci.pti_loca) in
+               EcTheory.Th_instance (ty, `Field cr, tci.pti_loca) in
              let item = EcTheory.mkitem ~import item in
               EcSection.add_item item scope.sc_env)
             [p_zmod; p_ring; p_idomain; p_field] }
@@ -2612,7 +2716,7 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    let subst = EcSubst.add_tydef EcSubst.empty tcp ([], ty) in
+    let subst = EcSubst.add_tydef EcSubst.empty tcp ([], [], ty) in
       List.map (fun (x, opty) ->
         (EcIdent.name x, (true, EcSubst.subst_ty subst opty)))
         tc.tc_ops
@@ -2621,10 +2725,10 @@ module Ty = struct
   (* ------------------------------------------------------------------ *)
   let add_generic_tc (scope : scope) _mode { pl_desc = tci; pl_loc = loc; } =
     let ty =
-      let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
+      let ue = TT.transtyvars ~idxparams:tci.pti_idx scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
         assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
+        (EcUnify.UniEnv.tparams ue, ty_subst (EcUnify.UniEnv.close_subst ue) ty)
     in
 
     let (tcp, tc) =
@@ -2687,7 +2791,7 @@ end
 module Circuit = struct
   type preoperator = [
     | `Path of path
-    | `Direct of ty_params * expr
+    | `Direct of EcIdent.t list * expr
     | `Form of pformula
   ]
 
@@ -2736,10 +2840,11 @@ module Circuit = struct
           | `Direct (tparams, body) -> `Direct (tparams, form_of_expr body)
           | `Form f ->
               `BySyntax
-                { opov_tyvars = None
-                ; opov_args   = []
-                ; opov_retty  = loced PTunivar
-                ; opov_body   = f } in
+                { opov_idxvars = []
+                ; opov_tyvars  = None
+                ; opov_args    = []
+                ; opov_retty   = loced PTunivar
+                ; opov_body    = f } in
         let ovrd = (loced (ovrd, mode) :> EcThCloning.xop_override located) in
         { evc with evc_ops = Msym.add name ovrd evc.evc_ops }
       ) nm evc
@@ -2793,8 +2898,8 @@ module Circuit = struct
         { name; kind = CRBT_Type (pqname root name) }
       | EcTheory.Th_operator (name, op) ->
         (* FIXME PY: refresh type parameters? *)
-        let tvars = List.map tvar op.op_tparams in
-        let body = e_op (pqname root name) tvars op.op_ty in
+        let tvars = List.map tvar op.op_tparams.tyvars in
+        let body = e_op (pqname root name) ~tyargs:tvars op.op_ty in
         { name; kind = CRBT_Op (op.op_tparams, body) }
       | EcTheory.Th_axiom (name, _) ->
         { name; kind = CRBT_Lemma (pqname root name) }
@@ -2811,7 +2916,7 @@ module Circuit = struct
           hierror ~loc:(loc bs.type_)
             "cannot find named type: `%s'" (string_of_qsymbol (unloc bs.type_))
       | Some (path, decl) ->
-          if not (List.is_empty decl.tyd_params) then
+          if not (List.is_empty decl.tyd_params.tyvars && List.is_empty decl.tyd_params.idxvars) then
             hierror ~loc:(loc bs.type_)
               "bit-string type must be a monomorphic named type: `%s'"
               (string_of_qsymbol (unloc bs.type_));
@@ -2842,7 +2947,7 @@ module Circuit = struct
 
     let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) bs.size tint in
     let size_i = try 
-      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env { idxvars = []; tyvars = [] }) size_f |> destr_int |> BI.to_int) 
       with 
       | DestrError "destr_int" -> None
       | EcEnv.NotReducible -> None 
@@ -2879,7 +2984,7 @@ module Circuit = struct
           (string_of_qsymbol (unloc ba.type_))
      
       | Some (path, decl) -> 
-        if List.length decl.tyd_params <> 1 then
+        if List.length decl.tyd_params.tyvars <> 1 then
           hierror ~loc:(loc ba.type_)
             "type constructor should take exactly one parameter: `%s'"
             (string_of_qsymbol (unloc ba.type_));
@@ -2916,7 +3021,7 @@ module Circuit = struct
 
     let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) ba.size tint in
     let size_i = try 
-      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env { idxvars = []; tyvars = [] }) size_f |> destr_int |> BI.to_int) 
       with 
       | DestrError "destr_int" -> None
       | EcEnv.NotReducible -> None
@@ -3052,13 +3157,13 @@ module Circuit = struct
             (string_of_qsymbol (unloc ty))
       
         | Some (path, decl), `BV _ -> 
-          if List.length decl.tyd_params <> 0 then
+          if List.length decl.tyd_params.tyvars <> 0 then
             hierror ~loc:(loc ty)
               "a bit-string type must be a monomorphic named type";
           path
 
         | Some (path, decl), `A ->
-          if List.length decl.tyd_params <> 1 then
+          if List.length decl.tyd_params.tyvars <> 1 then
             hierror ~loc:(ty.pl_loc)
               "an array type must be a 1-polymorphic named type";
           path
@@ -3154,7 +3259,7 @@ module Circuit = struct
       List.filter_map (fun (qname, (item : crb_theory1)) ->
         match item.kind with
         | CRBT_Op (tparams, e) ->
-          Some (qname, `Direct (tparams, e), `Inline `Clear)
+          Some (qname, `Direct (tparams.tyvars, e), `Inline `Clear)
         | _ -> None
       ) cltheories in
 
@@ -3197,7 +3302,7 @@ module Circuit = struct
     let env = env scope in
     let operator, opdecl = EcEnv.Op.lookup op.pl_desc env in
 
-    if not (List.is_empty opdecl.op_tparams) then
+    if not (List.is_empty opdecl.op_tparams.tyvars && List.is_empty opdecl.op_tparams.idxvars) then
       hierror ~loc:(loc op) "operator must be monomorphic";
 
     let ospec = EcEnv.Circuit.get_specification_by_name ~filename (unloc circ) in

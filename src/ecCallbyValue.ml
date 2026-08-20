@@ -68,6 +68,12 @@ let rec f_eq_simpl st f1 f2 =
   if f_equal f1 f2 then f_true else
 
   match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
+  (* Ignoring the ctor targs (types AND indices) is sound only because
+     datatypes are NON-REFINING: a ctor's result type is the datatype
+     at its own binders, so same-typed ctor applications have
+     canonically equal targs (f1/f2 share a type here). A refining-
+     datatype extension must revisit this and the parallel case in
+     EcReduction.reduce_logic. *)
   | (Fop (p1, _), args1), (Fop (p2, _), args2)
       when EcEnv.Op.is_dtype_ctor st.st_env p1
            && EcEnv.Op.is_dtype_ctor st.st_env p2 ->
@@ -217,7 +223,7 @@ and betared st s bd f args =
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_record_projection
-  (st : state) ((p, _tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, _tys) : EcPath.path * targs) (args : args)
 =
   let exception Bailout in
 
@@ -245,7 +251,7 @@ and try_reduce_record_projection
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_fixdef
-  (st : state) ((p, tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, tys) : EcPath.path * targs) (args : args)
 =
   let exception Bailout in
 
@@ -300,7 +306,9 @@ and try_reduce_fixdef
 
     let body = EcFol.form_of_expr body in
     let body =
-      Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+      EcFol.f_subst_tparams ~freshen:true
+        op.EcDecl.op_tparams.idxvars op.EcDecl.op_tparams.tyvars
+        tys body in
 
     Some (cbv st subst body (Args.create ty eargs))
 

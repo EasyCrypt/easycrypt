@@ -219,6 +219,7 @@ type preenv = {
   env_ntbase   : ntbase Mop.t;
   env_albase   : path Mp.t;             (* theory aliases   *)
   env_modlcs   : Sid.t;                 (* declared modules *)
+  env_idxdecl  : EcIdent.t list;        (* section-declared indices (ℕ) *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
   env_crbds    : crbindings;
@@ -354,6 +355,7 @@ let empty gstate =
     env_ntbase   = Mop.empty;
     env_albase   = Mp.empty;
     env_modlcs   = Sid.empty;
+    env_idxdecl  = [];
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
     env_crbds    = empty_crbindings;
@@ -362,6 +364,20 @@ let empty gstate =
 (* -------------------------------------------------------------------- *)
 let copy (env : env) =
   { env with env_gstate = EcGState.copy env.env_gstate }
+
+(* -------------------------------------------------------------------- *)
+(* Section-declared indices (natural-number parameters).  They live in
+   the environment so that [word<:n>] resolves without an explicit [{n}]
+   binder; they are generalized back to [{n}] index binders on section
+   close. *)
+let declared_indices (env : env) : EcIdent.t list =
+  env.env_idxdecl
+
+let lookup_declared_index (name : symbol) (env : env) : EcIdent.t option =
+  List.find_opt (fun id -> EcIdent.name id = name) env.env_idxdecl
+
+let push_declared_index (id : EcIdent.t) (env : env) : env =
+  { env with env_idxdecl = id :: env.env_idxdecl }
 
 (* -------------------------------------------------------------------- *)
 type lookup_error = [
@@ -831,9 +847,12 @@ module MC = struct
           let cs      = dtype.tydt_ctors   in
           let schelim = dtype.tydt_schelim in
           let schcase = dtype.tydt_schcase in
-          let params  = List.map tvar tyd.tyd_params in
+          let params  = List.map tvar tyd.tyd_params.tyvars in
+          let indices = List.map (fun id -> TIVar id) tyd.tyd_params.idxvars in
           let for1 i (c, aty) =
-            let aty = EcTypes.toarrow aty (tconstr mypath params) in
+            let aty =
+              EcTypes.toarrow aty
+                (tconstr ~indices ~tyargs:params mypath) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
             let cop = mk_op
                         ~opaque:optransparent (fst aty) (snd aty)
@@ -872,11 +891,13 @@ module MC = struct
             ) mc projs
 
       | Record (scheme, fields) ->
-          let params  = List.map tvar tyd.tyd_params in
+          let params  = List.map tvar tyd.tyd_params.tyvars in
+          let indices = List.map (fun id -> TIVar id) tyd.tyd_params.idxvars in
+          let self_ty = tconstr ~indices ~tyargs:params mypath in
           let nfields = List.length fields in
           let cfields =
             let for1 i (f, aty) =
-              let aty = EcTypes.tfun (tconstr mypath params) aty in
+              let aty = EcTypes.tfun self_ty aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
               let fop = mk_op ~opaque:optransparent (fst aty) (snd aty)
                           (Some (OP_Proj (mypath, i, nfields))) loca in
@@ -897,7 +918,7 @@ module MC = struct
 
           let stname = Printf.sprintf "mk_%s" x in
           let stop   =
-            let stty = toarrow (List.map snd fields) (tconstr mypath params) in
+            let stty = toarrow (List.map snd fields) self_ty in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
               mk_op ~opaque:optransparent (fst stty) (snd stty) (Some (OP_Record mypath)) loca
           in
@@ -947,14 +968,14 @@ module MC = struct
 
       let self = EcIdent.create "'self" in
 
-      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], tvar self) in
+      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], [], tvar self) in
 
       let operators =
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
           let optype = EcSubst.subst_ty tsubst optype in
           let opdecl =
-            mk_op ~opaque:optransparent [(self)]
+            mk_op ~opaque:optransparent { idxvars = []; tyvars = [self] }
               optype (Some OP_TC) loca
           in (opid, xpath opname, optype, opdecl)
         in
@@ -964,7 +985,7 @@ module MC = struct
       let fsubst =
         List.fold_left
           (fun s (x, xp, xty, _) ->
-            let fop = EcCoreFol.f_op xp [tvar self] xty in
+            let fop = EcCoreFol.f_op xp ~tyargs:[tvar self] xty in
               EcSubst.add_flocal s x fop)
           tsubst
           operators
@@ -974,7 +995,7 @@ module MC = struct
         List.map
           (fun (x, ax) ->
             let ax = EcSubst.subst_form fsubst ax in
-              (x, { ax_tparams = [(self)];
+              (x, { ax_tparams = { idxvars = []; tyvars = [self] };
                     ax_spec    = ax;
                     ax_kind    = `Lemma;
                     ax_loca    = loca;
@@ -1537,7 +1558,7 @@ module Reduction = struct
 
     let p : topsym =
       match rule.rl_ptn with
-      | Rule (`Op p, _)   -> `Path (fst p)
+      | Rule (`Op (p, _, _), _) -> `Path p
       | Rule (`Tuple, _)  -> `Tuple
       | Rule (`Proj i, _) -> `Proj i
       | Var _ | Int _     -> assert false in
@@ -2606,11 +2627,20 @@ module Ty = struct
     | Some { tyd_type = Concrete _ } -> true
     | _ -> false
 
-  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
+  let unfold (name : EcPath.path) (args : EcAst.targs) (env : env) =
     match by_path_opt name env with
     | Some ({ tyd_type = Concrete body } as tyd) ->
-        Tvar.subst
-          (Tvar.init tyd.tyd_params args)
+        (* Substitute BOTH parameter kinds: an indexed alias's body
+           mentions its formal index variables. *)
+        (* Ill-arity applications are corrupt nodes: fail loudly. *)
+        assert (List.compare_lengths
+                  tyd.tyd_params.idxvars args.indices = 0);
+        ty_subst
+          (f_subst_init
+             ~tv:(Tvar.init tyd.tyd_params.tyvars args.types)
+             ~idx:(EcIdent.Mid.of_list
+                     (List.combine tyd.tyd_params.idxvars args.indices))
+             ())
           body
     | _ -> raise (LookupFailure (`Path name))
 
@@ -2661,7 +2691,7 @@ module Ty = struct
 
   let get_top_decl (ty : ty) (env : env) =
     match (ty_hnorm ty env).ty_node with
-    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
+    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys.types)
     | _ -> None
 
   let rebind name ty env =
@@ -2767,9 +2797,43 @@ module Op = struct
       with NotReducible -> false
     else false
 
-  let reduce ?mode ?nargs env p tys =
+  let reduce ?mode ?nargs env p (tys : EcAst.targs) =
     let op, f = core_reduce ?mode ?nargs env p in
-    Tvar.f_subst ~freshen:true op.op_tparams tys f
+    let tparams = op.op_tparams in
+    (* Arity mismatches are corrupt applications: fail loudly
+       (silently skipping the substitution produced bodies with
+       dangling parameters). *)
+    assert (List.compare_lengths tys.types tparams.tyvars = 0);
+    assert (List.compare_lengths tys.indices tparams.idxvars = 0);
+    let tv =
+      List.fold_left2
+        (fun m id v -> EcIdent.Mid.add id v m)
+        EcIdent.Mid.empty tparams.tyvars tys.types
+    in
+    let idx =
+      List.fold_left2
+        (fun m id v -> EcIdent.Mid.add id v m)
+        EcIdent.Mid.empty tparams.idxvars tys.indices
+    in
+    let fs =
+      EcCoreSubst.Fsubst.f_subst_init ~freshen:true ~tv ~idx () in
+    (* Idxvars also occupy the formula-locals namespace (Phase 2):
+       bind each idxvar's int-typed [Flocal] to the call-site index
+       projected into the int-formula world (so e.g. an idxvar [n]
+       that the body uses as an int term gets resolved to [m+1] when
+       called at index [m+1]). *)
+    let fs =
+      if List.compare_lengths tys.indices tparams.idxvars <> 0
+      then fs
+      else
+        List.fold_left2
+          (fun s id v ->
+             match EcCoreFol.f_of_tindex_opt v with
+             | Some f -> EcCoreSubst.Fsubst.f_bind_local s id f
+             | None   -> s)
+          fs tparams.idxvars tys.indices
+    in
+    EcCoreSubst.Fsubst.f_subst fs f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -2887,10 +2951,48 @@ module Ax = struct
   let rebind name ax env =
     MC.bind_axiom name ax env
 
-  let instantiate p tys env =
+  let instantiate ?(idxs : tindex list = []) p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
-        Tvar.f_subst ~freshen:true ax.ax_tparams tys f
+        let tparams = ax.ax_tparams in
+        (* Kernel discipline: the index instantiation must cover the
+           axiom's idxvars exactly -- an empty list is only valid for
+           an index-free axiom (a partial map would leave dangling
+           idxvars in the produced statement). *)
+        if List.compare_lengths idxs tparams.idxvars <> 0 then
+          raise (LookupFailure (`Path p));
+        let idx_map =
+          List.fold_left2
+            (fun m id v -> EcIdent.Mid.add id v m)
+            EcIdent.Mid.empty tparams.idxvars idxs
+        in
+        let tv_map =
+          if List.compare_lengths tys tparams.tyvars <> 0 then
+            EcIdent.Mid.empty
+          else
+            List.fold_left2
+              (fun m id v -> EcIdent.Mid.add id v m)
+              EcIdent.Mid.empty tparams.tyvars tys
+        in
+        let fs =
+          EcCoreSubst.Fsubst.f_subst_init
+            ~freshen:true ~tv:tv_map ~idx:idx_map () in
+        (* Idxvars share the formula-locals namespace (Phase 2): also
+           bind each idxvar's int [Flocal] to the call-site index
+           projected into the int-formula world. Without this the
+           lemma's body's [Flocal n_lem] (when [n] was used as int
+           inside the proposition) survives unsubstituted. *)
+        let fs =
+          if List.is_empty idxs then fs
+          else
+            List.fold_left2
+              (fun s id v ->
+                 match EcCoreFol.f_of_tindex_opt v with
+                 | Some f -> EcCoreSubst.Fsubst.f_bind_local s id f
+                 | None   -> s)
+              fs tparams.idxvars idxs
+        in
+        EcCoreSubst.Fsubst.f_subst fs f
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
@@ -2905,15 +3007,15 @@ module Algebra = struct
   let bind_ring ty cr env =
     assert (Mid.is_empty ty.ty_fv);
     { env with env_tci =
-        TypeClass.bind_instance ([], ty) (`Ring cr) env.env_tci }
+        TypeClass.bind_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Ring cr) env.env_tci }
 
   let bind_field ty cr env =
     assert (Mid.is_empty ty.ty_fv);
     { env with env_tci =
-        TypeClass.bind_instance ([], ty) (`Field cr) env.env_tci }
+        TypeClass.bind_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Field cr) env.env_tci }
 
-  let add_ring  ty cr lc env = TypeClass.add_instance ([], ty) (`Ring  cr) lc env
-  let add_field ty cr lc env = TypeClass.add_instance ([], ty) (`Field cr) lc env
+  let add_ring  ty cr lc env = TypeClass.add_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Ring  cr) lc env
+  let add_field ty cr lc env = TypeClass.add_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Field cr) lc env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3144,9 +3246,19 @@ module LDecl = struct
   (* ------------------------------------------------------------------ *)
   let init env ?(locals = []) tparams =
     let buildenv env =
-      List.fold_right
-        (fun (x, k) env -> add_local_env x k env)
-        locals env
+      let env =
+        List.fold_right
+          (fun (x, k) env -> add_local_env x k env)
+          locals env
+      in
+      (* Idxvars are NOT added to [h_local] — they remain solely
+         tparams. But the env exposed via [toenv] must resolve them
+         as int values (so a tactic argument [exists n] can refer to
+         a bound idxvar). Register each idxvar as an int local in
+         the env only; [h_local] stays clean. *)
+      List.fold_left
+        (fun env id -> Var.bind_local id EcTypes.tint env)
+        env tparams.idxvars
     in
 
     { le_init = env;
@@ -3362,12 +3474,12 @@ module Circuit = struct
     let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
     match Mp.find_opt k env.env_crbds.bitstrings with
     | Some _ as bs -> bs
-    | None -> try lookup_bitstring env (Ty.unfold k [] env)
+    | None -> try lookup_bitstring env (Ty.unfold k (EcTypes.mk_targs ()) env)
       with LookupFailure _ -> None
 
   and lookup_bitstring (env : env) (ty : ty) : crb_bitstring option =
     match ty.ty_node with
-    | Tconstr (p, []) -> lookup_bitstring_path env p
+    | Tconstr (p, { indices = []; types = [] }) -> lookup_bitstring_path env p
     | _ -> None
     
   let lookup_bitstring_size_path (env : env) (pth : path) : int option = 
@@ -3385,17 +3497,17 @@ module Circuit = struct
     match Mp.find_opt k env.env_crbds.arrays with
     | Some arr -> Some arr
     | None -> try
-      lookup_array env (Ty.unfold pth [] env)
+      lookup_array env (Ty.unfold pth (EcTypes.mk_targs ()) env)
       with LookupFailure _ -> None
 
   and lookup_array (env : env) (ty : ty) : crb_array option = 
     match ty.ty_node with
-    | Tconstr (p, [_w]) -> lookup_array_path env p
+    | Tconstr (p, { indices = []; types = [_w] }) -> lookup_array_path env p
     | _ -> None
 
   let rec lookup_array_and_bitstring (env: env) (ty: ty) : (crb_array * crb_bitstring) option =
     match ty.ty_node with
-    | Tconstr (p, [w]) -> 
+    | Tconstr (p, { indices = []; types = [w] }) ->
       notify env `Debug "Unfolding parametric type with path %s@." (EcPath.tostring p);
       let arr = lookup_array_path env p in
       let bs = lookup_bitstring env w in
@@ -3403,10 +3515,10 @@ module Circuit = struct
       | Some arr, Some bs -> Some (arr, bs)
       | _ -> None    
       end
-    | Tconstr (p, []) -> 
+    | Tconstr (p, { indices = []; types = [] }) ->
       notify env `Debug "Unfolding non parametric type with path %s@." (EcPath.tostring p);
       (try
-      lookup_array_and_bitstring env (Ty.unfold p [] env)
+      lookup_array_and_bitstring env (Ty.unfold p (EcTypes.mk_targs ()) env)
       with LookupFailure _ -> None)
     | _ -> None
 

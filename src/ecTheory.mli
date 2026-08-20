@@ -51,7 +51,7 @@ and rule_pattern =
   | Var  of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple | `Proj of int]
+  [`Op of (EcPath.path * EcAst.tindex list * EcTypes.ty list) | `Tuple | `Proj of int]
 
 and rule = {
   rl_tyd   : EcDecl.ty_params;

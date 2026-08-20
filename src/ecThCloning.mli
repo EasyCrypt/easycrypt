@@ -6,6 +6,7 @@ open EcParsetree
 (* -------------------------------------------------------------------- *)
 type incompatible =
 | NotSameNumberOfTyParam of int * int
+| NotSameNumberOfIdxParam of int * int
 | DifferentType of EcTypes.ty * EcTypes.ty
 | OpBody (* of (EcPath.path * EcDecl.operator) * (EcPath.path * EcDecl.operator) *)
 | TyBody (* of (EcPath.path * EcDecl.tydecl) * (EcPath.path * EcDecl.tydecl) *)
@@ -36,6 +37,7 @@ type clone_error =
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
+| CE_IdxArgMism        of ovkind * qsymbol
 | CE_NoExceptions
 
 exception CloneError of EcEnv.env * clone_error
@@ -49,7 +51,7 @@ type xty_override =
 (* ------------------------------------------------------------------ *)
 type xop_override = [
   | op_override_def genoverride
-  | `Direct of EcDecl.ty_params * EcAst.form
+  | `Direct of EcIdent.t list * EcAst.form
 ] * clmode
 
 (* ------------------------------------------------------------------ *)

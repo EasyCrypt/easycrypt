@@ -111,7 +111,7 @@ val t_apply : ?cutsolver:cutsolver -> proofterm -> FApi.backward
  * constructed from the path, type parameters, and formulas given to
  * the function. The [int] argument gives the number of premises to
  * skip before applying [p]. *)
-val t_apply_s : path -> ty list -> ?args:(form list) -> ?sk:int -> FApi.backward
+val t_apply_s : path -> ?idxs:(EcAst.tindex list) -> ty list -> ?args:(form list) -> ?sk:int -> FApi.backward
 
 (* Apply a proof term of the form [h f1...fp _ ... _] constructed from
  * the local hypothesis and formulas given to the function. The [int]

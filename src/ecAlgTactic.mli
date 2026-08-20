@@ -14,6 +14,9 @@ val ring_symbols  : EcEnv.env -> EcDecl.rkind -> ty -> (symbol * (bool * ty)) li
 val field_symbols : EcEnv.env -> ty -> (symbol * (bool * ty)) list
 
 val ring_axioms  : EcEnv.env -> ring  -> (symbol * form) list
+(* the optional non-triviality obligation, emitted only when the
+   instance supplies a proof for it (backward compatibility) *)
+val ring_axioms_1neq0 : EcEnv.env -> ring -> (symbol * form) list
 val field_axioms : EcEnv.env -> field -> (symbol * form) list
 
 (* -------------------------------------------------------------------- *)

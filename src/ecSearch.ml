@@ -29,7 +29,7 @@ let as_bypattern (search : search) =
 let match_ (env : EcEnv.env) (search : search list) f =
   let module E = struct exception MatchFound end in
 
-  let hyps = EcEnv.LDecl.init env [] in
+  let hyps = EcEnv.LDecl.init env { idxvars = []; tyvars = [] } in
   let mode = EcMatching.fmsearch in
   let opts = lazy (EcFol.f_ops f) in
 

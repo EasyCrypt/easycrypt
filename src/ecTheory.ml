@@ -54,7 +54,10 @@ and rule_pattern =
   | Var  of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple | `Proj of int]
+  (* Op patterns carry the head's index arguments (normalized).
+     Compilation restricts each to the affine fragment: a constant,
+     a rule idxvar [k], or [b + k]; see EcReduction.User. *)
+  [`Op of (EcPath.path * EcAst.tindex list * EcTypes.ty list) | `Tuple | `Proj of int]
 
 and rule = {
   rl_tyd   : EcDecl.ty_params;

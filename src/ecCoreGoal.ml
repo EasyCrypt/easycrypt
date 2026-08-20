@@ -51,7 +51,7 @@ and pt_head =
 | PTCut    of EcFol.form * cutsolve option
 | PTHandle of handle
 | PTLocal  of EcIdent.t
-| PTGlobal of EcPath.path * (ty list)
+| PTGlobal of EcPath.path * (tindex list) * (ty list)
 | PTTerm   of proofterm
 
 and cutsolve = [`Done | `Smt | `DoneSmt]
@@ -81,8 +81,8 @@ let pamemory  = fun x -> PAMemory  x
 let pamodule  = fun x -> PAModule  x
 
 (* -------------------------------------------------------------------- *)
-let ptglobal ?(args = []) ~tys p =
-  PTApply { pt_head = PTGlobal (p, tys); pt_args = args; }
+let ptglobal ?(args = []) ?(idxs = []) ~tys p =
+  PTApply { pt_head = PTGlobal (p, idxs, tys); pt_args = args; }
 
 let ptlocal ?(args = []) x =
   PTApply { pt_head = PTLocal x; pt_args = args; }
@@ -94,8 +94,8 @@ let ptcut ?(args = []) ?(cutsolve : cutsolve option) f =
   PTApply { pt_head = PTCut (f, cutsolve); pt_args = args; }
 
 (* -------------------------------------------------------------------- *)
-let paglobal ?args ~tys p =
-  PASub (Some (ptglobal ?args ~tys p))
+let paglobal ?args ?idxs ~tys p =
+  PASub (Some (ptglobal ?args ?idxs ~tys p))
 
 let palocal ?args x =
   PASub (Some (ptlocal ?args x))
