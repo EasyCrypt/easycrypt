@@ -588,6 +588,9 @@ let main () =
     | `Llm llmopts ->
         EcLlm.run ~relocdir ~boot:ldropts.ldro_boot ~projini llmopts
 
+    | `Mcp mcpopts ->
+        EcMcp.run ~relocdir ~boot:ldropts.ldro_boot ~projini mcpopts
+
     | `Runtest _ ->
         (* Eagerly executed *)
         assert false

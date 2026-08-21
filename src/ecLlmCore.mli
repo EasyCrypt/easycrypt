@@ -83,8 +83,8 @@ val step : state -> string -> answer
 (* [step], but a failure leaves no trace: the engine is rolled back to
    the uuid it had on entry (as REVERT does) and the failure comes back
    with [reverted = true]. Successes and [Quit] behave exactly as in
-   [step]. A phrase that fails halfway through a compound sentence is
-   rolled back whole. *)
+   [step]. A phrase that fails after having already advanced the engine
+   is rolled back whole. *)
 val try_step : state -> string -> answer
 
 val goals      : state -> all:bool -> (reply, failure) result

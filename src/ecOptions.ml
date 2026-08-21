@@ -11,6 +11,7 @@ type command = [
   | `Why3Config
   | `DocGen of doc_option
   | `Llm of llm_option
+  | `Mcp of mcp_option
 ]
 
 and options = {
@@ -52,6 +53,11 @@ and llm_option = {
   llmo_provers   : prv_options;
   llmo_help      : bool;
   llmo_eval      : string option;
+}
+
+and mcp_option = {
+  mcpo_provers   : prv_options;
+  mcpo_help      : bool;
 }
 
 and prv_options = {
@@ -387,6 +393,11 @@ let specs = {
       `Spec  ("help", `Flag  , "Print the LLM agent guide and exit");
       `Spec  ("eval", `String, "Run the given commands (newline-separated) and exit, in lieu of reading stdin")]);
 
+    ("mcp", "Model Context Protocol server (stdio)", [
+      `Group "loader";
+      `Group "provers";
+      `Spec  ("help", `Flag  , "Print the MCP server usage and exit")]);
+
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
       `Group "provers";
@@ -623,6 +634,10 @@ let llm_options_of_values ini values =
     llmo_help      = get_flag "help" values;
     llmo_eval      = get_string "eval" values; }
 
+let mcp_options_of_values ini values =
+  { mcpo_provers   = prv_options_of_values ini values;
+    mcpo_help      = get_flag "help" values; }
+
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
   let (command, values, anons) = parse specs argv in
@@ -700,6 +715,15 @@ let parse getini argv =
 
         let ini = getini None in
         let cmd = `Llm (llm_options_of_values ini values) in
+
+        (cmd, ini, true)
+
+    | "mcp" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
+
+        let ini = getini None in
+        let cmd = `Mcp (mcp_options_of_values ini values) in
 
         (cmd, ini, true)
 
