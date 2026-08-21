@@ -245,7 +245,9 @@ split.
 Bullet characters cycle through `-`, `+`, `*`, `--`, `++`, `**`, ...
 and are chosen to avoid colliding with any frames the LOAD prefix
 already opened. Use `COMMIT` once the proof is complete (or at any
-checkpoint) and paste the result back into the source file.
+checkpoint) and paste the result back into the source file. Running
+`COMMIT` after `qed.` still emits a bulleted body: the proof structure
+is read from a snapshot taken while the proof was open.
 
 `UNDO` / `REVERT` trim the COMMIT transcript automatically.
 

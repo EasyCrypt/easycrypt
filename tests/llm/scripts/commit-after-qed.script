@@ -1,7 +1,8 @@
 # exit: 0
-# COMMIT run after `qed.`: the proof DAG is gone, so the current
-# implementation emits the transcript with no bullets at all. Frozen
-# here so a refactor cannot change it silently.
+# COMMIT run after `qed.`: the active proof is gone, but COMMIT queries
+# the proofenv snapshot taken at the last recorded phrase, so the body
+# still carries bullets. `qed.` itself stays flat (no goal was open
+# right before it, hence no parent handle).
 LOAD "fixtures/simple.ec" 6
 QUIET ON
 split.
