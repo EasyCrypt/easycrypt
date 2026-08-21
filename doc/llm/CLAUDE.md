@@ -58,7 +58,9 @@ ERROR [uuid:N]
 ```
 
 The `uuid` is a monotonically increasing integer identifying the proof
-engine state. It increments with each successful command.
+engine state. It increments with each successful command that changes
+that state. Queries do not change it: `SEARCH`, and the `search`,
+`print` and `locate` statements, report the uuid they were called at.
 
 ### Meta-commands
 
@@ -77,7 +79,7 @@ These are protocol-level commands, not EasyCrypt syntax:
 | `NEXT` | Rotate focus to the next subgoal (equivalent to `FOCUS 2`) |
 | `COMMIT` | Emit recorded REPL phrases as a bulleted proof body (works under `+strict_bullets`) |
 | `CHECKPOINT <name>` | Save current uuid under a name for later `REVERT` |
-| `SEARCH <pattern>` | Search for lemmas matching a pattern |
+| `SEARCH <pattern>` | Search for lemmas matching a pattern (read-only: the uuid does not move) |
 | `QUIET ON` / `QUIET OFF` | Suppress/enable automatic goal display after tactics |
 | `<BEGIN>` / `<DONE>` | Delimit multi-line EasyCrypt input |
 | `HELP` | Print this guide |

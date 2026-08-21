@@ -12,7 +12,7 @@ OK [uuid:4]
 <END>
 OK [uuid:5]
 <END>
-OK [uuid:6]
+OK [uuid:5]
 (* RField.signr_odd *)
 lemma signr_odd:
   forall (n : int), 0 <= n => (- 1%r) ^ b2i (odd n) = (- 1%r) ^ n.
@@ -30,11 +30,11 @@ lemma b2i0: b2i false = 0.
 lemma signr_odd: forall (n : int), 0 <= n => (-1) ^ b2i (odd n) = (-1) ^ n.
 
 <END>
-OK [uuid:7]
+OK [uuid:6]
 <END>
-OK [uuid:7]
+OK [uuid:6]
 <END>
-OK [uuid:7]
+OK [uuid:6]
 - trivial.
 - trivial.
 <END>

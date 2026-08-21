@@ -403,6 +403,13 @@ let process_action (st : state) ?(record=false) ~src (p : EP.global) =
   let parent =
     match opens_pre with h :: _ -> Some h | [] -> None
   in
+  (* Queries only inspect the environment: they neither advance the
+     proof nor belong in the body COMMIT emits. *)
+  let is_query =
+    match EcLocation.unloc p.EP.gl_action with
+    | EP.Gprint _ | EP.Gsearch _ | EP.Glocate _ -> true
+    | _ -> false
+  in
   let succeeded = ref false in
   begin try
     ignore (EcCommands.process ~src p.EP.gl_action : float option);
@@ -412,17 +419,16 @@ let process_action (st : state) ?(record=false) ~src (p : EP.global) =
   | _ when p.EP.gl_fail -> ()
   | e -> raise (EcScope.toperror_of_exn ~gloc:loc e)
   end;
+  (* The engine pushes an undo context for every command it runs, a
+     query included -- with the *same* scope, since a query returns the
+     scope it was handed. Pop it back off: a read-only command must not
+     spend a uuid, or REVERT targets and the MCP [readOnlyHint] would
+     both be lying. A no-op when the query failed (nothing was pushed). *)
+  if is_query then EcCommands.undo pre_uuid;
   if !succeeded && p.EP.gl_fail then
     raise (EcScope.toperror_of_exn ~gloc:loc
       (EcScope.HiScopeError (None,
         "this command is expected to fail")));
-  (* Queries only inspect the environment: they neither advance the
-     proof nor belong in the body COMMIT emits. *)
-  let is_query =
-    match EcLocation.unloc p.EP.gl_action with
-    | EP.Gprint _ | EP.Gsearch _ | EP.Glocate _ -> true
-    | _ -> false
-  in
   if record && !succeeded && not p.EP.gl_fail && not is_query then begin
     transcript := (pre_uuid, src, parent, opens_pre) :: !transcript;
     (* Keep the newest non-empty snapshot: a phrase that closes the
