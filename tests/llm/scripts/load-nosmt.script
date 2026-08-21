@@ -1,0 +1,4 @@
+# exit: 0
+# LOAD -nosmt just has to load.
+LOAD "fixtures/simple.ec" 6 -nosmt
+GOALS

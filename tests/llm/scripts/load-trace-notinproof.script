@@ -1,0 +1,3 @@
+# exit: 1
+# LOAD -trace whose target sentence is outside any proof.
+LOAD "fixtures/simple.ec" 3 -trace
