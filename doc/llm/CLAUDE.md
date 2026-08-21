@@ -10,7 +10,11 @@ reasoning.
 
 The `llm` subcommand provides an interactive REPL with a
 machine-friendly protocol designed for LLM agents. The LLM sends
-commands over stdin and receives structured responses on stdout.
+commands over stdin and receives structured responses on stdout. The
+same engine is also served over the Model Context Protocol by the `mcp`
+subcommand — see [the MCP section](#using-the-mcp-mode) below. The
+two are front-ends over one core, so everything said here about state,
+uuids and the proof workflow holds there as well.
 
 ```
 easycrypt llm [OPTIONS]
@@ -300,6 +304,158 @@ The SEARCH meta-command is a shorthand that adds `search`/`.`:
 ```
 SEARCH (fdom _)
 SEARCH (_ %/ _)
+```
+
+## Using the MCP mode
+
+The `mcp` subcommand serves the same proof engine over the [Model
+Context Protocol](https://modelcontextprotocol.io/) instead of the
+text protocol above: JSON-RPC 2.0 messages, one per line, over stdio.
+Use it from a client that already speaks MCP; use `llm` for the raw
+protocol, as a debug console, or for `-eval` scripting.
+
+```
+easycrypt mcp [OPTIONS]
+```
+
+The same loader and prover options as `llm` are available (`-I`,
+`-timeout`, `-p`, `-stdlib`, etc.). Use `-help` to print this section
+and exit:
+
+```
+easycrypt mcp -help
+```
+
+Only protocol messages appear on stdout; everything the engine has to
+say goes to stderr. The server speaks the `initialize` /
+`notifications/initialized` handshake, implements `initialize`,
+`ping`, `tools/list` and `tools/call`, and tolerates notifications as
+no-ops. It advertises the `tools` capability and nothing else: no
+resources, no prompts, no sampling.
+
+### Tools
+
+Eleven tools. Required arguments are marked; the others default as
+noted.
+
+| Tool | Arguments | Description |
+|------|-----------|-------------|
+| `ec_load` | `file` (req), `line`, `col`, `nosmt` (false), `trace` (false) | Reset the session and compile `file` from the top, stopping after the last sentence that ends on or before `line` |
+| `ec_step` | `phrase` (req) | Run EasyCrypt sentences — tactics, declarations, `require`, `print`, ... — against the current session |
+| `ec_try` | `phrase` (req) | Like `ec_step`, but roll the engine back to its pre-call state whenever a sentence fails |
+| `ec_goals` | `all` (false) | Print the focused subgoal, or, with `all`, every open subgoal |
+| `ec_tree` | `full` (false) | List the open subgoals as a tree of dotted-path labels, marking the focused one |
+| `ec_focus` | `path` (req) | Rotate the focus onto the subgoal at dotted path `path`, or onto the next one with `"next"` |
+| `ec_undo` | — | Undo the last engine step |
+| `ec_revert` | `target` (req) | Return the session to an earlier state, named by a uuid or by a checkpoint name |
+| `ec_checkpoint` | `name` (req) | Record the current uuid under `name`, for a later `ec_revert` |
+| `ec_commit` | — | Emit the phrases recorded since the last `ec_load` as a bulleted proof body |
+| `ec_search` | `pattern` (req) | Search the environment for lemmas matching an EasyCrypt search pattern |
+
+`tools/list` carries a fuller, agent-facing `description` and a JSON
+Schema for every tool; those are the authoritative texts. The tools
+mirror the REPL meta-commands — `-nosmt`, `-trace`, dotted paths,
+checkpoints, bullets and search patterns all behave exactly as
+described above, and `NEXT` folds into `ec_focus` with path `"next"` —
+plus `ec_try`, which has no REPL equivalent. The meta-commands that are
+pure console affordances have no tool: multi-line input needs no
+`<BEGIN>`/`<DONE>` (a `phrase` may simply contain newlines), `QUIET`
+has no purpose when the client decides what to display, `HELP` is this
+section, and the session ends when the client closes stdin — or when a
+phrase is `exit.`, which answers `session terminated` and stops the
+process.
+
+### Running sentences
+
+`ec_step` takes one or more complete EasyCrypt sentences in a single
+`phrase`, exactly as a REPL line does: all of them are executed, in
+order, as if the text had been appended to the source file, and one
+reply describes the state they leave behind. If one of them fails, the
+reply is that failure, the sentences before it stay applied, and the
+engine is left wherever the failing sentence left it.
+
+`ec_try` runs the same input under a rollback contract: whenever a
+sentence fails, the engine is returned to the state it had before the
+call — including input that failed only after having already advanced
+the proof. The failure result sets `structuredContent.reverted` to
+`true`, and its `uuid` and text describe that restored state, not the
+point of failure. Use `ec_try` to probe a tactic without having to
+`ec_revert` afterwards, and `ec_step` when you mean to keep whatever
+progress the phrase makes. A successful phrase behaves identically
+under both, and is recorded for `ec_commit` in both.
+
+### State and uuids
+
+The state model is the REPL's, unchanged. One client is one process is
+one engine state: there is no multiplexing, and tool calls run strictly
+in arrival order even when a client pipelines them. Every result
+reports in its `structuredContent` the `uuid` the call left behind —
+the same monotonically increasing state identifier the REPL prints as
+`[uuid:N]`, advancing only on calls that change engine state — and
+`ec_revert` accepts either one of those uuids or a name given to
+`ec_checkpoint`. Note the uuid returned by `ec_load`: reverting to it
+is the instant way back to the start of the proof.
+
+### Errors
+
+Two kinds of failure, deliberately kept apart:
+
+* **Protocol faults** — malformed JSON, an unknown method, an unknown
+  tool, an argument that violates the declared schema — are JSON-RPC
+  errors (`-32700`, `-32600`, `-32601`, `-32602`).
+* **EasyCrypt failures** — a tactic that does not apply, a file that
+  does not compile, an SMT timeout, a file that is not there — are
+  *successful* responses carrying `"isError": true` and the prover's
+  error text.
+
+The second kind is data: read those messages and act on them, the way
+the REPL's `ERROR` replies are meant to be read.
+
+### Result shape
+
+Every `tools/call` result, error or not, has the same shape:
+
+```json
+{"content": [{"type": "text", "text": "Current goal\n..."}],
+ "structuredContent": {"text": "Current goal\n...", "uuid": 3,
+                       "changed": true},
+ "isError": false}
+```
+
+`text` is the body the REPL would print between its envelope and
+`<END>`, `uuid` is the resulting state, and `changed` says whether the
+engine advanced; `ec_try` adds `reverted` on failure, and each tool
+declares an `outputSchema` matching that structured half. The text
+appears twice on purpose: some clients hand the model
+`structuredContent` alone and drop `content` whenever both are present,
+so a payload living only in `content` would never reach the agent (the
+measurement is in `tests/mcp/README.md`).
+
+What has no counterpart here are the REPL's status-line annotations:
+`[loaded:file:N]` and the `[focus: k/N]` tag do not ride along, so ask
+`ec_tree` when you need to know which of several goals the next tactic
+will hit.
+
+### Client configuration
+
+As a project-scoped `.mcp.json`, dropped next to a proof development:
+
+```json
+{
+  "mcpServers": {
+    "easycrypt": {
+      "command": "easycrypt",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Add loader options to `args` as needed, e.g. `["mcp", "-I",
+"theories"]`. The equivalent one-liner, for Claude Code:
+
+```
+claude mcp add easycrypt -- easycrypt mcp
 ```
 
 ## EasyCrypt proof strategy
