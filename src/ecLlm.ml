@@ -462,8 +462,6 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       in
       let sibling_depth : int Hmap.t ref = ref Hmap.empty in
       let current_depth = ref 0 in
-      (* Pick a bullet token for each depth, skipping tokens already
-         in scope from the LOAD prefix's bullet stack. *)
       let bullet_to_string (b : EcParsetree.bullet) =
         let ch =
           match b.b_kind with
@@ -473,17 +471,31 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
         in
         String.concat "" (List.init b.b_count (fun _ -> ch))
       in
-      let in_use_tokens =
+      (* Bullet frames the LOAD prefix left open, OUTERMOST first (the
+         stack stores the innermost frame at its head). Frame [t_d] is
+         the one whose siblings live at emitted depth [d]. *)
+      let frames : EcBullets.frame list =
         match !prior_bullets with
-        | None -> []
-        | Some stack ->
-          List.map
-            (fun (f : EcBullets.frame) -> bullet_to_string f.bf_bullet)
-            stack
+        | None       -> []
+        | Some stack -> List.rev stack
+      in
+      let in_use_tokens =
+        List.map
+          (fun (f : EcBullets.frame) -> bullet_to_string f.bf_bullet)
+          frames
       in
       let depth_cache : (int, string) Hashtbl.t = Hashtbl.create 8 in
       let next_tok_idx = ref 0 in
       let assigned_tokens = ref [] in
+      (* Depths 1..k address the next sibling of a frame the prefix
+         already opened, and strict bullets accepts nothing but that
+         frame's own token there. Deeper levels get fresh tokens, so
+         pre-populate the cache before any fresh pick happens. *)
+      List.iteri (fun i (f : EcBullets.frame) ->
+        let t = bullet_to_string f.bf_bullet in
+        Hashtbl.replace depth_cache (i + 1) t;
+        assigned_tokens := t :: !assigned_tokens)
+        frames;
       let bullet_for_depth d =
         match Hashtbl.find_opt depth_cache d with
         | Some t -> t
@@ -500,14 +512,27 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           Hashtbl.add depth_cache d t;
           t
       in
-      (* Seed: if the first recorded phrase entered a state with
-         multiple open goals, the LOAD prefix opened a frame whose
-         siblings are still pending. Register all of them at depth 1
-         so the first phrase's parent gets a bullet. *)
+      (* Seed: the goals already open when the first recorded phrase ran
+         were left there by the LOAD prefix, so COMMIT must place each of
+         them at the depth the prefix's own bullets put it at. A frame
+         with floor [f] is discharged once [f] goals remain, hence it
+         still owns the first [n - f] goals of the focused-first list;
+         a goal covered by [c] frames sits at depth [c + 1].
+         Nothing to seed when the prefix left no frame and a single goal
+         (the REPL just continues on the prefix's own focus). *)
       (match entries with
-       | (_, _, Some _, (_ :: _ :: _ as opens)) :: _ ->
-         List.iter
-           (fun h -> sibling_depth := Hmap.add h 1 !sibling_depth)
+       | (_, _, Some _, (_ :: _ as opens)) :: _
+         when frames <> [] || List.length opens >= 2 ->
+         let n = List.length opens in
+         List.iteri (fun i h ->
+           let pos = i + 1 in
+           let covering =
+             List.length
+               (List.filter
+                  (fun (f : EcBullets.frame) -> pos <= n - f.bf_floor)
+                  frames)
+           in
+           sibling_depth := Hmap.add h (covering + 1) !sibling_depth)
            opens
        | _ -> ());
       List.iter (fun (_uuid, src, parent_opt, _opens) ->

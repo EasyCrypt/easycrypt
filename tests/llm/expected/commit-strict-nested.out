@@ -1,0 +1,28 @@
+READY [uuid:0]
+<END>
+OK [uuid:7] [loaded:fixtures/strictnested.ec:13] [focus: 1/4]
+Current goal (remaining: 4)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:7]
+<END>
+OK [uuid:8] [focus: 1/3]
+<END>
+OK [uuid:9] [focus: 1/2]
+<END>
+OK [uuid:10]
+<END>
+OK [uuid:11]
+<END>
+OK [uuid:11]
+<END>
+OK [uuid:11]
+    * trivial.
+    * trivial.
+  + trivial.
+- trivial.
+<END>
