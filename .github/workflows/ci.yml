@@ -113,7 +113,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [unit, stdlib, examples]
+        target: [unit, stdlib, examples, test-llm, test-mcp]
     steps:
     - uses: actions/checkout@v4
     - uses: actions/download-artifact@v4
