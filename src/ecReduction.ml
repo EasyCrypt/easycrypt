@@ -1519,7 +1519,8 @@ let rec conv ri env f1 f2 stk =
         && List.length args1 = List.length args2 -> begin
     (* So that we do not unfold operators *)
     match f1'.f_node, f2'.f_node with
-    | Fop(p1, _), Fop(p2, _) when EcPath.p_equal p1 p2 ->
+    | Fop(p1, tys1), Fop(p2, tys2)
+        when EcPath.p_equal p1 p2 && List.all2 (EqTest_i.for_type env) tys1 tys2 ->
       conv_next ri env f1' (zapp args1 args2 f1.f_ty stk)
     | _, _ ->
       conv ri env f1' f2' (zapp args1 args2 f1.f_ty stk)
