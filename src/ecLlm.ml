@@ -341,7 +341,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Checkpoint n -> Wire.reply (EcLlmCore.checkpoint st ~name:n)
       | Revert s     -> Wire.reply (EcLlmCore.revert st s)
       | Quiet on     -> do_quiet on
-      | Search q     -> Wire.answer (EcLlmCore.search st ~pattern:q)
+      | Search q     -> Wire.reply (EcLlmCore.search st ~pattern:q)
       | Load args    ->
         Wire.reply (EcLlmCore.load st
           ~file:args.Parse.ld_file

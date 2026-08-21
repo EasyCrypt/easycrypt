@@ -107,7 +107,13 @@ val undo       : state -> (reply, failure) result
 val revert     : state -> string -> (reply, failure) result
 val checkpoint : state -> name:string -> (reply, failure) result
 val commit     : state -> (reply, failure) result
-val search     : state -> pattern:string -> answer
+
+(* SEARCH. [pattern] is a search pattern, not EasyCrypt input: the
+   composed phrase is parsed here and refused unless it is exactly one
+   toplevel [search] item, so a pattern carrying a sentence-ending '.'
+   cannot smuggle further commands past it. Hence a [result] and not an
+   [answer]: SEARCH runs a query and can never end the session. *)
+val search     : state -> pattern:string -> (reply, failure) result
 
 (* -------------------------------------------------------------------- *)
 (* Front-end helpers: for replies a front-end produces on its own (the
