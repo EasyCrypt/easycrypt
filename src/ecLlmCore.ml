@@ -1054,5 +1054,52 @@ let revert (st : state) spec =
       Ok (mk_reply_goals st ~pre)
     end
 
+(* SEARCH is handed a search pattern, not EasyCrypt input. Composing
+   ["search " ^ pattern ^ "."] and running it through [step] made every
+   sentence-ending '.' inside the pattern a statement separator, so a
+   pattern like [(_ /\ _). split. admit] executed [split] and [admit]
+   too. Parse the composed phrase here instead, and run it only if it
+   is exactly one toplevel item whose action is a [search]: a pattern
+   that closes the sentence on its own leaves trailing input, which
+   this rejects. Screening the pattern for '.' would be wrong --
+   qualified names (A.B.lem) are legitimate patterns. *)
 let search (st : state) ~pattern =
-  step st (Printf.sprintf "search %s." pattern)
+  let pre = EcCommands.uuid () in
+  Buffer.clear st.notices;
+  let src = Printf.sprintf "search %s." pattern in
+  let reject = "SEARCH: the argument must be a single search pattern" in
+  let is_search (p : EP.global) =
+    not p.EP.gl_fail
+    && match EcLocation.unloc p.EP.gl_action with
+       | EP.Gsearch _ -> true
+       | _            -> false
+  in
+  let parsed =
+    let reader = EcIo.from_string src in
+    let next () =
+      match EcIo.xparse reader with
+      | exception End_of_file -> `End
+      | (_, prog) ->
+        match EcLocation.unloc prog with
+        | EP.P_Prog ([ ], true ) -> `End
+        | EP.P_Prog ([p], false) -> `Item p
+        | _                      -> `Other
+    in
+    let result =
+      try
+        match next () with
+        | `Item p when is_search p ->
+          (match next () with
+           | `End             -> Ok p
+           | `Item _ | `Other -> Error reject)
+        | `Item _ | `Other | `End -> Error reject
+      with e -> Error (Goals.format_error e)
+    in
+    EcIo.finalize reader; result
+  in
+  match parsed with
+  | Error msg -> Error (mk_failure st ~pre msg)
+  | Ok p ->
+    match process_action st ~src p with
+    | ()            -> Ok (mk_reply_goals st ~pre)
+    | exception e   -> Error (mk_failure st ~pre (Goals.format_error ~src e))
