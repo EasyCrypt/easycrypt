@@ -1,0 +1,6 @@
+READY [uuid:0]
+<END>
+ERROR [uuid:0]
+trace: target sentence is not in a proof context
+No active proof.
+<END>

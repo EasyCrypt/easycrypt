@@ -1,0 +1,37 @@
+READY [uuid:0]
+<END>
+OK [uuid:1] [loaded:fixtures/simple.ec:3]
+No active proof.
+<END>
+OK [uuid:2]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:2]
+<END>
+OK [uuid:3] [focus: 1/2]
+<END>
+OK [uuid:4]
+<END>
+OK [uuid:5]
+<END>
+OK [uuid:5]
+<END>
+OK [uuid:5]
+No more goals
+<END>
+OK [uuid:6]
+added lemma: `multi'
+No active proof.
+<END>
+OK [uuid:6]
+lemma multi : 1 = 1 /\ 2 = 2.
+split.
+trivial.
+trivial.
+qed.
+<END>
