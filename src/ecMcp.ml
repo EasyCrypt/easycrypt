@@ -625,7 +625,7 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
       outcome (EcLlmCore.commit st)
 
     | "ec_search" ->
-      answer (EcLlmCore.search st
+      outcome (EcLlmCore.search st
         ~pattern:(Args.string_req name args "pattern"))
 
     | _ ->
