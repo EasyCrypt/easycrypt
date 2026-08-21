@@ -27,6 +27,7 @@ type failure = {
   goals    : string;
   notices  : string;
   reverted : bool;
+  changed  : bool;
 }
 
 type answer =
@@ -365,11 +366,12 @@ let mk_reply_goals (st : state) ~(pre : int) =
   let tag = Goals.focus_tag () in
   mk_reply st ~pre ~tag Goals
 
-let mk_failure (st : state) (message : string) =
+let mk_failure (st : state) ~(pre : int) (message : string) =
   let notices = Buffer.contents st.notices in
   Buffer.clear st.notices;
-  { uuid = EcCommands.uuid (); message;
-    goals = Goals.goals_to_string (); notices; reverted = false; }
+  let uuid = EcCommands.uuid () in
+  { uuid; message; goals = Goals.goals_to_string (); notices;
+    reverted = false; changed = uuid <> pre; }
 
 (* -------------------------------------------------------------------- *)
 (* Transcript manipulation. *)
@@ -626,7 +628,7 @@ let make_reply (st : state) ?tag (body : body) =
   mk_reply st ~pre:(EcCommands.uuid ()) ?tag body
 
 let make_failure (st : state) (message : string) =
-  mk_failure st message
+  mk_failure st ~pre:(EcCommands.uuid ()) message
 
 (* -------------------------------------------------------------------- *)
 (* Process EasyCrypt input typed at the prompt. The input is a file
@@ -688,7 +690,7 @@ let step (st : state) input =
       Transcript.clear st;
       Done (Ok (mk_reply st ~pre (Text "Session restarted")))
     | e ->
-      Done (Error (mk_failure st (Goals.format_error ~src:!last_src e)))
+      Done (Error (mk_failure st ~pre (Goals.format_error ~src:!last_src e)))
     end
   in
   EcIo.finalize reader;
@@ -698,9 +700,14 @@ let step (st : state) input =
 (* [step] with an automatic rollback on failure. A phrase can fail
    after having advanced the engine, so the pre-entry uuid is the only
    faithful notion of "unchanged": restore it the way REVERT does.
-   The failure is then re-stamped, because its uuid and goal text
-   described the state at the point of failure, which no longer
-   exists. *)
+   The failure is then re-stamped, because its uuid, goal text and
+   [changed] flag described the state at the point of failure, which no
+   longer exists. [changed] is recomputed against the same pre-entry
+   uuid, so it reports the *net* effect of the call: normally [false],
+   the rollback having undone whatever the input managed to do. It
+   stays [true] in the one case where the rollback cannot reach [pre],
+   namely a phrase that reset the engine ([pragma Reset]) and landed
+   below it -- then the state really did change. *)
 let try_step (st : state) input =
   let pre = EcCommands.uuid () in
   match step st input with
@@ -709,10 +716,12 @@ let try_step (st : state) input =
   | Done (Error failure)  ->
     EcCommands.undo pre;
     Transcript.trim st pre;
+    let uuid = EcCommands.uuid () in
     Done (Error { failure with
-      uuid     = EcCommands.uuid ();
+      uuid;
       goals    = Goals.goals_to_string ();
-      reverted = true; })
+      reverted = true;
+      changed  = uuid <> pre; })
 
 (* -------------------------------------------------------------------- *)
 (* LOAD: run [file] up to [upto], optionally with SMT calls weakened
@@ -957,11 +966,11 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
     Ok (mk_reply st ~pre (Text "Session restarted"))
   | Trace_failed e ->
     let msg = Goals.format_error ~src:!last_src e in
-    Error (mk_failure st (!trace_prefix ^ msg))
+    Error (mk_failure st ~pre (!trace_prefix ^ msg))
   | Failure s ->
-    Error (mk_failure st s)
+    Error (mk_failure st ~pre s)
   | e ->
-    Error (mk_failure st (Goals.format_error ~src:!last_src e))
+    Error (mk_failure st ~pre (Goals.format_error ~src:!last_src e))
 
 (* -------------------------------------------------------------------- *)
 (* The remaining meta-commands. *)
@@ -993,7 +1002,7 @@ let undo (st : state) =
     Transcript.trim st (uuid - 1);
     Ok (mk_reply_goals st ~pre)
   end else
-    Error (mk_failure st "nothing to undo")
+    Error (mk_failure st ~pre "nothing to undo")
 
 let focus (st : state) request =
   (* [request] is the user's intent normalized:
@@ -1010,11 +1019,11 @@ let focus (st : state) request =
     | `Path path -> FrameTree.resolve_path path
   in
   match resolved with
-  | Error msg -> Error (mk_failure st msg)
+  | Error msg -> Error (mk_failure st ~pre msg)
   | Ok target ->
     match EcCommands.focus_goal target with
     | Ok _      -> Ok (mk_reply_goals st ~pre)
-    | Error msg -> Error (mk_failure st msg)
+    | Error msg -> Error (mk_failure st ~pre msg)
 
 let checkpoint (st : state) ~name =
   let pre = EcCommands.uuid () in
@@ -1032,12 +1041,12 @@ let revert (st : state) spec =
   in
   match target with
   | None ->
-    Error (mk_failure st (Printf.sprintf
+    Error (mk_failure st ~pre (Printf.sprintf
       "REVERT: '%s' is not a valid uuid or checkpoint name" spec))
   | Some target ->
     let uuid = EcCommands.uuid () in
     if target < 0 || target > uuid then
-      Error (mk_failure st (Printf.sprintf
+      Error (mk_failure st ~pre (Printf.sprintf
         "REVERT: uuid %d out of range [0, %d]" target uuid))
     else begin
       EcCommands.undo target;
