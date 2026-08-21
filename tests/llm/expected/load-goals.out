@@ -24,7 +24,7 @@ Type variables: <none>
 ------------------------------------------------------------------------
 1 = 1
 <END>
-OK [uuid:4]
+OK [uuid:4] [focus: 1/2]
 Current goal (remaining: 2)
 
 Type variables: <none>
@@ -32,7 +32,7 @@ Type variables: <none>
 ------------------------------------------------------------------------
 1 = 1
 <END>
-OK [uuid:4]
+OK [uuid:4] [focus: 1/2]
 Current goal (remaining: 2)
 
 Type variables: <none>

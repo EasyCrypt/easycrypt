@@ -430,9 +430,10 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   (* ------------------------------------------------------------------ *)
   (* COMMIT: replay the transcript against the proof DAG (parent_of /
      children_of, backed by [EcCoreGoal.pr_parent]), inserting bullets
-     at multi-child splits. Bullet tokens skip any character already on
-     the LOAD prefix's [puc_bullets] stack so emitted bullets cannot
-     collide with frames opened by the prefix. *)
+     at multi-child splits. Levels the LOAD prefix's [puc_bullets] stack
+     already opened are addressed with that frame's own token; deeper
+     levels get fresh tokens, chosen so they collide with neither the
+     stack nor each other. *)
   let module Commit = struct
     (* Token order matches PR 1017's lexer: -, +, *, --, ++, **,
        ---, +++, *** ... *)
@@ -1155,19 +1156,24 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Undo         -> do_undo ()
       | Goals `One   ->
         Buffer.clear notices;
-        Wire.reply_ok (Goals.goals_to_string ())
+        Wire.reply_ok ~tag:(Goals.focus_tag ())
+          (Goals.goals_to_string ())
       | Goals `All   ->
         Buffer.clear notices;
-        Wire.reply_ok (Goals.goals_to_string ~all:true ())
+        Wire.reply_ok ~tag:(Goals.focus_tag ())
+          (Goals.goals_to_string ~all:true ())
       | Tree `One    ->
         Buffer.clear notices;
-        Wire.reply_ok (FrameTree.render ())
+        Wire.reply_ok ~tag:(Goals.focus_tag ())
+          (FrameTree.render ())
       | Tree `All    ->
         Buffer.clear notices;
-        Wire.reply_ok (FrameTree.render ~all:true ())
+        Wire.reply_ok ~tag:(Goals.focus_tag ())
+          (FrameTree.render ~all:true ())
       | Commit       ->
         Buffer.clear notices;
-        Wire.reply_ok (Commit.proof_text ())
+        Wire.reply_ok ~tag:(Goals.focus_tag ())
+          (Commit.proof_text ())
       | Focus path   -> do_focus_request (`Path path)
       | Next         -> do_focus_request `Next
       | Checkpoint n -> do_checkpoint n
