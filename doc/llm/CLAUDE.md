@@ -195,7 +195,7 @@ turn. Use `TREE` to see the structure, including nested splits:
 
 ```
 TREE
-→ OK [uuid:N]
+→ OK [uuid:N] [focus: 1/4]
     [1.1.1] x = 0 <- focused
     [1.1.2] y = 1
   [1.2] z = 2
@@ -347,9 +347,11 @@ SEARCH (_ %/ _)
   first one. Address them in any order via `FOCUS path`, or in the
   default order by closing each in turn. Use `TREE` or `GOALS ALL`
   to see what's open.
-- When more than one subgoal is open, replies carry a
-  `[focus: k/N]` tag (e.g. `OK [uuid:42] [focus: 1/3]`) so you know
-  which one the next tactic will hit.
+- When more than one subgoal is open, every `OK` reply that reflects
+  proof state -- tactics, `GOALS`, `GOALS ALL`, `TREE`, `TREE ALL`,
+  `FOCUS`, `NEXT`, `COMMIT`, `LOAD` -- carries a `[focus: k/N]` tag
+  (e.g. `OK [uuid:42] [focus: 1/3]`) so you know which one the next
+  tactic will hit. `HELP`, `QUIET` and `CHECKPOINT` are untagged.
 - `pragma +strict_bullets` does **not** apply to REPL input. Files
   loaded via `LOAD` still respect their own pragmas, but tactics typed
   at the REPL prompt are never rejected for missing bullets — the
