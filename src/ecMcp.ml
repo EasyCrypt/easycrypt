@@ -508,10 +508,8 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
         ~is_error:false ~extra:[]
 
     (* A prover error is data, not a protocol failure: it comes back as
-       a successful response the agent can read and act on. [changed] is
-       computed against the uuid the call started from, since a phrase
-       can fail after having advanced the engine. *)
-    let failure ~pre ~extra (f : EcLlmCore.failure) =
+       a successful response the agent can read and act on. *)
+    let failure ~extra (f : EcLlmCore.failure) =
       let body =
         if f.EcLlmCore.goals = "" then f.EcLlmCore.message
         else f.EcLlmCore.message ^ "\n" ^ f.EcLlmCore.goals
@@ -519,12 +517,12 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
       make
         ~text:(join f.EcLlmCore.notices body)
         ~uuid:f.EcLlmCore.uuid
-        ~changed:(f.EcLlmCore.uuid <> pre)
+        ~changed:f.EcLlmCore.changed
         ~is_error:true ~extra:(extra f)
 
-    let outcome ?(extra = fun _ -> []) ~pre = function
+    let outcome ?(extra = fun _ -> []) = function
       | Ok r      -> reply r
-      | Error f   -> failure ~pre ~extra f
+      | Error f   -> failure ~extra f
   end in
 
   (* ------------------------------------------------------------------ *)
@@ -541,19 +539,18 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
      goes out, then the process stops. *)
   let quitting = ref false in
 
-  let answer ~pre ?(extra = fun _ -> []) = function
+  let answer ?(extra = fun _ -> []) = function
     | EcLlmCore.Quit ->
       quitting := true;
       Result_of.make ~text:"session terminated"
         ~uuid:(EcLlmCore.uuid st) ~changed:false ~is_error:false ~extra:[]
     | EcLlmCore.Done outcome ->
-      Result_of.outcome ~extra ~pre outcome
+      Result_of.outcome ~extra outcome
   in
 
   let call_tool (name : string) (params : J.t option) : J.t =
     let args = Args.arguments params in
-    let pre  = EcLlmCore.uuid st in
-    let outcome = Result_of.outcome ~pre in
+    let outcome = Result_of.outcome in
 
     match name with
     | "ec_load" ->
@@ -571,10 +568,10 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
       outcome (EcLlmCore.load st ~file ~upto ~nosmt ~trace)
 
     | "ec_step" ->
-      answer ~pre (EcLlmCore.step st (Args.string_req name args "phrase"))
+      answer (EcLlmCore.step st (Args.string_req name args "phrase"))
 
     | "ec_try" ->
-      answer ~pre
+      answer
         ~extra:(fun (f : EcLlmCore.failure) ->
           [("reverted", `Bool f.EcLlmCore.reverted)])
         (EcLlmCore.try_step st (Args.string_req name args "phrase"))
@@ -605,7 +602,7 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
       outcome (EcLlmCore.commit st)
 
     | "ec_search" ->
-      answer ~pre (EcLlmCore.search st
+      answer (EcLlmCore.search st
         ~pattern:(Args.string_req name args "pattern"))
 
     | _ ->
