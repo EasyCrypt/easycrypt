@@ -290,6 +290,8 @@ abstract theory AdversaryN.
       by rcondt 1 => //;wp;conseq (_: _ ==> true) => // /#.
     move=> b c;proc;sp;inline *;if => //.
     sp;wp;if;auto => /#.
+    (* F003: non-negativity of the per-step weight over the whole range *)
+    by move=> i; smt(p_pos n_pos).
   qed.
 
   local lemma pr_bad_eq &m :
