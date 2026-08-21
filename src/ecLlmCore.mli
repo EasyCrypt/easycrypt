@@ -77,14 +77,21 @@ val load :
   -> trace:bool
   -> (reply, failure) result
 
-(* One line of raw EasyCrypt input (or a multi-line block). *)
+(* Raw EasyCrypt input: one line, or a multi-line block. Every
+   sentence the input holds is executed, in order, and a single reply
+   describes the state they leave behind. A sentence that fails stops
+   the run at that point and its failure is returned; the sentences
+   before it stay applied, as they would in a compiled file. An
+   [exit.] ends the session immediately, with the sentences that
+   preceded it applied. *)
 val step : state -> string -> answer
 
 (* [step], but a failure leaves no trace: the engine is rolled back to
    the uuid it had on entry (as REVERT does) and the failure comes back
    with [reverted = true]. Successes and [Quit] behave exactly as in
-   [step]. A phrase that fails after having already advanced the engine
-   is rolled back whole. *)
+   [step]. Input that fails after having already advanced the engine
+   -- a phrase with a side effect, or an earlier sentence of a
+   multi-sentence input -- is rolled back whole. *)
 val try_step : state -> string -> answer
 
 val goals      : state -> all:bool -> (reply, failure) result
