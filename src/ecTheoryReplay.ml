@@ -351,15 +351,13 @@ let check_evtags ?(tags : evtags option) (src : symbol list) =
       let dfl =
         not (List.mem explicit src) &&
         not (List.exists (fun (mode, _) -> mode = `Include) tags) in
-      let stt =
-        List.map (fun src ->
-          let do1 status (mode, dst) =
-            match mode with
-            | `Exclude -> if sym_equal src dst then raise Reject; status
-            | `Include -> status || (sym_equal src dst)
-          in List.fold_left do1 dfl tags)
-          src
-      in List.mem true stt
+      let has_tag dst = List.exists (fun s -> sym_equal s dst) src in
+      let do1 status (mode, dst) =
+        match mode with
+        | `Exclude -> if has_tag dst then raise Reject; status
+        | `Include -> status || has_tag dst
+      in
+      List.fold_left do1 dfl tags
 
   with Reject -> false
 
