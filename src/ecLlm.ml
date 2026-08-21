@@ -409,7 +409,14 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       raise (EcScope.toperror_of_exn ~gloc:loc
         (EcScope.HiScopeError (None,
           "this command is expected to fail")));
-    if record && !succeeded && not p.EP.gl_fail then begin
+    (* Queries only inspect the environment: they neither advance the
+       proof nor belong in the body COMMIT emits. *)
+    let is_query =
+      match EcLocation.unloc p.EP.gl_action with
+      | EP.Gprint _ | EP.Gsearch _ | EP.Glocate _ -> true
+      | _ -> false
+    in
+    if record && !succeeded && not p.EP.gl_fail && not is_query then begin
       transcript := (pre_uuid, src, parent, opens_pre) :: !transcript;
       (* Keep the newest non-empty snapshot: a phrase that closes the
          proof ([qed]) leaves no active proof, and precisely then we
