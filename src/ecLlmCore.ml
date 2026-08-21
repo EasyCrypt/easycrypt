@@ -671,8 +671,7 @@ let step (st : state) input =
 
 (* -------------------------------------------------------------------- *)
 (* [step] with an automatic rollback on failure. A phrase can fail
-   after having advanced the engine (a compound sentence whose first
-   tactics went through, say), so the pre-entry uuid is the only
+   after having advanced the engine, so the pre-entry uuid is the only
    faithful notion of "unchanged": restore it the way REVERT does.
    The failure is then re-stamped, because its uuid and goal text
    described the state at the point of failure, which no longer
