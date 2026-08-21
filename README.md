@@ -166,6 +166,13 @@ with proof scripts). At present, the only available front-end is based on Emacs'
 [Proof General](https://github.com/ProofGeneral/PG).
 However, a front-end for VSCode is currently in development.
 
+Besides these, EasyCrypt ships an interface aimed at LLM agents rather
+than at humans: `easycrypt llm`, an interactive REPL speaking a
+machine-friendly protocol, and `easycrypt mcp`, a
+[Model Context Protocol](https://modelcontextprotocol.io/) server over
+stdio. Both drive the same proof engine, and both are documented in
+[doc/llm/CLAUDE.md](doc/llm/CLAUDE.md).
+
 ### Proof-General (Emacs)
 
 EasyCrypt mode has been integrated upstream. Please, go

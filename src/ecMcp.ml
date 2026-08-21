@@ -56,32 +56,38 @@ exception Invalid_params of string
 exception Tool_error of string
 
 (* -------------------------------------------------------------------- *)
-(* TODO(phase 3): replace with the MCP section of doc/llm/CLAUDE.md,
-   the way [llm -help] prints the whole guide. *)
-let usage = {|easycrypt mcp -- Model Context Protocol server (stdio, JSON-RPC 2.0)
+(* [-help]. Where [llm -help] prints the whole agent guide, we print the
+   one section of it that describes this server: from its heading down
+   to the next heading of the same level. A guide in which that heading
+   cannot be found is printed whole, rather than not at all. *)
+let usage_section = "## Using the MCP mode"
 
-Exposes the EasyCrypt proof engine to an MCP client as a set of tools.
-Reads newline-delimited JSON-RPC messages on stdin and writes responses
-on stdout; diagnostics go to stderr. One client = one process = one
-proof session. Standard loader and prover options (-I, -timeout, -p,
--stdlib, ...) are accepted, as for `easycrypt llm'.
+let extract_usage (guide : string) =
+  let is_heading line =
+    String.length line >= 3 && String.sub line 0 3 = "## " in
+  let rec seek = function
+    | [] -> None
+    | line :: rest when String.trim line = usage_section ->
+      Some (line :: keep rest)
+    | _ :: rest -> seek rest
+  and keep = function
+    | [] -> []
+    | line :: _ when is_heading line -> []
+    | line :: rest -> line :: keep rest
+  in
+  match seek (String.split_on_char '\n' guide) with
+  | None       -> guide
+  | Some lines -> String.concat "\n" lines
 
-Tools:
-  ec_load        compile a file up to a position and start a session
-  ec_step        run one or more EasyCrypt sentences
-  ec_try         run sentences, rolling back if any of them fails
-  ec_goals       print the current goal state
-  ec_tree        list the open subgoals as a labelled tree
-  ec_focus       focus the subgoal at a dotted path (or `next')
-  ec_undo        undo the last step
-  ec_revert      return to a uuid or to a named checkpoint
-  ec_checkpoint  name the current state for a later ec_revert
-  ec_commit      emit the recorded phrases as a bulleted proof body
-  ec_search      search for lemmas matching a pattern
-
-Client configuration and the full protocol description live in
-doc/llm/CLAUDE.md.
-|}
+let print_usage () =
+  let path = EcLlm.llm_guide_path () in
+  try
+    let ic = open_in_bin path in
+    let guide = really_input_string ic (in_channel_length ic) in
+    close_in ic;
+    print_string (extract_usage guide)
+  with Sys_error e ->
+    Printf.eprintf "cannot read LLM guide: %s\n%!" e
 
 (* -------------------------------------------------------------------- *)
 (* JSON schema fragments for the tool declarations. *)
@@ -429,7 +435,7 @@ let focus_target (arg : string) =
 (* -------------------------------------------------------------------- *)
 let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
   if mcpopts.mcpo_help then begin
-    print_string usage;
+    print_usage ();
     exit 0
   end;
 
