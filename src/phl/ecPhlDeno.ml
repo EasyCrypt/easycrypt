@@ -115,7 +115,10 @@ let t_ehoare_deno_r pre post tc =
   let concl_po = map_ss_inv2 f_xreal_le (map_ss_inv1 f_b2xr ev) post in
   let concl_po = f_forall_mems_ss_inv mpo concl_po in
 
-  FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
+  (* 0%r <= bd *)
+  let concl_nn = f_real_le f_r0 bd in
+
+  FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po; concl_nn]
 
 (* -------------------------------------------------------------------- *)
 let cond_pre env prl prr pre =
@@ -262,7 +265,11 @@ let process_ehoare_deno info tc =
       (ehf_pr hf, ehf_po hf)
   in
 
-  FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_ehoare_deno pre post tc)
+  (* [t_ehoare_deno] always emits the [0%r <= bd] non-negativity goal last; try
+     to close it automatically so trivially non-negative bounds stay effort-free
+     (a genuinely negative bound is left as an unprovable goal). *)
+  FApi.t_last (FApi.t_try t_trivial)
+    (FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_ehoare_deno pre post tc))
 
 
 (* -------------------------------------------------------------------- *)
