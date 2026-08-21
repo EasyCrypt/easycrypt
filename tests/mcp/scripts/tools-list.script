@@ -1,0 +1,5 @@
+# exit: 0
+# The tool declarations, verbatim. This golden pins the agent-facing
+# contract: names, descriptions, input schemas, output schemas and
+# annotations. Editing any tool description re-records this file.
+{"jsonrpc":"2.0","id":1,"method":"tools/list"}

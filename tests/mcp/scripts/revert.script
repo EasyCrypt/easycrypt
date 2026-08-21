@@ -1,0 +1,15 @@
+# exit: 0
+# ec_revert addressed both ways: by the uuid ec_load reported, and by
+# a name given to ec_checkpoint. Each revert is followed by ec_goals,
+# so the golden records where the session actually landed.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","line":6}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_checkpoint","arguments":{"name":"start"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"split."}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ec_revert","arguments":{"target":"3"}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"ec_goals","arguments":{}}}
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"split. trivial."}}}
+{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"ec_revert","arguments":{"target":"start"}}}
+{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"ec_goals","arguments":{}}}
+{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"ec_commit","arguments":{}}}
+{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"ec_revert","arguments":{"target":"nosuchname"}}}
