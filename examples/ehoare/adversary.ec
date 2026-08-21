@@ -117,5 +117,6 @@ lemma pr_bad &m (A<:Adv{-O}) : Pr[Main(A).main() @ &m : O.bad] <= eps * Q%r * (i
       by apply o_bad.
     by wp; auto; move => *; case (Q <= 0); smt(xle0x).
   + auto.
-  auto.
+  + auto.
+  by smt(eps_ge0 Q_nneg dr_mu_test).
 qed.
