@@ -1,0 +1,2 @@
+This file exists but is not an EasyCrypt source: LOAD must reject it
+with the unknown-extension error, not with the missing-file error.
