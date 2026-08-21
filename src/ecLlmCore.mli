@@ -34,13 +34,19 @@ type reply = {
    the same, so the buffer is left clean for the next operation.
    [reverted] is set by [try_step] only: it says the engine was rolled
    back to the state it had before the operation ran, so [uuid] and
-   [goals] describe that restored state, not the point of failure. *)
+   [goals] describe that restored state, not the point of failure.
+   [changed] tells whether the engine uuid advanced -- a failing
+   operation may well have moved the engine before failing. It reports
+   the *net* effect of the call, so under [try_step] it is [false] for
+   a phrase that advanced, failed and was rolled back: after the
+   rollback there is nothing left to have changed. *)
 type failure = {
   uuid     : int;
   message  : string;
   goals    : string;
   notices  : string;
   reverted : bool;
+  changed  : bool;
 }
 
 (* Operations that can be asked to end the session ([exit.]) return an
