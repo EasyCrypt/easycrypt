@@ -1,0 +1,2 @@
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"easycrypt","version":"VERSION"}}}
+{"jsonrpc":"2.0","id":2,"result":{}}
