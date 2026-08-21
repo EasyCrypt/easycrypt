@@ -17,6 +17,7 @@ up in both sets of goldens — that is the point.
 | `expected/*.out` | recorded stdout, one file per script |
 | `../llm/fixtures/*` | the EasyCrypt files the scripts load (shared with the REPL harness, never duplicated) |
 | `../../scripts/testing/mcp-golden` | the runner |
+| `../../scripts/testing/mcp-parity` | the REPL/MCP parity checker (see below) |
 
 ## Running
 
@@ -27,6 +28,7 @@ make test-mcp                      # build + run every scenario
 scripts/testing/mcp-golden         # run every scenario
 scripts/testing/mcp-golden happy-path protocol-errors
 scripts/testing/mcp-golden --bin /path/to/ec.exe
+scripts/testing/mcp-parity -v          # the parity check, alone
 ```
 
 The runner defaults to `_build/default/src/ec.exe`, resolved relative
@@ -63,6 +65,56 @@ gate for changes to the protocol layer.
 | `notifications` | notifications, known and unknown, draw no reply |
 | `exit` | `exit.` answers "session terminated", then the process stops |
 | `eof` | end of input is a clean shutdown, exit 0 |
+
+## Parity
+
+`make test-mcp` runs `scripts/testing/mcp-parity` after the goldens.
+Where the goldens freeze *what* the MCP server answers, the parity
+check pins *why the two front-ends can be trusted to agree*: they are
+two wire layers over one core, so the same operation must produce the
+same answer on both.
+
+It plays one representative operation per tool family — load, step,
+goals, tree, focus, undo, checkpoint, step again, revert, search,
+commit, and a failing phrase — in that order, against two sessions
+started from the same directory (`tests/llm`, so both name the fixture
+identically and no path difference can leak into a reply): a REPL
+session driven with `llm -eval`, and an MCP session driven with a
+JSON-RPC script. For each step it asserts two things.
+
+**The uuid matches.** The REPL's `[uuid:N]` envelope tag against the
+MCP result's `structuredContent.uuid`.
+
+**The payload matches.** The REPL's reply body — everything it prints
+between the `OK`/`ERROR` line and `<END>` — against the MCP result's
+`content[0].text`, *up to one trailing newline*. That slack is the
+whole of the licensed difference: the REPL terminates a body that lacks
+a newline so that `<END>` starts a line of its own, and MCP, having no
+sentinel, does not. The checker appends that newline and then demands
+byte equality.
+
+The comparison is derived from the two envelopes rather than pattern
+matched out of them: the REPL wire is a sequence of blocks opened by a
+status line and closed by a lone `<END>`, and the MCP wire is one JSON
+object per line. Both are parsed structurally, so the checker cannot
+be fooled by a body that happens to contain something envelope-shaped.
+
+Two asymmetries are structural, and the check deliberately does not
+span them:
+
+* **Envelope tags.** The REPL's `[loaded:file:N]` and `[focus: 1/N]`
+  annotations ride on the status line, not in the body; MCP's envelope
+  is `structuredContent`, which by the plan's result shape carries
+  `uuid` and `changed` only. So an MCP client does not see them at all.
+  That is a gap worth closing one day — the natural home is a
+  `structuredContent` field — but it is not a parity violation: no body
+  differs.
+* **Notices on failures.** The REPL has never rendered the engine's
+  notice buffer on an `ERROR` reply; the MCP failure result does
+  include it. The two therefore agree only when the failing operation
+  emitted no notices, which is the case for the failing phrase the
+  check plays. Should a future step want a noisy failure, this is the
+  invariant to weaken — knowingly, and here.
 
 ## Expected exit status
 

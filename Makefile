@@ -15,6 +15,8 @@ LLMCHECK  := scripts/testing/llm-golden
 LLMCHECK  += --bin=./ec.native
 MCPCHECK  := scripts/testing/mcp-golden
 MCPCHECK  += --bin=./ec.native
+MCPPARITY := scripts/testing/mcp-parity
+MCPPARITY += --bin=./ec.native
 NIX       ?= nix --extra-experimental-features "nix-command flakes"
 PROFILE   ?= dev
 
@@ -59,6 +61,7 @@ test-llm: build
 
 test-mcp: build
 	$(MCPCHECK)
+	$(MCPPARITY)
 
 check: unit stdlib examples
 	@true
