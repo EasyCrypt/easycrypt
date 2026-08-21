@@ -660,6 +660,13 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
             | f :: rest -> (f, String.concat " " rest)
         in
         if filename = "" then failwith "LOAD: missing filename";
+        (* Checked here, before anything else touches the session: the
+           reader would otherwise raise [Sys_error] far downstream, and
+           the REPL would report it as an anomaly after having already
+           reset the scope. *)
+        if not (Sys.file_exists filename) then
+          failwith
+            (Printf.sprintf "LOAD: no such file: %s" filename);
 
         (* Parse optional LINE[:COL] and flags (-nosmt, -trace). *)
         let upto, nosmt, trace =
