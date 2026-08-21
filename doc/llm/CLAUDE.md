@@ -224,7 +224,9 @@ another, because the tree always shows the focused goal first.
 
 **5. Build a `+strict_bullets`-friendly proof with `COMMIT`:**
 
-The REPL records every successful interactive phrase. `COMMIT` walks
+The REPL records every successful interactive phrase except queries
+(`search`, `print`, `locate`, and the `SEARCH` command), so you can
+look things up mid-proof without polluting the body. `COMMIT` walks
 the proof DAG and emits the recorded tactics with bullets inserted
 at every multi-child split. The output is a proof body that compiles
 under `pragma +strict_bullets`:
