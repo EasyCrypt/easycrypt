@@ -1,0 +1,10 @@
+# exit: 0
+# A query issued in the middle of a proof must not end up in the body
+# COMMIT emits: the two `trivial.` lines are the whole proof.
+LOAD "fixtures/midproof.ec"
+QUIET ON
+trivial.
+SEARCH (b2i _)
+trivial.
+QUIET OFF
+COMMIT
