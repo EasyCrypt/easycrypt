@@ -342,6 +342,27 @@ let t_eager_fun_abs_r i tc =
 
   let s, fl, fr = (eg.eg_sl, eg.eg_fl, eg.eg_fr) in
 
+  (* Side-condition (0): the swapping statement must depend only on global
+     variables. *)
+  check_only_global !!tc env s;
+
+  (* Side-condition (c): the swapping statement must not modify [glob A], where
+     [A] is the abstract module underlying the eager functions [fl]/[fr]. An
+     unrestricted abstract [A] may read/write any concrete global, so writing to
+     a concrete global that [A] is allowed to touch is unsound. *)
+  let (topl, _, _, _), (topr, _, _, _) =
+    abstract_info2 env fl fr in
+  let glob_a = PV.add_glob env topr (PV.add_glob env topl PV.empty) in
+  let bad = PV.interdep env (s_write env s) glob_a in
+  if not (PV.is_empty bad) then begin
+    let bad_s = Format.asprintf "%a" (PV.pp env) bad in
+    tc_error_lazy !!tc (fun fmt ->
+        Format.fprintf fmt
+          "eager: swapping statement may not modify the globals of the \
+           abstract module: %s"
+          bad_s)
+  end;
+
   let pre, post, sg_e = EcPhlFun.FunAbsLow.equivF_abs_spec !!tc env fl fr i in
   let _, _, sg_f = EcPhlFun.FunAbsLow.equivF_abs_spec !!tc env fr fr i in
   let _, _, sg_g = EcPhlFun.FunAbsLow.equivF_abs_spec !!tc env fl fl i in
