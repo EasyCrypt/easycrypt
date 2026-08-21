@@ -110,10 +110,19 @@ module Schema = struct
                          `List (List.map (fun s -> `String s) required))])
             @ [("additionalProperties", `Bool false)])
 
-  (* Every tool answers with the same structured payload: the engine
-     state the call left behind, and whether it moved. *)
+  (* Every tool answers with the same structured payload: the reply
+     text, the engine state the call left behind, and whether it moved.
+
+     [text] repeats [content[0].text] verbatim. The duplication is
+     deliberate: Claude Code, our primary client, hands the model the
+     [structuredContent] object alone and drops [content] whenever both
+     are present, so a payload that lives only in [content] never
+     reaches the agent. See tests/mcp/README.md. *)
   let output ?(reverted = false) () =
     let base = [
+      ("text", str ~description:"the reply body -- goal state, proof \
+                                 body, search results, error text; the \
+                                 same string as content[0].text" ());
       ("uuid", int ~description:"engine state identifier after the call; \
                                  pass it to ec_revert to come back here" ());
       ("changed", `Assoc [("type", `String "boolean");
@@ -132,7 +141,8 @@ module Schema = struct
     in
     `Assoc [("type", `String "object");
             ("properties", `Assoc base);
-            ("required", `List [`String "uuid"; `String "changed"])]
+            ("required", `List [`String "text"; `String "uuid";
+                                `String "changed"])]
 end
 
 (* -------------------------------------------------------------------- *)
@@ -477,11 +487,18 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
     let content text =
       `List [`Assoc [("type", `String "text"); ("text", `String text)]]
 
+    (* [text] appears twice, once in each half of the result, and the
+       two copies are the same string by construction. Clients that read
+       [content] are served by the first; Claude Code, which drops
+       [content] as soon as [structuredContent] is present, is served
+       only by the second. *)
     let make ~text ~uuid ~changed ~is_error ~extra =
       `Assoc [
         ("content", content text);
         ("structuredContent",
-         `Assoc ([("uuid", `Int uuid); ("changed", `Bool changed)] @ extra));
+         `Assoc ([("text", `String text);
+                  ("uuid", `Int uuid);
+                  ("changed", `Bool changed)] @ extra));
         ("isError", `Bool is_error);
       ]
 
