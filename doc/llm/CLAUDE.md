@@ -87,7 +87,7 @@ These are protocol-level commands, not EasyCrypt syntax:
 
 Any line that is not a meta-command is parsed as EasyCrypt input.
 This covers tactics, declarations, `search`, `print`, `require`,
-etc. The line must be a complete EasyCrypt statement ending with `.`
+etc. Every statement on the line must be complete and end with `.`
 
 ```
 smt().
@@ -95,6 +95,18 @@ rewrite H1 H2.
 search (%/).
 print mulzK.
 ```
+
+A line may hold several statements; all of them are executed, in
+order, exactly as if the text had been appended to the source file,
+and a single reply describes the state they leave behind:
+
+```
+split. trivial. trivial.
+```
+
+If one of them fails, the reply is that failure and the statements
+before it stay applied — again as in a file. `exit.` ends the session
+there, with the statements that preceded it applied.
 
 For multi-line statements, wrap with `<BEGIN>` and `<DONE>`:
 
