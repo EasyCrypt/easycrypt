@@ -15,9 +15,11 @@ up in both sets of goldens — that is the point.
 |------|----------|
 | `scripts/*.script` | the JSON-RPC messages piped into the server |
 | `expected/*.out` | recorded stdout, one file per script |
+| `claude-code.mcp.json` | a ready-to-paste client configuration |
 | `../llm/fixtures/*` | the EasyCrypt files the scripts load (shared with the REPL harness, never duplicated) |
 | `../../scripts/testing/mcp-golden` | the runner |
 | `../../scripts/testing/mcp-parity` | the REPL/MCP parity checker (see below) |
+| `../../scripts/testing/mcp-inspector-check` | manual smoke test against a real client (see below) |
 
 ## Running
 
@@ -115,6 +117,82 @@ span them:
   emitted no notices, which is the case for the failing phrase the
   check plays. Should a future step want a noisy failure, this is the
   invariant to weaken — knowingly, and here.
+
+## Real clients
+
+Neither the goldens nor the parity check involve an MCP client: they
+speak the wire themselves, so they prove the server is consistent with
+itself and with the REPL, not that a client can use it. Two manual
+checks close that gap. Neither is in CI — both need network access —
+and both should be run after touching `src/ecMcp.ml`.
+
+**The reference client.** `scripts/testing/mcp-inspector-check` drives
+the server with the MCP Inspector's CLI mode, `npx
+@modelcontextprotocol/inspector --cli`, over `tools/list` and a
+`tools/call` of `ec_load`:
+
+```
+scripts/testing/mcp-inspector-check --bin ./ec.native
+```
+
+**Claude Code.** `claude-code.mcp.json` is a project configuration to
+drop next to a proof development. It names `easycrypt` on the `PATH`,
+so it stays free of absolute paths:
+
+```json
+{"mcpServers": {"easycrypt": {"command": "easycrypt", "args": ["mcp"]}}}
+```
+
+A project-scoped `.mcp.json` needs interactive approval, so for a
+headless check register the server at local scope instead and ask for
+its health:
+
+```
+claude mcp add-json easycrypt '{"command":"/abs/path/ec.exe","args":["mcp"]}' --scope local
+claude mcp list          # easycrypt: ... - ✔ Connected
+claude mcp remove easycrypt -s local
+```
+
+### Known gap: the payload does not reach a Claude Code agent
+
+That headless check found something the wire-level tests cannot see.
+Claude Code, when a `tools/call` result carries `structuredContent`,
+hands the model **only** that object and drops `content` entirely. Our
+result shape puts the metadata in `structuredContent` (`uuid`,
+`changed`) and the payload — the goal state, the search results, the
+proof body — in `content`, so an agent driving this server through
+Claude Code sees the uuid and nothing else:
+
+```
+> Call ec_load with file=.../simple.ec and line=6. Then quote the
+  ENTIRE raw tool result you received, verbatim.
+
+  {"uuid":3,"changed":true}
+
+  That's the complete content — no additional human-readable text
+  accompanied it.
+```
+
+Isolated against a four-tool probe server that returns the same text
+under four different result shapes, the client's rule is:
+
+| result shape | payload reaches the model? |
+|--------------|----------------------------|
+| `content` + `structuredContent`, with `outputSchema` | no |
+| `content` + `structuredContent`, without `outputSchema` | no |
+| `content` only | yes |
+| `content` + `structuredContent` *containing* the text | yes |
+
+So the presence of `structuredContent`, not of `outputSchema`, is what
+suppresses `content`. The Inspector shows both, which is why the
+Inspector check passes while the agent starves.
+
+Fixing this means changing the result shape, which is a design decision
+outside this harness: either move the payload into `structuredContent`
+(a `text` field beside `uuid` and `changed`, matching row 4), or drop
+`structuredContent` and fold the metadata into the text (row 3). Until
+then, `easycrypt mcp` is fully usable from the Inspector and from any
+client that reads `content`, and effectively blind from Claude Code.
 
 ## Expected exit status
 
