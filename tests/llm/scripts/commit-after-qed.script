@@ -1,0 +1,12 @@
+# exit: 0
+# COMMIT run after `qed.`: the proof DAG is gone, so the current
+# implementation emits the transcript with no bullets at all. Frozen
+# here so a refactor cannot change it silently.
+LOAD "fixtures/simple.ec" 6
+QUIET ON
+split.
+trivial.
+trivial.
+qed.
+QUIET OFF
+COMMIT

@@ -1,0 +1,18 @@
+READY [uuid:0]
+<END>
+ERROR [uuid:0]
+LOAD: missing filename
+No active proof.
+<END>
+ERROR [uuid:0]
+unknown file extension: .txt
+No active proof.
+<END>
+ERROR [uuid:0]
+anomaly: Sys_error("fixtures/nosuch.ec: No such file or directory")
+No active proof.
+<END>
+ERROR [uuid:0]
+LOAD: unexpected arguments
+No active proof.
+<END>

@@ -1,0 +1,11 @@
+# exit: 0
+# The LOAD prefix of fixtures/strict.ec ends under `pragma
+# +strict_bullets` with `-` on the bullet stack, so COMMIT must pick a
+# token other than `-`.
+LOAD "fixtures/strict.ec"
+QUIET ON
+trivial.
+trivial.
+trivial.
+QUIET OFF
+COMMIT

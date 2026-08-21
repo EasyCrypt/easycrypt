@@ -1,0 +1,84 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/nested.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+((1 = 1 /\ 2 = 2) /\ 3 = 3) /\ 4 = 4
+<END>
+OK [uuid:3]
+<END>
+OK [uuid:4] [focus: 1/2]
+<END>
+OK [uuid:5] [focus: 1/3]
+<END>
+OK [uuid:6] [focus: 1/4]
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:6]
+    [1.1.1] 1 = 1 <- focused
+    [1.1.2] 2 = 2
+  [1.2] 3 = 3
+[2] 4 = 4
+<END>
+OK [uuid:7] [focus: 1/4]
+Current goal (remaining: 4)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+3 = 3
+<END>
+ERROR [uuid:7]
+FOCUS: path must select a leaf goal, not a frame
+Current goal (remaining: 4)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+3 = 3
+<END>
+ERROR [uuid:7]
+FOCUS: index 9 out of range (1..2)
+Current goal (remaining: 4)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+3 = 3
+<END>
+ERROR [uuid:7]
+FOCUS: not a path of integers: foo
+Current goal (remaining: 4)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+3 = 3
+<END>
+ERROR [uuid:7]
+FOCUS: missing argument
+Current goal (remaining: 4)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+3 = 3
+<END>
+OK [uuid:8] [focus: 1/4]
+Current goal (remaining: 4)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+4 = 4
+<END>
+OK [uuid:8]
+[1] 4 = 4 <- focused
+    [2.1.1] 1 = 1
+    [2.1.2] 2 = 2
+  [2.2] 3 = 3
+<END>
