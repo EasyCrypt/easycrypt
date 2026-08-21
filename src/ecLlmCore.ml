@@ -623,8 +623,11 @@ let make_failure (st : state) (message : string) =
   mk_failure st message
 
 (* -------------------------------------------------------------------- *)
-(* Process EasyCrypt input typed at the prompt (single phrase or a
-   line ending with a "."). *)
+(* Process EasyCrypt input typed at the prompt. The input is a file
+   fragment, not a single phrase: every sentence it holds runs, in
+   order, and one reply describes the state they leave behind. A
+   failure stops the run there; the sentences before it stay applied,
+   exactly as they would in a compiled file. *)
 let step (st : state) input =
   let notices = st.notices in
   let prior_bullets = st.prior_bullets in
@@ -638,25 +641,41 @@ let step (st : state) input =
    | Some _ as snapshot -> prior_bullets := snapshot);
   let reader = EcIo.from_string input in
   let last_src = ref "" in
+  (* Reply body, decided by the last item that did something: a run of
+     sentences ends on the goals, a doc comment on an empty body. The
+     end-of-input marker is an empty [P_Prog], and must not count. *)
+  let body = ref Goals in
+  let quit = ref false in
   let answer =
     begin try
-      let (src, prog) = EcIo.xparse reader in
-      let src = String.strip src in
-      last_src := src;
-      begin match EcLocation.unloc prog with
-      | EP.P_Prog (commands, _) ->
-        List.iter (process_action st ~record:true ~src) commands;
-        Done (Ok (mk_reply_goals st ~pre))
-      | EP.P_Undo i ->
-        EcCommands.undo i;
-        Transcript.trim st i;
-        Done (Ok (mk_reply_goals st ~pre))
-      | EP.P_Exit ->
-        Quit
-      | EP.P_DocComment doc ->
-        EcCommands.doc_comment doc;
-        Done (Ok (mk_reply st ~pre (Text "")))
-      end
+      begin try while true do
+        last_src := "";
+        let (src, prog) = EcIo.xparse reader in
+        let src = String.strip src in
+        last_src := src;
+        match EcLocation.unloc prog with
+        | EP.P_Prog (commands, locterm) ->
+          if commands <> [] then begin
+            body := Goals;
+            List.iter (process_action st ~record:true ~src) commands
+          end;
+          if locterm then raise Exit
+        | EP.P_Undo i ->
+          body := Goals;
+          EcCommands.undo i;
+          Transcript.trim st i
+        | EP.P_Exit ->
+          (* Everything before [exit.] stays applied; the front-end
+             owns what happens next. *)
+          quit := true; raise Exit
+        | EP.P_DocComment doc ->
+          body := Text "";
+          EcCommands.doc_comment doc
+      done with Exit | End_of_file -> () end;
+      if !quit then Quit else
+        match !body with
+        | Goals      -> Done (Ok (mk_reply_goals st ~pre))
+        | Text _ as b -> Done (Ok (mk_reply st ~pre b))
     with
     | EcCommands.Restart ->
       do_initialize st;

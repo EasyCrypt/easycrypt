@@ -1,0 +1,7 @@
+# exit: 0
+# Several sentences on one line: every one of them runs, and a single
+# reply describes the state they leave behind. COMMIT records all three.
+LOAD "fixtures/simple.ec" 6
+split. trivial. trivial.
+GOALS
+COMMIT

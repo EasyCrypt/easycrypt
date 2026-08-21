@@ -68,8 +68,8 @@ proof session. Standard loader and prover options (-I, -timeout, -p,
 
 Tools:
   ec_load        compile a file up to a position and start a session
-  ec_step        run one EasyCrypt sentence
-  ec_try         run one sentence, rolling back if it fails
+  ec_step        run one or more EasyCrypt sentences
+  ec_try         run sentences, rolling back if any of them fails
   ec_goals       print the current goal state
   ec_tree        list the open subgoals as a labelled tree
   ec_focus       focus the subgoal at a dotted path (or `next')
@@ -186,21 +186,22 @@ let tools : J.t list =
     tool
       ~name:"ec_step"
       ~description:
-        "Run one EasyCrypt sentence -- a tactic, a declaration, require, \
-         print, ... -- against the current session. Send exactly one \
-         complete sentence, ending with a period: anything past the \
-         first sentence of the phrase is ignored, so chain tactics with \
-         `;' rather than with `.'. A sentence spanning several lines is \
-         fine as one string. Requires a file loaded with ec_load, and, \
+        "Run EasyCrypt sentences -- tactics, declarations, require, \
+         print, ... -- against the current session. Every complete \
+         sentence in the argument is executed, in order, exactly as if \
+         the text had been appended to the source file, and a single \
+         reply describes the state they leave behind; sentences may \
+         span several lines. Requires a file loaded with ec_load, and, \
          for tactics, an open proof. On success the reply carries the \
          new goal state; on failure the prover's error text comes back \
-         with isError set and the engine is left wherever the sentence \
-         left it -- use ec_try when you want a guaranteed rollback. \
-         Successful non-query phrases are recorded for ec_commit."
+         with isError set, the sentences before the failing one stay \
+         applied and the engine is left wherever that sentence left it \
+         -- use ec_try when you want a guaranteed rollback. Successful \
+         non-query phrases are recorded for ec_commit."
       ~input:(Schema.obj ~required:["phrase"] [
         ("phrase", Schema.str
-                     ~description:"one complete EasyCrypt sentence, \
-                                   ending with `.'" ());
+                     ~description:"one or more complete EasyCrypt \
+                                   sentences, each ending with `.'" ());
       ])
       ~annotations:[("destructiveHint", `Bool false);
                     ("idempotentHint", `Bool false)]
@@ -211,8 +212,8 @@ let tools : J.t list =
       ~name:"ec_try"
       ~description:
         "Like ec_step, but the engine is rolled back to the state it had \
-         before the call whenever the phrase fails, including a phrase \
-         that failed only after having already advanced the proof. The \
+         before the call whenever a sentence fails, including input that \
+         failed only after having already advanced the proof. The \
          failure reply sets structuredContent.reverted to true, and its \
          uuid and goal text describe the restored state, not the point \
          of failure. Use this to probe a tactic without having to \
