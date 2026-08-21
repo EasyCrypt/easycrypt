@@ -1,3 +1,9 @@
 # exit: 1
-# LOAD -trace whose target sentence is outside any proof.
+# LOAD -trace whose target sentence is outside any proof. Tracing
+# fails, but the prefix must be in effect exactly as after a plain
+# LOAD: the deferred `require import AllCore.` has run, so `b2i' below
+# resolves and GOALS shows its goal.
 LOAD "fixtures/simple.ec" 3 -trace
+GOALS
+lemma preserved : b2i true = 1.
+GOALS

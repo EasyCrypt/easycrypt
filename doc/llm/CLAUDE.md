@@ -153,6 +153,11 @@ trace the file's last sentence. On tactic failure the reply uses the
 `ERROR` envelope and still includes the BEFORE/TACTIC blocks plus an
 `<sentence failed>` marker in the AFTER block.
 
+A `-trace` LOAD that cannot trace at all (the target sentence is not
+inside a proof, or there is no sentence to trace) reports the error but
+still leaves the session where the same LOAD without `-trace` would:
+you can carry on from there instead of reloading.
+
 **2. Try tactics, using REVERT to restart:**
 
 The uuid returned by LOAD is a revertible state. Use `REVERT` to
