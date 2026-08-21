@@ -69,6 +69,7 @@ val disable_repl_bullets : unit -> EcBullets.stack option
 val pp_tree : ?all:bool -> unit -> (int * bool * string) list
 val focus_goal : int -> (int, string) result
 val open_handles : unit -> EcCoreGoal.handle list
+val current_proofenv : unit -> EcCoreGoal.proofenv option
 val children_of : EcCoreGoal.handle -> EcCoreGoal.handle list
 val parent_of : EcCoreGoal.handle -> EcCoreGoal.handle option
 

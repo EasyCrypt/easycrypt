@@ -1214,6 +1214,17 @@ let open_handles () : EcCoreGoal.handle list =
     EcCoreGoal.all_hd_opened pf
   | _ -> []
 
+(* The proof environment of the active proof, or [None] if no proof is
+   active. A [proofenv] is immutable and cumulative, so a snapshot taken
+   while the proof was open keeps answering DAG queries after [qed] has
+   discarded the active proof. *)
+let current_proofenv () : EcCoreGoal.proofenv option =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    Some (EcCoreGoal.proofenv_of_proof pf)
+  | _ -> None
+
 (* Direct DAG children of [h] in the active proof. [] if no proof. *)
 let children_of (h : EcCoreGoal.handle) : EcCoreGoal.handle list =
   match S.xgoal (current ()) with

@@ -31,7 +31,7 @@ No active proof.
 OK [uuid:6]
 lemma multi : 1 = 1 /\ 2 = 2.
 split.
-trivial.
-trivial.
+- trivial.
+- trivial.
 qed.
 <END>

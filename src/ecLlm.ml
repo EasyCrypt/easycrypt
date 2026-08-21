@@ -104,6 +104,13 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
     (int * string * EcCoreGoal.handle option
       * EcCoreGoal.handle list) list ref = ref [] in
 
+  (* Proof environment snapshot, refreshed at every recorded phrase.
+     [COMMIT] queries the proof DAG through it rather than through the
+     active proof, which is gone once [qed] has run. A [proofenv] is
+     immutable and cumulative, so the last snapshot knows about every
+     handle any transcript entry can mention. *)
+  let commit_env : EcCoreGoal.proofenv option ref = ref None in
+
   (* The bullet stack of the active proof at the moment REPL input
      took over. Captured the first time [disable_repl_bullets] clears
      a non-empty stack. Used by [Commit] to pick bullet characters
@@ -371,7 +378,8 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
 
     let clear () =
       transcript := [];
-      prior_bullets := None
+      prior_bullets := None;
+      commit_env := None
   end in
 
   (* ------------------------------------------------------------------ *)
@@ -401,8 +409,15 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       raise (EcScope.toperror_of_exn ~gloc:loc
         (EcScope.HiScopeError (None,
           "this command is expected to fail")));
-    if record && !succeeded && not p.EP.gl_fail then
-      transcript := (pre_uuid, src, parent, opens_pre) :: !transcript
+    if record && !succeeded && not p.EP.gl_fail then begin
+      transcript := (pre_uuid, src, parent, opens_pre) :: !transcript;
+      (* Keep the newest non-empty snapshot: a phrase that closes the
+         proof ([qed]) leaves no active proof, and precisely then we
+         still need the environment the previous phrases built. *)
+      match EcCommands.current_proofenv () with
+      | None     -> ()
+      | Some _ as penv -> commit_env := penv
+    end
   in
 
   (* ------------------------------------------------------------------ *)
@@ -419,6 +434,19 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       let rep = i / 3 + 1 in
       let chr = chars.(i mod 3) in
       String.concat "" (List.init rep (fun _ -> chr))
+
+    (* DAG queries go through the snapshot recorded at the last phrase,
+       so COMMIT still sees the structure after [qed]. Fall back to the
+       live proof when no phrase was recorded under a proof. *)
+    let parent_of h =
+      match !commit_env with
+      | Some penv -> EcCoreGoal.parent_of_handle penv h
+      | None      -> EcCommands.parent_of h
+
+    let children_of h =
+      match !commit_env with
+      | Some penv -> EcCoreGoal.children_of_handle penv h
+      | None      -> EcCommands.children_of h
 
     let proof_text () =
       let entries = List.rev !transcript in
@@ -495,7 +523,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
             match Hmap.find_opt h !sibling_depth with
             | Some d -> Some (h, d)
             | None ->
-              match EcCommands.parent_of h with
+              match parent_of h with
               | Some p -> find_ancestor p
               | None -> None
           in
@@ -517,7 +545,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
              links do. A compound phrase like [split; split.] can
              produce nested splits within one phrase. *)
           let rec walk h d =
-            match EcCommands.children_of h with
+            match children_of h with
             | [c] -> walk c d
             | (_ :: _ :: _) as cs ->
               List.iter
