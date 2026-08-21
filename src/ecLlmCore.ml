@@ -22,10 +22,11 @@ type reply = {
 }
 
 type failure = {
-  uuid    : int;
-  message : string;
-  goals   : string;
-  notices : string;
+  uuid     : int;
+  message  : string;
+  goals    : string;
+  notices  : string;
+  reverted : bool;
 }
 
 type answer =
@@ -368,7 +369,7 @@ let mk_failure (st : state) (message : string) =
   let notices = Buffer.contents st.notices in
   Buffer.clear st.notices;
   { uuid = EcCommands.uuid (); message;
-    goals = Goals.goals_to_string (); notices; }
+    goals = Goals.goals_to_string (); notices; reverted = false; }
 
 (* -------------------------------------------------------------------- *)
 (* Transcript manipulation. *)
@@ -667,6 +668,27 @@ let step (st : state) input =
   in
   EcIo.finalize reader;
   answer
+
+(* -------------------------------------------------------------------- *)
+(* [step] with an automatic rollback on failure. A phrase can fail
+   after having advanced the engine (a compound sentence whose first
+   tactics went through, say), so the pre-entry uuid is the only
+   faithful notion of "unchanged": restore it the way REVERT does.
+   The failure is then re-stamped, because its uuid and goal text
+   described the state at the point of failure, which no longer
+   exists. *)
+let try_step (st : state) input =
+  let pre = EcCommands.uuid () in
+  match step st input with
+  | Quit                  -> Quit
+  | Done (Ok _) as answer -> answer
+  | Done (Error failure)  ->
+    EcCommands.undo pre;
+    Transcript.trim st pre;
+    Done (Error { failure with
+      uuid     = EcCommands.uuid ();
+      goals    = Goals.goals_to_string ();
+      reverted = true; })
 
 (* -------------------------------------------------------------------- *)
 (* LOAD: run [file] up to [upto], optionally with SMT calls weakened

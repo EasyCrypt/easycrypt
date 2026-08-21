@@ -31,12 +31,16 @@ type reply = {
 
 (* [goals] is the goal state at the point of failure. The REPL does not
    render [notices] on failures (it never did); they are captured all
-   the same, so the buffer is left clean for the next operation. *)
+   the same, so the buffer is left clean for the next operation.
+   [reverted] is set by [try_step] only: it says the engine was rolled
+   back to the state it had before the operation ran, so [uuid] and
+   [goals] describe that restored state, not the point of failure. *)
 type failure = {
-  uuid    : int;
-  message : string;
-  goals   : string;
-  notices : string;
+  uuid     : int;
+  message  : string;
+  goals    : string;
+  notices  : string;
+  reverted : bool;
 }
 
 (* Operations that can be asked to end the session ([exit.]) return an
@@ -75,6 +79,13 @@ val load :
 
 (* One line of raw EasyCrypt input (or a multi-line block). *)
 val step : state -> string -> answer
+
+(* [step], but a failure leaves no trace: the engine is rolled back to
+   the uuid it had on entry (as REVERT does) and the failure comes back
+   with [reverted = true]. Successes and [Quit] behave exactly as in
+   [step]. A phrase that fails halfway through a compound sentence is
+   rolled back whole. *)
+val try_step : state -> string -> answer
 
 val goals      : state -> all:bool -> (reply, failure) result
 val tree       : state -> all:bool -> (reply, failure) result
