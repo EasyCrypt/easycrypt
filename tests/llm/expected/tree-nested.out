@@ -18,13 +18,13 @@ OK [uuid:6] [focus: 1/4]
 <END>
 OK [uuid:6]
 <END>
-OK [uuid:6]
+OK [uuid:6] [focus: 1/4]
     [1.1.1] 1 = 1 <- focused
     [1.1.2] 2 = 2
   [1.2] 3 = 3
 [2] 4 = 4
 <END>
-OK [uuid:6]
+OK [uuid:6] [focus: 1/4]
     [1.1.1] <- focused
 Type variables: <none>
 
