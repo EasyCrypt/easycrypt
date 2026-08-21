@@ -1,0 +1,12 @@
+# exit: 0
+# ec_try rolls back. The phrase advances the proof (`split.') before
+# failing, so the rollback has real work to do: the failure reply
+# reports reverted true and changed false, and the ec_goals that
+# follows proves the pre-call goal is back.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","line":6}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_try","arguments":{"phrase":"split. apply nosuchlemma."}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ec_goals","arguments":{}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ec_commit","arguments":{}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"ec_try","arguments":{"phrase":"split."}}}
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"ec_goals","arguments":{}}}

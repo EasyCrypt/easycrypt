@@ -13,6 +13,8 @@ CHECK     += $(foreach arg,$(ECARGS),--bin-args="$(arg)")
 CHECK     += $(ECEXTRA) config/tests.config
 LLMCHECK  := scripts/testing/llm-golden
 LLMCHECK  += --bin=./ec.native
+MCPCHECK  := scripts/testing/mcp-golden
+MCPCHECK  += --bin=./ec.native
 NIX       ?= nix --extra-experimental-features "nix-command flakes"
 PROFILE   ?= dev
 
@@ -22,7 +24,7 @@ UNAME_S = $(shell uname -s)
 
 # --------------------------------------------------------------------
 .PHONY: default build byte native tests check examples
-.PHONY: test-llm
+.PHONY: test-llm test-mcp
 .PHONY: nix-build nix-build-with-provers nix-develop
 .PHONY: clean install uninstall
 
@@ -54,6 +56,9 @@ examples: build
 
 test-llm: build
 	$(LLMCHECK)
+
+test-mcp: build
+	$(MCPCHECK)
 
 check: unit stdlib examples
 	@true
