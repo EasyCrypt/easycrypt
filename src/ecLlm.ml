@@ -834,8 +834,16 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
               | Some (src, p)                   -> `Ready (src, p)
             in
             match pre_state with
-            | `Nothing    -> failwith "trace: nothing to trace"
+            (* Tracing is off the table, but the prefix is not: run the
+               sentence we deferred so that the session ends up exactly
+               where a plain LOAD of the same prefix would leave it. A
+               failure inside the flush is reported by the enclosing
+               handler, as any prefix failure is. *)
+            | `Nothing    ->
+              flush_pending ();
+              failwith "trace: nothing to trace"
             | `NotInProof ->
+              flush_pending ();
               failwith
                 "trace: target sentence is not in a proof context"
             | `Ready (src, p) ->
