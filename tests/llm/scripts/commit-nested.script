@@ -1,0 +1,13 @@
+# exit: 0
+# COMMIT after nested splits: bullets nest as - / + / *.
+LOAD "fixtures/nested.ec" 6
+QUIET ON
+split.
+split.
+split.
+trivial.
+trivial.
+trivial.
+trivial.
+QUIET OFF
+COMMIT
