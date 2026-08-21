@@ -68,6 +68,48 @@ gate for changes to the protocol layer.
 | `exit` | `exit.` answers "session terminated", then the process stops |
 | `eof` | end of input is a clean shutdown, exit 0 |
 
+## Result shape
+
+Every `tools/call` result carries the reply text **twice**:
+
+```json
+{"content": [{"type": "text", "text": "Current goal\n..."}],
+ "structuredContent": {"text": "Current goal\n...", "uuid": 3,
+                       "changed": true},
+ "isError": false}
+```
+
+The two strings are the same by construction — `Result_of.make` takes
+one `~text` and writes it into both halves — and `outputSchema`
+declares `text` required alongside `uuid` and `changed` (and optional
+`reverted`, on `ec_try`).
+
+The duplication is deliberate, and it is empirical rather than
+aesthetic. Claude Code, the client this server is primarily for, hands
+the model the `structuredContent` object **alone** and drops `content`
+entirely whenever both are present. Isolated against a four-tool probe
+server returning the same text under four result shapes (the run is
+recorded in the message of commit `e3dce8552`):
+
+| result shape | payload reaches the model? |
+|--------------|----------------------------|
+| `content` + `structuredContent`, with `outputSchema` | no |
+| `content` + `structuredContent`, without `outputSchema` | no |
+| `content` only | yes |
+| `content` + `structuredContent` *containing* the text | yes |
+
+So it is the presence of `structuredContent`, not of `outputSchema`,
+that suppresses `content` — and before the text was duplicated, an
+agent driving this server through Claude Code saw `{"uuid":3,
+"changed":true}` and nothing else, while the Inspector, which displays
+both halves, showed no problem at all.
+
+Row 4 is the shape we ship. Keeping `content` as well as filling
+`structuredContent.text` costs one repeated string per reply and keeps
+the server correct for spec-abiding clients that read `content`, for
+clients that read only the structured half, and for the parity check,
+which compares the REPL body against `content[0].text`.
+
 ## Parity
 
 `make test-mcp` runs `scripts/testing/mcp-parity` after the goldens.
@@ -106,11 +148,11 @@ span them:
 
 * **Envelope tags.** The REPL's `[loaded:file:N]` and `[focus: 1/N]`
   annotations ride on the status line, not in the body; MCP's envelope
-  is `structuredContent`, which by the plan's result shape carries
-  `uuid` and `changed` only. So an MCP client does not see them at all.
-  That is a gap worth closing one day — the natural home is a
-  `structuredContent` field — but it is not a parity violation: no body
-  differs.
+  is `structuredContent`, which carries `text`, `uuid` and `changed`,
+  none of which reproduces them. So an MCP client does not see them at
+  all. That is a gap worth closing one day — the natural home is a
+  further `structuredContent` field — but it is not a parity violation:
+  no body differs.
 * **Notices on failures.** The REPL has never rendered the engine's
   notice buffer on an `ERROR` reply; the MCP failure result does
   include it. The two therefore agree only when the failing operation
@@ -153,46 +195,20 @@ claude mcp list          # easycrypt: ... - ✔ Connected
 claude mcp remove easycrypt -s local
 ```
 
-### Known gap: the payload does not reach a Claude Code agent
-
-That headless check found something the wire-level tests cannot see.
-Claude Code, when a `tools/call` result carries `structuredContent`,
-hands the model **only** that object and drops `content` entirely. Our
-result shape puts the metadata in `structuredContent` (`uuid`,
-`changed`) and the payload — the goal state, the search results, the
-proof body — in `content`, so an agent driving this server through
-Claude Code sees the uuid and nothing else:
+Health is not the interesting question, though: it was this headless
+check that found the payload never reaching the agent (see **Result
+shape** above), which no wire-level test can see. So ask the session to
+*use* the server and quote back what it got — that, and not the
+connection, is what the client-side check is for:
 
 ```
-> Call ec_load with file=.../simple.ec and line=6. Then quote the
-  ENTIRE raw tool result you received, verbatim.
-
-  {"uuid":3,"changed":true}
-
-  That's the complete content — no additional human-readable text
-  accompanied it.
+claude -p 'Call ec_load with file=<abs>/tests/llm/fixtures/simple.ec
+           and line=6, then ec_goals. Quote the goal text verbatim.' \
+       --allowedTools mcp__easycrypt__ec_load mcp__easycrypt__ec_goals
 ```
 
-Isolated against a four-tool probe server that returns the same text
-under four different result shapes, the client's rule is:
-
-| result shape | payload reaches the model? |
-|--------------|----------------------------|
-| `content` + `structuredContent`, with `outputSchema` | no |
-| `content` + `structuredContent`, without `outputSchema` | no |
-| `content` only | yes |
-| `content` + `structuredContent` *containing* the text | yes |
-
-So the presence of `structuredContent`, not of `outputSchema`, is what
-suppresses `content`. The Inspector shows both, which is why the
-Inspector check passes while the agent starves.
-
-Fixing this means changing the result shape, which is a design decision
-outside this harness: either move the payload into `structuredContent`
-(a `text` field beside `uuid` and `changed`, matching row 4), or drop
-`structuredContent` and fold the metadata into the text (row 3). Until
-then, `easycrypt mcp` is fully usable from the Inspector and from any
-client that reads `content`, and effectively blind from Claude Code.
+An agent that can quote `1 = 1 /\ 2 = 2` is reading the payload; one
+that answers with a bare uuid is not.
 
 ## Expected exit status
 
