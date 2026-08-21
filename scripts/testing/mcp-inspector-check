@@ -1,0 +1,72 @@
+#! /bin/sh
+
+# --------------------------------------------------------------------
+# Manual smoke test against a real MCP client.
+#
+#   mcp-inspector-check [--bin PATH]
+#
+# Drives `easycrypt mcp' with the reference client, the MCP Inspector's
+# CLI mode, rather than with our own golden harness: the goldens only
+# prove the server is consistent with itself, this proves a client that
+# knows nothing about EasyCrypt can complete the handshake, read the
+# tool declarations and call a tool.
+#
+# NOT wired into CI, and deliberately so: it downloads
+# @modelcontextprotocol/inspector through npx, so it needs node and
+# network access, and it tracks a version we do not pin. Run it by hand
+# after touching the protocol layer (src/ecMcp.ml).
+#
+# Two checks, both of which must print their result and exit 0:
+#
+#   1. tools/list  -- the handshake and the tool table;
+#   2. tools/call  -- ec_load on a test fixture, whose result must
+#                     carry the goal `1 = 1 /\ 2 = 2' and uuid 3.
+# --------------------------------------------------------------------
+
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+bin="$root/_build/default/src/ec.exe"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --bin)
+      [ $# -ge 2 ] || { echo "mcp-inspector-check: --bin needs an argument" >&2; exit 2; }
+      bin=$2; shift 2 ;;
+    --bin=*)
+      bin=${1#--bin=}; shift ;;
+    -h|--help)
+      echo "usage: mcp-inspector-check [--bin PATH]"; exit 0 ;;
+    *)
+      echo "mcp-inspector-check: unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+
+case "$bin" in
+  /*) ;;
+  *) bin=$(CDPATH= cd -- "$(dirname -- "$bin")" && pwd)/$(basename -- "$bin") ;;
+esac
+
+if [ ! -x "$bin" ]; then
+  echo "mcp-inspector-check: no such executable: $bin" >&2
+  exit 2
+fi
+
+if ! command -v npx > /dev/null 2>&1; then
+  echo "mcp-inspector-check: npx not found; install node, or skip" >&2
+  exit 2
+fi
+
+inspector="npx --yes @modelcontextprotocol/inspector --cli"
+fixture="$root/tests/llm/fixtures/simple.ec"
+
+echo "== tools/list =============================================="
+$inspector "$bin" mcp --method tools/list
+
+echo
+echo "== tools/call ec_load ======================================"
+$inspector "$bin" mcp \
+  --method tools/call \
+  --tool-name ec_load \
+  --tool-arg "file=$fixture" \
+  --tool-arg line=6
