@@ -1,0 +1,132 @@
+#! /bin/sh
+
+# --------------------------------------------------------------------
+# Golden-output regression harness for the `easycrypt llm` REPL.
+#
+#   llm-golden [--bin PATH] [--record] [NAME...]
+#
+# Each tests/llm/scripts/NAME.script holds the newline-separated
+# commands fed to `ec.exe llm -eval`. Lines starting with `#` are
+# stripped before the script is passed to -eval; the first such line
+# must be `# exit: N`, the expected process exit status. Stdout is
+# compared against tests/llm/expected/NAME.out.
+#
+# Scripts run with tests/llm as the working directory, so fixture paths
+# stay relative and the [loaded:...] reply tags remain machine
+# independent.
+# --------------------------------------------------------------------
+
+set -u
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+bin="$root/_build/default/src/ec.exe"
+record=0
+names=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --bin)
+      [ $# -ge 2 ] || { echo "llm-golden: --bin needs an argument" >&2; exit 2; }
+      bin=$2; shift 2 ;;
+    --bin=*)
+      bin=${1#--bin=}; shift ;;
+    --record)
+      record=1; shift ;;
+    -h|--help)
+      echo "usage: llm-golden [--bin PATH] [--record] [NAME...]"; exit 0 ;;
+    -*)
+      echo "llm-golden: unknown option: $1" >&2; exit 2 ;;
+    *)
+      names="$names $1"; shift ;;
+  esac
+done
+
+case "$bin" in
+  /*) ;;
+  *) bin=$(CDPATH= cd -- "$(dirname -- "$bin")" && pwd)/$(basename -- "$bin") ;;
+esac
+
+if [ ! -x "$bin" ]; then
+  echo "llm-golden: no such executable: $bin" >&2
+  exit 2
+fi
+
+tests="$root/tests/llm"
+scripts="$tests/scripts"
+expected="$tests/expected"
+
+if [ -z "$names" ]; then
+  names=$(cd "$scripts" && ls *.script 2>/dev/null | sed 's/\.script$//')
+fi
+
+mkdir -p "$expected"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/llm-golden.XXXXXX") || exit 2
+trap 'rm -rf "$tmp"' EXIT INT TERM
+
+nfail=0
+npass=0
+
+for name in $names; do
+  script="$scripts/$name.script"
+  gold="$expected/$name.out"
+
+  if [ ! -f "$script" ]; then
+    echo "FAIL $name (no such script: $script)"
+    nfail=$((nfail + 1))
+    continue
+  fi
+
+  want_exit=$(sed -n 's/^# *exit: *\([0-9][0-9]*\).*$/\1/p' "$script" | head -n 1)
+  if [ -z "$want_exit" ]; then
+    echo "FAIL $name (script has no '# exit: N' line)"
+    nfail=$((nfail + 1))
+    continue
+  fi
+
+  grep -v '^#' "$script" > "$tmp/eval.in"
+
+  (cd "$tests" && "$bin" llm -eval "$(cat "$tmp/eval.in")") \
+    > "$tmp/out" 2> "$tmp/err"
+  got_exit=$?
+
+  if [ "$record" = 1 ]; then
+    cp "$tmp/out" "$gold"
+    if [ "$got_exit" != "$want_exit" ]; then
+      echo "RECORD $name (exit $got_exit, script declares $want_exit)"
+      nfail=$((nfail + 1))
+    else
+      echo "RECORD $name"
+      npass=$((npass + 1))
+    fi
+    continue
+  fi
+
+  ok=1
+
+  if [ ! -f "$gold" ]; then
+    echo "FAIL $name (no golden: $gold; re-run with --record)"
+    ok=0
+  elif ! diff -u "$gold" "$tmp/out" > "$tmp/diff"; then
+    echo "FAIL $name (stdout differs)"
+    sed 's/^/    /' "$tmp/diff"
+    ok=0
+  fi
+
+  if [ "$got_exit" != "$want_exit" ]; then
+    echo "FAIL $name (exit $got_exit, expected $want_exit)"
+    ok=0
+  fi
+
+  if [ "$ok" = 1 ]; then
+    echo "PASS $name"
+    npass=$((npass + 1))
+  else
+    nfail=$((nfail + 1))
+  fi
+done
+
+echo "----"
+echo "$npass passed, $nfail failed"
+
+[ "$nfail" = 0 ]

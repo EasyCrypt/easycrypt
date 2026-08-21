@@ -1,0 +1,6 @@
+# exit: 1
+# LOAD argument errors: missing filename, unknown extension, missing file.
+LOAD
+LOAD "fixtures/simple.txt"
+LOAD "fixtures/nosuch.ec"
+LOAD "fixtures/simple.ec" 6 7

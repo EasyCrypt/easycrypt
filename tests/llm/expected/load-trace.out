@@ -1,0 +1,30 @@
+READY [uuid:0]
+<END>
+OK [uuid:4] [loaded:fixtures/midproof.ec:8] [focus: 1/2]
+=== BEFORE: line 8 (col 0) ===
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+
+=== TACTIC (lines 8:0 - 8:6) ===
+split.
+
+=== AFTER: line 8 (col 0) ===
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+2 = 2
+
+
+=== SUMMARY ===
+open goals: 1 -> 2
+<END>

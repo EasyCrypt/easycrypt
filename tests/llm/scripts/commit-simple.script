@@ -1,0 +1,9 @@
+# exit: 0
+# COMMIT after a plain split + two trivials.
+LOAD "fixtures/simple.ec" 6
+QUIET ON
+split.
+trivial.
+trivial.
+QUIET OFF
+COMMIT
