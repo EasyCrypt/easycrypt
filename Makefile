@@ -63,7 +63,7 @@ test-mcp: build
 	$(MCPCHECK)
 	$(MCPPARITY)
 
-check: unit stdlib examples
+check: unit stdlib examples test-llm test-mcp
 	@true
 
 nix-build:
