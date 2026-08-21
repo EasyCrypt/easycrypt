@@ -8,7 +8,7 @@ Type variables: <none>
 ------------------------------------------------------------------------
 1 = 1 /\ 2 = 2
 <END>
-OK [uuid:4]
+OK [uuid:3]
 (* RField.signr_odd *)
 lemma signr_odd:
   forall (n : int), 0 <= n => (- 1%r) ^ b2i (odd n) = (- 1%r) ^ n.
@@ -32,7 +32,7 @@ Type variables: <none>
 ------------------------------------------------------------------------
 1 = 1 /\ 2 = 2
 <END>
-ERROR [uuid:4]
+ERROR [uuid:3]
 SEARCH: missing query
 Current goal
 
