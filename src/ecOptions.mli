@@ -7,6 +7,7 @@ type command = [
   | `Why3Config
   | `DocGen of doc_option
   | `Llm of llm_option
+  | `Mcp of mcp_option
 ]
 
 and options = {
@@ -48,6 +49,11 @@ and llm_option = {
   llmo_provers   : prv_options;
   llmo_help      : bool;
   llmo_eval      : string option;
+}
+
+and mcp_option = {
+  mcpo_provers   : prv_options;
+  mcpo_help      : bool;
 }
 
 and prv_options = {
