@@ -158,6 +158,13 @@ let create ~relocdir ~boot ~projini ~prvopts =
     prior_bullets = ref None;
   } in
 
+  (* [print] renders on the process's stdout by default, which in the
+     REPL lands *before* the reply's status line -- outside the frame --
+     and under MCP is swallowed whole, stdout being pointed at stderr
+     there. Send it to the notice buffer, where the engine's other
+     messages, [search] and [locate] included, already arrive. *)
+  EcCommands.set_print_formatter (Format.formatter_of_buffer st.notices);
+
   do_initialize st; st
 
 (* -------------------------------------------------------------------- *)
