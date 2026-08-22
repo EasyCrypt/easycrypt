@@ -31,6 +31,33 @@ let print_llm_guide () =
     Printf.eprintf "cannot read LLM guide: %s\n%!" e
 
 (* -------------------------------------------------------------------- *)
+(* Body escaping.
+
+   A reply is framed by a status line and a lone [<END>] sentinel, and
+   nothing downstream of us knows that: a body line that is itself
+   envelope-shaped closes the frame early and desynchronizes the
+   client. HELP does it to itself -- doc/llm/CLAUDE.md quotes the
+   protocol it documents, [<END>] lines included -- and any goal,
+   notice or error text carrying such a line would do the same.
+
+   So every body line that is envelope-shaped goes out with one extra
+   leading space. Leading spaces are part of the test, so escaping an
+   already-escaped line escapes it again, and the rule is reversible: a
+   client that sees an envelope-shaped body line drops one leading
+   space from it, and leaves every other line alone. The rule is
+   documented in doc/llm/CLAUDE.md and tests/llm/README.md.
+
+   The MCP front-end needs none of this: its frame is a JSON string. *)
+let envelope_shaped (line : string) =
+  let n = String.length line in
+  let rec skip i = if i < n && line.[i] = ' ' then skip (i + 1) else i in
+  let body = String.sub line (skip 0) (n - skip 0) in
+  body = "<END>"
+  || List.exists
+       (fun kw -> String.starts_with body (kw ^ " [uuid:"))
+       ["OK"; "ERROR"; "READY"]
+
+(* -------------------------------------------------------------------- *)
 (* Surface command vocabulary. Parsing turns each stdin line into one
    of these, and dispatch is a flat pattern-match. Argument
    parsing/validation lives here; commands that interact with mutable
@@ -236,6 +263,24 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   let had_error = ref false in
 
   let module Wire = struct
+    (* Write a chunk of reply body, one line at a time, escaping the
+       lines that would collide with the envelope. The chunk is
+       terminated with a newline if it lacks one, so that whatever
+       follows -- another chunk, or the [<END>] sentinel -- starts a
+       line of its own. *)
+    let print_body (text : string) =
+      let lines =
+        match List.rev (String.split_lines text) with
+        | "" :: rest -> List.rev rest    (* the final newline's tail *)
+        | rev        -> List.rev rev
+      in
+      List.iter
+        (fun line ->
+          if envelope_shaped line then print_char ' ';
+          print_string line;
+          print_char '\n')
+        lines
+
     let reply_ok (r : EcLlmCore.reply) =
       let body =
         match r.EcLlmCore.body with
@@ -245,26 +290,16 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       in
       Printf.printf "OK [uuid:%d]%s\n" r.EcLlmCore.uuid r.EcLlmCore.tag;
       let n = r.EcLlmCore.notices in
-      if n <> "" then print_string n;
-      if body <> "" then begin
-        print_string body;
-        let len = String.length body in
-        if len > 0 && body.[len - 1] <> '\n' then
-          print_char '\n'
-      end;
+      if n <> "" then print_body n;
+      if body <> "" then print_body body;
       Printf.printf "<END>\n%!"
 
     let reply_failure (f : EcLlmCore.failure) =
       had_error := true;
       let goals = f.EcLlmCore.goals in
-      Printf.printf "ERROR [uuid:%d]\n%s\n"
-        f.EcLlmCore.uuid f.EcLlmCore.message;
-      if goals <> "" then begin
-        print_string goals;
-        let len = String.length goals in
-        if len > 0 && goals.[len - 1] <> '\n' then
-          print_char '\n'
-      end;
+      Printf.printf "ERROR [uuid:%d]\n" f.EcLlmCore.uuid;
+      print_body (f.EcLlmCore.message ^ "\n");
+      if goals <> "" then print_body goals;
       Printf.printf "<END>\n%!"
 
     (* Render an operation's outcome. *)
