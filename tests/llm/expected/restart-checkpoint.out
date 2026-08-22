@@ -1,0 +1,28 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/simple.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:4] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:4]
+checkpoint 'c' set at uuid 4
+<END>
+OK [uuid:0]
+Session restarted
+<END>
+ERROR [uuid:0]
+REVERT: 'c' is not a valid uuid or checkpoint name
+No active proof.
+<END>

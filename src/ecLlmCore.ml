@@ -404,6 +404,17 @@ module Transcript = struct
 end
 
 (* -------------------------------------------------------------------- *)
+(* Full session reset. Both LOAD and a [pragma restart.] destroy the
+   uuid space, so every piece of bookkeeping keyed on engine uuids goes
+   with it: a surviving checkpoint would name a state of a session that
+   no longer exists, and REVERT would resolve it. Shared by [step] and
+   [load] so the two paths cannot drift apart again. *)
+let reset_session (st : state) : unit =
+  do_initialize st;
+  Hashtbl.clear st.checkpoints;
+  Transcript.clear st
+
+(* -------------------------------------------------------------------- *)
 (* Process a single EasyCrypt command, respecting [gl_fail]. When
    [~record:true], append a transcript entry on success: the parent
    handle (focused goal before the phrase) and the open-handle list,
@@ -780,8 +791,7 @@ let step (st : state) input =
         | Text _ as b -> Done (Ok (mk_reply st ~pre b))
     with
     | EcCommands.Restart ->
-      do_initialize st;
-      Transcript.clear st;
+      reset_session st;
       Done (Ok (mk_reply st ~pre (Text "Session restarted")))
     | e ->
       Done (Error (mk_failure st ~pre (Goals.format_error ~src:!last_src e)))
@@ -837,7 +847,6 @@ let try_step (st : state) input =
 let load (st : state) ~file ~upto ~nosmt ~trace =
   let notices = st.notices in
   let cur_prvopts = st.cur_prvopts in
-  let checkpoints = st.checkpoints in
   let pre = EcCommands.uuid () in
   Buffer.clear notices;
   let filename = file in
@@ -876,9 +885,7 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
         ~recursive:isrec dir)
       (EcOptions.ini_loadpath ini);
 
-    do_initialize st;
-    Hashtbl.clear checkpoints;
-    Transcript.clear st;
+    reset_session st;
     EcCommands.addidir (Filename.dirname filename);
     EcCommands.set_current_path (Filename.dirname filename);
 
@@ -1083,9 +1090,7 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
 
   with
   | EcCommands.Restart ->
-    do_initialize st;
-    Hashtbl.clear checkpoints;
-    Transcript.clear st;
+    reset_session st;
     Ok (mk_reply st ~pre (Text "Session restarted"))
   | Trace_failed e ->
     let msg = Goals.format_error ~src:!last_src e in
