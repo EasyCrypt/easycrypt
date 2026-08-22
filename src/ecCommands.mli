@@ -12,6 +12,16 @@ val addidir : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (EcLoader.namespace option * string) list
 val set_current_path : string -> unit
 
+(* An opaque record of the include path at one point in time.
+   [loadpath_reset] puts the loader back to it, dropping every
+   directory added since. The include path is process-global and
+   [addidir] only ever grows it, so this is the only way to keep one
+   loaded file's directory out of an unrelated later load. *)
+type loadpath_mark
+
+val loadpath_mark  : unit -> loadpath_mark
+val loadpath_reset : loadpath_mark -> unit
+
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit
 
