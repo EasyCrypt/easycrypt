@@ -284,8 +284,10 @@ module FrameTree = struct
     if handles = [] then []
     else
       let leaves =
-        List.mapi (fun i (h, (_, focused, text)) ->
-          let leaf = Leaf { idx = i + 1; focused; text } in
+        List.mapi (fun i (h, (e : EcCommands.goal_entry)) ->
+          let leaf =
+            Leaf { idx = i + 1; focused = e.ge_focused; text = e.ge_text }
+          in
           (split_chain h, leaf))
           (List.combine handles texts)
       in
@@ -325,11 +327,9 @@ module FrameTree = struct
                (Printf.sprintf "[%s] %s%s\n"
                   label (one_line text) marker)
            | Some entries ->
-             let (_, _, full) =
-               List.nth entries (idx - 1)
-             in
+             let e : EcCommands.goal_entry = List.nth entries (idx - 1) in
              Buffer.add_string buf
-               (Printf.sprintf "[%s]%s\n%s\n" label marker full))
+               (Printf.sprintf "[%s]%s\n%s\n" label marker e.ge_text))
         | Frame children ->
           List.iteri (fun i child ->
             emit ~depth:(depth + 1) ~path:((i + 1) :: path) child)
