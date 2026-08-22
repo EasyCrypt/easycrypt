@@ -37,6 +37,29 @@ type answer =
 exception Init_error of string
 
 (* -------------------------------------------------------------------- *)
+(* One recorded REPL phrase, as [Commit] needs to see it again.
+
+   [en_penv] is the proof DAG as of just after the phrase ran, and it
+   is per entry rather than per session on purpose: a session holding
+   several lemmas has one DAG per lemma, handles are only meaningful in
+   their own, and a single newest-wins snapshot answered "no parent"
+   for every handle of every earlier proof -- which rendered those
+   proofs flat, without their bullets. *)
+type entry = {
+  (* Engine uuid right before the phrase; UNDO/REVERT trim on it. *)
+  en_uuid   : int;
+  en_src    : string;
+  (* Focused handle right before the phrase; [None] iff outside a
+     proof, which is also what separates one proof from the next. *)
+  en_parent : EcCoreGoal.handle option;
+  (* Full open-handle list (focused first) right before the phrase,
+     used to seed the sibling map when the first recorded phrase of a
+     proof already sits inside a frame opened by the LOAD prefix. *)
+  en_opens  : EcCoreGoal.handle list;
+  en_penv   : EcCoreGoal.proofenv option;
+}
+
+(* -------------------------------------------------------------------- *)
 (* Session state. The proof engine ([EcCommands]) is a global mutable
    singleton, so at most one [state] may exist per process. *)
 type state = {
@@ -72,24 +95,9 @@ type state = {
   (* CHECKPOINT name -> uuid. *)
   checkpoints : (string, int) Hashtbl.t;
 
-  (* Transcript of REPL-typed phrases that succeeded. Each entry is
-     [(uuid_before, src, parent, opens_at_entry)]:
-       - [parent]: focused handle right before the phrase ([None] iff
-         outside a proof);
-       - [opens_at_entry]: full open-handle list (focused first), used
-         by [Commit] to seed the sibling map when the first recorded
-         phrase already sits inside a frame opened by the LOAD prefix.
+  (* Transcript of REPL-typed phrases that succeeded, newest first.
      Trimmed by UNDO/REVERT; cleared on LOAD/Restart. *)
-  transcript :
-    (int * string * EcCoreGoal.handle option
-      * EcCoreGoal.handle list) list ref;
-
-  (* Proof environment snapshot, refreshed at every recorded phrase.
-     [COMMIT] queries the proof DAG through it rather than through the
-     active proof, which is gone once [qed] has run. A [proofenv] is
-     immutable and cumulative, so the last snapshot knows about every
-     handle any transcript entry can mention. *)
-  commit_env : EcCoreGoal.proofenv option ref;
+  transcript : entry list ref;
 
   (* The bullet stack of the active proof at the moment REPL input
      took over. Captured the first time [disable_repl_bullets] clears
@@ -157,7 +165,6 @@ let create ~relocdir ~boot ~projini ~prvopts =
     base_loadpath = EcCommands.loadpath_mark ();
     checkpoints   = Hashtbl.create 16;
     transcript    = ref [];
-    commit_env    = ref None;
     prior_bullets = ref None;
   } in
 
@@ -389,14 +396,11 @@ module Transcript = struct
   let trim (st : state) target =
     let transcript = st.transcript in
     transcript :=
-      List.filter
-        (fun (uuid_before, _, _, _) -> uuid_before < target)
-        !transcript
+      List.filter (fun e -> e.en_uuid < target) !transcript
 
   let clear (st : state) =
     st.transcript := [];
-    st.prior_bullets := None;
-    st.commit_env := None
+    st.prior_bullets := None
 end
 
 (* -------------------------------------------------------------------- *)
@@ -406,7 +410,6 @@ end
    which together let [Commit] reconstruct bullet structure. *)
 let process_action (st : state) ?(record=false) ~src (p : EP.global) =
   let transcript = st.transcript in
-  let commit_env = st.commit_env in
   let loc = p.EP.gl_action.EcLocation.pl_loc in
   let pre_uuid = EcCommands.uuid () in
   let opens_pre =
@@ -441,15 +444,21 @@ let process_action (st : state) ?(record=false) ~src (p : EP.global) =
     raise (EcScope.toperror_of_exn ~gloc:loc
       (EcScope.HiScopeError (None,
         "this command is expected to fail")));
-  if record && !succeeded && not p.EP.gl_fail && not is_query then begin
-    transcript := (pre_uuid, src, parent, opens_pre) :: !transcript;
-    (* Keep the newest non-empty snapshot: a phrase that closes the
-       proof ([qed]) leaves no active proof, and precisely then we
-       still need the environment the previous phrases built. *)
-    match EcCommands.current_proofenv () with
-    | None     -> ()
-    | Some _ as penv -> commit_env := penv
-  end
+  if record && !succeeded && not p.EP.gl_fail && not is_query then
+    (* The DAG is snapshot here, per phrase: a [proofenv] is immutable
+       and cumulative *within one proof*, so this entry's snapshot
+       answers for every handle its own proof can mention -- and, being
+       its own, keeps answering after [qed] has discarded the proof and
+       a later lemma has replaced it. A phrase that ends the proof
+       leaves none active and so records [None]; such a phrase is
+       outside a proof ([en_parent = None]) and its DAG is never
+       consulted. *)
+    transcript :=
+      { en_uuid   = pre_uuid;
+        en_src    = src;
+        en_parent = parent;
+        en_opens  = opens_pre;
+        en_penv   = EcCommands.current_proofenv (); } :: !transcript
 
 (* -------------------------------------------------------------------- *)
 (* COMMIT: replay the transcript against the proof DAG (parent_of /
@@ -467,16 +476,17 @@ module Commit = struct
     let chr = chars.(i mod 3) in
     String.concat "" (List.init rep (fun _ -> chr))
 
-  (* DAG queries go through the snapshot recorded at the last phrase,
-     so COMMIT still sees the structure after [qed]. Fall back to the
-     live proof when no phrase was recorded under a proof. *)
-  let parent_of (st : state) h =
-    match !(st.commit_env) with
+  (* DAG queries go through the snapshot the entry recorded, so COMMIT
+     still sees the structure of a proof [qed] has since discarded --
+     and sees the *right* one when the session holds several. Fall back
+     to the live proof for an entry that recorded no snapshot. *)
+  let parent_of penv h =
+    match penv with
     | Some penv -> EcCoreGoal.parent_of_handle penv h
     | None      -> EcCommands.parent_of h
 
-  let children_of (st : state) h =
-    match !(st.commit_env) with
+  let children_of penv h =
+    match penv with
     | Some penv -> EcCoreGoal.children_of_handle penv h
     | None      -> EcCommands.children_of h
 
@@ -485,9 +495,9 @@ module Commit = struct
      the DAG's preorder, which is the order in which a proof body has
      to discharge the subgoals -- and, FOCUS/NEXT being free to jump
      between open goals, not the order the phrases were typed in. *)
-  let dag_path (st : state) (h : EcCoreGoal.handle) =
+  let dag_path penv (h : EcCoreGoal.handle) =
     let rec walk h acc =
-      match parent_of st h with
+      match parent_of penv h with
       | None   -> acc
       | Some p ->
         let rec index i = function
@@ -495,42 +505,50 @@ module Commit = struct
           | c :: cs ->
             if EcCoreGoal.eq_handle c h then i else index (i + 1) cs
         in
-        walk p (index 0 (children_of st p) :: acc)
+        walk p (index 0 (children_of penv p) :: acc)
     in
     walk h []
 
-  (* Reorder a transcript into DAG order, so that a body typed out of
-     order (FOCUS 2, prove the second goal, come back to the first)
-     still replays top to bottom. Phrases typed outside a proof
-     ([parent = None]) separate one proof from the next and act as
-     barriers: each run of in-proof phrases between two of them is
-     sorted on its own. The sort is stable, so entries the DAG does not
-     order keep their typing order. *)
-  let dag_order (st : state) entries =
-    let key (_, _, parent, _) =
-      match parent with
+  (* Cut the transcript at its proof boundaries. A phrase typed outside
+     a proof ([en_parent = None]) is a [`Barrier] -- the lemma statement
+     that opens a proof, the [qed] that closes it -- and each run of
+     in-proof phrases between two of them belongs to exactly one proof.
+     Both the DAG sort and the bullet state below are per proof, and
+     this is what delimits one. *)
+  let blocks entries =
+    let close acc run = if run = [] then acc else `Run (List.rev run) :: acc in
+    let rec walk acc run = function
+      | [] -> List.rev (close acc run)
+      | ({ en_parent = None; _ } as e) :: rest ->
+        walk (`Barrier e :: close acc run) [] rest
+      | e :: rest -> walk acc (e :: run) rest
+    in
+    walk [] [] entries
+
+  (* Reorder one proof's phrases into DAG order, so that a body typed
+     out of order (FOCUS 2, prove the second goal, come back to the
+     first) still replays top to bottom. The sort is stable, so entries
+     the DAG does not order keep their typing order. *)
+  let dag_order run =
+    let key e =
+      match e.en_parent with
       | None   -> []
-      | Some h -> dag_path st h
+      | Some h -> dag_path e.en_penv h
     in
-    let sort run =
-      List.stable_sort
-        (fun a b -> compare (key a : int list) (key b))
-        run
+    List.stable_sort
+      (fun a b -> compare (key a : int list) (key b))
+      run
+
+  let bullet_to_string (b : EcParsetree.bullet) =
+    let ch =
+      match b.b_kind with
+      | `Minus -> "-"
+      | `Plus  -> "+"
+      | `Star  -> "*"
     in
-    let rec regroup run = function
-      | [] -> sort (List.rev run)
-      | ((_, _, None, _) as e) :: rest ->
-        sort (List.rev run) @ (e :: regroup [] rest)
-      | e :: rest -> regroup (e :: run) rest
-    in
-    regroup [] entries
+    String.concat "" (List.init b.b_count (fun _ -> ch))
 
   let proof_text (st : state) =
-    let parent_of = parent_of st in
-    let children_of = children_of st in
-    let transcript = st.transcript in
-    let prior_bullets = st.prior_bullets in
-    let entries = List.rev !transcript in
     let buf = Buffer.create 1024 in
     let emit_indent depth =
       for _ = 1 to depth do Buffer.add_string buf "  " done
@@ -541,138 +559,150 @@ module Commit = struct
         let compare = compare
       end)
     in
-    let sibling_depth : int Hmap.t ref = ref Hmap.empty in
-    let current_depth = ref 0 in
-    let bullet_to_string (b : EcParsetree.bullet) =
-      let ch =
-        match b.b_kind with
-        | `Minus -> "-"
-        | `Plus  -> "+"
-        | `Star  -> "*"
+    (* Render one proof's phrases. Every piece of bullet state --
+       the sibling map, the current depth, the token reserved at each
+       depth -- is local to this call, so one lemma can neither inherit
+       another's indentation nor exhaust its token supply.
+       [frames] are the bullet frames the LOAD prefix left open; they
+       belong to the proof that was in progress when the REPL took
+       over, hence to the first run only. *)
+    let render_run ~(frames : EcBullets.frame list) run =
+      let sibling_depth : int Hmap.t ref = ref Hmap.empty in
+      let current_depth = ref 0 in
+      let in_use_tokens =
+        List.map
+          (fun (f : EcBullets.frame) -> bullet_to_string f.bf_bullet)
+          frames
       in
-      String.concat "" (List.init b.b_count (fun _ -> ch))
+      let depth_cache : (int, string) Hashtbl.t = Hashtbl.create 8 in
+      let next_tok_idx = ref 0 in
+      let assigned_tokens = ref [] in
+      (* Depths 1..k address the next sibling of a frame the prefix
+         already opened, and strict bullets accepts nothing but that
+         frame's own token there. Deeper levels get fresh tokens, so
+         pre-populate the cache before any fresh pick happens. *)
+      List.iteri (fun i (f : EcBullets.frame) ->
+        let t = bullet_to_string f.bf_bullet in
+        Hashtbl.replace depth_cache (i + 1) t;
+        assigned_tokens := t :: !assigned_tokens)
+        frames;
+      let bullet_for_depth d =
+        match Hashtbl.find_opt depth_cache d with
+        | Some t -> t
+        | None ->
+          let rec pick () =
+            let t = token_at_index !next_tok_idx in
+            incr next_tok_idx;
+            if List.mem t in_use_tokens || List.mem t !assigned_tokens
+            then pick ()
+            else t
+          in
+          let t = pick () in
+          assigned_tokens := t :: !assigned_tokens;
+          Hashtbl.add depth_cache d t;
+          t
+      in
+      (* Seed: the goals already open when this proof's first recorded
+         phrase ran were left there by the LOAD prefix, so COMMIT must
+         place each of them at the depth the prefix's own bullets put it
+         at. A frame with floor [f] is discharged once [f] goals remain,
+         hence it still owns the first [n - f] goals of the focused-first
+         list; a goal covered by [c] frames sits at depth [c + 1].
+         Nothing to seed when the prefix left no frame and a single goal
+         (the REPL just continues on the prefix's own focus). *)
+      (match run with
+       | { en_parent = Some _; en_opens = (_ :: _ as opens); en_penv; _ } :: _
+         when frames <> [] || List.length opens >= 2 ->
+         (* [pr_opened] is focused-first, so a FOCUS/NEXT run before the
+            first recorded phrase leaves it rotated. The floors below
+            count goals in the order the prefix's bullets consume them,
+            which is DAG order. *)
+         let opens =
+           List.stable_sort
+             (fun a b ->
+                compare (dag_path en_penv a : int list) (dag_path en_penv b))
+             opens
+         in
+         let n = List.length opens in
+         List.iteri (fun i h ->
+           let pos = i + 1 in
+           let covering =
+             List.length
+               (List.filter
+                  (fun (f : EcBullets.frame) -> pos <= n - f.bf_floor)
+                  frames)
+           in
+           sibling_depth := Hmap.add h (covering + 1) !sibling_depth)
+           opens
+       | _ -> ());
+      List.iter (fun e ->
+        match e.en_parent with
+        | None -> assert false        (* [blocks] keeps these out *)
+        | Some parent ->
+          let parent_of = parent_of e.en_penv in
+          let children_of = children_of e.en_penv in
+          (* Walk upward via pr_parent until we hit a registered
+             sibling ancestor. If found, emit its bullet and consume
+             the registration. *)
+          let rec find_ancestor h =
+            match Hmap.find_opt h !sibling_depth with
+            | Some d -> Some (h, d)
+            | None ->
+              match parent_of h with
+              | Some p -> find_ancestor p
+              | None -> None
+          in
+          (match find_ancestor parent with
+           | Some (h, d) ->
+             emit_indent (d - 1);
+             Buffer.add_string buf (bullet_for_depth d);
+             Buffer.add_char buf ' ';
+             current_depth := d;
+             sibling_depth := Hmap.remove h !sibling_depth
+           | None ->
+             emit_indent !current_depth);
+          Buffer.add_string buf e.en_src;
+          Buffer.add_char buf '\n';
+          (* Register fresh siblings: walk the subtree rooted at
+             [parent], finding every multi-child split, and register
+             each such child at the right depth. Single-child links
+             are continuations and don't bump depth; multi-child
+             links do. A compound phrase like [split; split.] can
+             produce nested splits within one phrase. *)
+          let rec walk h d =
+            match children_of h with
+            | [c] -> walk c d
+            | (_ :: _ :: _) as cs ->
+              List.iter
+                (fun c ->
+                  sibling_depth :=
+                    Hmap.add c d !sibling_depth;
+                  walk c (d + 1))
+                cs
+            | [] -> ()
+          in
+          walk parent (!current_depth + 1))
+        (dag_order run)
     in
-    (* Bullet frames the LOAD prefix left open, OUTERMOST first (the
-       stack stores the innermost frame at its head). Frame [t_d] is
-       the one whose siblings live at emitted depth [d]. *)
-    let frames : EcBullets.frame list =
-      match !prior_bullets with
+    let prefix_frames : EcBullets.frame list =
+      (* The stack stores the innermost frame at its head; [render_run]
+         wants them OUTERMOST first, frame [t_d] being the one whose
+         siblings live at emitted depth [d]. *)
+      match !(st.prior_bullets) with
       | None       -> []
       | Some stack -> List.rev stack
     in
-    let in_use_tokens =
-      List.map
-        (fun (f : EcBullets.frame) -> bullet_to_string f.bf_bullet)
-        frames
-    in
-    let depth_cache : (int, string) Hashtbl.t = Hashtbl.create 8 in
-    let next_tok_idx = ref 0 in
-    let assigned_tokens = ref [] in
-    (* Depths 1..k address the next sibling of a frame the prefix
-       already opened, and strict bullets accepts nothing but that
-       frame's own token there. Deeper levels get fresh tokens, so
-       pre-populate the cache before any fresh pick happens. *)
-    List.iteri (fun i (f : EcBullets.frame) ->
-      let t = bullet_to_string f.bf_bullet in
-      Hashtbl.replace depth_cache (i + 1) t;
-      assigned_tokens := t :: !assigned_tokens)
-      frames;
-    let bullet_for_depth d =
-      match Hashtbl.find_opt depth_cache d with
-      | Some t -> t
-      | None ->
-        let rec pick () =
-          let t = token_at_index !next_tok_idx in
-          incr next_tok_idx;
-          if List.mem t in_use_tokens || List.mem t !assigned_tokens
-          then pick ()
-          else t
-        in
-        let t = pick () in
-        assigned_tokens := t :: !assigned_tokens;
-        Hashtbl.add depth_cache d t;
-        t
-    in
-    (* Seed: the goals already open when the first recorded phrase ran
-       were left there by the LOAD prefix, so COMMIT must place each of
-       them at the depth the prefix's own bullets put it at. A frame
-       with floor [f] is discharged once [f] goals remain, hence it
-       still owns the first [n - f] goals of the focused-first list;
-       a goal covered by [c] frames sits at depth [c + 1].
-       Nothing to seed when the prefix left no frame and a single goal
-       (the REPL just continues on the prefix's own focus). *)
-    (match entries with
-     | (_, _, Some _, (_ :: _ as opens)) :: _
-       when frames <> [] || List.length opens >= 2 ->
-       (* [pr_opened] is focused-first, so a FOCUS/NEXT run before the
-          first recorded phrase leaves it rotated. The floors below
-          count goals in the order the prefix's bullets consume them,
-          which is DAG order. *)
-       let opens =
-         List.stable_sort
-           (fun a b -> compare (dag_path st a : int list) (dag_path st b))
-           opens
-       in
-       let n = List.length opens in
-       List.iteri (fun i h ->
-         let pos = i + 1 in
-         let covering =
-           List.length
-             (List.filter
-                (fun (f : EcBullets.frame) -> pos <= n - f.bf_floor)
-                frames)
-         in
-         sibling_depth := Hmap.add h (covering + 1) !sibling_depth)
-         opens
-     | _ -> ());
-    List.iter (fun (_uuid, src, parent_opt, _opens) ->
-      match parent_opt with
-      | None ->
-        Buffer.add_string buf src;
-        Buffer.add_char buf '\n'
-      | Some parent ->
-        (* Walk upward via pr_parent until we hit a registered
-           sibling ancestor. If found, emit its bullet and consume
-           the registration. *)
-        let rec find_ancestor h =
-          match Hmap.find_opt h !sibling_depth with
-          | Some d -> Some (h, d)
-          | None ->
-            match parent_of h with
-            | Some p -> find_ancestor p
-            | None -> None
-        in
-        (match find_ancestor parent with
-         | Some (h, d) ->
-           emit_indent (d - 1);
-           Buffer.add_string buf (bullet_for_depth d);
-           Buffer.add_char buf ' ';
-           current_depth := d;
-           sibling_depth := Hmap.remove h !sibling_depth
-         | None ->
-           emit_indent !current_depth);
-        Buffer.add_string buf src;
-        Buffer.add_char buf '\n';
-        (* Register fresh siblings: walk the subtree rooted at
-           [parent], finding every multi-child split, and register
-           each such child at the right depth. Single-child links
-           are continuations and don't bump depth; multi-child
-           links do. A compound phrase like [split; split.] can
-           produce nested splits within one phrase. *)
-        let rec walk h d =
-          match children_of h with
-          | [c] -> walk c d
-          | (_ :: _ :: _) as cs ->
-            List.iter
-              (fun c ->
-                sibling_depth :=
-                  Hmap.add c d !sibling_depth;
-                walk c (d + 1))
-              cs
-          | [] -> ()
-        in
-        walk parent (!current_depth + 1)
-    ) (dag_order st entries);
+    let first_run = ref true in
+    List.iter
+      (function
+        | `Barrier e ->
+          Buffer.add_string buf e.en_src;
+          Buffer.add_char buf '\n'
+        | `Run run ->
+          let frames = if !first_run then prefix_frames else [] in
+          first_run := false;
+          render_run ~frames run)
+      (blocks (List.rev !(st.transcript)));
     Buffer.contents buf
 end
 
@@ -770,8 +800,9 @@ let step (st : state) input =
    by a bad tactic -- left the engine at that lower state while the
    reply claimed [reverted = true]. Take a mark of the whole engine
    context instead, which restores forward as readily as backward, and
-   restore the session's own bookkeeping (transcript, COMMIT's proof
-   environment, the prefix's bullet stack) alongside it rather than
+   restore the session's own bookkeeping (the transcript, whose entries
+   carry COMMIT's proof-DAG snapshots, and the prefix's bullet stack)
+   alongside it rather than
    trimming it, since trimming is likewise one-directional. Checkpoints
    need nothing: EasyCrypt input cannot reach them, and the uuids they
    name are valid again once the engine is back.
@@ -784,7 +815,6 @@ let try_step (st : state) input =
   let pre        = EcCommands.uuid () in
   let mark       = EcCommands.undo_mark () in
   let transcript = !(st.transcript) in
-  let commit_env = !(st.commit_env) in
   let bullets    = !(st.prior_bullets) in
   match step st input with
   | Quit                  -> Quit
@@ -792,7 +822,6 @@ let try_step (st : state) input =
   | Done (Error failure)  ->
     EcCommands.undo_restore mark;
     st.transcript    := transcript;
-    st.commit_env    := commit_env;
     st.prior_bullets := bullets;
     let uuid = EcCommands.uuid () in
     Done (Error { failure with
