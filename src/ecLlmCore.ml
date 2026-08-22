@@ -894,6 +894,16 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
           | Some c -> ec > c)
     in
 
+    (* [upto] stops the prefix at the requested position whatever kind
+       of sentence sits past it. This is applied to every item the
+       reader yields, not only to the [P_Prog] commands: an `undo N.`
+       on the line after [upto] used to run all the same, silently
+       rewinding the very prefix the caller asked for, so that LOAD
+       returned a state that was not the state at that line. *)
+    let stop_at_upto (item : _ EcLocation.located) =
+      if past_upto (EcLocation.loc item) then raise Exit
+    in
+
     let last_loc = ref None in
 
     (* For -trace: lazy whole-file bytes, used to slice the exact
@@ -948,11 +958,13 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
         List.iter (step src) commands;
         if locterm then raise Exit
       | EP.P_Undo i ->
+        stop_at_upto prog;
         last_src := src;
         EcCommands.undo i
       | EP.P_Exit ->
         raise Exit
       | EP.P_DocComment doc ->
+        stop_at_upto prog;
         last_src := src;
         EcCommands.doc_comment doc
     done with
