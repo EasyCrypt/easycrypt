@@ -1,0 +1,9 @@
+# exit: 0
+# A JSON string is UTF-8; EasyCrypt output is bytes. ../llm/fixtures/
+# latin1.ec hides a Latin-1 comment inside the sentence ec_load traces,
+# so the reply text carries raw 0xe9 bytes. They must reach the wire as
+# U+FFFD: before the repair, this response line was not parseable JSON
+# at all.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/latin1.ec","line":12,"trace":true}}}
