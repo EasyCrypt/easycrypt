@@ -61,6 +61,7 @@ gate for changes to the protocol layer.
 | `happy-path` | a session end to end: load, step, goals, tree, focus, commit |
 | `prover-error` | EasyCrypt-level failures as `isError` results carrying the goal state |
 | `print-query` | `print` and `locate` reach the agent, spend no uuid, and stay out of `ec_commit` |
+| `non-utf8` | engine output that is not UTF-8 comes back as U+FFFD, not as invalid JSON |
 | `try-revert` | `ec_try` rolling back a phrase that had already advanced the proof |
 | `protocol-errors` | `-32700`, `-32600`, `-32601` and the `-32602` family |
 | `revert` | `ec_revert` by uuid and by checkpoint name |
@@ -239,6 +240,15 @@ anything machine- or environment-dependent:
   `"../llm/fixtures/simple.ec"`. Error messages echo the path
   verbatim, so an absolute one would bake the developer's home
   directory into the golden.
+* **One fixture is deliberately not UTF-8.** `../llm/fixtures/latin1.ec`
+  is Latin-1, and the `non-utf8` scenario exists precisely because of
+  it: a JSON string is UTF-8 by definition, EasyCrypt output is bytes,
+  and the server repairs the difference (invalid bytes become U+FFFD)
+  at the single point where a message leaves for the wire. It lives
+  with the other fixtures under `../llm/fixtures` rather than in a
+  `tests/mcp/fixtures` of its own, per the rule above: fixtures are
+  shared, never duplicated. Do not "fix" its encoding — that would make
+  the scenario vacuous.
 * **One normalization, and only one.** `serverInfo.version` is a
   git-describe string; the runner rewrites it to `VERSION` with `sed`
   before diffing. Nothing else is touched — if a second unstable field
