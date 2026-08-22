@@ -259,8 +259,20 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   let quiet = ref false in
 
   (* ------------------------------------------------------------------ *)
-  (* OK/ERROR/<END> wire envelope: the only printers. *)
+  (* Exit status. Scripted runs (-eval) report in-band errors through
+     it, so that automation does not mistake an ERROR reply for success;
+     interactive sessions always exit 0.
+
+     Every way out of the REPL goes through [terminate]: end of input,
+     QUIT, and an [exit.] phrase alike. Routing QUIT and [exit.] around
+     it is how the contract used to be lost -- and a script ending in
+     QUIT, which is the natural thing to write, is exactly the case
+     that lost it. *)
   let had_error = ref false in
+
+  let terminate () =
+    exit (if llmopts.llmo_eval <> None && !had_error then 1 else 0)
+  in
 
   let module Wire = struct
     (* Write a chunk of reply body, one line at a time, escaping the
@@ -309,7 +321,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
 
     (* Same, for operations that may end the session. *)
     let answer = function
-      | EcLlmCore.Quit      -> exit 0
+      | EcLlmCore.Quit         -> terminate ()
       | EcLlmCore.Done outcome -> reply outcome
 
     let reply_error msg =
@@ -363,7 +375,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
     let run (cmd : Parse.command) =
       match cmd with
       | Blank        -> ()
-      | Quit         -> exit 0
+      | Quit         -> terminate ()
       | Help         -> do_help ()
       | Undo         -> Wire.reply (EcLlmCore.undo st)
       | Goals `One   -> Wire.reply (EcLlmCore.goals st ~all:false)
@@ -420,7 +432,4 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
   | End_of_file -> ()
   end;
 
-  (* Scripted runs (-eval) report in-band errors through the exit
-     status, so that automation does not mistake an ERROR reply for
-     success. Interactive sessions keep exiting 0. *)
-  exit (if llmopts.llmo_eval <> None && !had_error then 1 else 0)
+  terminate ()

@@ -60,7 +60,10 @@ prose. The first `# exit: N` line wins; a script without one fails.
 
 `ec.exe llm -eval` exits 1 if any command produced an `ERROR` reply and
 0 otherwise, so scenarios that deliberately exercise error paths
-declare `# exit: 1`.
+declare `# exit: 1`. That holds however the run ends: `error-exit`
+falls off the end of the script, `error-exit-quit` ends on `QUIT` and
+`error-exit-phrase` on an `exit.` phrase, and all three declare
+`# exit: 1`.
 
 ## Determinism rules
 
