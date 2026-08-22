@@ -1154,6 +1154,21 @@ let undo (olduuid : int) =
     done
 
 (* -------------------------------------------------------------------- *)
+(* [undo] only pops, so it cannot undo an [undo]: input that lowered the
+   uuid before failing leaves it at the wrong state, not the one it
+   started from. A caller that has to put the engine back *exactly*
+   where it was takes a mark first. The context is an immutable record
+   -- current scope, undo stack, uuid -- so this is a snapshot, not a
+   replay: restoring it moves forward as readily as backward. *)
+type undo_mark = context
+
+let undo_mark () : undo_mark =
+  oget !context
+
+let undo_restore (mark : undo_mark) =
+  context := Some mark
+
+(* -------------------------------------------------------------------- *)
 let doc_comment (doc : [`Global | `Item] * string) : unit =
   let current = oget !context in
   let scope   = current.ct_current in
