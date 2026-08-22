@@ -139,6 +139,7 @@ module Loader : sig
 
   val addidir : ?namespace:namespace -> ?recursive:bool -> string -> loader -> unit
   val aslist  : loader -> ((namespace option * string) * idx_t) list
+  val setidirs : ((namespace option * string) * idx_t) list -> loader -> unit
   val locate  : ?namespaces:namespace option list -> string ->
                   loader -> (namespace option * string * kind) option
 
@@ -198,6 +199,9 @@ end = struct
 
   let aslist (ld : loader) =
     EcLoader.aslist ld.ld_core
+
+  let setidirs (idirs : ((namespace option * string) * idx_t) list) (ld : loader) =
+    EcLoader.setidirs idirs ld.ld_core
 
   let locate ?namespaces (path : string) (ld : loader) =
     EcLoader.locate ?namespaces path ld.ld_core
@@ -931,6 +935,21 @@ let addidir ?namespace ?recursive (idir : string) =
 
 let loadpath () =
   List.map fst (Loader.aslist loader)
+
+(* The include path lives in this one process-global loader and only
+   ever grows: [addidir] never removes anything, and [initialize] --
+   [~restart:true] included -- does not rebuild it. A front-end that
+   loads unrelated files one after another therefore needs a way back,
+   or each loaded file's own directory stays searchable for every later
+   load. The batch compiler loads one file and exits, so it never wants
+   this. *)
+type loadpath_mark = ((Loader.namespace option * string) * Loader.idx_t) list
+
+let loadpath_mark () : loadpath_mark =
+  Loader.aslist loader
+
+let loadpath_reset (mark : loadpath_mark) =
+  Loader.setidirs mark loader
 
 let set_current_path (path : string) =
   Loader.set_current_path path loader

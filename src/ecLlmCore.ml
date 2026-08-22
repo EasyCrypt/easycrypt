@@ -62,9 +62,12 @@ type state = {
      [~restart:true]. *)
   initialized : bool ref;
 
-  (* Project-file load-path entries already added to the (global)
-     loader, so repeated [LOAD]s do not pile up duplicates. *)
-  projdirs : (string option * string * bool) list ref;
+  (* The include path as the session started: the prelude and stdlib
+     roots, the command line's -I/-R/-stdlib entries, and the working
+     directory. Every [LOAD] rewinds the (process-global) loader to it
+     before adding the loaded file's own directory and its project's,
+     so one file's neighbours are never visible to the next. *)
+  base_loadpath : EcCommands.loadpath_mark;
 
   (* CHECKPOINT name -> uuid. *)
   checkpoints : (string, int) Hashtbl.t;
@@ -151,7 +154,7 @@ let create ~relocdir ~boot ~projini ~prvopts =
     cur_prvopts   = ref prvopts;
     notices       = Buffer.create 256;
     initialized   = ref false;
-    projdirs      = ref [];
+    base_loadpath = EcCommands.loadpath_mark ();
     checkpoints   = Hashtbl.create 16;
     transcript    = ref [];
     commit_env    = ref None;
@@ -791,7 +794,6 @@ let try_step (st : state) input =
 let load (st : state) ~file ~upto ~nosmt ~trace =
   let notices = st.notices in
   let cur_prvopts = st.cur_prvopts in
-  let projdirs = st.projdirs in
   let checkpoints = st.checkpoints in
   let pre = EcCommands.uuid () in
   Buffer.clear notices;
@@ -813,17 +815,22 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
        [easycrypt.project], as the batch compiler does when the
        file is given on the command line: refresh the prover
        options (timeout, provers, pragmas, ...) and extend the
-       load path with the project's include dirs. *)
+       load path with the project's include dirs.
+
+       The include path is rewound first. It is process-global and
+       [addidir] only grows it, so without this a previously loaded
+       file's directory -- and its project's -- stayed searchable
+       here, and `require'ing one of its neighbours silently
+       succeeded in a session that has nothing to do with it. LOAD
+       resets the session, and the load path is part of the session. *)
     let ini = Option.to_list (st.projini (Some filename)) in
     cur_prvopts :=
       EcOptions.prv_options_with_ini ini st.base_prvopts;
-    List.iter (fun ((nm, dir, isrec) as entry) ->
-      if not (List.mem entry !projdirs) then begin
-        projdirs := entry :: !projdirs;
-        EcCommands.addidir
-          ?namespace:(omap (fun nm -> `Named nm) nm)
-          ~recursive:isrec dir
-      end)
+    EcCommands.loadpath_reset st.base_loadpath;
+    List.iter (fun (nm, dir, isrec) ->
+      EcCommands.addidir
+        ?namespace:(omap (fun nm -> `Named nm) nm)
+        ~recursive:isrec dir)
       (EcOptions.ini_loadpath ini);
 
     do_initialize st;

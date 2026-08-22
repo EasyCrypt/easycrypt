@@ -20,4 +20,9 @@ val aslist  : ecloader -> ((namespace option * string) * idx_t) list
 val dup     : ecloader -> ecloader
 val forsys  : ecloader -> ecloader
 val addidir : ?namespace:namespace -> ?recursive:bool -> string -> ecloader -> unit
+
+(* Replace the include path wholesale, [aslist] being its reader.
+   [addidir] only ever grows the path, so this is what lets a caller
+   come back to an earlier one. *)
+val setidirs : ((namespace option * string) * idx_t) list -> ecloader -> unit
 val locate  : ?namespaces:(namespace option) list -> string -> ecloader -> (namespace option * string * kind) option
