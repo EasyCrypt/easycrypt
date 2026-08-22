@@ -90,6 +90,60 @@ let print_usage () =
     Printf.eprintf "cannot read LLM guide: %s\n%!" e
 
 (* -------------------------------------------------------------------- *)
+(* UTF-8 repair.
+
+   A JSON string is UTF-8 by definition, and OCaml strings are bytes.
+   Reply text is engine output, which is not ours to trust: EasyCrypt
+   echoes source text verbatim (a traced sentence, an error message
+   quoting its input), so one Latin-1 comment in a loaded file is
+   enough to put a raw 0xe9 inside a JSON string and make the whole
+   response line unparseable. Every invalid byte is replaced by U+FFFD
+   on the way out; a message that is already valid UTF-8 is returned
+   unchanged, allocating nothing. *)
+
+(* Length of the well-formed UTF-8 sequence starting at [i], or 0. The
+   bounds are the Unicode standard's: no overlong encodings, no
+   surrogates, nothing past U+10FFFF. *)
+let utf8_width (s : string) (i : int) =
+  let n = String.length s in
+  let byte k = Char.code (String.unsafe_get s k) in
+  let cont k = k < n && byte k land 0xc0 = 0x80 in
+  let b0 = byte i in
+  if b0 < 0x80 then 1
+  else if b0 < 0xc2 then 0            (* stray continuation, or overlong *)
+  else if b0 <= 0xdf then
+    (if cont (i + 1) then 2 else 0)
+  else if b0 <= 0xef then
+    let lo = if b0 = 0xe0 then 0xa0 else 0x80 in
+    let hi = if b0 = 0xed then 0x9f else 0xbf in
+    if i + 2 < n && byte (i + 1) >= lo && byte (i + 1) <= hi && cont (i + 2)
+    then 3 else 0
+  else if b0 <= 0xf4 then
+    let lo = if b0 = 0xf0 then 0x90 else 0x80 in
+    let hi = if b0 = 0xf4 then 0x8f else 0xbf in
+    if i + 3 < n && byte (i + 1) >= lo && byte (i + 1) <= hi
+       && cont (i + 2) && cont (i + 3)
+    then 4 else 0
+  else 0
+
+let utf8_repair (s : string) =
+  let n = String.length s in
+  let rec valid i =
+    i >= n || (let k = utf8_width s i in k > 0 && valid (i + k))
+  in
+  if valid 0 then s
+  else begin
+    let buf = Buffer.create (n + 8) in
+    let rec copy i =
+      if i < n then
+        match utf8_width s i with
+        | 0 -> Buffer.add_string buf "\xef\xbf\xbd"; copy (i + 1)
+        | k -> Buffer.add_substring buf s i k; copy (i + k)
+    in
+    copy 0; Buffer.contents buf
+  end
+
+(* -------------------------------------------------------------------- *)
 (* JSON schema fragments for the tool declarations. *)
 module Schema = struct
   let str ?description () =
@@ -464,8 +518,21 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
      newlines inside strings, so a message never contains one, as the
      stdio transport requires. *)
   let module Wire = struct
+    (* Repair every string in the message rather than the reply text
+       alone: this is the one point every byte leaves through, so no
+       future tool or error path can put invalid UTF-8 on the wire by
+       forgetting to sanitize. *)
+    let rec repair (msg : J.t) : J.t =
+      match msg with
+      | `String s       -> `String (utf8_repair s)
+      | `List l         -> `List (List.map repair l)
+      | `Tuple l        -> `Tuple (List.map repair l)
+      | `Assoc l        -> `Assoc (List.map (fun (k, v) -> (k, repair v)) l)
+      | `Variant (k, v) -> `Variant (k, Option.map repair v)
+      | msg             -> msg
+
     let send (msg : J.t) =
-      output_string wire (J.to_string msg);
+      output_string wire (J.to_string (repair msg));
       output_char wire '\n';
       flush wire
 

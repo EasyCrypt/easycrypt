@@ -9,7 +9,7 @@ compared against recorded goldens.
 
 | Path | Contents |
 |------|----------|
-| `fixtures/*` | tiny EasyCrypt files the scripts `LOAD` (plus one non-`.ec` file, for the unknown-extension error) |
+| `fixtures/*` | tiny EasyCrypt files the scripts `LOAD` (plus one non-`.ec` file, for the unknown-extension error, and one deliberately Latin-1 file used by `../mcp`) |
 | `scripts/*.script` | the newline-separated commands passed to `-eval` |
 | `expected/*.out` | recorded stdout, one file per script |
 | `../../scripts/testing/llm-golden` | the runner |
