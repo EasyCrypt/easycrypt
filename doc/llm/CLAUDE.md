@@ -37,6 +37,12 @@ GOALS
 COMMIT'
 ```
 
+A `-eval` run exits 1 if any command produced an `ERROR` reply, and 0
+otherwise. The status covers the whole run however it ends: ending the
+script with `QUIT`, or with an `exit.` phrase, reports the errors that
+came before just as end-of-input does. Interactive sessions (no
+`-eval`) always exit 0.
+
 ### Protocol
 
 **Startup.** EasyCrypt prints a `READY` message and waits for input:
