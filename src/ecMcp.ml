@@ -337,11 +337,16 @@ let tools : J.t list =
       ~name:"ec_focus"
       ~description:
         "Rotate the focus onto the subgoal at dotted path PATH, as \
-         printed by ec_tree (\"2\", \"1.2\", \"1.1.1\"); a single \
-         integer selects the k-th goal of the flat listing, and the \
-         special value \"next\" moves to the next open subgoal. \
-         Subsequent tactics act on the focused goal. Selecting an \
-         internal frame instead of a leaf goal is an error."
+         printed by ec_tree (\"2\", \"1.2\", \"1.1.1\"). The path walks \
+         the tree, one component per level, so a single integer selects \
+         the k-th TOP-LEVEL node -- not the k-th open goal: with four \
+         goals nested under two top-level nodes, \"3\" is out of range. \
+         Selecting a node that is an internal frame rather than a leaf \
+         goal is an error. The special value \"next\" is a different \
+         operation, not a synonym for \"2\": it moves to the next open \
+         subgoal in ec_goals-with-all order, whatever the nesting, and \
+         the two coincide only when the tree is flat. Subsequent \
+         tactics act on the focused goal."
       ~input:(Schema.obj ~required:["path"] [
         ("path", Schema.str
                    ~description:"\"N\", a dotted path \"N1.N2...\", or \

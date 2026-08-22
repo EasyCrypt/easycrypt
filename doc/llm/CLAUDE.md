@@ -90,8 +90,8 @@ These are protocol-level commands, not EasyCrypt syntax:
 | `GOALS ALL` | Print all subgoals |
 | `TREE` | List open subgoals with dotted-path labels showing nesting, marking the focused one |
 | `TREE ALL` | Same as `TREE`, but with full goal bodies |
-| `FOCUS P` | Rotate focus to the leaf addressed by path `P` (`N` or `N1.N2.N3...`) |
-| `NEXT` | Rotate focus to the next subgoal (equivalent to `FOCUS 2`) |
+| `FOCUS P` | Focus the leaf at `TREE` path `P` (`N` or `N1.N2.N3...`); the path walks the tree, so a single `N` picks the `N`-th **top-level node**, not the `N`-th goal |
+| `NEXT` | Focus the next open subgoal, in `GOALS ALL` order. A different operation from `FOCUS 2` — see below |
 | `COMMIT` | Emit recorded REPL phrases as a bulleted proof body (works under `+strict_bullets`) |
 | `CHECKPOINT <name>` | Save current uuid under a name for later `REVERT` |
 | `SEARCH <pattern>` | Search for lemmas matching a pattern (read-only: the uuid does not move) |
@@ -246,9 +246,23 @@ FOCUS 2          ← work on `w = 3`
 FOCUS 1.1.1      ← back to `x = 0`
 ```
 
-`FOCUS k` (a single integer) targets the k-th open goal in the flat
-listing. `NEXT` is shorthand for `FOCUS 2`. Selecting an internal
-frame errors (`FOCUS: path must select a leaf goal, not a frame`).
+A `FOCUS` path always walks the tree, one component per level, so a
+single integer `k` names the **k-th top-level node** — not the k-th
+open goal. The tree above has four open goals but only two top-level
+nodes, `[1]` (a frame) and `[2]` (a leaf), so:
+
+```
+FOCUS 2          ← `w = 3`, the second top-level node
+FOCUS 3          ← ERROR: FOCUS: index 3 out of range (1..2)
+FOCUS 1          ← ERROR: FOCUS: path must select a leaf goal, not a frame
+```
+
+`NEXT` is a different operation, and **not** shorthand for `FOCUS 2`:
+it moves to the next open subgoal in `GOALS ALL` order, whatever the
+nesting. From the tree above, `NEXT` focuses `y = 1` (`[1.1.2]`) while
+`FOCUS 2` focuses `w = 3`. The two agree only when the tree is flat —
+one `split.`, two leaves at the top level — which is the common case,
+and the reason the difference is easy to miss.
 
 Replies carry a `[focus: k/N]` tag when more than one goal is open
 (e.g. `OK [uuid:42] [focus: 1/3]`) so you always know which goal the
