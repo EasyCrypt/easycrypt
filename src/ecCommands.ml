@@ -1335,12 +1335,14 @@ let pp_all_goals () =
   | _ -> []
 
 (* -------------------------------------------------------------------- *)
-(* Render the open-subgoals tree. Each entry is (index, is_focused,
-   text). [index] is 1-based, [is_focused] marks the focused goal
-   (always at index 1 with EC's current focus model), and [text] is
-   either a one-line conclusion digest (when [~all = false]) or the
-   full goal body (when [~all = true]). *)
-let pp_tree ?(all = false) () : (int * bool * string) list =
+type goal_entry = {
+  ge_index   : int;
+  ge_focused : bool;
+  ge_text    : string;
+}
+
+(* Render the open goals of the active proof, focused first. *)
+let pp_tree ?(all = false) () : goal_entry list =
   let scope = current () in
   match S.xgoal scope with
   | Some { S.puc_active = Some ({ puc_jdg = S.PSCheck pf }, _) } -> begin
@@ -1361,6 +1363,6 @@ let pp_tree ?(all = false) () : (int * bool * string) list =
           else
             Format.asprintf "%a" (EcPrinting.pp_form ppe) g_concl
         in
-        (i + 1, i = 0, text)) goals
+        { ge_index = i + 1; ge_focused = i = 0; ge_text = text; }) goals
   end
   | _ -> []
