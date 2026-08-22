@@ -60,6 +60,7 @@ gate for changes to the protocol layer.
 | `tools-list` | the whole tool table: names, descriptions, input/output schemas, annotations |
 | `happy-path` | a session end to end: load, step, goals, tree, focus, commit |
 | `prover-error` | EasyCrypt-level failures as `isError` results carrying the goal state |
+| `print-query` | `print` and `locate` reach the agent, spend no uuid, and stay out of `ec_commit` |
 | `try-revert` | `ec_try` rolling back a phrase that had already advanced the proof |
 | `protocol-errors` | `-32700`, `-32600`, `-32601` and the `-32602` family |
 | `revert` | `ec_revert` by uuid and by checkpoint name |

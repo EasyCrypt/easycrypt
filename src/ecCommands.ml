@@ -442,8 +442,24 @@ let check_opname_validity (scope : EcScope.scope) (x : string) =
       "operator `%s' cannot be used in infix mode" x
 
 (* -------------------------------------------------------------------- *)
+(* Where [print] renders. The batch compiler and the interactive
+   terminals want the process's stdout, which is what this defaults to.
+   A front-end that frames its replies ([llm], [mcp]) cannot let the
+   engine write outside the frame, so it installs a formatter of its
+   own -- [search] and [locate] already come back through the notifier,
+   and this is what puts [print] on the same footing. Routing it
+   through the notifier instead would have been the smaller patch, but
+   the notifier drops `Info under the batch compiler's log level, so
+   `ec compile' would have stopped printing altogether. *)
+let print_formatter = ref Format.std_formatter
+
+let set_print_formatter (fmt : Format.formatter) =
+  print_formatter := fmt
+
 let process_print scope p =
-  process_pr Format.std_formatter scope p
+  let fmt = !print_formatter in
+  process_pr fmt scope p;
+  Format.pp_print_flush fmt ()
 
 (* -------------------------------------------------------------------- *)
 let process_expect scope (expected, p) =
