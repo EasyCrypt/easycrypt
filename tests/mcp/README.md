@@ -63,6 +63,7 @@ gate for changes to the protocol layer.
 | `print-query` | `print` and `locate` reach the agent, spend no uuid, and stay out of `ec_commit` |
 | `non-utf8` | engine output that is not UTF-8 comes back as U+FFFD, not as invalid JSON |
 | `try-revert` | `ec_try` rolling back a phrase that had already advanced the proof |
+| `try-undo` | `ec_try` rolling *forward* again after a phrase whose `undo` lowered the uuid |
 | `protocol-errors` | `-32700`, `-32600`, `-32601` and the `-32602` family |
 | `revert` | `ec_revert` by uuid and by checkpoint name |
 | `load-missing` | a missing file and an unknown extension: `isError`, *not* `-32602` |
