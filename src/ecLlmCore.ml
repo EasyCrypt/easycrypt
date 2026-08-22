@@ -470,6 +470,51 @@ module Commit = struct
     | Some penv -> EcCoreGoal.children_of_handle penv h
     | None      -> EcCommands.children_of h
 
+  (* Position of [h] in the proof DAG: the child indices on the path
+     from the root down to [h]. Lexicographic order on those paths is
+     the DAG's preorder, which is the order in which a proof body has
+     to discharge the subgoals -- and, FOCUS/NEXT being free to jump
+     between open goals, not the order the phrases were typed in. *)
+  let dag_path (st : state) (h : EcCoreGoal.handle) =
+    let rec walk h acc =
+      match parent_of st h with
+      | None   -> acc
+      | Some p ->
+        let rec index i = function
+          | []      -> i
+          | c :: cs ->
+            if EcCoreGoal.eq_handle c h then i else index (i + 1) cs
+        in
+        walk p (index 0 (children_of st p) :: acc)
+    in
+    walk h []
+
+  (* Reorder a transcript into DAG order, so that a body typed out of
+     order (FOCUS 2, prove the second goal, come back to the first)
+     still replays top to bottom. Phrases typed outside a proof
+     ([parent = None]) separate one proof from the next and act as
+     barriers: each run of in-proof phrases between two of them is
+     sorted on its own. The sort is stable, so entries the DAG does not
+     order keep their typing order. *)
+  let dag_order (st : state) entries =
+    let key (_, _, parent, _) =
+      match parent with
+      | None   -> []
+      | Some h -> dag_path st h
+    in
+    let sort run =
+      List.stable_sort
+        (fun a b -> compare (key a : int list) (key b))
+        run
+    in
+    let rec regroup run = function
+      | [] -> sort (List.rev run)
+      | ((_, _, None, _) as e) :: rest ->
+        sort (List.rev run) @ (e :: regroup [] rest)
+      | e :: rest -> regroup (e :: run) rest
+    in
+    regroup [] entries
+
   let proof_text (st : state) =
     let parent_of = parent_of st in
     let children_of = children_of st in
@@ -549,6 +594,15 @@ module Commit = struct
     (match entries with
      | (_, _, Some _, (_ :: _ as opens)) :: _
        when frames <> [] || List.length opens >= 2 ->
+       (* [pr_opened] is focused-first, so a FOCUS/NEXT run before the
+          first recorded phrase leaves it rotated. The floors below
+          count goals in the order the prefix's bullets consume them,
+          which is DAG order. *)
+       let opens =
+         List.stable_sort
+           (fun a b -> compare (dag_path st a : int list) (dag_path st b))
+           opens
+       in
        let n = List.length opens in
        List.iteri (fun i h ->
          let pos = i + 1 in
@@ -608,7 +662,7 @@ module Commit = struct
           | [] -> ()
         in
         walk parent (!current_depth + 1)
-    ) entries;
+    ) (dag_order st entries);
     Buffer.contents buf
 end
 
