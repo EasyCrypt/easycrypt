@@ -465,7 +465,6 @@ let main () =
       (*---*) gccompact   : int option;
       (*---*) docgen      : bool;
       (*---*) outdirp     : string option;
-      (*---*) upto        : (int * int option) option;
       mutable trace       : trace1 list option;
     }
 
@@ -544,7 +543,6 @@ let main () =
         ; gccompact   = None
         ; docgen      = false
         ; outdirp     = None
-        ; upto        = None
         ; trace       = None }
 
     end
@@ -580,7 +578,6 @@ let main () =
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
         ; outdirp     = None
-        ; upto        = None
         ; trace       = trace0 }
 
       end
@@ -631,7 +628,6 @@ let main () =
         ; gccompact   = None
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
-        ; upto        = None
         ; trace       = None }
       end
 
@@ -651,7 +647,7 @@ let main () =
         EcCommands.set_current_path current_path);
 
   (* Check if the .eco is up-to-date and exit if so *)
-  (if not state.docgen && state.upto = None then
+  (if not state.docgen then
     oiter
       (fun input -> if EcCommands.check_eco input then exit 0)
       state.input);
@@ -738,16 +734,6 @@ let main () =
   (* Warn about GC-regressed OCaml versions (5.0-5.3) *)
   warn_ocaml_version terminal;
 
-  (* Check if a location is past the -upto point *)
-  let past_upto (loc : EcLocation.t) =
-    match state.upto with
-    | None -> false
-    | Some (line, col) ->
-        let (sl, sc) = loc.loc_start in
-        sl > line || (sl = line && match col with
-          | None -> true
-          | Some c -> sc >= c) in
-
   try
     if T.interactive terminal then Sys.catch_break true;
 
@@ -816,13 +802,6 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
-
-                   (* -upto: if this command starts past the target, print goals and exit *)
-                   if past_upto loc then begin
-                     T.finalize terminal;
-                     EcCommands.pp_current_goal_or_noproof ~all:true Format.std_formatter;
-                     exit 0
-                   end;
 
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
