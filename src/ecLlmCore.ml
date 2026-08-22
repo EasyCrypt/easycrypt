@@ -201,11 +201,14 @@ module Goals = struct
     Buffer.contents buf
 
   (* Inline focus annotation ([focus: 1/N]) appended to reply tags
-     whenever the active proof has >=2 open subgoals. *)
+     whenever the active proof has >=2 open subgoals. Counted on the
+     handles: [pp_tree] enumerates the same goals under the same guard,
+     but renders each one's conclusion on the way, and every reply that
+     ends on the goals asks for this tag. *)
   let focus_tag () =
-    match EcCommands.pp_tree () with
-    | _ :: _ :: _ as entries ->
-      Printf.sprintf " [focus: 1/%d]" (List.length entries)
+    match EcCommands.open_handles () with
+    | _ :: _ :: _ as handles ->
+      Printf.sprintf " [focus: 1/%d]" (List.length handles)
     | _ -> ""
 end
 
