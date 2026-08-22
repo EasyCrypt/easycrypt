@@ -35,11 +35,10 @@ type reply = {
    [reverted] is set by [try_step] only: it says the engine was rolled
    back to the state it had before the operation ran, so [uuid] and
    [goals] describe that restored state, not the point of failure.
-   [changed] tells whether the engine uuid advanced -- a failing
-   operation may well have moved the engine before failing. It reports
-   the *net* effect of the call, so under [try_step] it is [false] for
-   a phrase that advanced, failed and was rolled back: after the
-   rollback there is nothing left to have changed. *)
+   [changed] tells whether the engine uuid moved -- a failing operation
+   may well have moved it before failing. It reports the *net* effect
+   of the call, so under [try_step] it is always [false]: the rollback
+   is exact, and after it there is nothing left to have changed. *)
 type failure = {
   uuid     : int;
   message  : string;
@@ -92,12 +91,14 @@ val load :
    preceded it applied. *)
 val step : state -> string -> answer
 
-(* [step], but a failure leaves no trace: the engine is rolled back to
-   the uuid it had on entry (as REVERT does) and the failure comes back
-   with [reverted = true]. Successes and [Quit] behave exactly as in
-   [step]. Input that fails after having already advanced the engine
-   -- a phrase with a side effect, or an earlier sentence of a
-   multi-sentence input -- is rolled back whole. *)
+(* [step], but a failure leaves no trace: the observable session --
+   uuid, goals, COMMIT transcript -- is put back exactly as it was on
+   entry, and the failure comes back with [reverted = true] and
+   [changed = false]. Successes and [Quit] behave exactly as in [step].
+   Input that fails after having already moved the engine is rolled
+   back whole, and "moved" includes moving *down*: a phrase whose first
+   sentence is [undo 3.] is restored just as faithfully as one that
+   advanced. *)
 val try_step : state -> string -> answer
 
 val goals      : state -> all:bool -> (reply, failure) result

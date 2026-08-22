@@ -762,24 +762,38 @@ let step (st : state) input =
 
 (* -------------------------------------------------------------------- *)
 (* [step] with an automatic rollback on failure. A phrase can fail
-   after having advanced the engine, so the pre-entry uuid is the only
-   faithful notion of "unchanged": restore it the way REVERT does.
+   after having advanced the engine, so nothing short of the state on
+   entry is a faithful notion of "unchanged".
+
+   Rolling back with [undo pre] was not enough: [undo] only pops, so
+   input that *lowered* the uuid before failing -- [undo 3.] followed
+   by a bad tactic -- left the engine at that lower state while the
+   reply claimed [reverted = true]. Take a mark of the whole engine
+   context instead, which restores forward as readily as backward, and
+   restore the session's own bookkeeping (transcript, COMMIT's proof
+   environment, the prefix's bullet stack) alongside it rather than
+   trimming it, since trimming is likewise one-directional. Checkpoints
+   need nothing: EasyCrypt input cannot reach them, and the uuids they
+   name are valid again once the engine is back.
+
    The failure is then re-stamped, because its uuid, goal text and
-   [changed] flag described the state at the point of failure, which no
-   longer exists. [changed] is recomputed against the same pre-entry
-   uuid, so it reports the *net* effect of the call: normally [false],
-   the rollback having undone whatever the input managed to do. It
-   stays [true] in the one case where the rollback cannot reach [pre],
-   namely a phrase that reset the engine ([pragma Reset]) and landed
-   below it -- then the state really did change. *)
+   [changed] flag described the point of failure, which no longer
+   exists. [changed] is [false] by construction now: the restore always
+   reaches [pre]. *)
 let try_step (st : state) input =
-  let pre = EcCommands.uuid () in
+  let pre        = EcCommands.uuid () in
+  let mark       = EcCommands.undo_mark () in
+  let transcript = !(st.transcript) in
+  let commit_env = !(st.commit_env) in
+  let bullets    = !(st.prior_bullets) in
   match step st input with
   | Quit                  -> Quit
   | Done (Ok _) as answer -> answer
   | Done (Error failure)  ->
-    EcCommands.undo pre;
-    Transcript.trim st pre;
+    EcCommands.undo_restore mark;
+    st.transcript    := transcript;
+    st.commit_env    := commit_env;
+    st.prior_bullets := bullets;
     let uuid = EcCommands.uuid () in
     Done (Error { failure with
       uuid;
