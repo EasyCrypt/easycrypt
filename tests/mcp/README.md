@@ -67,6 +67,8 @@ gate for changes to the protocol layer.
 | `protocol-errors` | `-32700`, `-32600`, `-32601` and the `-32602` family |
 | `revert` | `ec_revert` by uuid and by checkpoint name |
 | `load-missing` | a missing file and an unknown extension: `isError`, *not* `-32602` |
+| `load-options` | `ec_load` with `nosmt`, and with `trace`: the two options that change what the engine does |
+| `load-trace-error` | `trace` on a sentence outside a proof: `isError`, and the prefix still in effect |
 | `notifications` | notifications, known and unknown, draw no reply |
 | `exit` | `exit.` answers "session terminated", then the process stops |
 | `eof` | end of input is a clean shutdown, exit 0 |
@@ -123,8 +125,9 @@ same answer on both.
 
 It plays one representative operation per tool family — load, step,
 goals, tree, focus, undo, checkpoint, step again, revert, search,
-commit, and a failing phrase — in that order, against two sessions
-started from the same directory (`tests/llm`, so both name the fixture
+commit, a failing phrase, and finally a `nosmt` load and a `trace` load
+(both reset the session, hence last) — in that order, against two
+sessions started from the same directory (`tests/llm`, so both name the fixture
 identically and no path difference can leak into a reply): a REPL
 session driven with `llm -eval`, and an MCP session driven with a
 JSON-RPC script. For each step it asserts two things.
