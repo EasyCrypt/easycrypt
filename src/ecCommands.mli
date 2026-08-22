@@ -92,14 +92,65 @@ val pp_current_goal : ?all:bool -> Format.formatter -> unit
 val pp_current_goal_or_noproof : ?all:bool -> Format.formatter -> unit
 val pp_maybe_current_goal : Format.formatter -> unit
 val pp_all_goals : unit -> string list
+
+(* -------------------------------------------------------------------- *)
+(* Proof-state introspection and navigation, for the LLM front-ends
+   ([EcLlmCore] and the REPL and MCP servers on top of it). Batch
+   compilation needs none of it: it never asks what the open goals are,
+   never walks between them, and never rewrites a proof's bullet state.
+
+   [focus_goal] and [disable_repl_bullets] MUTATE the global context;
+   every other val here is a query that leaves it alone. *)
+
+(* One open subgoal, as [pp_tree] reports it. *)
+type goal_entry = {
+  (* 1-based position in the open-goal list. *)
+  ge_index   : int;
+  (* The focused goal -- always the one at index 1, EC's focus model
+     keeping the focused goal at the head. *)
+  ge_focused : bool;
+  (* The goal's conclusion on one line, or its full body under [~all]. *)
+  ge_text    : string;
+}
+
+(* Is a proof active in the current scope? *)
 val in_proof : unit -> bool
-val disable_repl_bullets : unit -> EcBullets.stack option
-val pp_tree : ?all:bool -> unit -> (int * bool * string) list
-val focus_goal : int -> (int, string) result
+
+(* Every open goal of the active proof, rendered, focused first (the
+   order [open_handles] uses). [] when no proof is active. *)
+val pp_tree : ?all:bool -> unit -> goal_entry list
+
+(* Handles of the active proof's open goals, focused first; [] when no
+   proof is active. Same goals as [pp_tree], unrendered. *)
 val open_handles : unit -> EcCoreGoal.handle list
+
+(* The active proof's environment, the one the DAG queries below read.
+   It is immutable and cumulative, so a snapshot keeps answering for its
+   own proof after [qed] has discarded it -- which is how COMMIT still
+   reconstructs the structure of a finished proof. [None] when no proof
+   is active. *)
 val current_proofenv : unit -> EcCoreGoal.proofenv option
+
+(* Proof-DAG navigation in the *active* proof; both answer emptily when
+   no proof is active. Use [EcCoreGoal.children_of_handle] /
+   [parent_of_handle] on a [current_proofenv] snapshot to query a proof
+   other than the active one. *)
 val children_of : EcCoreGoal.handle -> EcCoreGoal.handle list
 val parent_of : EcCoreGoal.handle -> EcCoreGoal.handle option
+
+(* MUTATES the context: rotates the active proof's focus onto the open
+   goal at 1-based index [k], and pushes the result as a new undo level,
+   so UNDO/REVERT roll the rotation back like any other step. Returns
+   the number of open goals. *)
+val focus_goal : int -> (int, string) result
+
+(* MUTATES the context: turns bullet enforcement off for phrases typed
+   at a prompt, by clearing the [strict_bullets] pragma and dropping the
+   active proof's bullet stack. Spends no undo level. Returns the stack
+   it dropped -- which COMMIT reads to pick bullet tokens that do not
+   collide with the ones already open -- and [None] on the idempotent
+   later calls, the stack being gone by then. *)
+val disable_repl_bullets : unit -> EcBullets.stack option
 
 (* -------------------------------------------------------------------- *)
 val pragma_verbose : bool -> unit
