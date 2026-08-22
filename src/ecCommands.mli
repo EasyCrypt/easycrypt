@@ -39,6 +39,13 @@ val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
 val notify      : EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
+(* Redirect the [print] statement's output. It goes to the process's
+   stdout by default; a front-end that frames its replies installs a
+   formatter it can read back, so that [print] lands inside the frame
+   the way [search] and [locate] already do. The formatter is flushed
+   after every [print]. *)
+val set_print_formatter : Format.formatter -> unit
+
 (* -------------------------------------------------------------------- *)
 val process_internal :
      loader
