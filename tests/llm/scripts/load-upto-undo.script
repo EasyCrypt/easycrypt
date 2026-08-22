@@ -1,0 +1,8 @@
+# exit: 0
+# LOAD stops at the requested position whatever sentence sits after it.
+# fixtures/undoafter.ec has `undo 3.` on the line following the stop
+# point: the two goals `split.` opened must still be there, and the
+# uuid must be the one that prefix reaches -- not the lower one the
+# `undo` would rewind to.
+LOAD "fixtures/undoafter.ec" 8
+GOALS ALL
