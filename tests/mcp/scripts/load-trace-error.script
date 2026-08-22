@@ -1,0 +1,11 @@
+# exit: 0
+# `trace' whose target sentence is outside any proof: tracing fails, so
+# the call is an isError result -- but the prefix must be in effect
+# exactly as after a plain ec_load, the deferred sentence included. The
+# ec_step below resolves `b2i', which only the traced-and-failed
+# `require import AllCore.' can have brought in. Mirrors tests/llm's
+# load-trace-notinproof.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","line":3,"trace":true}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"lemma preserved : b2i true = 1."}}}

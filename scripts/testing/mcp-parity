@@ -60,6 +60,17 @@ STEPS = [
                    "ec_commit",     {}),
     ("failure",    'apply nosuchlemma.',
                    "ec_step",       {"phrase": "apply nosuchlemma."}),
+    # The two load options that change what the engine does. Both
+    # reset the session, so they come last. `trace' is the one whose
+    # reply body the core builds itself, rather than handing back the
+    # goals -- the most front-end-independent body there is, and the
+    # one most worth pinning across both wires.
+    ("load/nosmt", 'LOAD "fixtures/simple.ec" 6 -nosmt',
+                   "ec_load",       {"file": "fixtures/simple.ec",
+                                     "line": 6, "nosmt": True}),
+    ("load/trace", 'LOAD "fixtures/midproof.ec" -trace',
+                   "ec_load",       {"file": "fixtures/midproof.ec",
+                                     "trace": True}),
 ]
 
 

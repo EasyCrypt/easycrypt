@@ -1,0 +1,10 @@
+# exit: 0
+# The two ec_load options that change what the engine does, which the
+# other scenarios never set. `nosmt' weakens SMT calls while replaying
+# the prefix; `trace' has the reply describe the last loaded sentence
+# as BEFORE/TACTIC/AFTER/SUMMARY instead of just showing the goals.
+# The REPL side of both is tests/llm's load-nosmt and load-trace.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","line":6,"nosmt":true}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/midproof.ec","trace":true}}}
