@@ -1,0 +1,14 @@
+# exit: 0
+# `print' renders inside the reply frame. It used to write straight to
+# the process's stdout, so its output came out *before* the OK status
+# line -- outside the envelope entirely. `locate', which already went
+# through the notice buffer, is pinned next to it. Both are queries:
+# neither spends a uuid nor enters the body COMMIT emits.
+LOAD "fixtures/midproof.ec"
+print b2i.
+locate b2i.
+QUIET ON
+trivial.
+trivial.
+QUIET OFF
+COMMIT
