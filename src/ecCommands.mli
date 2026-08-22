@@ -69,6 +69,17 @@ val process : ?src:string -> ?timed:bool -> ?break:bool ->
 
 val undo  : int  -> unit
 val reset : unit -> unit
+
+(* An opaque snapshot of the engine's undo context: current scope, undo
+   stack and uuid. [undo] only pops, so it cannot undo an [undo] --
+   input that lowered the uuid before failing lands somewhere else
+   entirely. [undo_restore] puts the engine back exactly, forward as
+   well as backward. Pragmas and the printing state are global and
+   outside the context, as they already are for [undo]. *)
+type undo_mark
+
+val undo_mark    : unit -> undo_mark
+val undo_restore : undo_mark -> unit
 val uuid  : unit -> int
 val mode  : unit -> string
 
