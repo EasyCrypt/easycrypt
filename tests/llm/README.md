@@ -77,8 +77,32 @@ anything machine- or environment-dependent:
   installed, and on their timing.
 * **stdout only.** stderr is discarded; only stdout is compared.
 * **No `HELP`.** `HELP` echoes `doc/llm/CLAUDE.md`, which would make
-  every documentation edit a test failure.
+  every documentation edit a test failure. `envelope-escape` covers the
+  one property `HELP` would otherwise be needed for — see below.
 * Fixtures require `AllCore` only.
+
+## Body escaping
+
+The reply frame is a status line, a body, and a lone `<END>`, and the
+body is whatever the engine produced: it can perfectly well hold a line
+that is itself envelope-shaped, which would close the frame early.
+`doc/llm/CLAUDE.md` does exactly that, so `HELP` used to desynchronize
+its own reader.
+
+Call a line *envelope-shaped* when, after dropping any leading spaces,
+it is exactly `<END>` or starts with `OK [uuid:`, `ERROR [uuid:` or
+`READY [uuid:`. The REPL writes every envelope-shaped **body** line
+with one extra leading space; a client drops one leading space from
+each envelope-shaped body line it reads, and touches nothing else.
+Since leading spaces are part of the test, escaping is idempotent in
+the right way — an already-escaped line escapes again — so the rule is
+exactly reversible. Status lines are not bodies and are never escaped.
+
+`scripts/envelope-escape.script` pins this. It loads
+`fixtures/envelope.ec` with `-trace`, which echoes the traced
+sentence's source verbatim; that sentence hides a bare `<END>` and a
+bare `OK [uuid:99]` in a comment. The MCP front-end needs no such rule:
+its frame is a JSON string.
 
 ## Adding a scenario
 

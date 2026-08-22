@@ -66,6 +66,17 @@ engine state. It increments with each successful command that changes
 that state. Queries do not change it: `SEARCH`, and the `search`,
 `print` and `locate` statements, report the uuid they were called at.
 
+**Escaping.** A body may itself contain a line that looks like an
+envelope — this document does, and `HELP` prints this document. Call a
+line *envelope-shaped* when, after dropping any leading spaces, it is
+exactly `<END>` or starts with `OK [uuid:`, `ERROR [uuid:` or
+`READY [uuid:`. Every envelope-shaped **body** line is written with one
+extra leading space, so a lone `<END>` inside a frame is always the
+sentinel and nothing else. To recover the original text, drop one
+leading space from each body line that is envelope-shaped, and leave
+every other line untouched. Status lines are not body lines and are
+never escaped.
+
 ### Meta-commands
 
 These are protocol-level commands, not EasyCrypt syntax:

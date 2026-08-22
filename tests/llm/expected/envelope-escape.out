@@ -1,0 +1,25 @@
+READY [uuid:0]
+<END>
+OK [uuid:4] [loaded:fixtures/envelope.ec:17]
+=== BEFORE: line 12 (col 0) ===
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+
+=== TACTIC (lines 12:0 - 17:8) ===
+by
+(*
+ <END>
+ OK [uuid:99]
+*)
+trivial.
+
+=== AFTER: line 12 (col 0) ===
+(no open goals)
+
+=== SUMMARY ===
+open goals: 1 -> 0
+<END>
