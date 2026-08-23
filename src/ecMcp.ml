@@ -475,21 +475,15 @@ module Args = struct
 end
 
 (* The [ec_focus] path is a string in the schema, so its shape is ours
-   to check: "next", or a dotted sequence of positive integers. *)
+   to check: "next", or a dotted sequence of positive integers. Only
+   "next" is MCP's own -- the REPL spells it as a separate command --
+   so the path itself goes through the shared parser. *)
 let focus_target (arg : string) =
   if String.lowercase_ascii arg = "next" then `Next
-  else begin
-    let path =
-      try List.map int_of_string (String.split_on_char '.' arg)
-      with Failure _ ->
-        raise (Invalid_params
-          (Printf.sprintf "ec_focus: not a path of integers: %s" arg))
-    in
-    if List.exists (fun k -> k < 1) path then
-      raise (Invalid_params
-        (Printf.sprintf "ec_focus: path indices must be >= 1: %s" arg));
-    `Path path
-  end
+  else
+    match EcLlmCore.parse_goal_path ~what:"ec_focus" arg with
+    | Ok path   -> `Path path
+    | Error msg -> raise (Invalid_params msg)
 
 (* -------------------------------------------------------------------- *)
 let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
@@ -624,11 +618,12 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
   (* Tool dispatch.
 
      Argument checking happens here, before the engine is touched: the
-     core trusts what it is handed (it does not test that a LOAD path
-     exists, for one), and a raw [int_of_string] message has no business
-     reaching an agent. Schema violations raise [Invalid_params] and
-     become JSON-RPC errors; checks a tool makes on its own behalf raise
-     [Tool_error] and become [isError] results. *)
+     core trusts what it is handed, [EcLlmCore.load] resetting the
+     session before it so much as opens the file. Schema violations
+     raise [Invalid_params] and become JSON-RPC errors; checks a tool
+     makes on its own behalf raise [Tool_error] and become [isError]
+     results. The checks the REPL makes too live in [EcLlmCore] and are
+     only reported here. *)
 
   (* Set by a phrase that ends the session ([exit.]): the response still
      goes out, then the process stops. *)
@@ -656,9 +651,9 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
       let trace = Args.bool_opt   name args "trace" ~default:false in
       if line = None && col <> None then
         raise (Invalid_params "ec_load: `col' requires `line'");
-      if not (Sys.file_exists file) then
-        raise (Tool_error
-          (Printf.sprintf "LOAD: no such file: %s" file));
+      (match EcLlmCore.check_load_file file with
+       | Ok ()     -> ()
+       | Error msg -> raise (Tool_error msg));
       let upto = Option.map (fun line -> (line, col)) line in
       outcome (EcLlmCore.load st ~file ~upto ~nosmt ~trace)
 
