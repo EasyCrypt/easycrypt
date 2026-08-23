@@ -110,17 +110,9 @@ module Parse = struct
   let parse_focus arg =
     if arg = "" then
       raise (Parse_error "FOCUS: missing argument");
-    let parts = String.split_on_char '.' arg in
-    let path =
-      try List.map int_of_string parts
-      with Failure _ ->
-        raise (Parse_error
-          (Printf.sprintf "FOCUS: not a path of integers: %s" arg))
-    in
-    if List.exists (fun k -> k < 1) path then
-      raise (Parse_error
-        (Printf.sprintf "FOCUS: path indices must be >= 1: %s" arg));
-    Focus path
+    match EcLlmCore.parse_goal_path ~what:"FOCUS" arg with
+    | Ok path   -> Focus path
+    | Error msg -> raise (Parse_error msg)
 
   let parse_checkpoint name =
     if name = "" then
@@ -175,9 +167,9 @@ module Parse = struct
          reader would otherwise raise [Sys_error] far downstream, and
          the REPL would report it as an anomaly after having already
          reset the scope. *)
-      if not (Sys.file_exists filename) then
-        failwith
-          (Printf.sprintf "LOAD: no such file: %s" filename);
+      (match EcLlmCore.check_load_file filename with
+       | Ok ()     -> ()
+       | Error msg -> failwith msg);
 
       (* Parse optional LINE[:COL] and flags (-nosmt, -trace). *)
       let upto, nosmt, trace =

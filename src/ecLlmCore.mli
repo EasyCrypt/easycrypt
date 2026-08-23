@@ -127,3 +127,20 @@ val current_goals : state -> string
 val clear_notices : state -> unit
 val make_reply    : state -> ?tag:string -> body -> reply
 val make_failure  : state -> string -> failure
+
+(* -------------------------------------------------------------------- *)
+(* Argument checks the two front-ends share. What a command accepts, and
+   what it says when it refuses, is the same at the prompt as over MCP;
+   only the way a rejection travels -- a line-parse error there, a
+   JSON-RPC error or an [isError] result here -- is the front-end's, so
+   these return the message rather than raising. *)
+
+(* A dotted goal path, as FOCUS accepts it: "2", "1.2.1". [what] is the
+   command's name as the calling front-end spells it ("FOCUS" at the
+   prompt, "ec_focus" over MCP), and opens the error message. *)
+val parse_goal_path : what:string -> string -> (int list, string) result
+
+(* Reject a LOAD path naming no file. [load] itself does not check:
+   it resets the session before opening the file, so the check has to
+   happen in the front-end, before the call. *)
+val check_load_file : string -> (unit, string) result

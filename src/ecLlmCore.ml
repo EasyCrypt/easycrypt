@@ -739,6 +739,34 @@ let make_failure (st : state) (message : string) =
   mk_failure st ~pre:(EcCommands.uuid ()) message
 
 (* -------------------------------------------------------------------- *)
+(* Argument checks the two front-ends share. What a command accepts, and
+   what it says when it refuses, is the same at the prompt as over MCP;
+   only the way a rejection travels -- a line-parse error there, a
+   JSON-RPC error or an [isError] result here -- is the front-end's. *)
+
+(* A dotted goal path, as FOCUS accepts it: "2", "1.2.1". [what] is the
+   command's name as the calling front-end spells it, and opens the
+   error message. *)
+let parse_goal_path ~(what : string) (arg : string)
+  : (int list, string) result
+=
+  match List.map int_of_string (String.split_on_char '.' arg) with
+  | exception Failure _ ->
+    Error (Printf.sprintf "%s: not a path of integers: %s" what arg)
+  | path when List.exists (fun k -> k < 1) path ->
+    Error (Printf.sprintf "%s: path indices must be >= 1: %s" what arg)
+  | path -> Ok path
+
+(* Reject a LOAD path naming no file. [load] resets the session before
+   it opens the file, so a front-end that skipped this would report the
+   reader's [Sys_error] against a session it had already destroyed --
+   which is why the check belongs to the caller, and only its wording
+   here. *)
+let check_load_file (file : string) : (unit, string) result =
+  if Sys.file_exists file then Ok ()
+  else Error (Printf.sprintf "LOAD: no such file: %s" file)
+
+(* -------------------------------------------------------------------- *)
 (* Process EasyCrypt input typed at the prompt. The input is a file
    fragment, not a single phrase: every sentence it holds runs, in
    order, and one reply describes the state they leave behind. A
