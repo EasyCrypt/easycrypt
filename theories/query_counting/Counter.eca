@@ -35,7 +35,7 @@ module Counter(S : System) = {
 
 section.
   declare module S <: System { -Counter }.
-  declare module D <: Distinguisher { -S }.
+  declare module D <: Distinguisher { -S, -Counter }.
 
 
   lemma ind_counting (E : (glob S) -> bool) &m:
