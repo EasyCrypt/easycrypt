@@ -205,8 +205,7 @@ module FunAbsLow = struct
       let use =
         try
           check_oracle_use pf env topl o_l;
-          if   EcPath.x_equal o_l o_r
-          then check_oracle_use pf env topl o_r;
+          check_oracle_use pf env topr o_r;
           false
         with _ -> true
       in
@@ -330,8 +329,7 @@ module UpToLow = struct
 
     let ospec o_l o_r =
       check_oracle_use pf env topl o_l;
-      if   EcPath.x_equal o_l o_r
-      then check_oracle_use pf env topl o_r;
+      check_oracle_use pf env topr o_r;
 
       let fo_l = EcEnv.Fun.by_xpath o_l env in
       let fo_r = EcEnv.Fun.by_xpath o_r env in
