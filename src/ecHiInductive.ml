@@ -468,7 +468,8 @@ let trans_matchfix
           match List.nth_opt args pos with
           | Some { e_node = Elocal a } when Sid.mem a pvars -> ()
           | _ -> fxerror loc env TT.FXE_SynCheckFailure
-          end
+          end;
+          List.iter check_body args
         | _ -> EcTypes.e_iter check_body e
       in
       check_body e
