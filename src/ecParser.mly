@@ -3911,11 +3911,8 @@ clone_override:
 | LEMMA x=qoident mode=loc(opclmode) y=qoident
   { x, PTHO_Axiom (y, unloc mode) }
 
-| MODULE uqident loc(opclmode) uqident
-   { parse_error
-       (EcLocation.make $startpos $endpos)
-       (Some "Module overriding is no longer supported.")
-   }
+| MODULE x=uqident mode=loc(opclmode) y=uqident
+   { (x, PTHO_Module (y, unloc mode)) }
 
 | MODULE TYPE x=uqident mode=loc(opclmode) y=uqident
    { (x, PTHO_ModTyp (y, unloc mode)) }
