@@ -39,6 +39,10 @@ claude mcp add easycrypt \
   -- /Users/gdel/Repos/ec-llm-next/ecd.native mcp
 ```
 
+(Paths above are one specific checkout — substitute your own
+`ec-llm-next` worktree root: `EC_LLM_BIN` points at its
+`ec.native`, the command at its `ecd.native`.)
+
 (Add `--scope user` to make it available in every project instead
 of just this one.)
 

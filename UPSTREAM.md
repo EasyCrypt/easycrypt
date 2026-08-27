@@ -1170,6 +1170,57 @@ the full set is upstreamed.
   EC's typechecker focuses correctly + replaying the script
   reproduces the same goal traversal.
 
+### 28. Runtime SMT-invocation telemetry
+
+- **Status**: landed (2026-08, "runtime SMT-invocation telemetry"
+  commit; field report B14 / round 12').
+- **Phase**: MCP v1.5.
+- **Files**:
+  - `src/ecGState.ml` / `.mli` — monotone `gs_smt_calls` counter on
+    the gstate (create 0; copy preserves) + `smt_calls` /
+    `bump_smt_calls` accessors
+  - `src/ecSmt.ml` — one bump at the head of `EcSmt.check`, the
+    single choke point every SMT discharge funnels through
+  - `src/ecCommands.ml` / `.mli` — `smt_calls ()` accessor over the
+    current scope's gstate
+  - `src/ecLlm.ml` — per-phrase delta measured around each P_Prog
+    action and spliced into the OK-JSON reply as `{"smt_calls":N}`
+- **Summary**: solver invocations are counted at RUNTIME, so
+  `by smt(...)` closers, the `/#` view, tacticals and any future
+  surface syntax count by construction — a lexical scan was tried
+  twice and was brittle twice. Telemetry only: no checking-behavior
+  change; monotone-plus-deltas is immune to undo and scope sharing.
+- **Tests**: MCP smoke pins `/#` = 1 invocation with zero `smt`
+  tokens in the source (prof.ec fixture, total_smt = 4).
+
+### 29. LOAD stop report + per-sentence LOAD ledger (`LEDGER-JSON`)
+
+- **Status**: landed (2026-08, "LOAD stop report + per-sentence
+  ledger" commit; field reports B15/B18).
+- **Phase**: MCP v1.5.
+- **Files**:
+  - `src/ecLlm.ml` — Load loop counts COMPLETE top-level parse
+    units, rolls a half-executed multi-command unit back to its
+    boundary (`EcCommands.undo` to the unit-start uuid), records a
+    per-sentence `(end_line, uuid_after)` ledger, and serves it via
+    the new machine command `LEDGER-JSON`; the LOAD failure reply
+    carries a structured stop report
+  - `src/ecLlmJson.ml` / `.mli` — `load_error_json` (generic
+    per-exception ERROR-JSON + guaranteed location + a `"load"`
+    object with loaded sentences / last loaded line), built on the
+    extracted `loc_json_field`
+- **Summary**: a failed LOAD tells the client everything the loader
+  knew — failing position (authoritative top-file parser loc even
+  when the exception's own loc is missing or points into a
+  require'd file) and how much of the file REMAINS LOADED; the
+  session state IS that prefix, so clients keep it (MCP partial
+  opens). The ledger gives clients a document-position -> uuid map:
+  EC's undo keeps every uuid, so backwards repositioning becomes
+  REVERT + short replay instead of a prefix re-run.
+- **Tests**: MCP smoke pins the partial open (position, live goals,
+  fix-in-place, repaired resync) and the exact-boundary rewind
+  (`rewind:true`, zero re-execution).
+
 ---
 
 ## ANALYZE-JSON v1 deferrals (under addition 14)
