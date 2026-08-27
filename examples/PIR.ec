@@ -196,13 +196,16 @@ lemma Pr_PIR_s i0 &m x :
 proof.
   byphoare=> // {i0};proc;inline *;wp.
   case: (is_restr x N);first last.
-  + conseq (_ : _ ==> _ : = 0%r) => [ _ -> // | ].
+  + conseq (_ : _ ==> _ : = 0%r) => [ _ | ].
+    + smt(expr_ge0 divr_ge0).
     hoare;conseq (_ : _ ==> is_restr (oflist PIR.s) N); 1:by smt().
     while (0<= j <= N /\ is_restr (oflist PIR.s) j).
     + by auto => &m1 />;rewrite oflist_cons;smt (is_restrS is_restr_addS).
     auto=> ?;rewrite -set0E;smt (is_restr_fset0 N_pos).
   sp; conseq (_ : _ ==> _ : = (if (oflist PIR.s) = restr x j then 1%r/2%r^(N-j) else 0%r)).
   + move=> {&m} &m />;rewrite -set0E.
+    split.
+    + smt(expr_ge0 invr_ge0).
     have -> // : fset0 = restr x 0.
     + by apply fsetP=> z;rewrite /restr !inE mem_oflist mem_iota /#.
   conseq (_ : _ ==> oflist PIR.s = restr x j) (_: _ ==> j = N) => //;1:smt().
@@ -222,7 +225,8 @@ proof.
         by conseq H=> /#.
       + by hoare;auto.
       smt().
-    conseq (_ : _ : = (1%r / 2%r ^ (N - j))) => [/#|].
+    conseq (_ : _ : = (1%r / 2%r ^ (N - j))).
+    + smt(divr_ge0 expr_ge0).
     exists * j, PIR.s;elim * => j0 s0.
     seq 3: (b = j0 \in x) (1%r/2%r) (1%r / 2%r ^ (N - (j0+1))) _ 0%r
         (1 <= j <= N /\ j = j0 + 1 /\ (PIR.s = if b then j0 :: s0 else s0) /\
@@ -230,7 +234,9 @@ proof.
     + by auto => /> /#.
     + by wp => /=;rnd (pred1 (j0 \in x));skip => /> &hr;rewrite dbool1E.
     + conseq H=> />.
-      + case: (j0 \in x) => Hjx ?? His Hof.
+      + split.
+        + smt(divr_ge0 expr_ge0).
+        case: (j0 \in x) => Hjx ?? His Hof.
         + by rewrite oflist_cons restrS 1:/# Hjx Hof.
         by rewrite restrS 1:/# Hjx Hof /= fset0U.
       smt (is_restrS is_restr_addS oflist_cons).
@@ -250,15 +256,17 @@ lemma Pr_PIR_s' i0 &m x :
 proof.
   byphoare=> // {i0};proc;inline *;wp.
   case: (is_restr x N);first last.
-  + conseq (_ : _ ==> _ : = 0%r) => [ _ -> // | ].
+  + conseq (_ : _ ==> _ : = 0%r).
+    + smt(divr_ge0 expr_ge0).
     hoare;conseq (_ : _ ==> is_restr (oflist PIR.s') N); 1:by smt().
     while (0<= j <= N /\ is_restr (oflist PIR.s') j).
     + auto;smt (oflist_cons is_restrS is_restr_addS).
     auto=> ?;rewrite -set0E;smt (is_restr_fset0 N_pos).
   sp; conseq (_ : _ ==> _ : = (if (oflist PIR.s') = restr x j then 1%r/2%r^(N-j) else 0%r)).
   + move=> {&m} &m />;rewrite -set0E.
-    have -> // : fset0 = restr x 0.
+    have ->: fset0 = restr x 0.
     + by apply fsetP=> z;rewrite /restr !inE mem_oflist mem_iota /#.
+    smt(invr_ge0 expr_ge0).
   conseq (_ : _ ==> oflist PIR.s' = restr x j) (_: _ ==> j = N) => //;1:smt().
   + while(0 <= j <= N);auto;smt (N_pos).
   conseq (: (0 <= j <= N /\ is_restr (oflist PIR.s') j) ==> _).
@@ -276,7 +284,8 @@ proof.
         by conseq H => /#.
       + by hoare; auto.
       smt().
-    conseq (_ : _ : = (1%r / 2%r ^ (N - j))) => [/#|].
+    conseq (_ : _ : = (1%r / 2%r ^ (N - j))).
+    + smt(divr_ge0 expr_ge0).
     exists * j, PIR.s';elim * => j0 s0.
     seq 3: (b = ((j0 = i) ^^ (j0 \in x))) (1%r/2%r) (1%r / 2%r ^ (N - (j0+1))) _ 0%r
         (1 <= j <= N /\ j = j0 + 1 /\ (PIR.s' = if (j0=i) then (if b then s0 else j0::s0) else if b then j0 :: s0 else s0) /\
@@ -284,7 +293,10 @@ proof.
     + by auto => /#.
     + by wp => /=;rnd (pred1 ((j0 = i) ^^ (j0 \in x)));skip => /> &hr;rewrite dbool1E.
     + conseq H => />.
-      + move=> &hr ?? His Hof;case: (j0 = i{hr}) => /=.
+      + move=> &hr. 
+        split. 
+        + smt(invr_ge0 expr_ge0).
+        move => ?? His Hof;case: (j0 = i{hr}) => /=.
         + rewrite xorC xor_true => <<-.
           case: (j0 \in x) => Hjx.
           + by rewrite restrS 1:/# Hjx /= oflist_cons Hof.
