@@ -257,6 +257,10 @@ type top_module_expr = {
 
 val is_me_body_alias : module_body -> bool
 
+(* Component path of the first program variable owned by the module, [None] if
+   it owns none (transitively through its sub-modules). *)
+val module_own_state : module_expr -> symbol list option
+
 (* -------------------------------------------------------------------- *)
 val mty_equal :
   module_type ->

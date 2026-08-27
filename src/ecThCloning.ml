@@ -25,13 +25,14 @@ type ovkind =
 | OVK_Abbrev
 | OVK_Theory
 | OVK_Lemma
+| OVK_ModExpr
 | OVK_ModType
 
 type clone_error =
 | CE_UnkTheory         of qsymbol
 | CE_DupOverride       of ovkind * qsymbol
 | CE_UnkOverride       of ovkind * qsymbol
-| CE_ThyOverride       of qsymbol
+| CE_ThyOverride       of qsymbol * qsymbol
 | CE_UnkAbbrev         of qsymbol
 | CE_TypeArgMism       of ovkind * qsymbol
 | CE_OpIncompatible    of qsymbol * incompatible
@@ -39,6 +40,8 @@ type clone_error =
 | CE_TyIncompatible    of qsymbol * incompatible
 | CE_ModTyIncompatible of qsymbol
 | CE_ModIncompatible   of qsymbol
+| CE_ModStateful       of qsymbol * symbol list
+| CE_ModNotConcrete    of qsymbol
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
@@ -80,6 +83,7 @@ type evclone = {
   evc_ops      : (xop_override located) Msym.t;
   evc_preds    : (xpr_override located) Msym.t;
   evc_abbrevs  : (nt_override located) Msym.t;
+  evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : (evclone * bool) Msym.t;
@@ -101,6 +105,7 @@ let evc_empty =
       evc_ops      = Msym.empty;
       evc_preds    = Msym.empty;
       evc_abbrevs  = Msym.empty;
+      evc_modexprs = Msym.empty;
       evc_modtypes = Msym.empty;
       evc_lemmas   = evl;
       evc_ths      = Msym.empty; }
@@ -408,6 +413,46 @@ end = struct
     (pr :: proofs, evc)
 
   (* ------------------------------------------------------------------ *)
+  (* Sound only for state-free modules: their own glob is empty, so AST-equal
+     components (checked at replay time) make source and target indiscernible. *)
+  let modexpr_ovrd oc ((proofs, evc) : state) name (med : me_override) =
+    let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
+
+    let () =
+      match find_modexpr oc.oc_oth name with
+      | None ->
+         clone_error oc.oc_env (CE_UnkOverride (OVK_ModExpr, name))
+      | Some src ->
+         oiter
+           (fun path -> clone_error oc.oc_env (CE_ModStateful (name, path)))
+           (EcCoreModules.module_own_state src.tme_expr) in
+
+    let () =
+      let target = unloc (fst med) in
+
+      match EcEnv.Mod.lookup_opt target oc.oc_env with
+      | None ->
+         clone_error oc.oc_env (CE_UnkOverride (OVK_ModExpr, target))
+      | Some (mp, (dst, loca)) ->
+         match mp.EcPath.m_top, loca with
+         | `Concrete (_, None), Some _ ->
+            oiter
+              (fun path -> clone_error oc.oc_env (CE_ModStateful (target, path)))
+              (EcCoreModules.module_own_state dst)
+         | _ ->
+            clone_error oc.oc_env (CE_ModNotConcrete target) in
+
+    let evc =
+      evc_update
+        (fun evc ->
+         if Msym.mem x evc.evc_modexprs then
+           clone_error oc.oc_env (CE_DupOverride (OVK_ModExpr, name));
+         { evc with evc_modexprs = Msym.add x (mk_loc lc med) evc.evc_modexprs })
+        nm evc
+
+    in (proofs, evc)
+
+  (* ------------------------------------------------------------------ *)
   let modtype_ovrd oc ((proofs, evc) : state) name (mtd : mt_override) =
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
@@ -442,18 +487,23 @@ end = struct
       | Some ({cth_mode = `Concrete} as th) -> th
     in
 
-    (* FIXME improve error message *)
-    let rec contains_module cth =
-      let doit it =
-        match it.ti_item with
-        | Th_module _ -> true
-        | Th_theory (_, cth) -> contains_module cth
-        | _ -> false
-      in
-      List.exists doit cth.cth_items
-    in
-    if contains_module dth then
-      clone_error oc.oc_env (CE_ThyOverride name);
+    let stateful_module (cth : ctheory) : qsymbol option =
+      let rec doit prefix cth =
+        List.opick (fun it ->
+          match it.ti_item with
+          | Th_module me ->
+             omap
+               (fun _ -> (nm @ [x] @ prefix, me.tme_expr.me_name))
+               (EcCoreModules.module_own_state me.tme_expr)
+          | Th_theory (y, cth) ->
+             doit (prefix @ [y]) cth
+          | _ -> None)
+          cth.cth_items
+      in doit [] cth in
+
+    oiter
+      (fun mp -> clone_error oc.oc_env (CE_ThyOverride (name, mp)))
+      (stateful_module dth);
 
     let sp =
       match EcEnv.Theory.lookup_opt (unloc thd) oc.oc_env with
@@ -518,8 +568,10 @@ end = struct
       | Th_export _ ->
          (proofs, evc)
 
-      | Th_module _ ->
-         (proofs, evc)
+      | Th_module me ->
+        let x = me.tme_expr.me_name in
+        let ovrd = loced (EcPath.toqsymbol (tgpath ~kind:`Module x)) in
+        modexpr_ovrd oc (proofs, evc) (dtpath x) (ovrd, mode)
 
       | Th_modtype (x, _) ->
         let ovrd = loced (EcPath.toqsymbol (tgpath ~kind:`ModType x)) in
@@ -553,6 +605,9 @@ end = struct
 
      | PTHO_Axiom axd ->
         ax_ovrd oc state name axd
+
+     | PTHO_Module med ->
+       modexpr_ovrd oc state name med
 
      | PTHO_ModTyp mtd ->
        modtype_ovrd oc state name mtd

@@ -553,6 +553,18 @@ type top_module_expr = {
 let is_me_body_alias (body : module_body) =
   match body with ME_Alias _ -> true | _ -> false
 
+let module_own_state (me : module_expr) : symbol list option =
+  let rec for_comps (comps : module_comps) : symbol list option =
+    List.opick for_item comps
+
+  and for_item (item : module_item) : symbol list option =
+    match item with
+    | MI_Variable v -> Some [v.v_name]
+    | MI_Function _ -> None
+    | MI_Module  me -> omap (fun p -> me.me_name :: p) (for_comps me.me_comps)
+
+  in for_comps me.me_comps
+
 (* -------------------------------------------------------------------- *)
 let ur_hash = EcAst.ur_hash
 

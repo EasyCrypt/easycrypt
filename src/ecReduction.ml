@@ -343,6 +343,9 @@ end) = struct
   let rec for_module_expr env ~norm ~body me1 me2 =
     me1.me_name = me2.me_name &&
       for_module_sig_body env me1.me_sig_body me2.me_sig_body &&
+    List.for_all2
+      (fun (_, mt1) (_, mt2) -> for_module_type env ~norm mt1 mt2)
+      me1.me_params me2.me_params &&
     let env, s = add_modules env me2.me_params me1.me_params in
     let comps1 = me1.me_comps in
     let comps2 = EcSubst.subst_module_comps s me2.me_comps in
