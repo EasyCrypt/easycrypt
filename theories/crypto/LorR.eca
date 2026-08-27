@@ -45,24 +45,28 @@ section.
     + by rewrite Pr [mu_split Aux.b].
     have -> : Pr[Aux.main(x') @ &m : res /\ Aux.b] = 1%r/2%r * Pr[L.main (x') @ &m : res].
     + byphoare (_: (glob L) = (glob L){m} /\ x = x' ==> res /\ Aux.b) => //.
-      proc; pose p := Pr[L.main(x') @ &m : res]. (* FIXME assert false without the pose *)
-      seq 1 : (Aux.b = true /\ x = x') (1%r/2%r) p  _ 0%r (glob L = (glob L){m} /\ x = x'); 1:by auto.
+      proc.
+      seq 1 : (Aux.b = true /\ x = x') (1%r/2%r) Pr[L.main(x') @ &m : res]
+        _ 0%r (glob L = (glob L){m} /\ x = x'); 1:by auto.
       + by rnd (pred1 true); skip => />; rewrite dbool1E.
-      + if; last by (conseq (_: false ==> _); 1:by smt()); auto.
+      + if; first last.
+        + (conseq (_: false ==> _) => //=; 1:by smt()); auto; progress; by rewrite Pr[mu_ge0]. 
         conseq (_ : _ ==> Aux.r) => //; 1:by smt().
         call (_: x = x' /\ glob L = (glob L){m} ==> res); last by auto.  
-        by bypr=> &m0 hm0; rewrite /p; byequiv=> //; proc (true).    
+        by bypr=> &m0; rewrite Pr[mu_ge0] /= => hm0; byequiv=> //; proc (true).    
       + by (conseq (_: _ ==> false); 1:smt()); auto.
       smt().
     have -> : Pr[Aux.main(x') @ &m : res /\ !Aux.b] = 1%r/2%r * Pr[R.main (x') @ &m : !res].
     + byphoare (_: (glob R) = (glob R){m} /\ x = x' ==> res /\ !Aux.b) => //.
-      proc; pose p := Pr[R.main(x') @ &m : !res]. 
-      seq 1 : (Aux.b = false /\ x = x') (1%r/2%r) p  _ 0%r (glob R = (glob R){m} /\ x = x'); 1:by auto.
+      proc. 
+      seq 1 : (Aux.b = false /\ x = x') (1%r/2%r) Pr[R.main(x') @ &m : !res] 
+        _ 0%r (glob R = (glob R){m} /\ x = x'); 1:by auto.
       + by rnd (pred1 false); skip => />; rewrite dbool1E.
-      + if; first by (conseq (_: false ==> _); 1:by smt()); auto.
-        conseq (_ : _ ==> !Aux.r) => //; 1:by smt().
+      + if.
+        + (conseq (_: false ==> _) => //=; 1:by smt()); auto; progress; by rewrite Pr[mu_ge0]. 
+        conseq (_ : _ ==> !Aux.r) => //=; 1:by smt().
         call (_: x = x' /\ glob R = (glob R){m} ==> !res); last by auto.
-        by bypr=> &m0 hm0; rewrite /p; byequiv=> //; proc (true). 
+        by bypr=> &m0; rewrite /p Pr[mu_ge0] => hm0; byequiv=> //; proc (true). 
       + by (conseq (_: _ ==> false); 1:smt()); auto.
       smt().
     rewrite Pr [mu_not] Hll /#.

@@ -102,13 +102,15 @@ while true (b2i (b = b')) 1 (2%r * p * (1%r - p))=> />.
     + by rnd (pred1 (!x)); auto.
     + by conseq ih=> />; rewrite -negbDR.
     + by rnd (pred1 x); auto=> /#.
-    by conseq ih=> /> &0 /negbDR /=.
+    conseq ih=> /> &0. 
+    rewrite ge0_mu /= => -> /#.
   + by rnd (pred1 (!x)); auto=> /#.
   + seq 1: (b' = x) _ 0%r (mu1 dbiased (!x)) (mu dvn (pred1 x \o fst)) (b <> x)=> //.
     + by auto.
     + by conseq ih=> /> &0 ->.
     + by rnd (pred1 (!x)); auto=> /#.
-    by conseq ih=> /> &0 /negbDR -> /negbDR ->.
+    conseq ih=> /> &0. 
+    rewrite ge0_mu /= => /#. 
   move=> {ih} _ -> /=; rewrite !vnE /svn /(\o)/ pred1 /= /b2i /=.
   by move: x=> [] /=; rewrite !dbiased1E /#.
 + by auto=> />; rewrite dbiased_ll.
