@@ -234,7 +234,8 @@ abstract theory SubuniformReference.
     => Pr[M.f(i) @ &m: res = a] = (k i)/(size (undup (X i)))%r.
   proof.
   move=> support_M a_in_X; have <-: Pr[M.f(i) @ &m: true] = (k i).
-  + by byphoare (_: arg = i ==> true)=> //=; conseq weight_M.
+  + byphoare (_: arg = i ==> true)=> //=; conseq weight_M => />.
+    apply/ltrW/gt0_k.
   rewrite (@subuniform_result M M_suf i X a &m support_M a_in_X) mulrAC divff //.
   rewrite eq_fromint size_eq0 undup_nilp -implybF=> h.
   by move: a_in_X; rewrite h.

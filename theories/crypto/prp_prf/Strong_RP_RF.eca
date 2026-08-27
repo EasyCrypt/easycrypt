@@ -433,18 +433,20 @@ section CollisionProbability.
           by left; exists x0.
         by rewrite fcardU fcard1; smt(fcard_ge0).
     by auto=> />; rewrite frng0 fcards0.
-  fel 2 FEL.c (fun x, x%r * mu uD (pred1 witness)) q (ARP.coll) 
+  fel 2 FEL.c (fun x, (max 0 x)%r * mu uD (pred1 witness)) q (ARP.coll) 
            [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]
            (card (fdom ARP.m) <= FEL.c /\ card (fdom ARP.mi) <= FEL.c)=> //.
-  + rewrite -mulr_suml Bigreal.sumidE 1:ge0_q. 
+  + rewrite -mulr_suml (eq_big_seq _ (%r)); 1:smt(mem_range).
+    rewrite  Bigreal.sumidE 1:ge0_q. 
     by rewrite expr2;smt(mu_bounded ge0_q).
   + by inline*; auto=> />; rewrite fdom0 fcards0.
   + exists*FEL.c;elim*=> c.
-    conseq(:_==>_ : (c%r * mu1 uD witness))=> />.
+    conseq(:_==>_ : ((max 0 c)%r * mu1 uD witness))=> />.
+    + move => &hr; smt(ge0_mu).
     proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
-    * hoare; auto=> // /> &hr 6?.
-      by apply/RealOrder.mulr_ge0; smt(mu_bounded ge0_q).
+    * hoare; auto=> // /> &hr.
+      progress; smt(ge0_mu).
     sp; if=> //=.
     * wp; rnd (rng ARP.m); skip.
       progress.
@@ -464,7 +466,8 @@ section CollisionProbability.
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
   + exists*FEL.c;elim*=> c.
-    conseq(:_==>_ : (c%r * mu1 uD witness));progress.
+    conseq(:_==>_ : ((max 0 c)%r * mu1 uD witness));progress.
+    + smt(ge0_mu).
     proc; sp; rcondt 1=> //=.
     inline *; sp; if=> //=; last by hoare; auto; smt(RealOrder.mulr_ge0 mu_bounded ge0_q).
     sp; if=> //=.
@@ -476,8 +479,8 @@ section CollisionProbability.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] _ uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         apply: RealOrder.ler_wpmul2r.
-        + exact: ge0_mu.
-        + exact/le_fromint/(lez_trans _ _ _ (leq_card_rng_dom _)).
+        + exact: ge0_mu. search (_ <= max _ _).
+          exact/le_fromint/(lez_trans FEL.c{hr})/maxrr/(lez_trans _ _ _ (leq_card_rng_dom _)).
       - by move: H9; rewrite H1.
     * by hoare; auto; smt(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
