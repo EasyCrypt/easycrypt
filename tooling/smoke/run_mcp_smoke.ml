@@ -2665,6 +2665,102 @@ let () =
   in
   check "close wlg" (not err) "";
 
+  (* Round 15 (B23): the certificate quantifies over the TRUE edit
+     script — TWO body sites + a sentence-count change must still
+     classify proof-body-only (the window over-approximation read
+     the unchanged declarations between the sites as statement
+     changes), the tail below the LAST site still skips, and a real
+     statement change among body edits still fails the
+     certificate. *)
+  let b23f = Filename.concat fixture_dir "b23.ec" in
+  let b23 v =
+    let oc = open_out b23f in
+    output_string oc v;
+    close_out oc
+  in
+  b23
+    "require import AllCore.\n\
+     lemma s1 : 1 = 1 /\\ 2 = 2.\n\
+     proof.\n\
+     split.\n\
+     trivial.\n\
+     trivial.\n\
+     qed.\n\
+     lemma s2 : 3 = 3.\n\
+     proof.\n\
+     trivial.\n\
+     qed.\n\
+     lemma s3 : 4 = 4.\n\
+     proof.\n\
+     trivial.\n\
+     qed.\n";
+  let (err, _) =
+    call fd_in fd_out "open_file"
+      (`Assoc [ "path", `String b23f; "session", `String "wb3" ])
+  in
+  check "B23 fixture open" (not err) "";
+  b23
+    "require import AllCore.\n\
+     lemma s1 : 1 = 1 /\\ 2 = 2.\n\
+     proof.\n\
+     split.\n\
+     have hX : 1 + 2 = 3.\n\
+     trivial.\n\
+     trivial.\n\
+     trivial.\n\
+     qed.\n\
+     lemma s2 : 3 = 3.\n\
+     proof.\n\
+     by [].\n\
+     qed.\n\
+     lemma s3 : 4 = 4.\n\
+     proof.\n\
+     trivial.\n\
+     qed.\n";
+  let (err, b1) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wb3" ])
+  in
+  check "B23: two sites + count change = proof-body-only, tail skipped"
+    ((not err)
+     && member "ok" b1 = `Bool true
+     && member "classification" b1 = `String "proof-body-only"
+     && member "warning" b1 = `Null
+     && (match member "tail_skipped" b1 with
+         | `Int n -> n > 0
+         | _ -> false))
+    (Yojson.Safe.to_string b1);
+  (* Negative: a STATEMENT change among body edits still fails the
+     certificate. *)
+  b23
+    "require import AllCore.\n\
+     lemma s1 : 1 = 1 /\\ 2 = 2.\n\
+     proof.\n\
+     split.\n\
+     have hX : 1 + 2 = 3.\n\
+     trivial.\n\
+     trivial.\n\
+     trivial.\n\
+     qed.\n\
+     lemma s2 : 3 + 0 = 3.\n\
+     proof.\n\
+     by [].\n\
+     qed.\n\
+     lemma s3 : 4 = 4.\n\
+     proof.\n\
+     trivial.\n\
+     qed.\n";
+  let (err, b2) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "wb3" ])
+  in
+  check "B23: a statement change among body edits stays statement-changing"
+    ((not err)
+     && member "classification" b2 = `String "statement-changing")
+    (Yojson.Safe.to_string b2);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "wb3" ])
+  in
+  check "close wb3" (not err) "";
+
   (* B17: a gone session says WHY it is gone and hands the authored
      work back; a never-opened label says it never existed. *)
   let (err, _) =

@@ -2430,50 +2430,98 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
             let formatting_equiv =
               (not unchanged) && n_all = n_old && core_prefix = n_all
             in
-            let window arr lo hi =
-              let out = ref [] in
-              Array.iteri
-                (fun i (s : Ec_llm_session.parsed_sentence) ->
-                   if i >= lo && i < hi then out := s.kind :: !out)
-                arr;
-              !out
-            in
-            let diff_kinds =
-              window old core_prefix (n_old - ks)
-              @ window parsed_all core_prefix (n_all - ks)
-            in
-            (* Environment-equivalence certificate (round 4): an edit
-               whose every changed sentence is a proof-mode TACTIC on
-               both sides cannot change the environment any
-               downstream sentence sees — statements are untouched
-               and save outcomes preserved (Gsave changes fail the
-               certificate: qed→abort would REMOVE the lemma). Two
-               ways to earn it: the contiguous diff window is all
-               tactics (single-body edits, insertions/deletions
-               included), or — same sentence count — every per-index
-               differing pair is a tactic pair (disjoint multi-body
-               edits). *)
-            let per_index_body_only =
-              n_old = n_all
-              && (let ok = ref true and any = ref false in
-                  for i = 0 to n_all - 1 do
-                    if not (core_equal old.(i) parsed_all.(i))
-                    then begin
-                      any := true;
-                      if (old.(i) : Ec_llm_session.parsed_sentence)
-                           .kind <> "Gtactics"
-                         || (parsed_all.(i)
-                             : Ec_llm_session.parsed_sentence)
-                              .kind <> "Gtactics"
-                      then ok := false
-                    end
+            (* The TRUE edit script between snapshot and new parse
+               (field report B23): after the prefix/suffix trim, an
+               LCS on comment-blind cores aligns the (small) middles,
+               and the change set is exactly the unmatched sentences
+               on both sides. The previous contiguous-window
+               over-approximation broke as soon as one edit session
+               touched TWO proof bodies: the unchanged declarations
+               BETWEEN the sites landed in the window and read as
+               statement changes, silently costing the certificate
+               (and its tail skip) on exactly the workflow it exists
+               for. [last_change_new] is the new-side position of the
+               last change — the tail-skip anchor. Middles too large
+               for the DP fall back to the window over-approximation:
+               conservative, never unsound. *)
+            let (diff_kinds, last_change_new) =
+              let a0 = core_prefix in
+              let a1 = n_old - ks and b1 = n_all - ks in
+              let la = max 0 (a1 - a0) and lb = max 0 (b1 - a0) in
+              let kind arr i =
+                (arr.(i) : Ec_llm_session.parsed_sentence).kind
+              in
+              if la * lb > 1_000_000 then begin
+                let window arr lo hi =
+                  let out = ref [] in
+                  for i = lo to hi - 1 do
+                    out := kind arr i :: !out
                   done;
-                  !ok && !any)
+                  !out
+                in
+                (window old a0 a1 @ window parsed_all a0 b1, b1)
+              end
+              else begin
+                let ca =
+                  Array.init la (fun i ->
+                      sentence_core
+                        (old.(a0 + i)
+                         : Ec_llm_session.parsed_sentence).src)
+                in
+                let cb =
+                  Array.init lb (fun i ->
+                      sentence_core
+                        (parsed_all.(a0 + i)
+                         : Ec_llm_session.parsed_sentence).src)
+                in
+                let dp = Array.make_matrix (la + 1) (lb + 1) 0 in
+                for i = la - 1 downto 0 do
+                  for j = lb - 1 downto 0 do
+                    dp.(i).(j) <-
+                      (if ca.(i) = cb.(j) then
+                         1 + dp.(i + 1).(j + 1)
+                       else max dp.(i + 1).(j) dp.(i).(j + 1))
+                  done
+                done;
+                (* Backtrack: when cores are equal, matching them is
+                   always LCS-optimal, so the walk is greedy on
+                   equality. Deletions are anchored at the CURRENT
+                   new-side position. *)
+                let kinds = ref [] and last = ref (-1) in
+                let i = ref 0 and j = ref 0 in
+                while !i < la || !j < lb do
+                  if !i < la && !j < lb && ca.(!i) = cb.(!j) then begin
+                    incr i; incr j
+                  end
+                  else if
+                    !j < lb
+                    && (!i >= la
+                        || dp.(!i).(!j + 1) >= dp.(!i + 1).(!j))
+                  then begin
+                    kinds := kind parsed_all (a0 + !j) :: !kinds;
+                    last := max !last (a0 + !j);
+                    incr j
+                  end
+                  else begin
+                    kinds := kind old (a0 + !i) :: !kinds;
+                    last := max !last (a0 + !j);
+                    incr i
+                  end
+                done;
+                (!kinds, if !last < 0 then b1 else !last)
+              end
             in
+            (* Environment-equivalence certificate (round 4, B23):
+               an edit whose every CHANGED sentence — per the edit
+               script, any number of disjoint sites — is a
+               proof-mode TACTIC on both sides cannot change the
+               environment any downstream sentence sees: statements
+               are untouched and save outcomes preserved (a
+               qed→abort flip surfaces as a changed Gsave and fails
+               the certificate — it would REMOVE the lemma). *)
             let body_only =
-              (diff_kinds <> []
-               && List.for_all (fun kd -> kd = "Gtactics") diff_kinds)
-              || per_index_body_only
+              diff_kinds <> []
+              && List.for_all (fun kd -> kd = "Gtactics") diff_kinds
             in
             let classification =
               if unchanged then "reposition"
@@ -2682,7 +2730,11 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                   then i + 1
                   else find_save (i + 1)
                 in
-                let stop = min m (find_save (n_all - ks)) in
+                (* Anchor at the LAST change per the edit script —
+                   the enclosing save of the last edited body (with
+                   multi-site edits, the window end overshot to the
+                   final site anyway; the script's anchor is exact). *)
+                let stop = min m (find_save last_change_new) in
                 (stop, m - stop)
               end
               else (m, 0)
@@ -4287,7 +4339,8 @@ let tools :
    Multi-sentence input is split by the real parser and executed \
    ONE SENTENCE AT A TIME: successes COMMIT, the first failure \
    stops the sequence, and the reply reports every sentence \
-   (per-sentence uuid and time_ms; goals_at_failure on error — \
+   (per-sentence uuid and time_ms; goals_at_failure on error is \
+   the state ENTERING the failing sentence, not after it — \
    sentences before the failure REMAIN EXECUTED). When the call \
    GROWS the open-goal count the reply carries the compact `tree` \
    (one line per goal) so the new subgoal ORDER is visible without \
@@ -4623,9 +4676,11 @@ let tools :
    default true), then FULL-checks the changed tail sentence-by-\
    sentence. Reports the edit classification. proof-body-only \
    carries an environment-equivalence certificate (every changed \
-   sentence is a proof tactic, save outcomes preserved), so the \
-   unchanged tail BELOW the edit is skipped (tail_skipped) and the \
-   session lands at the edited lemma's end — resync again or hop \
+   sentence per the TRUE sentence-level edit script is a proof \
+   tactic, save outcomes preserved — any number of disjoint body \
+   sites, sentence counts free to change), so the unchanged tail \
+   BELOW the last edited site is skipped (tail_skipped) and the \
+   session lands at that lemma's end — resync again or hop \
    forward to load more; statement-changing edits re-check \
    everything downstream and are warned in proof mode. BACKWARDS \
    repositioning (earlier upto_line / at_lemma / upto_sentence) is \

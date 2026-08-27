@@ -102,6 +102,14 @@ The 30-second digest you must not violate:
   whole-file re-verification (`tail_executed` + `admitted` in one
   call, before any compile). Broken big file: `analyze_file
   {view: "triage"}` = first error per declaration.
+- **Multi-site repair = the `exec`-forward loop** (measured ~50×
+  cheaper than compile-per-site): `open_file {upto_line: <first
+  site>, nosmt: true}` once, then feed the FILE'S OWN text in
+  chunks with `exec` — a failing chunk leaves you LIVE at the
+  site (`goals_at_failure` = the entering state); probe with
+  `try_script {smt_timeout: 5}`, commit the fix with `exec`,
+  mirror it into the file, keep feeding; one `resync_file` at the
+  end. Full recipe in the guide's Standard workflows.
 
 ## 5. Two-minute validation proof
 
@@ -151,6 +159,10 @@ any step fails, report it verbatim and stop.
   one call.
 - When committing in the USER'S repos, follow that repo's
   conventions; **no AI co-author trailers** on commits.
+- Commit messages containing EasyCrypt syntax (`/\`, backticks)
+  can be REFUSED by the agent harness when passed via `git commit
+  -F - <<EOF` heredocs (worktree-safety heuristic). Write the
+  message to a scratchpad file and use `-F <path>` instead.
 - Respect the locks: a refusal naming another session is
   coordination, not an obstacle — close your own sessions when
   done (`close_session`), claim disjoint lemmas, route

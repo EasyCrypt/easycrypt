@@ -93,7 +93,19 @@
 > identity can't tell new from old; transactional, nothing runs);
 > pre-existing uses load as warned legacy debt and keep replaying
 > (proof_profile flags them);
-> `run_mcp_smoke` 206/206).
+> round 14 (reports 0t/0u: B18/B19/B21/B22 confirmed FIXED by three
+> workers on the real files; the `exec`-forward loop measured ~50×
+> cheaper than compile-per-site and promoted to the documented
+> multi-site-repair workflow; B23 root-caused and fixed — the
+> environment-equivalence certificate now quantifies over the TRUE
+> sentence-level edit script (prefix/suffix trim + LCS on cores)
+> instead of a contiguous window, so multi-site body edits with
+> count changes certify and tail-skip; goals_at_failure documented
+> as the ENTERING state);
+> `run_mcp_smoke` 210/210. 2026-08-27: rebased onto origin/main
+> @01fce1239 (5 upstream commits, zero conflicts, full sweep
+> green; archive/llm-interactive-next-20260827 preserves the
+> pre-rebase line).
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is

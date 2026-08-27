@@ -220,12 +220,14 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
     - `formatting-only` — comments/whitespace only: the snapshot
       swaps, NOTHING re-executes, and your position, state and
       subgoal claims are preserved (zero cost).
-    - `proof-body-only` — every changed sentence is a proof tactic
-      on both sides (statements and qed/abort outcomes untouched),
-      which is an environment-equivalence certificate: the edit
-      provably cannot affect other lemmas, so the unchanged tail
-      below is SKIPPED (`tail_skipped`) and the session lands at
-      the edited lemma's end. Resync again (or hop forward) to
+    - `proof-body-only` — every changed sentence (per the TRUE
+      sentence-level edit script: any number of disjoint body
+      sites, counts free to change) is a proof tactic on both
+      sides, statements and qed/abort outcomes untouched — an
+      environment-equivalence certificate: the edit provably
+      cannot affect other lemmas, so the unchanged tail below the
+      LAST edited site is SKIPPED (`tail_skipped`) and the session
+      lands at that lemma's end. Resync again (or hop forward) to
       load the rest when you need it.
     - `additive` — pure appends (including completing a
       previously-open proof: that ADDS the lemma to the env).
@@ -338,6 +340,31 @@ commit_proof {lemma:"foo", write:true}     # transcript lands, verified
 No manual splicing in either loop; `replace_proof` remains for
 landing text composed elsewhere.
 
+**Multi-site repair (the `exec`-forward loop).** For fixing many
+sites across one big file (a prover upgrade broke N calls, a
+renamed lemma, …), do NOT loop compile-find-fix-recompile, and do
+not reposition per site — drive the file FORWARD once, feeding the
+file's own text in chunks:
+```
+open_file {upto_line: <first site>, nosmt: true}   # one cold prefix
+loop:
+  exec {text: <the file's own next chunk>}         # document replay
+     # a chunk fails -> you are LIVE at the site, entering state
+     # in goals_at_failure, no repositioning needed
+  try_script {script: <candidate fix>, smt_timeout: 5}   # probe
+  exec {text: <the winning fix>}                   # commit in place
+  ...edit the file to match what you executed; continue feeding
+resync_file at the end                             # reconcile + verify
+```
+Measured (round 0u): one 42.6 s prefix open, then ~1250 lines /
+five lemmas repaired interactively with ZERO resyncs — total MCP
+wall-clock ≈ ONE cold compile of the file, vs one compile per
+site (~50×) for the compile-loop. `try_script`'s state-neutrality
+plus `smt_timeout` on probes is what makes negative probes cheap
+(~6 s) on big goals. Note the loop only ever opens a known-green
+prefix and never backs up — that is why it also never needs
+`revert` or hits load failures.
+
 **Parallel lemmas (orchestrator + workers).** Orchestrator picks
 disjoint lemmas; each worker opens `{session: "w<i>", mode:
 "proof", lemmas: ["lem_i"], nosmt: true}` — the locks make
@@ -435,10 +462,15 @@ session ≡ file. If the session itself is wedged (rare), re-run
   middle setting on huge conclusions: `goal_detail: "counts"` +
   `max_chars: N` widens the one-liners to N chars. Every reply
   carries exactly ONE terminal-state field (`goals`/
-  `goals_at_end` on success, `goals_at_failure` on failure), and
+  `goals_at_end` on success, `goals_at_failure` on failure —
+  `goals_at_failure` is the state ENTERING the failing sentence,
+  not a post-state: the failed sentence changed nothing), and
   a `payload_note` field means the server budget degraded an
   over-size payload rather than lose the reply — narrow with the
-  axes it names.
+  axes it names. Never diff two TRUNCATED payloads: two different
+  goals can share a 4000-char prefix — compare per-goal after a
+  split, or raise `max_chars` until the discriminating subterm is
+  visible.
 - `admit` is allowed and visible (profile counts it; skeleton
   treats it as a hole). Never leave one in text you hand back
   without saying so.
@@ -514,7 +546,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 206/206).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 210/210).
 
 ## Known limits (v1, honest)
 
