@@ -12,6 +12,14 @@ of low-level implementations—particularly those in
 
 EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
 
+> **This branch (`llm-interactive-alt`)** additionally carries the LLM
+> proof-tooling stack: an `ecd mcp` server driving EasyCrypt proof
+> sessions for LLM agents, an LSP daemon, and the machine-profile
+> REPL. Start at [QUICKSTART.md](QUICKSTART.md) (consumer bootstrap),
+> then [doc/mcp-agent-guide.md](doc/mcp-agent-guide.md) (agent
+> operating manual); engineering state lives in [STATUS.md](STATUS.md)
+> and [ONBOARDING.md](ONBOARDING.md).
+
 ## Table of Contents
 
 - [EasyCrypt: Computer-Aided Cryptographic Proofs](#easycrypt-computer-aided-cryptographic-proofs)
@@ -26,6 +34,7 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
     - [Visual Studio Code](#visual-studio-code)
 - [Useful Resources](#useful-resources)
   - [Examples](#examples)
+  - [LaTeX Formatting](#latex-formatting)
 
 # Installation
 
@@ -185,3 +194,9 @@ Examples of how to use EasyCrypt are in the `examples` directory. You
 will find basic examples at the root of this directory, as well as a
 more advanced example in the `MEE-CBC` sub-directory and a tutorial on
 how to use the complexity system in `cost` sub-directory.
+
+## LaTeX Formatting
+
+LaTeX style file is in `assets/latex` directory. The basic usages are
+`\begin{eclst} ... \end{eclst}` (display mode) and
+`\ecinl{proc main() = { ...  }}` (inline mode).

@@ -1,7 +1,12 @@
-# ONBOARDING — tooling worktree (`llm-interactive` branch)
+# ONBOARDING — tooling worktree (branch `llm-interactive-next`, pushed as `origin/llm-interactive-alt`)
 
 Procedure for fresh sessions. Stable across sessions; volatile state
 lives in [STATUS.md](STATUS.md).
+
+**Consumers (people/agents who just want to PROVE things over MCP)
+do not read this file — their chain is [QUICKSTART.md](QUICKSTART.md)
+→ [doc/mcp-agent-guide.md](doc/mcp-agent-guide.md). This file is for
+working ON the tooling.**
 
 ## Required reading (in order)
 
@@ -9,39 +14,44 @@ lives in [STATUS.md](STATUS.md).
    `~/.claude/projects/-Users-gdel-Repos-easycrypt/memory/MEMORY.md`
    plus `project_tooling_workstream.md` — entry points, workflow
    gotchas, pinned decisions.
-2. **`STATUS.md`** (repo root) — current phase snapshot, landed
-   additions, test coverage, next-natural-moves, open issues.
-   Updated each session; the source of truth for "where are we now".
-3. **`HANDOFF-VSCODE-FIRST.md`** (repo root) — staged plan tracker
-   (Stages 1-4 + Slice A-D + parity plan Phases 0-4). What's done,
-   what's next, design decisions for the next-up work.
-4. **`UPSTREAM.md`** (repo root) — authoritative status of every
+2. **`STATUS.md`** (repo root) — "Current state" section at the top
+   is the source of truth for "where are we now"; the round log
+   below it is the field-report servicing history; everything under
+   "Historical snapshot" is the preserved 2026-04-29 state.
+3. **`UPSTREAM.md`** (repo root) — authoritative status of every
    EC-core addition. Memory and STATUS.md are snapshots; this file is
    truth.
-5. **`doc/tooling-poc-plan.md`** — phase sequencing (0a→10),
+4. **`doc/ecllm-compat.md`** — the governing plan for the EcLlm
+   base and its reconciliation with Pierre-Yves' line.
+5. **`doc/mcp-agent-guide.md`** — the MCP server's operating manual
+   (written for agents, but it IS the tool's spec surface).
+6. **`doc/tooling-poc-plan.md`** — phase sequencing (0a→10),
    cross-cutting commitments, "Shipping against upstream redesigns"
    four-tier wrapper strategy, Deferrals, Post-PoC anchors, Open
    architectural points, Risk register, Phase 5-parity plan.
-6. **`doc/tooling-protocol.md`** — wire-level spec for the daemon ↔
+7. **`doc/tooling-protocol.md`** — wire-level spec for the daemon ↔
    `ec llm` subprocess. Framing, addressing, CAS, error taxonomy,
    notifications, reconnect, directive enumeration, uuid invariant,
    pp-text inventory.
-7. **`doc/lsp-schema.md`** — wire-level spec for the daemon ↔ LSP
+8. **`HANDOFF-VSCODE-FIRST.md`** (repo root) — HISTORICAL staged
+   plan tracker for the VSCode-first arc (pre-2026-04-29); consult
+   for design rationale, not current state.
+9. **`doc/lsp-schema.md`** — wire-level spec for the daemon ↔ LSP
    client surface. Methods, notifications, capability handshake.
-8. **`doc/tooling-roadmap.md`** — feature ambitions, semantic edit
-   mode S1→S3 arc, design commitments.
-9. **`doc/commit-conventions.md`** — commit prefix grammar
-   (`ec-core:` / `daemon:` / `nvim:` / `tui:` / `vscode:` / `docs:` /
-   `build:` / `ci:` / `merge:` / `revert:`).
-10. **`doc/tcb-discipline.md`** — TCB overapproximation heuristic;
+10. **`doc/tooling-roadmap.md`** — feature ambitions, semantic edit
+    mode S1→S3 arc, design commitments.
+11. **`doc/commit-conventions.md`** — commit prefix grammar
+    (`ec-core:` / `daemon:` / `nvim:` / `tui:` / `vscode:` / `docs:` /
+    `build:` / `ci:` / `merge:` / `revert:`).
+12. **`doc/tcb-discipline.md`** — TCB overapproximation heuristic;
     gates `ec-core:` commit testing requirements.
-11. **`doc/golden-policy.md`** — three-tier golden assertion policy;
+13. **`doc/golden-policy.md`** — three-tier golden assertion policy;
     when to use byte-strict vs structural vs substring goldens.
-12. **`VSCODE_LSP.md`** (repo root) — survey of upstream's `vscode`
+14. **`VSCODE_LSP.md`** (repo root) — survey of upstream's `vscode`
     branch (their LSP + MCP + VSCode extension). We adopted their
     `easycrypt/proof/*` namespace and ported the TextMate grammar.
 
-Read STATUS + HANDOFF first; the rest revisit as relevant.
+Read STATUS + UPSTREAM first; the rest revisit as relevant.
 
 ## Where the code lives
 
@@ -66,8 +76,14 @@ Read STATUS + HANDOFF first; the rest revisit as relevant.
   - Other substrate: `transcript.ml`, `replay.ml`, `correlation.ml`,
     `error.ml`, `publish.ml`, `stub_publish.ml`, `pool.ml`,
     `overlay.ml`, `plugin.ml`, `surface_ctx.ml`.
+  - **MCP server: `mcp_server.ml`** — the `ecd mcp` stdio server
+    (25 tools, named parallel sessions with edit-mode locks, the
+    unified goal-payload renderer + reply budget, resync
+    classification/certificate, uuid ledger, tombstones, policy).
+    The most consumer-exercised surface; its operating manual is
+    `doc/mcp-agent-guide.md`.
 - **Daemon binary:** `tooling/daemon/` — `main.ml` (subcommands:
-  `drive`, `repl`, `tui`, `replay`, `daemon` [+ `--stdio`]),
+  `drive`, `repl`, `tui`, `replay`, `mcp`, `daemon` [+ `--stdio`]),
   `repl.ml`, `tui.ml`, `semantic_tui.ml`.
 - **VSCode extension:** `vscode/` (TypeScript). `package.json`,
   `src/extension.ts` (~400 LoC; spawns `ecd daemon --stdio`,
@@ -75,16 +91,31 @@ Read STATUS + HANDOFF first; the rest revisit as relevant.
   revert/goals/restart commands). Build: `cd vscode && npm install
   && npm run compile`. Repo-root `.vscode/launch.json` lets F5
   open an Extension Host.
-- **Smoke tests:** `tooling/smoke/` — 18 stanzas. See
-  [STATUS.md](STATUS.md) test-coverage table. Run via `dune test`.
-- **EC-core changes:** `src/ec.ml`, `src/ecCommands.ml`, `src/ecIo.ml`,
-  plus `src/ecExecJson.ml`. Every change tracked in `UPSTREAM.md`.
+- **Smoke tests:** `tooling/smoke/` — the MCP suite
+  (`run_mcp_smoke`) is the biggest; see STATUS's "Current state"
+  for the live counts. Run via `dune test`.
+- **EC-core changes:** `src/ecLlm.ml` (REPL) + `src/ecLlmJson.ml`
+  (machine profile) are the big ones; the full inventory with
+  status lives in `UPSTREAM.md` — always read that file, not this
+  list.
 
 ## Running things
 
-- **Tests:** `dune test` (or `dune build @runtest`). Runs the full
-  smoke suite green. 18 test stanzas; see [STATUS.md](STATUS.md)
-  for what each covers.
+- **Full build (ALWAYS full):**
+  `direnv exec ~/Repos/ec-tooling-release dune build` — the root
+  `ecd.native` promote rule does not fire on partial builds, which
+  leaves a stale root binary. After a build that touched `src/`,
+  re-promote the REPL binary:
+  `rm -f ec.native && cp _build/default/src/ec.exe ec.native &&
+  chmod +w ec.native`.
+- **MCP smoke:** `EC_LLM_BIN=$PWD/ec.native dune exec
+  tooling/smoke/run_mcp_smoke.exe` (expected count: see
+  `doc/mcp-agent-guide.md` Setup section).
+- **MCP server (what consumers register):** `ecd.native mcp` with
+  `EC_LLM_BIN` pointing at the promoted `ec.native`. Registration
+  recipe: QUICKSTART § 3.
+- **Tests:** `dune test` (or `dune build @runtest`) runs the full
+  smoke suite.
 - **Diagnostic:** `dune exec tooling/smoke/run_search_debug.exe -- <pat>`.
   Not a regression test; raw EC search output for ad-hoc inspection.
 - **REPL:** `dune exec ecd -- repl <file.ec>`.
@@ -122,8 +153,9 @@ Read STATUS + HANDOFF first; the rest revisit as relevant.
 - One component per commit, per `doc/commit-conventions.md`.
 - Every `ec-core:` commit corresponds to an `UPSTREAM.md` entry (or
   an Exceptions row).
-- Always include the trailer
-  `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`.
+- **No AI co-author trailers** — commit messages stay app-agnostic
+  (these commits are upstream-bound). This supersedes the earlier
+  always-add-trailer rule.
 - Don't skip hooks (`--no-verify`) unless the user explicitly asks.
 - Don't commit unless the user asks.
 

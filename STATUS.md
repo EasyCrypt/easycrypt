@@ -109,17 +109,68 @@
 > `searchall` (#22) and EXEC-JSON v0 (#13) re-landed 2026-07-26;
 > still deferred: EcCancel, bullets scoping — see
 > [doc/ecllm-compat.md](doc/ecllm-compat.md), which is
-> the governing plan. The sections BELOW are the imported daemon-v1
-> snapshot (2026-04-29) and are stale wherever they touch `src/`
-> facts; a full refresh is pending.
+> the governing plan. (The blockquote above is the ROUND LOG —
+> the servicing history of the consumer field reports; the
+> current state is the section right below it.)
 
-Volatile snapshot of where the project is right now. Onboarding
-procedure lives in [ONBOARDING.md](ONBOARDING.md).
+## Current state (2026-08-28)
 
-**Last updated:** 2026-04-29 (beta-prep nearly complete — 13
-commits in this session closed beta-1 gates 1, 3, 4, 7-partial,
-10-slim, 14 + a proc-rewrite emission bug fix + two doc pins.
-Branch `llm-interactive` now 211 commits ahead of
+- **Branch:** `llm-interactive-next` in worktree
+  `~/Repos/ec-llm-next`, pushed as **`origin/llm-interactive-alt`**
+  (upstream-tracked: plain `git push` updates it). Shape:
+  `origin/main` @ `01fce1239` + ~70 commits, rebase model —
+  re-cut onto main 2026-08-27 with zero conflicts;
+  `archive/llm-interactive-next-20260827` preserves the pre-rebase
+  line.
+- **What's on it:** Pierre-Yves' EcLlm REPL base + the machine
+  profile (`src/ecLlmJson.ml`, proto 3) + our EC-core additions
+  (authoritative inventory: [UPSTREAM.md](UPSTREAM.md)) + the
+  `tooling/` stack — `ecd mcp` (25 tools: parallel sessions with
+  edit-mode locks, the check/resync/replace refactoring loop with
+  the environment-equivalence certificate, strategy layer, unified
+  payload control with reply budgets, session tombstones, uuid
+  rewind ledger, forbidden-tactic policy), `ecd daemon` (LSP),
+  REPL/TUI — + the VSCode extension.
+- **Docs entry chain (new coworkers):** [README.md](README.md) →
+  [QUICKSTART.md](QUICKSTART.md) (consumer bootstrap) →
+  [doc/mcp-agent-guide.md](doc/mcp-agent-guide.md) (agent
+  operating manual). Engineering: [ONBOARDING.md](ONBOARDING.md),
+  [UPSTREAM.md](UPSTREAM.md),
+  [doc/ecllm-compat.md](doc/ecllm-compat.md).
+- **Verification:** `run_mcp_smoke` 210/210; full sweep green
+  (repl_core 68, exec_json 42, semantic_lib 41, speculation 45,
+  lsp proof-flow 36, replay 5, analyze 15, ec_llm, document).
+- **Field program:** sixteen consumer report rounds serviced
+  (`MCP_REPORT.md`, consumers' repo — read-only for us); the
+  latest rounds confirm the payload/session fixes on the real
+  Mithril files and promote the `exec`-forward loop as the
+  documented multi-site-repair workflow.
+- **Next milestone — EcLlm reconciliation:** Pierre-Yves'
+  `origin/llm-interactive` has moved independently (52 commits vs
+  our 68 since the only common ancestor, plain `main`): he split
+  the REPL into `EcLlmCore` + front-ends and added an in-core
+  `easycrypt mcp` (10 thin single-session tools) with golden
+  harnesses in CI. Reconciling by git is not meaningful (add/add
+  on the whole EcLlm surface); it is a design conversation —
+  plausibly his core split as substrate, our daemon layers on
+  top. EcCancel and wire v2 are agenda items for that meeting.
+- **Beta re-cut** stays gated on the reconciliation; the April
+  release-bundle pipeline details are preserved below.
+
+---
+
+# Historical snapshot (2026-04-29) — SUPERSEDED
+
+Everything below this line is the imported daemon-v1 snapshot as
+of 2026-04-29, kept verbatim as reference for the beta re-cut
+(release-bundle pipeline, rerere setup, vscode arc). Branch names,
+counts, and `src/` facts in it are STALE — trust the sections
+above and [UPSTREAM.md](UPSTREAM.md) instead.
+
+**Last updated (historical):** 2026-04-29 (beta-prep nearly
+complete — 13 commits in this session closed beta-1 gates 1, 3,
+4, 7-partial, 10-slim, 14 + a proc-rewrite emission bug fix + two
+doc pins. Branch `llm-interactive` now 211 commits ahead of
 `origin/llm-interactive` and is 100% on top of current `main`
 (no rebase needed). **Open**: gate 12 (BETA.md) + the
 release-bundle pipeline (`release/beta-1-circuits` worktree at
