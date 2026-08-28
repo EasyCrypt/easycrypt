@@ -300,17 +300,27 @@ let pos_at_index proof_state index =
       let pos = Some (s.end_line - 1, s.end_col - 1) in
       (sid, pos)
 
-(* Emit stateChanged using a caller-supplied index. Lockless — does
-   not call [Proof_state.snapshot]. Safe to call from inside the
-   proof_state mutex (e.g. from [exec_walk_unlocked]'s [on_step]
-   callback) where calling snapshot would deadlock the non-reentrant
-   Eio.Mutex. *)
+(* Emit stateChanged using a caller-supplied index. Does not call
+   [Proof_state.snapshot], so it is safe inside the proof_state
+   mutex (e.g. from [exec_walk_unlocked]'s [on_step] callback)
+   where calling snapshot would deadlock the non-reentrant
+   Eio.Mutex.
+
+   seq ASSIGNMENT and the socket write happen under one dedicated
+   mutex: params used to take their seq before the write, and a
+   write is a suspension point — a second fiber could take the next
+   seq and reach the socket first, inverting seq order on the wire
+   (the historic proof-flow-smoke flake). Lock order is
+   proof_state → emit_mutex → write_mutex, never the reverse. *)
+let emit_mutex = Eio.Mutex.create ()
+
 let emit_state_changed_at server ~io ~uri ~proof_state ~corr_id ~index =
   let current_sid, current_end = pos_at_index proof_state index in
-  Lsp_server.send_notification server ~io
-    ~method_:(proof_method "stateChanged")
-    ~params:(state_changed_params
-               ~uri ~current_sid ~current_end ~corr_id) ()
+  Eio.Mutex.use_rw ~protect:false emit_mutex (fun () ->
+    Lsp_server.send_notification server ~io
+      ~method_:(proof_method "stateChanged")
+      ~params:(state_changed_params
+                 ~uri ~current_sid ~current_end ~corr_id) ())
 
 (* Emit stateChanged based on the current index — acquires the
    proof_state mutex via snapshot. DO NOT call from inside a
