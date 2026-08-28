@@ -446,7 +446,7 @@ section CollisionProbability.
     proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
     * hoare; auto=> // /> &hr.
-      progress; smt(ge0_mu).
+      split => [| _ _ _ _ _ _]; smt(ge0_mu).
     sp; if=> //=.
     * wp; rnd (rng ARP.m); skip.
       progress.
