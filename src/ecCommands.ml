@@ -90,6 +90,11 @@ module Pragmas = struct
     let prpo_po_spl = "PrPo:po:ands"
   end
 
+  module Log = struct
+    let debug = "Log:debug"
+    let info  = "Log:info"
+  end
+
 end
 
 (* Boolean gstate flags settable in-script via [pragma +name.] / [pragma -name.]
@@ -727,6 +732,17 @@ and process_pragma (scope : EcScope.scope) opt =
   | x when x = Pragmas.Proofs.weak    -> pragma_check `WeakCheck
   | x when x = Pragmas.Proofs.check   -> pragma_check `Check
   | x when x = Pragmas.Proofs.report  -> pragma_check `Report
+
+  (* Notification loglevel: `pragma Log:debug.` routes `Debug
+     notifications through to the front-ends' notifiers (the
+     default Info threshold drops them — this is the only surface
+     access to the gstate loglevel); `pragma Log:info.` restores
+     the default. Mutates the live gstate, like the boolean gstate
+     flags: not undoable. *)
+  | x when x = Pragmas.Log.debug ->
+    EcGState.set_loglevel `Debug (EcEnv.gstate (EcScope.env scope))
+  | x when x = Pragmas.Log.info ->
+    EcGState.set_loglevel `Info (EcEnv.gstate (EcScope.env scope))
 
   | "noop"    -> ()
   | "compact" -> Gc.compact ()

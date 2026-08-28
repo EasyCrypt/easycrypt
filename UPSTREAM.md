@@ -1223,6 +1223,27 @@ the full set is upstreamed.
 
 ---
 
+### 30. `Log:debug` / `Log:info` loglevel pragmas
+
+- **Status**: landed (2026-08, "Log:debug/Log:info pragmas" commit;
+  ready-now queue item from the circuit-debug investigation).
+- **Phase**: MCP v1.5.
+- **Files**:
+  - `src/ecCommands.ml` — `Pragmas.Log.{debug,info}` +
+    `process_pragma` arms calling `EcGState.set_loglevel` on the
+    current scope's gstate.
+- **What**: the gstate loglevel (`Debug < Info < Warning <
+  Critical`) had NO surface access: the default `Info` threshold
+  drops every `Debug` notification (e.g. the circuit tactic's
+  `EcEnv.notify env `Debug` traces in `ecCircuits.ml`), and
+  nothing could raise it. `pragma Log:debug.` routes them through
+  to the front-ends' notifiers (REPL NOTICE lines / MCP notices);
+  `pragma Log:info.` restores the default. Mutates the live
+  gstate like the boolean gstate flags: not undoable.
+- **Tests**: `run_mcp_smoke` "pragma Log:debug / Log:info
+  accepted" (an unknown `Log:*` name still warns
+  `unknown pragma`).
+
 ## ANALYZE-JSON v1 deferrals (under addition 14)
 
 For reference — these are deferred-from-v0 items tracked under
