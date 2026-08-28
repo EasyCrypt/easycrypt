@@ -2761,6 +2761,150 @@ let () =
   in
   check "close wb3" (not err) "";
 
+  (* Round 16: contract-true check modes on replays — under a
+     certified body edit, unchanged DOWNSTREAM sentences weak-check
+     (a bad smt hint there no longer fails the resync), while the
+     CHANGED region always full-checks; and the session's check
+     mode is restored to full strength afterwards. *)
+  let wwf = Filename.concat fixture_dir "ww.ec" in
+  let ww v =
+    let oc = open_out wwf in
+    output_string oc v;
+    close_out oc
+  in
+  ww
+    "require import AllCore.\n\
+     timeout 1.\n\
+     lemma a : 1 = 1.\n\
+     proof.\n\
+     trivial.\n\
+     qed.\n\
+     lemma b : 1 = 2.\n\
+     proof.\n\
+     smt().\n\
+     qed.\n";
+  let (err, wo) =
+    call fd_in fd_out "open_file"
+      (`Assoc [
+         "path", `String wwf; "session", `String "ww";
+         "nosmt", `Bool true;
+       ])
+  in
+  check "weak-span fixture open (nosmt admits the unprovable smt)"
+    ((not err) && member "synced_upto" wo = `Int 10)
+    (Yojson.Safe.to_string wo);
+  ww
+    "require import AllCore.\n\
+     timeout 1.\n\
+     lemma a : 1 = 1.\n\
+     proof.\n\
+     by [].\n\
+     qed.\n\
+     lemma b : 1 = 2.\n\
+     proof.\n\
+     smt().\n\
+     qed.\n";
+  let (err, w1) =
+    call fd_in fd_out "resync_file"
+      (`Assoc [ "session", `String "ww"; "upto_sentence", `Int 10 ])
+  in
+  check "weak-span: certified downstream weak-checks (smt skipped)"
+    ((not err)
+     && member "ok" w1 = `Bool true
+     && member "classification" w1 = `String "proof-body-only"
+     && member "rewind" w1 = `Bool true)
+    (Yojson.Safe.to_string w1);
+  ww
+    "require import AllCore.\n\
+     timeout 1.\n\
+     lemma a : 1 = 1.\n\
+     proof.\n\
+     have h : 1 = 2 by smt().\n\
+     trivial.\n\
+     qed.\n\
+     lemma b : 1 = 2.\n\
+     proof.\n\
+     smt().\n\
+     qed.\n";
+  let (err, w2) =
+    call fd_in fd_out "resync_file" (`Assoc [ "session", `String "ww" ])
+  in
+  check "weak-span: the CHANGED region still full-checks (smt runs, fails)"
+    ((not err)
+     && member "ok" w2 = `Bool false
+     && (let fs = member "failed_sentence" w2 in
+         match member "src" fs with
+         | `String s -> r14_has "have h" s
+         | _ -> false))
+    (Yojson.Safe.to_string w2);
+  (* Steady state: full-strength checking is restored — a false
+     claim by smt must FAIL, not slip through a leaked weak mode.
+     (The session sits inside a's open proof after the failure.) *)
+  let (err, w3) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "have hz : 1 = 2 by smt().";
+         "session", `String "ww";
+       ])
+  in
+  check "weak-span: check mode restored (false smt claim fails)"
+    ((not err) && member "ok" w3 = `Bool false)
+    (Yojson.Safe.to_string w3);
+  (* Log:debug / Log:info pragmas exist (surface access to the
+     gstate loglevel). *)
+  let (err, w4) =
+    call fd_in fd_out "exec"
+      (`Assoc [
+         "text", `String "pragma Log:debug.\npragma Log:info.";
+         "session", `String "ww";
+       ])
+  in
+  check "pragma Log:debug / Log:info accepted"
+    ((not err) && member "ok" w4 = `Bool true)
+    (Yojson.Safe.to_string w4);
+  let (err, _) =
+    call fd_in fd_out "close_session" (`Assoc [ "session", `String "ww" ])
+  in
+  check "close ww" (not err) "";
+
+  (* B17 persistence: a label THIS server never saw, whose journal a
+     previous server run left WITHOUT a burial line, is reported as
+     "live in a previous server run" with the authored work handed
+     back — the cross-restart half of the tombstone story. Forge the
+     journal exactly where the server keeps them. *)
+  let ghost_dir =
+    Filename.concat
+      (match Sys.getenv_opt "XDG_STATE_HOME" with
+       | Some d when d <> "" -> d
+       | _ ->
+         (match Sys.getenv_opt "HOME" with
+          | Some h -> Filename.concat h ".local/state"
+          | None -> Filename.get_temp_dir_name ()))
+      "ecd-mcp"
+  in
+  (try Unix.mkdir (Filename.dirname ghost_dir) 0o755 with _ -> ());
+  (try Unix.mkdir ghost_dir 0o755 with _ -> ());
+  let ghost_path =
+    Filename.concat ghost_dir
+      ("session-" ^ Digest.to_hex (Digest.string "ghost729") ^ ".jsonl")
+  in
+  let oc = open_out ghost_path in
+  output_string oc
+    "{\"file\":\"/tmp/ghost.ec\",\"label\":\"ghost729\",\
+     \"started\":\"09:00:00\"}\n\
+     {\"s\":\"have hg : 5 = 5 by trivial.\"}\n";
+  close_out oc;
+  let (err, gj) =
+    call fd_in fd_out "goals" (`Assoc [ "session", `String "ghost729" ])
+  in
+  let gj_str = Yojson.Safe.to_string gj in
+  check "B17: journal recall across server restarts (live + authored)"
+    (err
+     && r14_has "previous server run" gj_str
+     && r14_has "have hg : 5 = 5 by trivial." gj_str)
+    gj_str;
+  (try Sys.remove ghost_path with _ -> ());
+
   (* B17: a gone session says WHY it is gone and hands the authored
      work back; a never-opened label says it never existed. *)
   let (err, _) =

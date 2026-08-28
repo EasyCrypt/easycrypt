@@ -143,17 +143,118 @@ let hms at =
   Printf.sprintf "%02d:%02d:%02d" tm.Unix.tm_hour tm.Unix.tm_min
     tm.Unix.tm_sec
 
+(* ----------------------------------------------------------------
+   Session journals (field report B17, the persistence half): the
+   in-memory tombstones die with the server — and a SERVER restart
+   is exactly the observed way sessions vanish. Each session keeps
+   a small per-label JSONL journal under the user's state dir:
+   line 1 = {"file","label","started"}; one {"s": <sentence>} per
+   authored commit; a final {"reason","at","uuid"} at burial. A
+   journal with no burial line means a server died with the session
+   LIVE — the next server's "no session" error says so and hands
+   the authored sentences back. All IO is best-effort: a journal
+   failure never breaks a tool call. *)
+
+let state_dir () =
+  let base =
+    match Sys.getenv_opt "XDG_STATE_HOME" with
+    | Some d when d <> "" -> d
+    | _ ->
+      (match Sys.getenv_opt "HOME" with
+       | Some h -> Filename.concat h ".local/state"
+       | None -> Filename.get_temp_dir_name ())
+  in
+  Filename.concat base "ecd-mcp"
+
+let journal_path label =
+  Filename.concat (state_dir ())
+    ("session-" ^ Digest.to_hex (Digest.string label) ^ ".jsonl")
+
+let journal_write label line ~reset =
+  try
+    let dir = state_dir () in
+    (try Unix.mkdir (Filename.dirname dir) 0o755 with _ -> ());
+    (try Unix.mkdir dir 0o755 with _ -> ());
+    let oc =
+      open_out_gen
+        (if reset then [ Open_wronly; Open_creat; Open_trunc ]
+         else [ Open_wronly; Open_creat; Open_append ])
+        0o644 (journal_path label)
+    in
+    output_string oc (Yojson.Safe.to_string line ^ "\n");
+    close_out oc
+  with _ -> ()
+
+let journal_start (e : entry) label =
+  journal_write label ~reset:true
+    (`Assoc [
+       "file", `String e.file; "label", `String label;
+       "started", `String (hms (Unix.gettimeofday ())) ])
+
+let journal_authored label (src : string) =
+  journal_write label ~reset:false (`Assoc [ "s", `String src ])
+
+let journal_bury (e : entry) label ~reason =
+  journal_write label ~reset:false
+    (`Assoc [
+       "reason", `String reason;
+       "at", `String (hms (Unix.gettimeofday ()));
+       "uuid", `Int (Ec_llm_session.current_uuid e.session) ])
+
+(* Read a label's journal back: (file, started, authored newest-
+   first, burial (reason, at) option). *)
+let journal_recall label =
+  let path = journal_path label in
+  if not (Sys.file_exists path) then None
+  else
+    try
+      let ic = open_in path in
+      let file = ref "" and started = ref "" in
+      let authored = ref [] and burial = ref None in
+      (try
+         while true do
+           let line = input_line ic in
+           match Yojson.Safe.from_string line with
+           | exception _ -> ()
+           | j ->
+             let open Yojson.Safe.Util in
+             (match member "s" j with
+              | `String s -> authored := s :: !authored
+              | _ ->
+                (match member "reason" j with
+                 | `String r ->
+                   let at =
+                     match member "at" j with
+                     | `String a -> a
+                     | _ -> "?"
+                   in
+                   burial := Some (r, at)
+                 | _ ->
+                   (match member "file" j with
+                    | `String f ->
+                      file := f;
+                      (match member "started" j with
+                       | `String s -> started := s
+                       | _ -> ())
+                    | _ -> ())))
+         done
+       with End_of_file -> ());
+      close_in ic;
+      Some (!file, !started, !authored, !burial)
+    with _ -> None
+
 let bury t label (e : entry) ~reason =
+  journal_bury e label ~reason;
   Hashtbl.replace t.tombstones label
     { tb_at = Unix.gettimeofday (); tb_reason = reason;
       tb_file = e.file;
       tb_uuid = Ec_llm_session.current_uuid e.session;
       tb_authored = e.authored_log }
 
-(* The authored-sentence tail of a tombstone, bounded (last 30
+(* The authored-sentence tail (newest-first input), bounded (last 30
    sentences / 4000 chars) — enough to replay a working session. *)
-let tomb_recovery tb =
-  match tb.tb_authored with
+let authored_recovery (l : string list) =
+  match l with
   | [] -> ""
   | l ->
     let n = List.length l in
@@ -176,21 +277,41 @@ let no_session_error t label =
       "session '%s' no longer exists: %s at %s (file %s, last uuid \
        %d).%s"
       label tb.tb_reason (hms tb.tb_at)
-      (Filename.basename tb.tb_file) tb.tb_uuid (tomb_recovery tb)
+      (Filename.basename tb.tb_file) tb.tb_uuid
+      (authored_recovery tb.tb_authored)
   | None ->
     let live =
       Hashtbl.fold (fun l _ acc -> l :: acc) t.sessions []
       |> List.sort compare
     in
-    Printf.sprintf
-      "no session '%s' — never opened in this server process \
-       (started %s; live sessions: %s). If you DID open it earlier, \
-       the server restarted and every session was lost — reopen with \
-       open_file and reposition/replay. Otherwise call open_file \
-       first (optionally with a {\"session\": \"<label>\"} argument \
-       to run parallel sessions)."
-      label (hms t.started_at)
-      (if live = [] then "none" else String.concat ", " live)
+    (* No in-memory tombstone: consult the on-disk journal — a
+       PREVIOUS server run may have owned this label (B17's real
+       case: the server restarted under the consumer). *)
+    (match journal_recall label with
+     | Some (file, started, authored, None) ->
+       Printf.sprintf
+         "session '%s' was LIVE in a previous server run (started \
+          %s, file %s) when that server terminated — this server \
+          (started %s) has no sessions for it. Reopen with \
+          open_file.%s"
+         label started (Filename.basename file) (hms t.started_at)
+         (authored_recovery authored)
+     | Some (file, _, authored, Some (reason, at)) ->
+       Printf.sprintf
+         "session '%s' was closed in a previous server run: %s at \
+          %s (file %s). Reopen with open_file.%s"
+         label reason at (Filename.basename file)
+         (authored_recovery authored)
+     | None ->
+       Printf.sprintf
+         "no session '%s' — never opened in this server process \
+          (started %s; live sessions: %s). If you DID open it \
+          earlier, the server restarted and every session was lost \
+          — reopen with open_file and reposition/replay. Otherwise \
+          call open_file first (optionally with a {\"session\": \
+          \"<label>\"} argument to run parallel sessions)."
+         label (hms t.started_at)
+         (if live = [] then "none" else String.concat ", " live))
 
 let find_session t args =
   let label = label_of_args args in
@@ -1428,6 +1549,7 @@ let tool_open_file t args =
                           authored_log = []; uuid_ledger = [] }
                       in
                       ledger_seed e parsed ~n_target:synced;
+                      journal_start e label;
                       Hashtbl.replace t.sessions label e;
                       [
                         "session", `String label;
@@ -1592,6 +1714,7 @@ let tool_exec t args =
                      | Ok ok ->
                        incr executed;
                        e.authored_log <- s.src :: e.authored_log;
+                       journal_authored label s.src;
                        (match adm with
                         | Some (g, h) ->
                           admitted :=
@@ -2747,24 +2870,105 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
               e.synced_upto >= 0 && e.synced_upto <= m_eff
               && core_prefix >= e.synced_upto
             in
+            (* Certificate-grade classifications: unchanged
+               sentences DOWNSTREAM of the change provably see the
+               same environment, so re-verifying them at full smt
+               strength buys nothing (round 0t: 42-45 s per
+               explicit-target resync — the dominant cost of a
+               site-by-site loop). *)
+            let certified =
+              classification = "reposition"
+              || classification = "proof-body-only"
+            in
+            (* Contract-true check modes over a replay range: the
+               documented contract is "weak-check the unchanged
+               prefix (nosmt), FULL-check the changed tail" — the
+               reload path always delivered it via LOAD -nosmt, but
+               the in-session replays full-checked everything.
+               Split [lo,hi) into unchanged-prefix / changed /
+               unchanged-downstream; weak segments run under
+               pragma Proofs:weak, restored on every exit, and the
+               downstream segment weak-checks ONLY under the
+               certificate (statement changes re-verify downstream
+               at full strength, as documented). *)
+            let exec_span lo hi =
+              let pragma p =
+                match
+                  Ec_llm_session.exec e.session ~document:true ~corr
+                    ~sentence_class:`Directive ~source:p
+                with
+                | Ok _ -> true
+                | Error _ -> false
+              in
+              let weak_range lo hi =
+                if lo >= hi then (0, None)
+                else if not (pragma "pragma Proofs:weak.") then
+                  (* cannot enter weak mode — full-check: sound *)
+                  exec_range lo hi
+                else begin
+                  let r =
+                    try exec_range lo hi
+                    with ex ->
+                      ignore (pragma "pragma Proofs:check.");
+                      raise ex
+                  in
+                  ignore (pragma "pragma Proofs:check.");
+                  r
+                end
+              in
+              if not nosmt then exec_range lo hi
+              else begin
+                let b1 = min hi core_prefix in
+                let b2 =
+                  if certified then min hi (last_change_new + 1)
+                  else hi
+                in
+                let segs =
+                  [ (`Weak, lo, min b1 hi);
+                    (`Full, max lo b1, min b2 hi);
+                    (`Weak, max lo b2, hi) ]
+                in
+                List.fold_left
+                  (fun (cnt, er) (mode, lo, hi) ->
+                     if er <> None || lo >= hi then (cnt, er)
+                     else
+                       let (c, e') =
+                         match mode with
+                         | `Weak -> weak_range lo hi
+                         | `Full -> exec_range lo hi
+                       in
+                       (cnt + c, e'))
+                  (0, None) segs
+              end
+            in
             let run () =
               if fast then begin
                 let t1 = Unix.gettimeofday () in
-                let (c, er) = exec_range e.synced_upto m_eff in
+                let (c, er) = exec_span e.synced_upto m_eff in
                 Ok (`Fast, 0, ms_since t1, c, er)
               end
               else begin
                 (* Backwards/diverged reposition (field report B18):
-                   when the prefix is core-valid up to the target,
                    REVERT to the nearest at-or-before uuid snapshot
                    and replay only the gap — the engine has been
                    through those sentences and undo keeps every
-                   uuid, so a rewind is near-free. Falls back to the
-                   full prefix reload when no snapshot applies. *)
+                   uuid, so a rewind is near-free. Plain rule: the
+                   prefix must be core-valid up to the target.
+                   Certificate extension (round 0t): under a
+                   certified body edit any snapshot at or below the
+                   core prefix is a valid landing even for a target
+                   BEYOND the edit — the replay from it executes
+                   the whole changed region (full-check) and the
+                   certified downstream weak-checks, instead of a
+                   prefix reload plus a full-strength downstream
+                   re-verification. Falls back to the reload when
+                   no snapshot applies. *)
                 let rewound =
-                  if core_prefix < m_eff then None
+                  if core_prefix < m_eff && not certified then None
                   else
-                    match ledger_best e ~at_most:m_eff with
+                    match
+                      ledger_best e ~at_most:(min m_eff core_prefix)
+                    with
                     | None -> None
                     | Some (kk, u) ->
                       (match
@@ -2779,7 +2983,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                 match rewound with
                 | Some kk ->
                   let t1 = Unix.gettimeofday () in
-                  let (c, er) = exec_range kk m_eff in
+                  let (c, er) = exec_span kk m_eff in
                   Ok (`Rewind, 0, ms_since t1, c, er)
                 | None ->
                 (* Back the prefix boundary off shared end-lines so
@@ -2841,7 +3045,7 @@ let resync_impl ~label (e : entry) ~nosmt ~upto_line ~upto_sentence
                   ledger_seed e parsed_all ~n_target:j;
                   let pms = ms_since t0 in
                   let t1 = Unix.gettimeofday () in
-                  let (c, er) = exec_range j m_eff in
+                  let (c, er) = exec_span j m_eff in
                   Ok (`Reload, pms, ms_since t1, c, er)
               end
             in
@@ -3528,6 +3732,8 @@ let tool_exec_in t args =
                    e.synced_upto <- -1;
                    e.authored_log <-
                      !executed @ e.authored_log;
+                   List.iter (journal_authored label)
+                     (List.rev !executed);
                    sc.sc_remaining <- !remaining;
                    sc.sc_transcript <-
                      List.rev_append !executed sc.sc_transcript;
@@ -4067,26 +4273,8 @@ let tool_replace_proof t args =
            "replace_proof: file changed on disk since this session \
             last synced — run resync_file first"
        else
-         let claim =
-           match e.mode with
-           | Proof cs ->
-             (match List.find_opt (fun c -> c.lemma = lemma) cs with
-              | Some c -> Ok c
-              | None ->
-                Error
-                  (Printf.sprintf
-                     "replace_proof: lemma '%s' is not claimed by \
-                      session '%s' (claims: %s)"
-                     lemma label
-                     (String.concat ", " (claim_names e.mode))))
-           | Statement ->
-             (match resolve_claims e.parsed [ lemma ] with
-              | Ok [ c ] -> Ok c
-              | Ok _ -> Error "replace_proof: internal claim error"
-              | Error m -> Error ("replace_proof: " ^ m))
-         in
-         (match claim with
-          | Error m -> Error m
+         (match claim_for e label lemma with
+          | Error m -> Error ("replace_proof: " ^ m)
           | Ok c ->
             if c.end_line <= c.decl_end_line then
               Error
@@ -4096,68 +4284,32 @@ let tool_replace_proof t args =
                     at %d)"
                    lemma c.decl_end_line c.end_line)
             else begin
-              let orig = e.text in
-              let lines = String.split_on_char '\n' orig in
-              let pre =
-                List.filteri (fun i _ -> i < c.decl_end_line) lines
-              in
-              let post =
-                List.filteri (fun i _ -> i >= c.end_line) lines
-              in
-              let script_lines =
-                String.split_on_char '\n' (String.trim script)
-              in
-              let candidate =
-                String.concat "\n" (pre @ script_lines @ post)
-              in
               let nosmt =
                 match Yojson.Safe.Util.member "nosmt" args with
                 | `Bool b -> b
                 | _ -> true
               in
-              (match write_file e.file candidate with
-               | exception Sys_error m ->
-                 Error (Printf.sprintf "replace_proof: %s" m)
-               | () ->
-                 (match resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~args:(`Assoc []) with
-                  | Error m ->
-                    (try write_file e.file orig with _ -> ());
-                    ignore
-                      (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~args:(`Assoc []));
-                    Error
-                      (Printf.sprintf
-                         "replace_proof: verification could not run \
-                          (%s); file restored"
-                         m)
-                  | Ok payload ->
-                    let ok =
-                      match Yojson.Safe.Util.member "ok" payload with
-                      | `Bool b -> b
-                      | _ -> false
-                    in
-                    if ok then
-                      Ok (`Assoc ([
-                        "ok", `Bool true;
-                        "lemma", `String lemma;
-                        "replaced_lines",
-                        `Assoc [
-                          "from", `Int (c.decl_end_line + 1);
-                          "to", `Int c.end_line;
-                        ];
-                        "file_written", `Bool true;
-                        "verification", payload;
-                      ] @ src_expanded_field s_expanded script))
-                    else begin
-                      (try write_file e.file orig with _ -> ());
-                      ignore
-                        (resync_impl ~label e ~nosmt ~upto_line:None ~upto_sentence:None ~at_lemma:None ~args:(`Assoc []));
-                      Ok (`Assoc ([
-                        "ok", `Bool false;
-                        "lemma", `String lemma;
-                        "file_restored", `Bool true;
-                        "verification", payload;
-                      ] @ src_expanded_field s_expanded script))
-                    end))
+              match write_body_verified ~label e c ~script ~nosmt with
+              | Error m -> Error ("replace_proof: " ^ m)
+              | Ok (true, payload) ->
+                Ok (`Assoc ([
+                  "ok", `Bool true;
+                  "lemma", `String lemma;
+                  "replaced_lines",
+                  `Assoc [
+                    "from", `Int (c.decl_end_line + 1);
+                    "to", `Int c.end_line;
+                  ];
+                  "file_written", `Bool true;
+                  "verification", payload;
+                ] @ src_expanded_field s_expanded script))
+              | Ok (false, payload) ->
+                Ok (`Assoc ([
+                  "ok", `Bool false;
+                  "lemma", `String lemma;
+                  "file_restored", `Bool true;
+                  "verification", payload;
+                ] @ src_expanded_field s_expanded script))
             end)))
 
 (* File-level admit audit: the goals your admits close. Scans the

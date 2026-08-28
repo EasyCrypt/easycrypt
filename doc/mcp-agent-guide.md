@@ -125,7 +125,11 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   are in: never opened (server start time + live labels given —
   if you opened it before that time, the server restarted) vs no
   longer exists (reason + timestamp + the session's authored
-  sentences handed back for replay).
+  sentences handed back for replay). This survives SERVER
+  restarts: each session keeps a small on-disk journal, so even a
+  label from a killed server run comes back as "was LIVE in a
+  previous server run" with its authored sentences attached —
+  committed exec work is never more than a replay away.
 
 ### Reading and searching
 
@@ -253,6 +257,17 @@ operator. Server internals: `tooling/lib/mcp_server.ml`; design:
   replayed only the gap — `revert` yourself and `resync_file`
   both use the same ledger, so hopping backwards to inspect and
   forwards again no longer pays the prefix reload each way.
+  Check modes on replays are CONTRACT-TRUE on every path (not
+  just reloads): with `nosmt` (the default), unchanged sentences
+  weak-check, the CHANGED region always full-checks, and
+  unchanged sentences DOWNSTREAM of a certified proof-body edit
+  weak-check too — an explicit-target resync past a body edit no
+  longer pays a full-strength re-verification of the whole
+  downstream span (statement-changing edits still re-verify
+  downstream at full strength). Certified body edits may also
+  `rewind` to a pre-edit snapshot even when the target lies
+  BEYOND the edit — the replay still full-checks the edit
+  itself.
 
 ### Strategy layer (refactoring at proof-structure level)
 
@@ -546,7 +561,7 @@ subprocesses with the target file's directory as CWD (so
 `easycrypt.project` is honored). `EC_LLM_BIN` pins the EC binary;
 without it, discovery falls back to the in-tree `_build` binary
 and then `easycrypt` on PATH. Smoke: `EC_LLM_BIN=$PWD/ec.native
-dune exec tooling/smoke/run_mcp_smoke.exe` (expects 210/210).
+dune exec tooling/smoke/run_mcp_smoke.exe` (expects 217/217).
 
 ## Known limits (v1, honest)
 
