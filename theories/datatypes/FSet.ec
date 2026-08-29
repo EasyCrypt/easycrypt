@@ -466,6 +466,9 @@ proof. by rewrite fsetDUl fsetDv fsetU0. qed.
 lemma fsetDKv (A B : 'a fset) : (A `&` B) `\` B = fset0.
 proof. by rewrite fsetDIl fsetDv fsetI0. qed.
 
+lemma fsetDID (A B : 'a fset) : A `\` B = A `\` (B `&` A).
+proof. by rewrite fsetDIr fsetDv fsetU0. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma subsetIl (A B : 'a fset) : (A `&` B) \subset A.
 proof. by apply/subsetP=> x; rewrite inE; case. qed.
@@ -745,6 +748,17 @@ proof.
     by apply/fun_ext=> x; rewrite /predC /predC1 in_fset1.
   rewrite -{1}(undup_id (filter (predC1 a) (elems A))) 2:oflistK//.
   by apply/filter_uniq/uniq_elems.
+qed.
+
+lemma foldU (a : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset):
+  (forall a a' b, f a (f a' b) = f a' (f a b)) =>
+  ! mem A a =>
+  fold f z (A `|` fset1 a) = f a (fold f z A).
+proof.
+move=> assoc_f. rewrite (foldC a _ _ (A `|` fset1 a) assoc_f). 
+- by apply in_fsetU; right; exact in_fset1. 
+rewrite fsetDK fsetDID fset1I.
+move=> />. by rewrite fsetD0.
 qed.
 
 (* -------------------------------------------------------------------- *)

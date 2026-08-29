@@ -64,6 +64,20 @@ inductive isdistr (m : 'a -> real) =
        (forall x, 0%r <= m x)
      & (forall s, uniq s => big predT m s <= 1%r).
 
+lemma isdistr_summable_equiv (m : 'a -> real) :
+  isdistr m <=> (forall x, 0%r <= m x) /\ summable m /\ sum m <= 1%r.
+proof.
+rewrite/bounded. split => [ [ * ] | [ ? [ * ] ] ]; last first.
+- split; 1: assumption.
+  move => ? ?. apply (ler_trans (sum m)) => //.
+  by apply ler_big_sum => //. 
+have sumM : summable m.
+- exists 1%r.
+  have <- : (fun i => `|m i|) = m; smt().
+do 2 ! (split => //).
+by apply (lerfin_sum sumM).
+qed.
+
 lemma eq_isdistr (d1 d2 : 'a -> real) :
   d1 == d2 => isdistr d1 = isdistr d2.
 proof. by move=> /fun_ext=> ->. qed.
