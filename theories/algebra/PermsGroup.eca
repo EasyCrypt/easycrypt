@@ -1,0 +1,269 @@
+(* -------------------------------------------------------------------- *)
+require import AllCore List Ring Binomial Perms FinType Finite Distr.
+require (*--*) Subtype.
+
+(* -------------------------------------------------------------------- *)
+type t.
+
+clone FinType as FinT with type t <- t.
+
+hint simplify FinT.enumP.
+
+hint exact : FinT.enum_uniq.
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: move this                                                     *)
+lemma uniq_nth ['a] (x0 : 'a) (s : 'a list) :
+  uniq s => forall i j, 0 <= i < size s => 0 <= j < size s =>
+    nth x0 s i = nth x0 s j => i = j.
+proof.
+move=> uqs  i j rgi rgj /(congr1 (fun x => index x s)) /=.
+by rewrite !index_uniq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: move this                                                     *)
+lemma inj_bij (f : t -> t) : injective f => bijective f.
+proof.
+pose P y x := y = f x; pose g := fun y => choiceb (P y) witness.
+move=> inj_f; exists g; split.
+- move=> x @/g; have := choicebP (P (f x)) witness _ => /=.
+  - by exists x. - by move/inj_f => /eq_sym.
+move=> y @/g; have /eq_sym // := choicebP (P y) witness _ => /=.
+pose s := map f FinT.enum; suff: perm_eq s FinT.enum.
+- by move/perm_eq_mem/(_ y) => /= /mapP[x] /= ->; exists x.
+have uqs: uniq s by rewrite map_inj_in_uniq //#.
+apply/perm_eq_sym/uniq_eq_perm_eq => //; last first.
+- by rewrite size_map.
+apply/fun_ext=> x /=; rewrite eq_sym &(eqT).
+suff: perm_eq s FinT.enum by move/perm_eq_mem/(_ x).
+apply: uniq_le_perm_eq => //.
+- by move=> x' /=.              (* ??? *)
+- by rewrite size_map.
+qed.
+
+(* -------------------------------------------------------------------- *)
+type preperm = t -> t.
+
+op isperm (p : preperm) =
+  bijective p.
+
+subtype perm as PSub = { p : preperm | isperm p }.
+
+realize inhabited by exists idfun; smt().
+
+(* -------------------------------------------------------------------- *)
+abbrev "_.[_]" (p : perm) (x : t) = (PSub.val p) x.
+
+(* -------------------------------------------------------------------- *)
+op preperm1 : preperm =
+  idfun.
+
+op prepermM (p1 p2 : preperm) =
+  p1 \o p2.
+
+op prepermV (p : preperm) =
+  choiceb (fun pV => cancel p pV) witness.
+
+(* -------------------------------------------------------------------- *)
+lemma perm1_spec : isperm preperm1 by smt().
+
+lemma permM_spec (p1 p2 : preperm) :
+  isperm p1 => isperm p2 => isperm (prepermM p1 p2).
+proof. by apply: bij_comp. qed.
+
+lemma permV_spec (p : preperm) :
+  isperm p => isperm (prepermV p).
+proof.
+move=> ^bijp [pV] [can_p can_pV].
+have ?: cancel p (prepermV p).
+- apply: (choicebP (fun pV => cancel p pV) witness) => /=.
+  by exists pV.  
+suff ->: prepermV p = pV by smt(bij_can_bij).
+- by apply/fun_ext; apply: (bij_can_eq _ _ _ bijp) => //#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op perm1 =
+  PSub.insubd preperm1.
+
+op ( \o ) (p1 p2 : perm) =
+  PSub.insubd (prepermM (PSub.val p1) (PSub.val p2)).
+
+op [ ! ] (p : perm) =
+  PSub.insubd (prepermV (PSub.val p)).
+
+(* -------------------------------------------------------------------- *)
+lemma perm1E (x : t) : perm1.[x] = x.
+proof. by rewrite /perm1 PSub.val_insubd ifT // &(perm1_spec). qed.
+
+lemma permME (p1 p2 : perm) (x : t) : (p1 \o p2).[x] = p1.[p2.[x]].
+proof. by rewrite /(+) PSub.val_insubd ifT 1:(permM_spec) // PSub.valP. qed.
+
+hint simplify perm1E, permME.
+
+(* -------------------------------------------------------------------- *)
+lemma perm_eqP (p1 p2 : perm) :
+  (p1 = p2) <=> (forall x, p1.[x] = p2.[x]).
+proof. by split=> [->//|eqext]; apply/PSub.val_inj/fun_ext. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mulpA: associative (\o).
+proof. by move=> p q r; apply/perm_eqP=> x. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mulp1: left_id perm1 (\o).
+proof. by move=> p; apply/perm_eqP=> x. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mul1p: right_id perm1 (\o).
+proof. by move=> p; apply/perm_eqP=> x. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mulpV : right_inverse perm1 [!] (\o).
+proof.
+move=> p; apply/perm_eqP=> x /=.
+rewrite /[!] PSub.insubdK 1:&(permV_spec) 1:(PSub.valP).
+have ->//: cancel (prepermV (PSub.val p)) (PSub.val p).
+apply/bij_can_sym; first by apply/PSub.valP.
+apply: (choicebP(fun pV => cancel (PSub.val p) pV) witness).
+by case: (PSub.valP p) => g [] *; exists g.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mulpVE (p : perm) (x : t) : p.[(!p).[x]] = x.
+proof. by rewrite -permME mulpV. qed.
+
+hint simplify mulpVE.
+
+(* -------------------------------------------------------------------- *)
+lemma bij_perm (p : perm) : bijective (PSub.val p).
+proof. by apply: PSub.valP. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma inj_perm (p : perm) : injective (PSub.val p).
+proof. by apply: (bij_inj _ (bij_perm p)). qed.
+
+(* -------------------------------------------------------------------- *)
+hint simplify mulp1, mul1p, mulpV.
+
+(* -------------------------------------------------------------------- *)
+op tolist (p : perm) : t list =
+  map (fun x => p.[x]) FinT.enum.
+
+(* -------------------------------------------------------------------- *)
+op pre_oflist (s : t list) : preperm =
+  fun x => nth witness s (index x FinT.enum).
+
+(* -------------------------------------------------------------------- *)
+op oflist (s : t list) : perm =
+  PSub.insubd (pre_oflist s).
+
+(* -------------------------------------------------------------------- *)
+lemma isperm_pre_oflist (s : t list) :
+  perm_eq s FinT.enum => isperm (pre_oflist s).
+proof.
+move=> sfull; apply: inj_bij => x y @/pre_oflist.
+have eqsz: size s = size FinT.enum by apply: perm_eq_size.
+have hid_x: 0 <= index x FinT.enum < size s.
+- by rewrite index_ge0 /= eqsz index_mem.
+have hid_y: 0 <= index y FinT.enum < size s.
+- by rewrite index_ge0 /= eqsz index_mem.
+have: uniq s by rewrite (perm_eq_uniq _ _ sfull).
+move/uniq_nth => + eqnth - /(_ witness _ _ hid_x hid_y eqnth).
+by move/(congr1 (nth witness FinT.enum)); rewrite !nth_index.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma oflistE (s : t list) (x : t) :
+  perm_eq s FinT.enum => (oflist s).[x] = nth witness s (index x FinT.enum).
+proof. by move/isperm_pre_oflist => h; rewrite PSub.insubdK. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma tolist_nth_index (p : perm) (x : t) :
+  nth witness (tolist p) (index x FinT.enum) = p.[x].
+proof.
+rewrite /tolist (nth_map witness) -1:nth_index //.
+by rewrite index_ge0 index_mem.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma perm_tolist (p : perm) : perm_eq (tolist p) FinT.enum.
+proof.
+apply/perm_eq_sym/uniq_eq_perm_eq.
+- by apply: FinT.enum_uniq.
+- apply/fun_ext=> x; rewrite eq_sym /= eqT.
+  by apply/mapP; exists (!p).[x].
+- by rewrite size_map.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma inj_tolist : injective tolist.
+proof.
+move=> p q; apply/contraLR; rewrite perm_eqP negb_forall.
+case=> x neq; pose i := index x FinT.enum.
+apply/negP => /(congr1 (fun s => nth witness s i)) /=.
+by rewrite !tolist_nth_index.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma inj_oflist (p q : t list) :
+     perm_eq p FinT.enum
+  => perm_eq q FinT.enum
+  => oflist p = oflist q
+  => p = q.
+proof.
+move=> hp hq eq; apply: (eq_from_nth witness).
+- by rewrite (perm_eq_size _ _ hp) (perm_eq_size _ _ hq).
+move=> i; rewrite (perm_eq_size _ _ hp) => rgi.
+pose x := nth witness FinT.enum i.
+move/(congr1 PSub.val): eq => /fun_ext /(_ x).
+by rewrite !oflistE // !index_uniq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma oflistK : cancel tolist oflist.
+proof.
+move=> p; apply/perm_eqP=> x; rewrite oflistE 1:&(perm_tolist).
+rewrite (nth_map witness) /=.
+- by rewrite index_ge0 /= index_mem.
+- by rewrite nth_index.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op dperm : perm distr = dmap (duniform (allperms FinT.enum)) oflist.
+
+(* -------------------------------------------------------------------- *)
+lemma dperm_ll : is_lossless dperm.
+proof.
+apply/dmap_ll/duniform_ll.
+suff: FinT.enum \in allperms FinT.enum by smt().
+by rewrite allpermsP &(perm_eq_refl).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dperm_uni : is_uniform dperm.
+proof.
+rewrite /dperm dmap_duniform.
+- move=> p q /allpermsP /perm_eq_sym hp /allpermsP /perm_eq_sym hq.
+  by apply: inj_oflist.
+- by apply: duniform_uni.
+qed.
+
+hint exact : dperm_uni.
+
+(* -------------------------------------------------------------------- *)
+lemma dperm_full : is_full dperm.
+proof.
+move=> p; apply/supp_dmap; exists (tolist p); split.
+- by apply/supp_duniform/allpermsP/perm_eq_sym/perm_tolist.
+- by rewrite oflistK.
+qed.
+
+hint exact : dperm_full.
+
+(* -------------------------------------------------------------------- *)
+lemma dperm_funiform : is_funiform dperm.
+proof. by apply: is_full_funiform. qed.
+
+hint exact : dperm_funiform.
