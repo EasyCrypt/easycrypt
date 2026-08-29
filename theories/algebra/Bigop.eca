@@ -589,3 +589,49 @@ have: forall (i : int), exists j, i = 2 * j \/ i = 2 * j + 1 by smt().
 - case/(_ x) => y [] ->>; [left | right]; apply/mapP=> /=;
     by exists y; (split; first apply/mem_range); smt().
 qed.
+
+(* -------------------------------------------------------------------- *)
+require import FSet.
+
+(* -------------------------------------------------------------------- *)
+abbrev bigs ['a] (P : 'a -> bool) (F : 'a -> t) (s : 'a fset) =
+  big P F (elems s).
+
+(* -------------------------------------------------------------------- *)
+section BigFSet.
+declare type a.
+
+lemma bigs0 (P : a -> bool) (F : a -> t) : bigs P F fset0 = idm.
+proof. by rewrite elems_fset0 big_nil. qed.
+
+lemma bigs1 (F : a -> t) (x : a) : bigs predT F (fset1 x) = F x.
+proof. by rewrite elems_fset1 big_seq1. qed.
+
+lemma bigsU (P : a -> bool) (F : a -> t) (s1 s2 : a fset) : disjoint s1 s2 =>
+  bigs P F (s1 `|` s2) = (bigs P F s1) + (bigs P F s2).
+proof.
+move=> djt; rewrite -big_cat &(eq_big_perm) &(uniq_perm_eq).
+- by apply: uniq_elems.
+- rewrite uniq_catC &(cat_uniq) !uniq_elems /=.
+  by apply/hasPn=> x; rewrite -!memE &(disjointP).
+- by move=> x; rewrite mem_cat -!memE in_fsetU.
+qed.
+
+lemma bigsU1 (F : a -> t) (x : a) (s : a fset) :
+  x \notin s => bigs predT F (s `|` fset1 x) = F x + bigs predT F s.
+proof.
+move=> x_notin_s; rewrite bigsU.
+- by rewrite fsetIC; apply/disjointP=> a /in_fset1 ->.
+- by rewrite bigs1 addmC.
+qed.
+
+lemma bigsD1 (F : a -> t) (x : a) (s : a fset) :
+  x \in s => bigs predT F s = F x + bigs predT F (s `\` fset1 x).
+proof.
+move=> x_in_s; suff {1}->: s = (s `\` fset1 x) `|` fset1 x.
+- rewrite bigsU; last by rewrite bigs1 addmC.
+  by apply/disjointP=> a; rewrite in_fsetD1 in_fset1.
+by apply/fsetP=> a; rewrite in_fsetU1 in_fsetD1 /#.
+qed.
+
+end section BigFSet.
