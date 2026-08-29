@@ -662,7 +662,7 @@ and process_th_clone (scope : EcScope.scope) thcl =
   EcScope.Cloning.clone scope (Pragma.get ()).pm_check thcl
 
 (* -------------------------------------------------------------------- *)
-and process_th_alias (scope : EcScope.scope) (thcl : psymbol * pqsymbol) =
+and process_th_alias (scope : EcScope.scope) (thcl : psymbol * pqsymbol list) =
   EcScope.check_state `InTop "theory alias" scope;
   EcScope.Theory.alias scope thcl
 

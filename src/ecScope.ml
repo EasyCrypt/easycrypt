@@ -2065,12 +2065,31 @@ module Theory = struct
   let required scope = scope.sc_required
 
   (* -------------------------------------------------------------------- *)
-  let alias (scope : scope) ((name, target) : psymbol * pqsymbol) =
-    let thpath = EcEnv.Theory.lookup_opt (unloc target) (env scope) in
-    let thpath, _ = ofdfl (fun () ->
-      hierror ~loc:(loc target) "unknown theory: %a" pp_qsymbol (unloc target)
-    ) thpath in
-    let item = EcTheory.mkitem ~import:true (Th_alias (unloc name, thpath)) in
+  let alias (scope : scope) ((name, targets) : psymbol * pqsymbol list) =
+    let resolve (target : pqsymbol) =
+      let thpath = EcEnv.Theory.lookup_opt (unloc target) (env scope) in
+      let thpath, _ = ofdfl (fun () ->
+        hierror ~loc:(loc target) "unknown theory: %a" pp_qsymbol (unloc target)
+      ) thpath in
+      thpath in
+
+    let thpaths = List.map resolve targets in
+
+    (* Packed aliases (more than one target) merge the targets' members
+     * under one name.  Restrict the targets to sibling sub-theories of
+     * the current scope, so that the components of the alias can be
+     * reconstructed purely from the enclosing theory (see
+     * [EcEnv.MC.mc_of_theory_r]). *)
+    if List.length thpaths > 1 then begin
+      let root = EcEnv.root (env scope) in
+      List.iter2 (fun target thpath ->
+        if EcPath.prefix thpath <> Some root then
+          hierror ~loc:(loc target)
+            "packed theory aliases must reference sibling theories")
+        targets thpaths
+    end;
+
+    let item = EcTheory.mkitem ~import:true (Th_alias (unloc name, thpaths)) in
 
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 end

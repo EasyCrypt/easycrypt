@@ -328,7 +328,7 @@ require DiffieHellman.
 clone DiffieHellman as DH.
 import DH.DDH DH.G DH.GP DH.FD DH.GP.ZModE.
 
-clone DH.GP.ZModE.ZModpField as ZPF.
+clone DH.GP.ZModE.ZModpFieldBd as ZPF.
 
 (*  Such statements make no sense when we don't restrict to a
     complexity class 
@@ -897,7 +897,7 @@ wp;call (_: ={glob HybFChan.F2Auth.F2Auth,
 ); last first.
 
 (* Init *)
-by auto => /> &2; rewrite expM /= -expM ZPF.mulrC expM.
+by auto => /> &2; rewrite expM /= -expM ZPF.R.mulrC expM.
 (* Now the call *)
 + by proc;inline *; auto => /> /#.
 + by sim />.

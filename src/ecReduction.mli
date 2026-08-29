@@ -78,6 +78,16 @@ type reduction_info = {
 and deltap      = [EcEnv.Op.redmode | `No]
 and rlogic_info = [`Full | `ProductCompat] option
 
+(* Effective reduction-opacity of an operator under the proof-local
+   overrides carried by [user_local]. *)
+val reduction_opaque : reduction_info -> EcEnv.env -> EcPath.path -> bool
+
+(* Adjust a delta mode by the proof-local opacity override. *)
+val opacity_mode :
+  reduction_info -> EcPath.path ->
+  [`Force | `IfTransparent | `IfApplied | `No] ->
+  [`Force | `IfTransparent | `IfApplied | `No]
+
 val full_red     : reduction_info
 val full_compat  : reduction_info
 val no_red       : reduction_info
