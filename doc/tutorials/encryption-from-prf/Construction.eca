@@ -1,0 +1,783 @@
+(* ****************** Requires/Imports ******************* *)
+(* Built-in (i.e., standard library *)
+require import AllCore Distr List.
+
+
+(* ****************** Types (i.e., non-empty sets) ******************* *)
+(* Keys, plaintexts and nonces *)
+type key, ptxt, nonce.
+
+(* Ciphertexts (same set as for plaintexts) *)
+type ctxt = ptxt.
+
+
+
+(* ****************** Operators ******************* *)
+(*
+  A family of functions from nonces to plaintexts, indexed by
+  the set of keys.
+*)
+op f : key -> nonce -> ptxt.
+
+(* Binary operator over plaintexts *)
+op (+) : ptxt -> ptxt -> ptxt.
+
+(* 
+  Assumed associativity, commutativity, and "left self-cancellation" 
+  properties of + operator, respectively.
+*)
+axiom addpA (x y z : ptxt) : x + y + z = x + (y + z).
+axiom addpC (x y : ptxt) : x + y = y + x.
+axiom addKp (x y : ptxt) : x + x + y = y.
+
+(* "Right self-cancellation" propery of + *)
+lemma addpK (x y : ptxt) : x + y + y = x.
+proof.
+(* 
+  Rewrite y + x + x as y + (x + x) 
+  using above associativity axiom addpA 
+*)
+rewrite addpA.
+(* 
+  Rewrite y + (x + x) as (x + x) + y (which is simply rendered as x + x + y)
+  using above commutativity axiom addpC 
+*) 
+rewrite addpC.
+(* 
+  Rewrite x + x + y as y
+  using above "left self-cancellation" axiom addKp
+*) 
+rewrite addKp.
+(* Trivially true: y = y *)
+trivial.
+qed.
+
+
+
+(* ****************** Distributions ******************* *)
+(* (Sub)Distribution over keys **)
+op dkey : key distr.
+
+(* 
+  Proper, uniform distribution over the entire set of 
+  plaintexts (and, hence, ciphertexts). 
+*)
+op [lossless full uniform] dptxt : ptxt distr.
+
+(* 
+  Alias to make it clear when we are conceptually considering
+  plaintexts and ciphertexts (even though they are really the same thing)
+*)
+op dctxt : ctxt distr = dptxt.
+
+
+
+(* ****************** Scheme ******************* *)
+(* Module type (i.e., interface) for (symmetric) nonce-based encryption schemes *)
+module type NBEncScheme = {
+  proc kgen() : key
+  proc enc(k : key, n : nonce, m : ptxt) : ctxt
+  proc dec(k : key, n : nonce, c : ctxt) : ptxt
+}.
+
+(* Specification of the considered (symmetric) nonce-based encryption scheme *)
+module E : NBEncScheme = {
+  proc kgen(): key = {
+    var k : key;
+
+    (* Sample key k from (sub)distribution dkey *)
+    k <$ dkey;
+    
+    return k;
+  }
+
+  proc enc(k : key, n : nonce, m : ptxt) : ctxt = {
+    (* 
+      Compute f k n, combine it with the message using +, 
+      and return the result
+    *)
+    return (f k n) + m;
+  }
+
+  proc dec(k : key, n : nonce, c : ctxt) : ptxt = {
+    (* 
+      Compute f k n, combine it with the ciphertext using +, 
+      and return the result
+    *)
+    return (f k n) + c;
+  }
+}.
+
+
+
+(* ****************** Security ******************* *)
+(* 
+  -- 
+  INDistinguishability from RANDOM ciphertexts under Nonce-Respecting 
+  Chosen-Plaintext Attacks (IND$-NRCPA)
+  
+  By observing ciphertext (supposedly) of chosen messages, it is hard 
+  to determine whether the ciphertexts were honestly created by a 
+  (symmetric nonce-based) encryption scheme or sampled uniformly at random.
+  -- 
+*)
+
+(* 
+  Module type (i.e., interface) for oracles used in IND$-NRCPA game.
+  Note the "option" in "ctxt option" (the return type of enc); intuitively,
+  this means that enc can either return a valid ciphertext c (as Some c) or an
+  indication of failure (as None). This is needed as the oracles will indicate
+  a failure when being queried on a nonce that was already used in a previous
+  query.
+*)
+module type NRCPA_Oraclei = {
+  proc init() : unit
+  proc enc(n : nonce, m : ptxt) : ctxt option
+}.
+
+(* 
+  Module type (i.e., interface) for oracles provided to the adversaries 
+  against the IND$-NRCPA game. Used to ensure we only expose the enc procedure
+  of the oracles to the adversaries, and not the init procedure.
+*)
+module type NRCPA_Oracle = {
+  (* Include only the enc procedure signature of the NRCPA_Oraclei module type *)
+  include NRCPA_Oraclei [enc]
+}.
+
+(*
+  Real oracle used in IND$-NRCPA game (and, thus, of type NRCPA_Oraclei).
+  Defined with respect to an (abstract) nonce-based encryption scheme E that it
+  uses to encrypt messages.
+*)
+module O_NRCPA_real (S : NBEncScheme) : NRCPA_Oraclei = {
+  var k : key (* Secret key *)
+  var log : nonce list (* Log of queried nonces *)
+  
+  (* Perform necessary initialization *)
+  proc init() : unit = {
+    (* Generate secret key with key generation of provided scheme *)
+    k <@ S.kgen();
+    
+    (* Initialize log to the empty list *)
+    log <- [];
+  }
+
+  (* Encryption procedure exposed to the adversary *)
+  proc enc(n : nonce, m : ptxt) : ctxt option = {
+    var c : ctxt;
+    var r : ctxt option; (* return variable *)
+
+    (* If the given nonce is not in the log of already queried nonces, ... *) 
+    if (! (n \in log)) {
+      (* then prepend the current nonce to the log, ... *)
+      log <- n :: log;
+      
+      (* encrypt the message using the provided scheme, and ... *)
+      c <@ S.enc(k, n, m);
+      
+      (* store the resulting ciphertext in the return variable; ... *)
+      r <- Some c;
+    } else {
+      (* else, store an indication of failure in the return variable. *)
+      r <- None;
+    }
+    
+    return r;
+  }
+}.
+
+(*
+  Ideal oracle used in IND$-NRCPA game (and, thus, of type NRCPA_Oraclei).
+  Instead of encrypting messages with an encryption scheme, it produces
+  ciphertexts by sampling them uniformly at random.
+*)
+module O_NRCPA_ideal : NRCPA_Oraclei = {
+  var log : nonce list (* Log of queried nonces *)
+
+  (* Perform necessary initialization *)
+  proc init() : unit = {
+    (* Initialize log to the empty list *)
+    log <- [];
+  }
+
+  (* Encryption procedure exposed to the adversary *)
+  proc enc(n : nonce, m : ptxt) : ctxt option = {
+    var c : ctxt;
+    var r : ctxt option; (* return variable *)
+    
+    (* If the given nonce is not in the log of already queried nonces, ... *) 
+    if (! (n \in log)) {
+      (* then prepend the current nonce to the log, ... *)
+      log <- n :: log;
+      
+      (* sample a ciphertext from dctxt, and ... *)
+      c <$ dctxt;
+      
+      (* store the resulting ciphertext in the return variable; ... *)
+      r <- Some c;
+    } else {
+      (* else, store an indication of failure in the return variable. *)
+      r <- None;
+    }
+    
+    return r;
+  }
+}.
+
+(* 
+  Module type (i.e., interface) for adversaries (or distinguishers) against IND$-NRCPA.
+  In essence, this defines the relevant class of adversaries, containing
+  any algorithm that expects a NR-CPA oracle and defines a 
+  procedure returning a boolean.
+*)
+module type Adv_IND_NRCPA (O : NRCPA_Oracle) = {
+  proc distinguish() : bool
+}.
+
+(* IND$-NRCPA game/experiment *)
+module Exp_IND_NRCPA (O : NRCPA_Oraclei) (D : Adv_IND_NRCPA) = {
+  proc run() : bool = {
+    var b : bool;
+
+    (* Initialize oracle O *)
+    O.init();
+    
+    (* 
+      Call distinguish procedure of adversary D, providing oracle O.
+      Note that, even though O is of type NRCPA_Oraclei, providing it
+      to D does not expose the init procedure to D. This because D itself
+      only expects the provided oracle to have the enc procedure, due to
+      the type of D being defined with respect to a module of type NRCPA_Oracle.
+    *)
+    b <@ D(O).distinguish();
+    
+    return b;
+  }
+}.
+
+
+(* 
+  -- 
+  "Nonce-Respecting" Pseudo-Random Function family (NR-PRF)
+  
+  By observing outputs (supposedly) of unique chosen inputs (nonces), it is hard to 
+  distinguish whether the function is a randomly sampled function from the domain
+  of functions with the considered domain (nonce) and co-domain (ptxt), or 
+  a randomly selected function from the hash function family f (i.e., a f k 
+  where k is randomly sampled from the domain of (indexing) keys).
+  -- 
+*)
+(* 
+  Module type (i.e., interface) for oracles used in NR-PRF game.
+  Again, note the "option" in "ptxt option" (the return type of get) to
+  model that the oracle can return either valid plaintexts (as Some p) or
+  an indication of failure (as None). 
+*)
+module type NRPRF_Oraclei = {
+  proc init() : unit
+  proc get(n : nonce) : ptxt option
+}.
+
+(* 
+  Module type (i.e., interface) for oracles used in NR-PRF game. 
+  Used to ensure we only expose the get procedure of the oracles 
+  to the advesaries, and not the init procedure.
+*)
+module type NRPRF_Oracle = {
+  (* Include only the get procedure signature of the NRCPA_Oraclei module type *)
+  include NRPRF_Oraclei [get]
+}.
+
+(* 
+  Real oracle used in NR-PRF game (and, thus, of type NRPRF_Oraclei). 
+  Creates plaintexts by mapping a given nonce under f k, where k is a
+  secret key randomly sampled during initialization. 
+*)
+module O_NRPRF_real : NRPRF_Oraclei = {
+  var k : key (* Secret key *)
+  var log : nonce list (* Log of queried nonces *)
+
+  (* Perform necessary initialization *)
+  proc init() : unit = {
+    (* Sample secret key at random *)
+    k <$ dkey;
+    (* Initialize log to the empty list *)
+    log <- [];
+  }
+
+  (* Get procedure exposed to the adversary *)
+  proc get(n : nonce) : ptxt option = {
+    var r : ptxt option; (* return variable *)
+
+    (* If the given nonce is not in the log of already queried nonces, ... *)
+    if (! (n \in log)) {
+      (* then prepend the current nonce to the log and ... *)
+      log <- n :: log;
+      
+      (* compute f k n and store the result in the return variable; ... *)
+      r <- Some (f k n);
+    } else {
+      (* else, store an indication of failure in the return variable. *)
+      r <- None;
+    }
+    
+    return r;
+  }
+}.
+
+(*
+  Ideal oracle used in NR-PRF game (and, thus, of type NRPRF_Oraclei).
+  Instead of mapping given nonces under f k, it produces
+  plaintexts by sampling them uniformly at random.
+*)
+module O_NRPRF_ideal : NRPRF_Oraclei = {
+  var log : nonce list (* Log of queried nonces *)
+
+  (* Perform necessary initalization *)
+  proc init() = {
+    (* Initialize log to the empty list *)
+    log <- [];
+  }
+
+  (* Get procedure exposed to the adversary *)
+  proc get(n : nonce) = {
+    var y : ptxt;
+    var r : ptxt option; (* return variable *)
+
+    (* If the given nonce is not in the log of already queried nonces, ... *)
+    if (! (n \in log)) {
+      (* then prepend the current nonce to the log and ... *)
+      log <- n :: log;
+      
+      (* sample a plaintext from dptxt, and ... *)
+      y <$ dptxt;
+      
+      (* store the resulting plaintext in the return variable; ... *)
+      r <- Some y;
+    } else {
+      (* else, store an indication of failure in the return variable. *)
+      r <- None;
+    }
+    
+    return r;
+  }
+}.
+
+(* Module type (i.e., interface) for adversaries (or distinguishers) against NR-PRF. *)
+module type Adv_NRPRF (O : NRPRF_Oracle) = {
+  proc distinguish() : bool
+}.
+
+(* NR-PRF game/experiment *)
+module Exp_NRPRF (O : NRPRF_Oraclei) (D : Adv_NRPRF) = {
+  proc run() : bool = {
+    var b : bool;
+    
+    (* Initialize oracle O *)
+    O.init();
+    
+    (* 
+      Call distinguish procedure of adversary D, providing oracle O.
+      Again, even though O is of type NRPRF_Oraclei, providing it
+      to D does not expose the init procedure to D as it expects an oracle
+      of type NRPRF_Oracle (i.e., an oracle that is only guaranteed to 
+      implement get).
+    *)
+    b <@ D(O).distinguish();
+    
+    return b;
+  }
+}.
+
+
+(*
+  Reduction adversary that, given an adversary against IND$-NRCPA, plays in the
+  NR-PRF game. As such, it takes a (adversary)  module of type Adv_IND_NRCPA and 
+  a (oracle) module of type NRPRF_Oracle and implements a distinguish procedure.
+  Here, the order of the module arguments is crucial for obtaining a module 
+  of the correct type. Namely, a module of type Adv_NRPRF should only be defined w.r.t.
+  a module of type NRPRF_Oracle, and not w.r.t. both a module of type Adv_IND_NRCPA *and*
+  a module of type NRPRF_Oracle. Since we can instantiate the module parameters partially 
+  (yet only from left to right), the module parameter of type Adv_IND_NRCPA should come before
+  the module parameter of type NRPRF_Oracle. Then, only instantiating the first module parameter
+  (e.g., R_NRPRF_IND_NRCPA(D), where D is a concrete module of type Adv_IND_NRCPA) results
+  in a module that is only still defined w.r.t. a module of type NRPRF_Oracle, as desired.
+  Lastly, note that the explicit typing of R_NRPRF_IND_NRCPA (D : Adv_IND_NRCPA) is not necessary
+  and, hence, the module signature of the reduction adversary could equivalently be written as
+  "module R_NRPRF_IND_NRCPA (D : Adv_IND_NRCPA) (O_NRPRF : NRPRF_Oracle)". However, even though
+  types can often be inferred, it is good practice to state the types explicitly for documentation
+  purposes.
+*) 
+module (R_NRPRF_IND_NRCPA (D : Adv_IND_NRCPA) : Adv_NRPRF) (O_NRPRF : NRPRF_Oracle) = {
+  (* 
+    Using the provided NRPRF oracle, construct a NRCPA oracle to provide 
+    to the given adversary.
+  *)
+  module O_NRCPA : NRCPA_Oracle = {
+    (* Encryption procedure exposed to the given adversary *)
+    proc enc(n : nonce, m : ptxt) : ctxt option = {
+      var p : ptxt option;
+      var r : ctxt option; (* return variable *)
+
+      (* 
+        Get plaintext (or failure indication) corresponding to n 
+        by querying given NRPRF oracle
+      *)
+      p <@ O_NRPRF.get(n);
+      
+      (* 
+        Compute a ciphertext or failure indication as follows:
+        If p is a failure indication (i.e., p = None), 
+          r is also a failure indication (i.e., r = None);
+        else (i.e., p = Some x for some x of type ptxt), 
+          r is Some (x + m).
+      *)
+      r <- if p = None then None else Some (oget p + m);      
+      
+      return r;
+    }
+  }
+
+  (* Distinguish procedure called by the NR-PRF game/experiment *)
+  proc distinguish() : bool = {
+    var b : bool; (* return variable *)
+    
+    (* 
+      Call the distinguish procedure of the given adversary, providing
+      the above-defined NRCPA oracle O_NRCPA
+    *)
+    b <@ D(O_NRCPA).distinguish();
+    
+    return b;
+  }
+}.
+
+
+(* 
+  Start a section for the security proof.
+  Although we could perform the entire proof without a section, this would
+  require us to define the considered adversary module (and all the corresponding 
+  restrictions) anew for each (intermediate) lemma we prove. Furthermore,
+  every intermediate lemma we prove would become a permanent part of the theory
+  (defined by the file), even if it is completely useless outside the proof.
+  A section allows us, among others, to "declare" the relevant modules (with restrictions) 
+  once and have them available throughout the entire section (but not outside the section).
+  Additionally, we can define local types, operators, module types, modules, and lemmas; 
+  these are only available/visible within the section and, as such, can be used to perform
+  any auxiliary intermediate proof steps without any of it being exposed to the outside.
+  Any non-local lemmas inside the section (i.e., lemmas that are exposed to the outside
+  after closing the section) are extended with a universal quantification over module types
+  of the modules declared earlier in the section.
+*)
+section E_IND_NRCPA.
+
+(* 
+  Declare the relevant adversary module.
+  Note that, by default, a module can access any other module's variables.
+  So, to prevent the adversary from illegally sabotaging the games that it is used in, 
+  we need to restrict the adversary from accessing the variables of the modules used in 
+  these games.
+*)
+declare module D <: Adv_IND_NRCPA { -O_NRCPA_real, -O_NRCPA_ideal, -O_NRPRF_real, -O_NRPRF_ideal }.
+
+(* 
+  Lemma.
+  The probability of D returning true in the IND$-NRCPA game when given the
+  real NR-CPA oracle is equal to the probability of R_NRPRF_IND_NRCPA returning true
+  when given D and the real NR-PRF oracle.
+  
+  This lemma is local (indicated by the "local" keyword), meaning that it is only
+  useable inside the section and, as such, can depend on local entities. 
+*)
+local lemma EqPr_IND_NRCPA_NRPRF_real &m:
+  Pr[Exp_IND_NRCPA(O_NRCPA_real(E), D).run() @ &m : res]
+  = 
+  Pr[Exp_NRPRF(O_NRPRF_real, R_NRPRF_IND_NRCPA(D)).run() @ &m : res].
+proof.
+(* 
+  Prove the equality of probabilities by showing the pRHL equivalence of the programs
+  where the programs start out with adversary D having the same 
+  environment (precondition) and end up with the same result (postcondition).
+   
+  We can combine tactics using a semicolon.
+  Specifically, "t1; t2." first applies tactic t1 on the goal and, afterward,
+  applies tactic t2 on all of the subgoals generated by applying t1.
+  So, here, "; trivial" applies trivial to all subgoals generated by applying byequiv,
+  solving/closing all generated trivial subgoals.
+*)
+byequiv (_ : ={glob D} ==> ={res}); trivial.
+(* 
+  Since both procedures in the pRHL equivalence are concrete,
+  prove the equivalence by reasoning about the actual code of the procedures.
+*)
+proc.
+(* 
+  In both programs, replace all calls to concrete procedures by the corresponding code
+  to be able to reason about the concrete code. 
+*)
+inline *.
+(*
+  Since both programs are sufficiently similar and call to the same abstract procedure 
+  that only differ in the implementation of the provided oracles, we can use the sim tactic. 
+  To infer the correct equality of program variables from the postcondition, we provide an 
+  explicit equality in form of an invariant that should be maintained throughout oracles 
+  calls. (in this case: the keys and logs of the oracles are equal)
+*)
+sim (_ : ={k}(O_NRCPA_real, O_NRPRF_real) /\ ={log}(O_NRCPA_real, O_NRPRF_real)).
+(* 
+  Goal generated by sim tactic.
+  pRHL equivalence between the enc procedures of the provided oracles 
+  where, as a precondition, we have equality of the inputs and the truth of 
+  the invariant, and, as a postcondition, we need to prove the equality 
+  of the (distribution of the) outputs as well as the truth of the
+  invariant.   
+*)
+(* proc, and inline * tactics used similarly to above. *)
+proc.
+inline *.
+(* 
+  Although it looks convoluted, the programs in the current goal can be trivially 
+  seen to be equivalent and, hence, solved by straightforward manipulations (e.g., 
+  unfolding definitions). The auto tactic uses various program logic tactics in attempt 
+  to reduce the goal and in is suffient to solve it in this case.
+  We could also use wp. skip. trivial. to solve the goal. These tactics are used
+  and explained in the next proof.
+*)
+auto.
+qed.
+
+(* 
+  Lemma.
+  The probablity of D returning true in the IND$-NRCPA game when given the
+  ideal NR-CPA oracle is equal to the probability of R_NRPRF_IND_NRCPA returning true
+  when given D and the ideal NR-PRF oracle.
+  
+  This lemma is local (indicated by the "local" keyword), meaning that it is only
+  useable inside the section and, as such, can depend on local entities. 
+*)
+local lemma EqPr_IND_NRCPA_NRPRF_ideal &m:
+  Pr[Exp_IND_NRCPA(O_NRCPA_ideal, D).run() @ &m: res]
+  = 
+  Pr[Exp_NRPRF(O_NRPRF_ideal, R_NRPRF_IND_NRCPA(D)).run() @ &m: res].
+proof.
+(* 
+  Most of the tactics and their application in this proof
+  are similar to those in the previous proof. As such, we do not provide 
+  comments for each and every tactic, but rather only wherever novel 
+  concepts arise.
+*)
+(* 
+  The trailing "=> //" is semantically equivalent to "; trivial", but syntactically 
+  more convenient/clean (especially when specifying more introduction patterns; 
+  see below for more information on these patterns).
+*)
+byequiv (_ : ={glob D} ==> ={res}) => //.
+proc; inline *.
+(*
+  From the end of the programs, consume all statements for which we know how to
+  adapt the postcondition as to reflect the execution of the statements without
+  actually executing them. In other words, transform the current pRHL equivalence
+  to a new one that implies the current one by removing as many statements 
+  from the end of the programs as possible while accordingly adapting the postcondition.
+*)
+wp.
+(*
+  Since both programs end with calls to the same abstract procedure that only differ 
+  in the implementation of the provided oracles, argue that the procedure 
+  must behave the same (and, hence, with the same probability produce the same 
+  output) as long as the module's view remains equal on both sides during the call. 
+  This requires the following:
+  - The module's environment (in this case: glob D) is the same in both programs
+    at the start of the call.
+  - The procedure's arguments (in this case: none) are the same on both sides.
+  - The (distribution of the) oracle outputs is the same on both sides; this may
+    require some invariant (in this case: the logs of the oracles are equal) 
+    to be maintained throughout oracles calls.
+  The first two requirements are proved based on the code preceding the calls; the final
+  requirement is proved with a separate pRHL equivalence on the oracle procedures (using 
+  the invariant that is supplied to the call tactic, following the colon).
+*)
+call (_ : ={log}(O_NRCPA_ideal, O_NRPRF_ideal)). 
+  (* 
+    First subgoal generated by call tactic.
+    pRHL equivalence between the enc procedures of the provided oracles 
+    where, as a precondition, we have equality of the inputs and the truth of 
+    the invariant, and, as a postcondition, we need to prove the equality 
+    of the (distribution of the) outputs as well as the truth of hte
+    invariant.   
+  *)
+- proc; inline *.
+  (* 
+    Analogous to wp, but removes statements from the beginning of the programs 
+    (instead of the end) and accordingly adjusts the precondition (instead of the
+    postcondition). 
+  *)
+  sp.
+  (*
+    Since both programs *start* with an if-statement, we can prove this 
+    pRHL equivalence by showing the following:
+    - The guards of the if-statements are equivalence (i.e., the if-guard of the left program 
+      evaluates to true iff the if-guard of the right program evaluates to true); this means
+      the left and right program go into the same branch.
+    - An appropriate pRHL equivalence where both programs take the then branch.
+    - An appropriate pRHL equivalence where both programs take the else branch.
+    
+    As the equivalence of the guards is trivial, we clear the corresponding subgoal 
+    using "=> //".
+  *)
+  if => //.
+    (* First subgoal generated by if tactic. *)
+  - wp.
+    (* 
+      Whenever both programs end with a sampling from the same distribution (remember, dctxt is
+      simply an alias for dptxt), we oftentimes want to assume that the same value is sampled 
+      on both sides using the rnd tactic. This tactic removes the samplings and adjusts the 
+      postcondition to capture that the sampled values are the same. (This produces some 
+      additional proof obligations in the postcondition that make sure this is actually 
+      sound.)
+      However, since in the postcondition we do not require the equality of the sampled values,
+      but rather of a random value and the addition of a random value with a fixed value, 
+      we want to "uniquely link" two sampled values that satisfy this equivalence. 
+      In other words, if 
+      we can specify a bijection (defined by, say, f and g = f^-1) between elements from 
+      the distribution of the left program and elements from the distribution of 
+      the right program (in this case: "a bijection on the set of plaintexts/ciphertexts"), 
+      we can assume that if we sample an element p in the left program, we sample f p in the
+      right program.
+      
+      To perform sampling that uses a certain bijection, we can provide f and g to the rnd
+      tactic (syntax: rnd f g). If f = g, then we can leave out the g (syntax: rnd f).
+      This latter case is applicable here.    
+    *)
+    rnd (fun (p : ptxt) => p + m{2}).
+    wp.
+    (* 
+      The skip tactic proves the pRHL equivalence where both programs are empty by showing that, 
+      for all possible program memories, the precondition implies the postcondition.
+      Here, "=> /> &2 _" does several things. Foremost, "=>" after a tactic allows us
+      to specify several so-called "introduction patterns" (such as the "//" seen earlier)
+      that will be applied to all subgoals generated by the preceding tactics (in this
+      case: skip, only generating a single subgoal). Then, the first introduction pattern,
+      />, simplfies the resulting subgoal as much as possible; the second introduction 
+      pattern, &2, specifies the name for the arbitrary memory introduced into the
+      context, removing the "forall memory" quantification in the subgoal's conclusion;
+      lastly, _ deletes the foremost antecedent of the subgoal's conclusion (we don't
+      need it to prove the remainder).
+    *) 
+    skip => />.
+    move => &2 _.
+    (* 
+      We prove a conjunction of predicates by splitting up the goal and
+      proving each of the predicates individually.
+    *)
+    split.
+      (* First subgoal generated by split tactic. *)
+      (* 
+        The move tactic does nothing, but still allows us to use 
+        introduction patterns (with "=>") 
+      *)
+    - move => y _.
+      (* 
+        The rewrite tactic allows for some nice syntactic sugar. 
+        Instead of "rewrite lemma1; rewrite lemma2.", we can use "rewrite lemma1 lemma2.".
+        Similarly, instead of "rewrite lemma1 => //", we can use "rewrite lemma1 //.". 
+      *)
+      rewrite addpK //.
+    (* Second subgoal generated by split tactic. *)
+    move => _ c _.
+    rewrite addpK //.
+  (* Second subgoal generated by if tactic. *)
+  auto.
+(* Second subgoal generated by call tactic. *)
+auto.
+qed.
+
+
+(* 
+  Lemma.
+  The advantage of D against IND$-NRCPA of E is equal to the advantage of
+  R_NRPRF_IND_NRCPA against NRPRF of f (when given D).
+  
+  This lemma is non-local, meaning it will be exposed outside the section and
+  will be preceded by a universal quantification for each module declared in
+  the section. Moreover, it cannot depend on local entities (as these are
+  non-existant outside the section).
+*)
+lemma EqAdvantage_IND_NRCPA_NRPRF &m:
+  `| Pr[Exp_IND_NRCPA(O_NRCPA_real(E), D).run() @ &m: res]
+     - Pr[Exp_IND_NRCPA(O_NRCPA_ideal, D).run() @ &m: res] |
+  = 
+  `| Pr[Exp_NRPRF(O_NRPRF_real, R_NRPRF_IND_NRCPA(D)).run() @ &m: res]
+     - Pr[Exp_NRPRF(O_NRPRF_ideal, R_NRPRF_IND_NRCPA(D)).run() @ &m: res] |.
+proof.
+(* 
+  The by keyword can be put in front of (a sequence of) tactics to try and
+  close all subgoals generated by the (sequence of) tactics. This will
+  only be successful if the generated subgoals are trivially solvable.
+  
+  The minuses in front of lemma names in a rewrite tactic 
+  indicate that the rewriting should occur in the opposite direction
+  of the equality/equivalence denoted by the lemma. For example,
+  suppose we have a lemma eqXY that shows X = Y. Then, rewrite eqXY 
+  rewrites all X in the goal's conclusion to Y, and rewrite -eqXY rewrites
+  all Y in the goal's conclusion to X.
+*)
+by rewrite EqPr_IND_NRCPA_NRPRF_real EqPr_IND_NRCPA_NRPRF_ideal.
+qed.
+
+end section E_IND_NRCPA.
+
+(**
+(** BONUS: A cost logic **)
+require import Xint CHoareTactic.
+
+clone import AllCore.Cost.
+
+op t_oplus: { int | 0 < t_oplus } as gt0_t_oplus.
+
+op t_prf: { int | 0 < t_prf } as gt0_t_prf.
+
+(** Assumptions on cost **)
+schema cost_omap `{P} {f : 'a -> 'b } { o : 'a option }:
+  cost [P : omap f o] = cost [P : f (oget o)].
+
+schema cost_transpose `{P} {f : 'a -> 'b -> 'c } { x : 'a } { y : 'b }:
+  cost [P : transpose f y x] = cost [P : f x y].
+
+schema cost_oplus `{P} { x y : ptxt }:
+  cost[P : x + y] = cost[P : x] + cost[P : y] + N t_oplus.
+
+schema cost_prf `{P} { k : key } { n : nonce }:
+  cost[P : f k n] = cost[P : k] + cost [P : n] + N t_prf.
+
+section.
+declare op q_enc : { int | 0 < q_enc } as gt0_q_enc.
+declare op t_distinguish : { int | 0 < t_distinguish } as gt0_t_distinguish.
+
+declare module D <: CPA_Distinguisher { -NR_CPA_Experiment, -PRF_Experiment, -CPA_Real, -PRF_Real } [distinguish : `{N t_distinguish, #O.enc : q_enc }].
+
+lemma cost_return:
+    cost(_: {m : ptxt, n : nonce, r : ptxt option}) [true : omap (transpose Top.(+) m) r]
+  = N (t_oplus + 1).
+proof.
+instantiate -> := (cost_omap {m : ptxt, n : nonce, r : ptxt option } `(true) (fun x=> x + m) r).
+instantiate -> := (cost_transpose {m : ptxt, n : nonce, r : ptxt option } `(true) (+) (oget r) m).
+instantiate -> := (cost_oplus {m : ptxt, n : nonce, r : ptxt option } `(true) (oget r) m).
+instantiate -> := (cost_oget {m : ptxt, n : nonce, r : ptxt option } `(true) r).
+have ->: cost (_ : {m : ptxt, n : nonce, r : ptxt option})[true : r] = N 0 by auto.
+have ->: cost (_ : {m : ptxt, n : nonce, r : ptxt option})[true : m] = N 0 by auto.
+by rewrite -!N_D /#.
+qed.
+
+lemma reduction_cost (P <: PRF_Oracle { -D, -R } [f : `{N t_prf}]):
+  choare[R(D, P).distinguish] time [N (t_distinguish + q_enc * (t_oplus + 1)); P.f : q_enc].
+proof.
+proc true: time [R(D, P).E.enc : [N (t_oplus + 1); P.f: 1]]=> //.
++ by auto=> />; rewrite Bigxint.bigi_constz 2:StdBigop.Bigint.bigi_constz 1,2:ltzW 1,2:gt0_q_enc /#.
+move=> k Hk; proc=> //.
++ by right; rewrite cost_return.
+by call (: true; time []); auto=> />; rewrite cost_return.
+qed.
+end section.
+**)

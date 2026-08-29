@@ -15,7 +15,7 @@ from sphinx.roles import code_role
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'EasyCrypt refman'
+project = 'EasyCrypt Documentation'
 copyright = '2026, EasyCrypt development team'
 author = 'EasyCrypt development team'
 
