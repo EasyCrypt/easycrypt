@@ -108,15 +108,22 @@ let p_List = [EcCoreLib.i_top; "List"]
 let p_BRA  = [EcCoreLib.i_top; "StdBigop"; "Bigreal"; "BRA"]
 let p_list_has = EcPath.fromqsymbol (p_List, "has")
 let p_BRA_big = EcPath.fromqsymbol (p_BRA, "big")
+let p_Logic = [EcCoreLib.i_top; "Logic"]
+let p_pred0 = EcPath.fromqsymbol (p_Logic, "pred0")
+let p_predI = EcPath.fromqsymbol (p_Logic, "predI")
+let p_predU = EcPath.fromqsymbol (p_Logic, "predU")
+let p_predC = EcPath.fromqsymbol (p_Logic, "predC")
 
-let destr_pr_has pr =
-  let m = pr.pr_event.m in
-  match pr.pr_event.inv.f_node with
+let destr_has m event =
+  match event.f_node with
   | Fapp ({ f_node = Fop(op, [ty_elem]) }, [f_f; f_l]) ->
       if EcPath.p_equal p_list_has op && not (Mid.mem m f_l.f_fv) then
-        Some(ty_elem, {m;inv=f_f}, f_l)
+        Some (ty_elem, {m;inv=f_f}, f_l)
       else None
   | _ -> None
+
+let destr_pr_has pr =
+  destr_has pr.pr_event.m pr.pr_event.inv
 
 let is_eq_w_const_rhs (f: ss_inv): bool =
   try 
@@ -140,6 +147,280 @@ let pr_has_le f_pr =
   let f_sum =
     f_app (f_op p_BRA_big [ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l] EcTypes.treal in
   f_real_le f_pr f_sum
+
+(* -------------------------------------------------------------------- *)
+type pr_rewrite_kind =
+  [ `Mu1LeEqMu1
+  | `MuSum
+  | `MuDisj
+  | `MuEq
+  | `MuFalse
+  | `MuGe0
+  | `MuLe1
+  | `MuNot
+  | `MuOr
+  | `MuSplit
+  | `MuSub
+  | `MuHasLe ]
+
+let rec decompose_imps f =
+  try
+    let f1, f2 = destr_imp f in
+    let fs, c = decompose_imps f2 in
+    (f1 :: fs, c)
+  with DestrError _ ->
+    ([], f)
+
+let destr_mu f =
+  match f.f_node with
+  | Fapp ({ f_node = Fop (op, [ty]) }, [d; p]) ->
+      if EcPath.p_equal EcCoreLib.CI_Distr.p_mu op then Some (ty, d, p) else None
+  | _ -> None
+
+let destr_eq_opt f =
+  try Some (destr_eq f) with DestrError _ -> None
+
+let destr_imp_opt f =
+  try Some (destr_imp f) with DestrError _ -> None
+
+let destr_or_r_opt f =
+  try Some (destr_or_r f) with DestrError _ -> None
+
+let destr_weight f =
+  obind (fun (ty, d, p) ->
+    if f_equal p (f_predT ty) then Some (ty, d) else None)
+    (destr_mu f)
+
+let destr_mu1 f =
+  obind (fun (_, d, p) ->
+    match p.f_node with
+    | Fapp ({ f_node = Fop (op, _) }, [x]) ->
+        if EcPath.p_equal EcCoreLib.CI_Pred.p_pred1 op then Some (d, x) else None
+    | _ -> None)
+    (destr_mu f)
+
+let destr_pred_not f =
+  match f.f_node with
+  | Fapp ({ f_node = Fop (op, [_]) }, [p]) ->
+      if EcPath.p_equal p_predC op then Some p else None
+  | _ -> None
+
+let destr_pred_binop path f =
+  match f.f_node with
+  | Fapp ({ f_node = Fop (op, [_]) }, [p; q]) ->
+      if EcPath.p_equal path op then Some (p, q) else None
+  | _ -> None
+
+let destr_pred_and = destr_pred_binop p_predI
+let destr_pred_or  = destr_pred_binop p_predU
+
+let destr_real_add f =
+  match f.f_node with
+  | Fapp ({ f_node = Fop (op, _) }, [f1; f2]) ->
+      if EcPath.p_equal EcCoreLib.CI_Real.p_real_add op then Some (f1, f2) else None
+  | _ -> None
+
+let destr_real_opp f =
+  match f.f_node with
+  | Fapp ({ f_node = Fop (op, _) }, [f1]) ->
+      if EcPath.p_equal EcCoreLib.CI_Real.p_real_opp op then Some f1 else None
+  | _ -> None
+
+let destr_real_sub f =
+  obind (fun (f1, f2) -> omap (fun f2 -> (f1, f2)) (destr_real_opp f2))
+    (destr_real_add f)
+
+let is_pred0 f =
+  match f.f_node with
+  | Fop (op, [_]) -> EcPath.p_equal p_pred0 op
+  | _ -> false
+
+let destr_lambda1 f =
+  match f.f_node with
+  | Fquant (Llambda, [(x, GTty ty)], body) -> ((x, ty), body)
+  | _ -> raise Not_found
+
+let destr_mu1_le_eq_mu1 hyps concl =
+  if List.length hyps <> 2 then None else
+  match hyps, concl.f_node with
+  | [hll; hle], Fquant (Lforall, [_], body) ->
+      begin match body.f_node with
+      | Fapp ({ f_node = Fop (op, _) }, [lhs; rhs]) when EcPath.p_equal EcCoreLib.CI_Bool.p_eq op ->
+          begin match destr_mu1 lhs, destr_mu1 rhs with
+          | Some (d1, _), Some (d2, _) when f_equal d1 d2 ->
+              begin match hll.f_node, hle.f_node with
+              | Fapp ({ f_node = Fop (opll, _) }, [_]), Fquant (Lforall, [_], bodyle) ->
+                  if EcPath.p_equal EcCoreLib.CI_Distr.p_lossless opll then
+                    begin match bodyle.f_node with
+                    | Fapp ({ f_node = Fop (ople, _) }, [lhsle; rhsle]) when EcPath.p_equal EcCoreLib.CI_Real.p_real_le ople ->
+                        begin match destr_mu1 lhsle, destr_mu1 rhsle with
+                        | Some (d1', _), Some (_, _) when f_equal d1 d1' -> Some `Mu1LeEqMu1
+                        | _ -> None
+                        end
+                    | _ -> None
+                    end
+                  else None
+              | _ -> None
+              end
+          | _ -> None
+          end
+      | _ -> None
+      end
+  | _ -> None
+
+let classify_pr_rewrite env s : pr_rewrite_kind =
+  let _path, ax = EcEnv.Ax.lookup ([], s) env in
+  let body = snd (decompose_forall ax.ax_spec) in
+  let hyps, concl = decompose_imps body in
+
+  match concl.f_node with
+  | Fapp ({ f_node = Fop (op, _) }, [lhs; rhs])
+    when EcPath.p_equal EcCoreLib.CI_Bool.p_eq op ->
+      begin match destr_mu lhs, destr_mu rhs with
+      | Some (_, d1, _), Some (_, d2, _)
+        when f_equal d1 d2 && List.length hyps = 1 ->
+          `MuEq
+
+      | Some (_, _, p), _ when List.length hyps = 0 && is_pred0 p && f_equal rhs f_r0 ->
+          `MuFalse
+
+      | Some (ty, d1, pnot), _
+        when List.length hyps = 0 ->
+          begin match destr_pred_not pnot, destr_real_sub rhs with
+          | Some p, Some (w, mu) ->
+              begin match destr_weight w, destr_mu mu with
+              | Some (ty', d2), Some (_, d3, p')
+                when EcTypes.ty_equal ty ty'
+                  && f_equal d1 d2
+                  && f_equal d1 d3
+                  && f_equal p p' ->
+                  `MuNot
+              | _ -> raise Not_found
+              end
+
+          | _ ->
+              begin match destr_pred_or pnot, destr_real_sub rhs with
+              | Some (p1, p2), Some (sum12, mu12) ->
+                  begin match destr_real_add sum12, destr_mu mu12 with
+                  | Some (mu1, mu2), Some (_, d4, pand) ->
+                      begin match destr_mu mu1, destr_mu mu2, destr_pred_and pand with
+                      | Some (_, d2, q1), Some (_, d3, q2), Some (a1, a2)
+                        when f_equal d1 d2
+                          && f_equal d1 d3
+                          && f_equal d1 d4
+                          && f_equal p1 q1
+                          && f_equal p2 q2
+                          && f_equal p1 a1
+                          && f_equal p2 a2 ->
+                          `MuOr
+                      | _ -> raise Not_found
+                      end
+                  | _ -> raise Not_found
+                  end
+
+              | _ ->
+                  begin match rhs.f_node with
+                  | Fapp ({ f_node = Fop (op, _) }, [mu1; mu2])
+                    when EcPath.p_equal EcCoreLib.CI_Real.p_real_add op ->
+                      begin match destr_pred_and pnot, destr_mu mu1, destr_mu mu2 with
+                      | Some (p, q), Some (_, d2, pand1), Some (_, d3, pand2)
+                        when f_equal d1 d2 && f_equal d1 d3 ->
+                          begin match destr_pred_and pand1, destr_pred_and pand2 with
+                          | Some (p1, q1), Some (p2, nq) ->
+                              begin match destr_pred_not nq with
+                              | Some q2
+                                when f_equal p p1
+                                  && f_equal p p2
+                                  && f_equal q q1
+                                  && f_equal q q2 ->
+                                  `MuSplit
+                              | _ -> raise Not_found
+                              end
+                          | _ -> raise Not_found
+                          end
+                      | _ -> raise Not_found
+                      end
+
+                  | Fapp ({ f_node = Fop (op, [_]) }, [lam])
+                    when EcPath.p_equal EcCoreLib.CI_Sum.p_sum op
+                      && List.length hyps = 0 ->
+                      begin match destr_lambda1 lam with
+                      | (_, _), body ->
+                          begin match body.f_node with
+                          | Fif (cond, then_, else_) ->
+                              begin match destr_mu1 then_ with
+                              | Some (_, x) when f_equal cond x && f_equal else_ f_r0 ->
+                                  `MuSum
+                              | _ -> raise Not_found
+                              end
+                          | _ -> raise Not_found
+                          end
+                      end
+
+                  | _ -> raise Not_found
+                  end
+              end
+          end
+
+      | _ ->
+          begin match destr_mu1_le_eq_mu1 hyps concl with
+          | Some kind -> kind
+          | None -> raise Not_found
+          end
+      end
+
+  | Fapp ({ f_node = Fop (op, _) }, [lhs; rhs])
+    when EcPath.p_equal EcCoreLib.CI_Real.p_real_le op ->
+      begin match destr_mu lhs, destr_mu rhs with
+      | Some (_, d1, _), Some (_, d2, _)
+        when f_equal d1 d2 && List.length hyps = 1 ->
+          `MuSub
+
+      | _, Some _ when f_equal lhs f_r0 && List.length hyps = 0 ->
+          `MuGe0
+
+      | Some _, _ when f_equal rhs f_r1 && List.length hyps = 0 ->
+          `MuLe1
+
+      | Some (_, _, p), _
+        when List.length hyps = 1 ->
+          begin match destr_pred_or p, rhs.f_node with
+          | Some _, Fapp ({ f_node = Fop (op, _) }, [mu1; mu2])
+            when EcPath.p_equal EcCoreLib.CI_Real.p_real_add op ->
+              begin match destr_mu mu1, destr_mu mu2 with
+              | Some _, Some _ -> `MuDisj
+              | _ -> raise Not_found
+              end
+          | _ -> raise Not_found
+          end
+
+      | Some (_, _, p), _
+        when List.length hyps = 0 ->
+          begin match destr_has (EcIdent.create "&hr") p, rhs.f_node with
+          | Some (ty1, _, s1), Fapp ({ f_node = Fop (op, [_]) }, [predt; lam; s2])
+            when EcPath.p_equal p_BRA_big op && f_equal s1 s2 ->
+              begin match destr_lambda1 lam with
+              | (_, ty2), body when EcTypes.ty_equal ty1 ty2 && f_equal predt (f_predT ty2) ->
+                  begin match destr_mu body with
+                  | Some _ -> `MuHasLe
+                  | None -> raise Not_found
+                  end
+              | _ -> raise Not_found
+              end
+          | _ -> raise Not_found
+          end
+
+      | _ -> raise Not_found
+      end
+
+  | Fquant (Lforall, [_], _) ->
+      begin match destr_mu1_le_eq_mu1 hyps concl with
+      | Some kind -> kind
+      | None -> raise Not_found
+      end
+
+  | _ ->
+      raise Not_found
 
 (* -------------------------------------------------------------------- *)
 exception FoundPr of form
@@ -198,26 +479,10 @@ let select_pr_muhasle sid f =
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
-let pr_rewrite_lemma =
-  [
-    ("mu1_le_eq_mu1", `Mu1LeEqMu1);
-    ("muE", `MuSum);
-    ("mu_disjoint", `MuDisj);
-    ("mu_eq", `MuEq);
-    ("mu_false", `MuFalse);
-    ("mu_ge0", `MuGe0);
-    ("mu_le1", `MuLe1);
-    ("mu_not", `MuNot);
-    ("mu_or", `MuOr);
-    ("mu_split", `MuSplit);
-    ("mu_sub", `MuSub);
-    ("mu_has_le", `MuHasLe)
-  ]
-
-(* -------------------------------------------------------------------- *)
 let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
+  let env, hyps, concl = FApi.tc1_eflat tc in
   let kind =
-    try List.assoc s pr_rewrite_lemma
+    try classify_pr_rewrite env s
     with Not_found ->
       tc_error !!tc "Pr-rewrite: `%s` is not a suitable probability lemma" s
   in
@@ -243,7 +508,6 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
   in
 
   let select xs fp = if select xs fp then `Accept (-1) else `Continue in
-  let env, hyps, concl = FApi.tc1_eflat tc in
   let torw =
     try
       ignore (EcMatching.FPosition.select select concl);
