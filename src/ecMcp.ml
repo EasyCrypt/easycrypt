@@ -521,14 +521,15 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
        alone: this is the one point every byte leaves through, so no
        future tool or error path can put invalid UTF-8 on the wire by
        forgetting to sanitize. *)
+    (* Only the constructors we build are named: [Tuple] and [Variant]
+       are non-standard extensions we never emit, and yojson 3 dropped
+       them from the type, so naming them here would not compile there. *)
     let rec repair (msg : J.t) : J.t =
       match msg with
-      | `String s       -> `String (utf8_repair s)
-      | `List l         -> `List (List.map repair l)
-      | `Tuple l        -> `Tuple (List.map repair l)
-      | `Assoc l        -> `Assoc (List.map (fun (k, v) -> (k, repair v)) l)
-      | `Variant (k, v) -> `Variant (k, Option.map repair v)
-      | msg             -> msg
+      | `String s -> `String (utf8_repair s)
+      | `List l   -> `List (List.map repair l)
+      | `Assoc l  -> `Assoc (List.map (fun (k, v) -> (k, repair v)) l)
+      | msg       -> msg
 
     let send (msg : J.t) =
       output_string wire (J.to_string (repair msg));
