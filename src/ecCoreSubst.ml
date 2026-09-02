@@ -28,7 +28,10 @@ type f_subst = {
   fs_mod     : EcPath.mpath Mid.t;
   fs_modex   : mod_extra Mid.t;
   fs_loc     : form Mid.t;
-  fs_eloc    : expr Mid.t;
+  (* Expression-level view of [fs_loc] entries, converted on demand:
+     fix-reduction binds large data at every step and almost never
+     substitutes into expressions. [None] when not translatable. *)
+  fs_eloc    : expr option Lazy.t Mid.t;
   fs_mem     : EcIdent.t Mid.t;
   (* free variables in the codom of the substitution *)
   fs_fv      : int Mid.t;
@@ -54,6 +57,15 @@ let fv_Mid (type a)
   Mid.fold (fun _ t s -> fv_union s (fv t)) m s
 
 (* -------------------------------------------------------------------- *)
+let eloc_of_expr (e : expr) : expr option Lazy.t =
+  Lazy.from_val (Some e)
+
+let eloc_of_form (f : form) : expr option Lazy.t =
+  lazy (
+    try  Some (EcCoreFol.expr_of_form f)
+    with EcCoreFol.CannotTranslate -> None)
+
+(* -------------------------------------------------------------------- *)
 let f_subst_init
       ?(freshen=false)
       ?(tu=Muid.empty)
@@ -72,7 +84,7 @@ let f_subst_init
     fs_mod      = Mid.empty;
     fs_modex    = Mid.empty;
     fs_loc      = Mid.empty;
-    fs_eloc     = esloc;
+    fs_eloc     = Mid.map eloc_of_expr esloc;
     fs_mem      = Mid.empty;
     fs_fv       = fv;
   }
@@ -81,27 +93,24 @@ let f_subst_id = f_subst_init ()
 
 (* -------------------------------------------------------------------- *)
 let bind_elocal (s : f_subst) (x : ident) (e : expr) : f_subst =
-  let fs_eloc = Mid.add x e s.fs_eloc in
+  let fs_eloc = Mid.add x (eloc_of_expr e) s.fs_eloc in
   let fs_fv   = fv_union (e_fv e) s.fs_fv in
   { s with fs_eloc; fs_fv; }
 
 (* -------------------------------------------------------------------- *)
 let bind_elocals (s : f_subst) (esloc : expr Mid.t) : f_subst =
-  let merger (_ : ident) (oe1 : expr option) (oe2 : expr option) =
-    match oe2 with None -> oe1 | Some _ -> oe2 in
+  let merger (_ : ident) oe1 oe2 =
+    match oe2 with None -> oe1 | Some e -> Some (eloc_of_expr e) in
   let fs_eloc = Mid.merge merger s.fs_eloc esloc in
   let fs_fv = fv_Mid e_fv esloc s.fs_fv in
   { s with fs_eloc; fs_fv; }
 
 (* -------------------------------------------------------------------- *)
 let f_bind_local (s : f_subst) (x : ident) (t : form) : f_subst =
-  let s =
-    match EcCoreFol.expr_of_form t with
-    | e -> bind_elocal s x e
-    | exception EcCoreFol.CannotTranslate -> s in
-  let fs_loc = Mid.add x t s.fs_loc in
-  let fs_fv = fv_union (f_fv t) s.fs_fv in
-  { s with fs_loc; fs_fv; }
+  let fs_loc  = Mid.add x t s.fs_loc in
+  let fs_eloc = Mid.add x (eloc_of_form t) s.fs_eloc in
+  let fs_fv   = fv_union (f_fv t) s.fs_fv in
+  { s with fs_loc; fs_eloc; fs_fv; }
 
 (* -------------------------------------------------------------------- *)
 let f_bind_mem (s : f_subst) (m1 : memory) (m2 : memory) : f_subst =
@@ -141,7 +150,7 @@ let f_bind_rename s xfrom xto ty =
   let xe = e_local xto ty in
   let s  = f_bind_local s xfrom xf in
   (* Free variable already added by f_bind_local *)
-  { s with fs_eloc = Mid.add xfrom xe s.fs_eloc; }
+  { s with fs_eloc = Mid.add xfrom (eloc_of_expr xe) s.fs_eloc; }
 
 (* ------------------------------------------------------------------ *)
 let f_rem_local (s : f_subst) (x : ident) : f_subst =
@@ -249,7 +258,7 @@ let elp_subst (s : f_subst) (lp : lpattern) : f_subst * lpattern =
 let rec e_subst (s : f_subst) (e : expr) : expr =
   match e.e_node with
   | Elocal id -> begin
-    match Mid.find_opt id s.fs_eloc with
+    match obind Lazy.force (Mid.find_opt id s.fs_eloc) with
     | Some e' -> e'
     | None    -> e_local id (ty_subst s e.e_ty)
     end
