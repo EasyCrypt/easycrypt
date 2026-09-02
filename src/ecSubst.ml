@@ -51,7 +51,7 @@ type subst = {
   sb_module   : EcPath.mpath Mid.t;
   sb_path     : EcPath.path Mp.t;
   sb_tyvar    : ty Mid.t;
-  sb_elocal   : expr Mid.t;
+  sb_elocal   : expr option Lazy.t Mid.t;
   sb_flocal   : EcCoreFol.form Mid.t;
   sb_fmem     : EcIdent.t Mid.t;
   sb_tydef    : (EcIdent.t list * ty) Mp.t;
@@ -262,7 +262,7 @@ let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
     { s with sb_module = Mid.change merger x s.sb_module }
 
 let add_elocal (s : subst) (x : EcIdent.t) (e : expr) =
-  { s with sb_elocal = Mid.add x e s.sb_elocal }
+  { s with sb_elocal = Mid.add x (Lazy.from_val (Some e)) s.sb_elocal }
 
 let add_elocals (s : subst) (xs : EcIdent.t list) (es : expr list) =
   List.fold_left2 add_elocal s xs es
@@ -285,12 +285,14 @@ let fresh_elocal_opt (s : subst) ((x, ty) : EcIdent.t option * ty) =
 let fresh_elocals_opt (s : subst) (locals : (EcIdent.t option * ty) list) =
   List.fold_left_map fresh_elocal_opt s locals
 
+(* Expression-level binding converted on demand (see
+   [EcCoreSubst.f_bind_local]); [None] when not translatable. *)
 let add_flocal (s : subst) (x : EcIdent.t) (f : EcCoreFol.form) =
-  let s =
-    match EcCoreFol.expr_of_form f with
-    | e -> add_elocal s x e
-    | exception EcCoreFol.CannotTranslate -> s in
-  { s with sb_flocal = Mid.add x f s.sb_flocal }
+  let e = lazy (
+    try  Some (EcCoreFol.expr_of_form f)
+    with EcCoreFol.CannotTranslate -> None) in
+  { s with sb_flocal = Mid.add x f s.sb_flocal;
+           sb_elocal = Mid.add x e s.sb_elocal; }
 
 let add_flocals (s : subst) (xs : EcIdent.t list) (fs : EcCoreFol.form list) =
   List.fold_left2 add_flocal s xs fs
@@ -317,9 +319,7 @@ let rename_flocal (s : subst) xfrom xto ty =
   let xf = EcCoreFol.f_local xto ty in
   let xe = EcTypes.e_local xto ty in
   let s  = add_flocal s xfrom xf in
-
-  let merger o = assert (o = None); Some xe in
-  { s with sb_elocal = Mid.change merger xfrom s.sb_elocal }
+  { s with sb_elocal = Mid.add xfrom (Lazy.from_val (Some xe)) s.sb_elocal }
 
 let add_memory (s : subst) (m : EcIdent.t) (target : EcIdent.t) =
   { s with sb_fmem = Mid.add m target s.sb_fmem }
@@ -402,9 +402,9 @@ let subst_expr_lpattern (s : subst) (lp : lpattern) =
 let rec subst_expr (s : subst) (e : expr) =
   match e.e_node with
   | Elocal id -> begin
-      match Mid.find id s.sb_elocal with
-      | aout -> aout
-      | exception Not_found -> e_local id (subst_ty s e.e_ty)
+      match obind Lazy.force (Mid.find_opt id s.sb_elocal) with
+      | Some aout -> aout
+      | None -> e_local id (subst_ty s e.e_ty)
     end
 
   | Evar pv ->
