@@ -393,11 +393,14 @@ let process_pr fmt scope p =
   let env = EcScope.env scope in
 
   match p with
-  | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   fmt env   (unloc qs)
-  | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
-  | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
+  (* [~locate] prefixes each printed object with the name `locate' reports
+     for it, so that a lookup that had homonyms to choose from says which
+     one each declaration is. *)
+  | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   ~locate:true fmt env (unloc qs)
+  | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   ~locate:true fmt env (unloc qs)
+  | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   ~locate:true fmt env (unloc qs)
   | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
-  | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   (unloc qs)
+  | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   ~locate:true fmt env (unloc qs)
   | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   (unloc qs)
   | Pr_proc qs -> EcPrinting.ObjectInfo.pr_fun  fmt env   (unloc qs)
   | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   (unloc qs)
