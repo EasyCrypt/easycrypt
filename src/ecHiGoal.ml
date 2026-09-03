@@ -167,10 +167,10 @@ let process_simplify_info ri (tc : tcenv1) =
   in
 
   let delta_p, delta_h =
-    ri.pdelta
-      |> omap (List.fold_left do1 (Sp.empty, Sid.empty))
-      |> omap (fun (x, y) -> (fun p -> if Sp.mem p x then `Force else `IfApplied), (Sid.mem^~ y))
-      |> odfl ((fun _ -> `IfTransparent), predT)
+    let sop, sid = List.fold_left do1 (Sp.empty, Sid.empty) ri.pdelta.pd_ops in
+    let dflt = if ri.pdelta.pd_all then `IfTransparent else `IfApplied in
+    ((fun p -> if Sp.mem p sop then `Force else dflt),
+     (if ri.pdelta.pd_all then predT else Sid.mem^~ sid))
   in
 
   let hint = ri.phint in

@@ -586,9 +586,16 @@ let empty_simplify_hint = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* [pd_all] unfolds every transparent definition; [pd_ops] are unfolded
+   unconditionally, opaque ones included. Both may be set at once. *)
+type pdelta = {
+  pd_all : bool;
+  pd_ops : pqsymbol list;
+}
+
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
-  pdelta   : pqsymbol list option;      (* definition unfolding *)
+  pdelta   : pdelta;                    (* definition unfolding *)
   pzeta    : bool;                      (* let-reduction *)
   piota    : bool;                      (* case/if-reduction *)
   peta     : bool;                      (* η-reduction *)
