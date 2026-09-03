@@ -3327,46 +3327,33 @@ module Search = struct
   let locate (scope : scope) ({ pl_desc = name } : pqsymbol) =
     let ppe = EcPrinting.PPEnv.ofenv (env scope) in
 
-    let shorten lk p =
-      let lk (p : path) (qs : qsymbol) =
-        match lk qs (env scope) with
-        | Some (p', _) -> p_equal p p'
-        | _ -> false in
-      EcPrinting.shorten_path ppe lk p
-    in
-
     let buffer = Buffer.create 0 in
     let fmt    = Format.formatter_of_buffer buffer in
 
-    let for_kind section getall shorten =
+    let for_kind ?pp_name section getall lookup =
       let objs = getall ?check:None ?name:(Some name) (env scope) in
-      let objs = List.map shorten (List.fst objs) in
 
       if not (List.is_empty objs) then begin
         Format.fprintf fmt "In section [%s]@\n@\n" section;
 
-        List.iter (fun (long, short) ->
-            match short with
-            | None ->
-                Format.fprintf fmt " - %a@\n"
-                  EcSymbols.pp_qsymbol long
-            | Some short ->
-                Format.fprintf fmt " - %a (shorten name: %a)@\n"
-                  EcSymbols.pp_qsymbol long
-                  EcSymbols.pp_qsymbol short
-          )  objs
+        List.iter (fun p ->
+            Format.fprintf fmt " - %a@\n"
+              (EcPrinting.pp_locate_path ?pp_name ppe lookup) p
+          ) (List.fst objs)
       end in
 
-    for_kind "operators" EcEnv.Op.all (shorten EcEnv.Op.lookup_opt);
-    for_kind "types"     EcEnv.Ty.all (shorten EcEnv.Ty.lookup_opt);
-    for_kind "lemmas"    EcEnv.Ax.all (shorten EcEnv.Ax.lookup_opt);
+    for_kind "operators" EcEnv.Op.all EcEnv.Op.lookup_opt
+      ~pp_name:EcPrinting.pp_opqsymbol;
+    for_kind "types"     EcEnv.Ty.all EcEnv.Ty.lookup_opt;
+    for_kind "lemmas"    EcEnv.Ax.all EcEnv.Ax.lookup_opt;
 
     Format.pp_print_flush fmt ();
 
     if Buffer.length buffer = 0 then begin
       Format.fprintf fmt
         "no objects found for `%a'"
-        EcSymbols.pp_qsymbol name
+        EcSymbols.pp_qsymbol name;
+      Format.pp_print_flush fmt ()
     end;
 
     notify scope `Info "%s" (Buffer.contents buffer)

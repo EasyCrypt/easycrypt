@@ -507,21 +507,58 @@ let pp_xpath fmt (xp: P.xpath) =
   Format.fprintf fmt "%s" (P.x_tostring xp)
 
 (* -------------------------------------------------------------------- *)
+(* [pp_name] is how the category at hand spells a name: an operator needs
+   its parentheses back ([pp_opqsymbol]) to be valid syntax again, whereas
+   a type or a lemma is spelled as it stands. *)
+let pp_shortened
+  ?(pp_name : qsymbol pp = EcSymbols.pp_qsymbol)
+   (fmt : Format.formatter)
+  ((plong, pshort) : qsymbol * qsymbol option)
+=
+  match pshort with
+  | None ->
+    Format.fprintf fmt "%a" pp_name plong
+  | Some pshort ->
+    Format.fprintf fmt "%a (shorten name: %a)"
+    pp_name plong
+    pp_name pshort
+
+(* -------------------------------------------------------------------- *)
 let pp_shorten_path
   (ppe  : PPEnv.t)
   (cond : P.path -> qsymbol -> bool)
   (fmt  : Format.formatter)
   (p    : P.path)
 =
-  let plong, pshort = shorten_path ppe cond p in
+  pp_shortened fmt (shorten_path ppe cond p)
 
-  match pshort with
-  | None ->
-    Format.fprintf fmt "%a" EcSymbols.pp_qsymbol plong
-  | Some pshort ->
-    Format.fprintf fmt "%a (shorten name: %a)"
-    EcSymbols.pp_qsymbol plong
-    EcSymbols.pp_qsymbol pshort
+(* -------------------------------------------------------------------- *)
+(* An object is reachable under a name exactly when looking that name up
+   resolves back to it -- which is the condition [shorten_path] wants. *)
+let locate_path
+  (ppe    : PPEnv.t)
+  (lookup : qsymbol -> EcEnv.env -> (P.path * 'a) option)
+  (p      : P.path)
+  : qsymbol * qsymbol option
+=
+  let cond (p : P.path) (qs : qsymbol) =
+    match lookup qs ppe.PPEnv.ppe_env with
+    | Some (p', _) -> P.p_equal p p'
+    | None -> false
+  in shorten_path ppe cond p
+
+(* [pp_locate_path] says where an object lives: the name it is known under,
+   plus the shortest form that still resolves to it. This is the report the
+   `locate' command lists, and the one `print' prefixes each of the objects
+   it displays with. *)
+let pp_locate_path
+  ?(pp_name : qsymbol pp = EcSymbols.pp_qsymbol)
+   (ppe    : PPEnv.t)
+   (lookup : qsymbol -> EcEnv.env -> (P.path * 'a) option)
+   (fmt    : Format.formatter)
+   (p      : P.path)
+=
+  pp_shortened ~pp_name fmt (locate_path ppe lookup p)
 
 (* -------------------------------------------------------------------- *)
 let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =
@@ -928,6 +965,10 @@ let pp_opname (fmt : Format.formatter) ((nm, op) : symbol list * symbol) =
     else op
 
   in EcSymbols.pp_qsymbol fmt (nm, op)
+
+(* [pp_opname] under a name the path-level [pp_opname] defined below does
+   not shadow. *)
+let pp_opqsymbol : qsymbol pp = pp_opname
 
 (* -------------------------------------------------------------------- *)
 let pp_opname_with_tvi
@@ -4039,6 +4080,30 @@ module ObjectInfo = struct
     od_printer : PPEnv.t -> Format.formatter -> 'a -> unit;
   }
 
+  (* ------------------------------------------------------------------ *)
+  (* With [locate], an object is prefixed by the name [locate] reports for
+     it: the one it is known under, and the shortest form that still
+     resolves to it. A name with no namespace prefix says nothing the
+     declaration does not, and is left out -- the same convention as the
+     [~long] flag of the declaration printers, which the report
+     supersedes. *)
+  let pp_located
+    ?(locate = false)
+    ?pp_name
+     (lookup : qsymbol -> EcEnv.env -> (P.path * 'a) option)
+     (pp     : PPEnv.t -> (P.path * 'a) pp)
+     (ppe    : PPEnv.t)
+     (fmt    : Format.formatter)
+    ((p, _) as obj : P.path * 'a)
+  =
+    if locate then begin
+      match locate_path ppe lookup p with
+      | (([], _), None) -> ()
+      | located ->
+          Format.fprintf fmt "(* %a *)@ " (pp_shortened ?pp_name) located
+    end;
+    pp ppe fmt obj
+
   (* -------------------------------------------------------------------- *)
   let pr_gen_r ?(prcat = false) dumper = fun fmt env qs ->
     let ppe = PPEnv.ofenv env in
@@ -4058,30 +4123,35 @@ module ObjectInfo = struct
         theprinter fmt env qs
       with NoObject ->
         Format.fprintf fmt
-          "no such object in the category [%s]@." dumper.od_name
+          "no object `%a' in the category [%s]@\n@."
+          EcSymbols.pp_qsymbol qs dumper.od_name
 
   (* ------------------------------------------------------------------ *)
-  let pr_ty_r =
+  let pr_ty_r ?locate () =
     { od_name    = "type declarations";
       od_lookup  = EcEnv.Ty.lookup;
-      od_printer = pp_typedecl; }
+      od_printer = pp_located ?locate EcEnv.Ty.lookup_opt pp_typedecl; }
 
-  let pr_ty = pr_gen pr_ty_r
+  let pr_ty ?locate fmt env qs = pr_gen (pr_ty_r ?locate ()) fmt env qs
 
   (* ------------------------------------------------------------------ *)
-  let pr_op_r =
+  let pr_op_r ?(locate = false) () =
     let get_ops qs env =
       let l = EcEnv.Op.all ~name:qs env in
       if l = [] then raise NoObject;
       l in
+    let pp_one =
+      pp_located ~locate ~pp_name:pp_opqsymbol EcEnv.Op.lookup_opt
+        (pp_opdecl ~long:(not locate)) in
     { od_name    = "operators, predicates or exceptions";
       od_lookup  = get_ops;
       od_printer =
         fun ppe fmt l ->
+          (* an annotated object spans two lines: keep the entries apart *)
           Format.fprintf fmt "@[<v>%a@]"
-            (pp_list "@ " (pp_opdecl ~long:true ppe)) l; }
+            (pp_list (if locate then "@ @ " else "@ ") (pp_one ppe)) l; }
 
-  let pr_op = pr_gen pr_op_r
+  let pr_op ?locate fmt env qs = pr_gen (pr_op_r ?locate ()) fmt env qs
 
   (* ------------------------------------------------------------------ *)
   let pr_th_r =
@@ -4092,19 +4162,23 @@ module ObjectInfo = struct
   let pr_th = pr_gen pr_th_r
 
   (* ------------------------------------------------------------------ *)
-  let pr_ax_r =
+  let pr_ax_r ?(locate = false) () =
     let get_ops qs env =
       let l = EcEnv.Ax.all ~name:qs env in
       if l = [] then raise NoObject;
       l in
+    let pp_one =
+      pp_located ~locate EcEnv.Ax.lookup_opt
+        (pp_axiom ~long:(not locate)) in
     { od_name    = "lemmas or axioms";
       od_lookup  = get_ops;
       od_printer =
         fun ppe fmt l ->
+          (* an annotated object spans two lines: keep the entries apart *)
           Format.fprintf fmt "@[<v>%a@]"
-            (pp_list "@ " (pp_axiom ~long:true ppe)) l; }
+            (pp_list (if locate then "@ @ " else "@ ") (pp_one ppe)) l; }
 
-  let pr_ax = pr_gen pr_ax_r
+  let pr_ax ?locate fmt env qs = pr_gen (pr_ax_r ?locate ()) fmt env qs
 
   (* ------------------------------------------------------------------ *)
   let pr_mod_r =
@@ -4179,10 +4253,10 @@ module ObjectInfo = struct
 
   (* ------------------------------------------------------------------ *)
   let pr_any fmt env qs =
-    let printers = [pr_gen_r ~prcat:true pr_ty_r ;
-                    pr_gen_r ~prcat:true pr_op_r ;
+    let printers = [pr_gen_r ~prcat:true (pr_ty_r ~locate:true ());
+                    pr_gen_r ~prcat:true (pr_op_r ~locate:true ());
                     pr_gen_r ~prcat:true pr_th_r ;
-                    pr_gen_r ~prcat:true pr_ax_r ;
+                    pr_gen_r ~prcat:true (pr_ax_r ~locate:true ());
                     pr_gen_r ~prcat:true pr_mod_r;
                     pr_gen_r ~prcat:true pr_fun_r;
                     pr_gen_r ~prcat:true pr_mty_r;
@@ -4195,7 +4269,8 @@ module ObjectInfo = struct
       (fun f -> try f fmt env qs with NoObject -> decr ok)
       printers;
     if !ok = 0 then
-      Format.fprintf fmt "%s@." "no such object in any category"
+      Format.fprintf fmt "no object `%a' in any category@\n@."
+        EcSymbols.pp_qsymbol qs
 end
 
 (* ------------------------------------------------------------------ *)

@@ -31,8 +31,11 @@ clone BV as L with type t =  int.   (* L.t is a plain alias        *)
 clone import Use as UK with theory P <= K.
 clone import Use as UL with theory P <= L.
 
-(* UK.P.t receives K.t's *body* (K.t is clinline): prints `int`. *)
-expect "type t = int." by print type UK.P.t.
+(* UK.P.t receives K.t's *body* (K.t is clinline): prints `int`. The
+   leading comment is the `locate' report `print' prefixes objects with. *)
+expect "(* UK.P.t *)
+type t = int." by print type UK.P.t.
 
 (* UL.P.t keeps the reference to L.t (L.t is a plain alias): prints `L.t`. *)
-expect "type t = L.t." by print type UL.P.t.
+expect "(* UL.P.t *)
+type t = L.t." by print type UL.P.t.

@@ -43,6 +43,9 @@ module type PrinterAPI = sig
   val pp_list : ?on_empty:unit pp -> ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
   (* ------------------------------------------------------------------ *)
+  (* an operator name, with the parentheses that make it valid syntax *)
+  val pp_opqsymbol : qsymbol pp
+
   val pp_pv      : PPEnv.t -> prog_var pp
   val pp_local   : ?fv:Sid.t -> PPEnv.t -> ident pp
   val pp_opname  : PPEnv.t -> path pp
@@ -66,6 +69,16 @@ module type PrinterAPI = sig
   val shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path -> qsymbol * qsymbol option
 
   val pp_shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path pp
+
+  (* [pp_locate_path ?pp_name ppe lookup] says where an object lives: the
+     name it is known under, plus the shortest form that [lookup] still
+     resolves to it. [pp_name] is how the category at hand spells a name --
+     [pp_opqsymbol] for an operator, the default for a type or a lemma. *)
+  val pp_locate_path :
+       ?pp_name:qsymbol pp
+    -> PPEnv.t
+    -> (qsymbol -> EcEnv.env -> (path * 'a) option)
+    -> path pp
 
   (* ------------------------------------------------------------------ *)
   val pp_codepos1      : PPEnv.t -> EcMatching.Position.codepos1 pp
@@ -131,10 +144,12 @@ module type PrinterAPI = sig
   module ObjectInfo : sig
     type db = [`Rewrite of qsymbol | `Solve of symbol]
 
-    val pr_ty  : Format.formatter -> EcEnv.env -> qsymbol -> unit
-    val pr_op  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+    (* [locate:true] prefixes each printed object with the name
+       [pp_locate_path] reports for it. *)
+    val pr_ty  : ?locate:bool -> Format.formatter -> EcEnv.env -> qsymbol -> unit
+    val pr_op  : ?locate:bool -> Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_th  : Format.formatter -> EcEnv.env -> qsymbol -> unit
-    val pr_ax  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+    val pr_ax  : ?locate:bool -> Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_mod : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_fun : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_mty : Format.formatter -> EcEnv.env -> qsymbol -> unit
