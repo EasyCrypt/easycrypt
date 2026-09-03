@@ -1,0 +1,418 @@
+require import AllCore Distr List FSet FMap.
+require import Dexcepted.
+require (*--*) PRP.
+(*---*) import RField StdOrder.RealOrder.
+
+require (*--*) FelTactic Mu_mem.
+
+(** We assume a finite domain D, equipped with a full and lossless
+    distribution. **)
+type D.
+op [lossless full] dD: D distr.
+
+op hmin_dD: { real | forall d, mu1 dD d <= hmin_dD } as hmin_dDP.
+
+lemma ge0_hmin_dD: 0%r <= hmin_dD.
+proof.
+apply: (ler_trans (mu1 dD witness)).
++ exact: ge0_mu.
+exact: hmin_dDP.
+qed.
+
+(** and a type K **)
+type K.
+
+clone import PRP as PRPt with
+  type D  <- D
+proof *.
+
+clone import PRP as PRPSec
+proof *.
+
+clone import RP as PRPi with
+    op dD <- dD
+proof *
+rename "RP" as "PRPi".
+realize dD_ll by smt(dD_ll).
+
+(* This is an "Almost (Random Permutation)" (the Almost applies to Permutation) *)
+(* We keep track of collisions explicitly because it's going to be useful anyway *)
+module ARP = {
+  var m, mi: (D, D) fmap
+
+  proc init(): unit = {
+    m    <- empty;
+    mi   <- empty;
+  }
+
+  proc f(x: D) = {
+    var y;
+
+    if (x \notin m) {
+      y      <$ dD;
+      m.[x]  <- y;
+      mi.[y] <- x;
+    }
+    return oget m.[x];
+  }
+
+  proc fi(y: D) = {
+    var x;
+
+    if (y \notin mi) {
+      x      <$ dD;
+      m.[x]  <- y;
+      mi.[y] <- x;
+    }
+    return oget mi.[y];
+  }
+}.
+
+section.
+
+declare module D <: Distinguisher { -PRPi, -ARP, -Count }.
+declare axiom D_ll (O <: PRP_Oracles { -D }):
+     islossless O.f
+  => islossless O.fi
+  => islossless D(O).distinguish.
+
+declare op q : { int | 0 <= q } as ge0_q.
+declare axiom D_count c:
+  hoare [D(Count(ARP)).distinguish: Count.c + Count.ci = c ==> Count.c + Count.ci <= c + q].
+
+local clone import TwoStepSampling with
+  type i    <- unit,
+  type t    <- D,
+  op   dt _ <- dD
+proof *.
+
+local module type Sample_t = {
+  proc sample(_: D -> bool): D
+}.
+
+local module Direct: Sample_t = {
+  proc sample(X) = {
+    var r;
+
+    r <@ S.direct((), fun _=> X);
+    return r;
+  }
+}.
+
+local module Indirect: Sample_t = {
+  proc sample(X) = {
+    var r;
+
+    r <@ S.indirect((), fun _=> X);
+    return r;
+  }
+}.
+
+local equiv eq_Direct_Indirect:
+  Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
+proof. by proc; call ll_direct_indirect_eq; auto; smt(dD_ll). qed.
+
+local module PRPi' (S: Sample_t) = {
+  var bad: bool
+
+  proc init() = {
+    PRPi.init();
+    bad <- false;
+  }
+
+  proc f(x:D): D = {
+    var r;
+
+    if (x \notin PRPi.m) {
+      r <@ S.sample(rng PRPi.m);
+      PRPi.m.[x] <- r;
+      PRPi.mi.[oget PRPi.m.[x]] <- x;
+    }
+    return oget PRPi.m.[x];
+  }
+
+  proc fi(x:D): D = {
+    var r;
+
+    if (x \notin PRPi.mi) {
+      r <@ S.sample(rng PRPi.mi);
+      PRPi.mi.[x] <- r;
+      PRPi.m.[oget PRPi.mi.[x]] <- x;
+    }
+    return oget PRPi.mi.[x];
+  }
+}.
+
+local module ARP_bad = {
+  var bad: bool
+
+  proc init() = {
+    ARP.init();
+    bad <- false;
+  }
+
+  proc f(x) = {
+    var y;
+
+    if (x \notin ARP.m) {
+      y <$ dD;
+      bad <- bad \/ rng ARP.m y;
+      ARP.m.[x] <- y;
+      ARP.mi.[y] <- x;
+    }
+    return oget ARP.m.[x];
+  }
+
+  proc fi(y) = {
+    var x;
+
+    if (y \notin ARP.mi) {
+      x <$ dD;
+      bad <- bad \/ rng ARP.mi x;
+      ARP.m.[x] <- y;
+      ARP.mi.[y] <- x;
+    }
+    return oget ARP.mi.[y];
+  }
+}.
+
+local module PRPi'_bad = {
+  proc init() = {
+    PRPi.init();
+    ARP_bad.bad <- false;
+  }
+
+  proc f(x) = {
+    var y;
+
+    if (x \notin PRPi.m) {
+      y <$ dD;
+      if (rng PRPi.m y) {
+        ARP_bad.bad <- true;
+        y <$ dD \ rng PRPi.m;
+      }
+      PRPi.m.[x] <- y;
+      PRPi.mi.[y] <- x;
+    }
+    return oget PRPi.m.[x];
+  }
+
+  proc fi(y) = {
+    var x;
+
+    if (y \notin PRPi.mi) {
+      x <$ dD;
+      if (rng PRPi.mi x) {
+        ARP_bad.bad <- true;
+        x <$ dD \ rng PRPi.mi;
+      }
+      PRPi.m.[x] <- y;
+      PRPi.mi.[y] <- x;
+    }
+    return oget PRPi.mi.[y];
+  }
+}.
+
+lemma notin_supportIP (P : 'a -> bool) (d : 'a distr):
+  (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
+proof.
+rewrite (mu_split _ predT P) /predI /predT /predC /=.
+rewrite (exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ a \in d)) /=.
++ by move=> a /=; rewrite andbC.
+by rewrite -(witness_support (predC P)) -/(predC _) /#.
+qed.
+
+lemma excepted_lossless (m:(D,D) fmap):
+  (exists x, x \notin m) =>
+  mu (dD \ (rng m)) predT = 1%r.
+proof. 
+move=> /endo_dom_rng [x h]; rewrite dexcepted_ll // 1:dD_ll.
+by rewrite -dD_ll; apply: notin_supportIP; exists x; rewrite dD_fu.
+qed.
+
+local lemma rng_set_subset_rngU1 (m : ('a, 'b) fmap) (x : 'a) y:
+  forall z, rng m.[x <- y] z => predU (rng m) (pred1 y) z.
+proof.
+move=> z; rewrite /predU /pred1 /= (rngE m.[_ <- _])=> /= - [] x0.
+rewrite get_setE; case: (x0 = x)=> |> _ m_x0; left; rewrite rngE /=.
+by exists x0.
+qed.
+
+local lemma frng_set_subset_rngU1 (m : ('a, 'b) fmap) (x : 'a) y:
+  frng m.[x <- y] \subset frng m `|` fset1 y.
+proof.
+by move=> z; rewrite in_fsetU1 !mem_frng=> /rng_set_subset_rngU1.
+qed.
+
+(** We split this into extremely small steps, but this is not
+    necessary **)
+local lemma pr_PRPi_PRPi'_Direct &m:
+    Pr[IND(PRPi, D).main() @ &m: res]
+  = Pr[IND(PRPi'(Direct), D).main() @ &m:res].
+proof.
+byequiv=> //; proc; call (: ={glob PRPi}).
++ by proc; if=> //; inline *; auto=> |> &2 _ y _; rewrite get_set_sameE.
++ by proc; if=> //; inline *; auto=> |> &2 _ y _; rewrite get_set_sameE.
+by inline *; auto.
+qed.
+
+local lemma pr_PRPi'_Direct_PRPi'_Indirect &m:
+    Pr[IND(PRPi'(Direct), D).main() @ &m: res]
+  = Pr[IND(PRPi'(Indirect), D).main() @ &m: res].
+proof.
+byequiv=> //; proc; call (: ={glob PRPi}).
++ proc; if=> //; auto.
+  by call eq_Direct_Indirect; auto=> |>; rewrite dD_ll.
++ proc; if=> //; auto.
+  by call eq_Direct_Indirect; auto=> |>; rewrite dD_ll.
+by inline *; auto.
+qed.
+
+local lemma pr_PRPi'_Indirect_PRPi'_bad &m:
+    Pr[IND(PRPi'(Indirect), D).main() @ &m: res]
+  = Pr[IND(PRPi'_bad, D).main() @ &m: res].
+proof.
+byequiv=> //; proc; call (: ={glob PRPi}).
++ proc; if=> //; inline *.
+  do ! cfold {1} 1.
+  seq 1 1: (#pre /\ r1{1} = y{2}); 1:by auto.
+  if=> //; auto=> |>.
+  + by move=> &2 _ _ y _; rewrite get_set_sameE.
+  by move=> &2; rewrite get_set_sameE.
++ proc; if=> //; inline *.
+  do ! cfold {1} 1.
+  seq 1 1: (#pre /\ r1{1} = x{2}); 1:by auto.
+  if=> //; auto=> |>.
+  + by move=> &2 _ _ y _; rewrite get_set_sameE.
+  by move=> &2; rewrite get_set_sameE.
+by inline *; auto.
+qed.
+
+local lemma pr_ARP_ARP_bad &m:
+    Pr[IND(ARP, D).main() @ &m: res]
+  = Pr[IND(ARP_bad, D).main() @ &m: res].
+proof.
+byequiv=> //; proc; call (: ={glob ARP}); 1,2:by sim.
+by inline *; auto.
+qed.
+
+local lemma pr_PRP_bad_ARP_bad &m:
+     `|  Pr[IND(PRPi'_bad, D).main() @ &m: res]
+       - Pr[IND(ARP, D).main() @ &m: res]|
+  <= Pr[IND(ARP_bad, D).main() @ &m: ARP_bad.bad].
+proof.
+rewrite pr_ARP_ARP_bad; byequiv: ARP_bad.bad=> //=; 2:smt().
+proc.
+call (: ARP_bad.bad
+      , !ARP_bad.bad{2} /\ ={m, mi}(PRPi, ARP) /\ ={ARP_bad.bad}
+      , ARP_bad.bad{2} /\ ={ARP_bad.bad}).
++ exact: D_ll.
++ proc; if=> //=; inline *.
+  seq 1 1: (#pre /\ ={y}); 1:by auto.
+  if {1}; auto=> |> &1 _ x_notin_m _.
+  by apply: excepted_lossless; exists x{1}.
++ move=> &2 bad; proc; if; 2:by auto.
+  seq 1: (ARP_bad.bad{2} /\ ARP_bad.bad = ARP_bad.bad{2} /\ x \notin PRPi.m)=> //.
+  + by auto=> |>; rewrite dD_ll.
+  + if; auto=> |> &1 _ x_notin_m _ @/predT /=.
+    by apply: excepted_lossless; exists x{1}.
+  + by hoare; auto.
+  + by move=> &1; proc; if; auto=> |>; rewrite dD_ll.
++ proc; if=> //=; inline *.
+  seq 1 1: (#pre /\ ={x}); 1:by auto.
+  if {1}; auto=> |> &1 _ y_notin_m _.
+  by apply: excepted_lossless; exists y{1}.
++ move=> &2 bad; proc; if; 2:by auto.
+  seq 1: #pre=> //.
+  + by auto=> |>; rewrite dD_ll.
+  + if; auto=> |> &1 _ x_notin_m _ @/predT /=.
+    by apply: excepted_lossless; exists y{1}.
+  + by hoare; auto.
+  + by move=> &1; proc; if; auto=> |>; rewrite dD_ll.
+by inline *; auto=> |> /#.
+qed.
+
+import StdBigop.Bigreal BRA.
+
+local equiv Count_ARP:
+  IND(Count(ARP_bad), D).main ~ IND(Count(ARP), D).main:
+    ={glob D, glob ARP, glob Count} ==> ={glob Count}.
+proof.
+proc; call (: ={glob Count, glob ARP}).
++ by proc; inline *; sp; if; auto.
++ by proc; inline *; sp; if; auto.
+by inline *; auto.
+qed.
+
+local hoare Count_ARP_bad:
+  IND(Count(ARP), D).main: true ==> Count.c + Count.ci <= q.
+proof. by proc; call (D_count 0); inline *; auto. qed.
+
+local lemma pr_ARP_bad &m:
+     Pr[IND(ARP_bad, D).main() @ &m: ARP_bad.bad]
+  <= (q^2 - q)%r / 2%r * hmin_dD.
+proof.
+have ->: Pr[IND(ARP_bad, D).main() @ &m: ARP_bad.bad]
+       = Pr[IND(Count(ARP_bad), D).main() @ &m: ARP_bad.bad /\ Count.c + Count.ci <= q].
++ byequiv (: ={glob D} ==> ={ARP_bad.bad} /\ (Count.c + Count.ci){2} <= q)=> //.
+  conseq (: _ ==> ={ARP_bad.bad}) _ (: _ ==> Count.c + Count.ci <= q)=> //.
+  + by conseq Count_ARP Count_ARP_bad=> [/#|].
+  proc; call (: ={ARP.m, ARP.mi, ARP_bad.bad})=> //.
+  + by proc; inline *; sp; if; auto.
+  + by proc; inline *; sp; if; auto.
+  by inline *; auto.
+fel 1 (Count.c + Count.ci) (fun i=> i%r * hmin_dD) q
+    ARP_bad.bad
+    [] (card (frng ARP.m) <= Count.c + Count.ci /\ card (frng ARP.mi) <= Count.c + Count.ci)=> //.
++ by rewrite -mulr_suml sumidE 1:ge0_q mulrDr expr2 mulrN1.
++ by inline *; auto=> |>; rewrite frng0 fcards0.
++ exlim (Count.c + Count.ci)=> c; conseq (: _: <= (c%r * hmin_dD))=> //.
+  proc; inline *; sp; if=> //.
+  + wp; rnd (rng ARP.m); auto=> |> &0 ge0_count lt_count_q.
+    move=> _ size_rng_m _ _; rewrite (mu_eq _ _ (mem (frng ARP.m{0}))).
+    + by move=> x; rewrite mem_frng.
+    apply: (ler_trans ((card (frng ARP.m{0}))%r * hmin_dD)).
+    + by apply: Mu_mem.mu_mem_le=> x _; exact: hmin_dDP.
+    apply: ler_wpmul2r; 1:exact: ge0_hmin_dD.
+    by apply: le_fromint=> /#.
+  by hoare; auto=> |>; smt(ge0_hmin_dD).
++ move=> c; proc; inline *; sp; if; auto=> |>; 2:smt().
+  move=> &0 card_rng_m card_rng_mi x_notin_m r _; split=> [/#|].
+  split.
+  + apply: (lez_trans (card (frng ARP.m{0} `|` fset1 r))).
+    + exact/subset_leq_fcard/frng_set_subset_rngU1.
+    by rewrite fcardU1 /#.
+  apply: (lez_trans (card (frng ARP.mi{0} `|` fset1 x{0}))).
+  + exact/subset_leq_fcard/frng_set_subset_rngU1.
+  by rewrite fcardU1 /#.
++ exlim (Count.c + Count.ci)=> c; conseq (: _: <= (c%r * hmin_dD))=> //.
+  proc; inline *; sp; if=> //.
+  + wp; rnd (rng ARP.mi); auto=> |> &0 ge0_count lt_count_q.
+    move=> _ _ size_rng_mi _; rewrite (mu_eq _ _ (mem (frng ARP.mi{0}))).
+    + by move=> x; rewrite mem_frng.
+    apply: (ler_trans ((card (frng ARP.mi{0}))%r * hmin_dD)).
+    + by apply: Mu_mem.mu_mem_le=> x _; exact: hmin_dDP.
+    apply: ler_wpmul2r; 1:exact: ge0_hmin_dD.
+    by apply: le_fromint=> /#.
+  by hoare; auto=> |>; smt(ge0_hmin_dD).
++ move=> c; proc; inline *; sp; if; auto=> |>; 2:smt().
+  move=> &0 card_rng_m card_rng_mi x_notin_m r _; split=> [/#|].
+  split.
+  + apply: (lez_trans (card (frng ARP.m{0} `|` fset1 y{0}))).
+    + exact/subset_leq_fcard/frng_set_subset_rngU1.
+    by rewrite fcardU1 /#.
+  apply: (lez_trans (card (frng ARP.mi{0} `|` fset1 r))).
+  + exact/subset_leq_fcard/frng_set_subset_rngU1.
+  by rewrite fcardU1 /#.
+qed.
+
+lemma Strong_RP_RF_Switching &m:
+     `|  Pr[IND(PRPi, D).main() @ &m: res]
+       - Pr[IND(ARP, D).main() @ &m: res]|
+  <= (q ^ 2 - q)%r / 2%r * hmin_dD.
+proof.
+rewrite (pr_PRPi_PRPi'_Direct &m) (pr_PRPi'_Direct_PRPi'_Indirect &m).
+rewrite (pr_PRPi'_Indirect_PRPi'_bad &m).
+smt(pr_PRP_bad_ARP_bad pr_ARP_bad).
+qed.
+end section.
