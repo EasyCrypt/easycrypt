@@ -141,6 +141,13 @@ val is_abbrev    : operator -> bool
 val is_prind     : operator -> bool
 val is_exception : operator -> bool
 
+(* The delta-reduction policy: the (uninstantiated) body of a plain
+   operator or predicate, provided the reduction mode allows unfolding
+   it with [nargs] arguments at hand. *)
+val operator_body :
+  mode:[`Force | `IfTransparent | `IfApplied] -> nargs:int
+  -> operator -> form option
+
 val optransparent : opopaque
 
 val mk_op   : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ty -> opbody option -> locality -> operator

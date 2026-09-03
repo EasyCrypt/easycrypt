@@ -11,11 +11,84 @@ open EcMemory
 module BI = EcBigInt
 
 (* -------------------------------------------------------------------- *)
-type state = {
-  st_ri   : reduction_info;
-  st_hyps : LDecl.hyps;
-  st_env  : EcEnv.env;
+(* Per-run caches. Operator lookups, and the instantiation of operator
+   bodies (which [Tvar.f_subst ~freshen:true] otherwise rebuilds - and
+   re-hashconses - at every single unfolding), are keyed by path and type
+   instance. Sharing one freshened body across unfoldings is sound: cbv
+   never substitutes eagerly under the binders it has not consumed, and
+   [Fsubst] is capture-avoiding, so reusing binder names across nested
+   unfoldings cannot capture. *)
+module InstKey = struct
+  type t = EcPath.path * ty list
+
+  let equal ((p1, tys1) : t) ((p2, tys2) : t) =
+       EcPath.p_equal p1 p2
+    && List.length tys1 = List.length tys2
+    && List.for_all2 ty_equal tys1 tys2
+
+  let hash ((p, tys) : t) =
+    Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) tys
+end
+
+module HInst = Hashtbl.Make(InstKey)
+
+module FixKey = struct
+  type t = EcPath.path * ty list * int list
+
+  let equal ((p1, tys1, idx1) : t) ((p2, tys2, idx2) : t) =
+       InstKey.equal (p1, tys1) (p2, tys2)
+    && (idx1 : int list) = idx2
+
+  let hash ((p, tys, idxs) : t) =
+    Why3.Hashcons.combine_list
+      (fun (i : int) -> i)
+      (InstKey.hash (p, tys)) idxs
+end
+
+module HFix = Hashtbl.Make(FixKey)
+
+module HForm = Hashtbl.Make(struct
+  type t = form
+  let equal = f_equal
+  let hash  = f_hash
+end)
+
+type cache = {
+  c_ops   : EcDecl.operator option EcPath.Hp.t;
+  c_plain : form HInst.t;
+  c_fix   : form HFix.t;
+  c_norm  : form HForm.t;
 }
+
+type state = {
+  st_ri    : reduction_info;
+  st_hyps  : LDecl.hyps;
+  st_env   : EcEnv.env;
+  st_cache : cache;
+}
+
+(* -------------------------------------------------------------------- *)
+let oper (st : state) (p : EcPath.path) : EcDecl.operator option =
+  match EcPath.Hp.find_opt st.st_cache.c_ops p with
+  | Some op -> op
+  | None ->
+    let op = EcEnv.Op.by_path_opt p st.st_env in
+    EcPath.Hp.add st.st_cache.c_ops p op; op
+
+let is_dtype_ctor (st : state) (p : EcPath.path) : bool =
+  match oper st p with Some op -> EcDecl.is_ctor op | None -> false
+
+let is_record_ctor (st : state) (p : EcPath.path) : bool =
+  match oper st p with Some op -> EcDecl.is_rcrd op | None -> false
+
+let is_projection (st : state) (p : EcPath.path) : bool =
+  match oper st p with Some op -> EcDecl.is_proj op | None -> false
+
+let is_fix_def (st : state) (p : EcPath.path) : bool =
+  match oper st p with Some op -> EcDecl.is_fix op | None -> false
+
+let ctor_index (st : state) (p : EcPath.path) : int =
+  snd (EcDecl.operator_as_ctor (oget (oper st p)))
 
 (* -------------------------------------------------------------------- *)
 module Subst : sig
@@ -69,13 +142,10 @@ let rec f_eq_simpl st f1 f2 =
 
   match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
   | (Fop (p1, _), args1), (Fop (p2, _), args2)
-      when EcEnv.Op.is_dtype_ctor st.st_env p1
-           && EcEnv.Op.is_dtype_ctor st.st_env p2 ->
+      when is_dtype_ctor st p1
+           && is_dtype_ctor st p2 ->
 
-    let idx p =
-      let idx = EcEnv.Op.by_path p st.st_env in
-      snd (EcDecl.operator_as_ctor idx)
-    in
+    let idx p = ctor_index st p in
     if   idx p1 <> idx p2
     then f_false
     else f_ands0_simpl (List.map2 (f_eq_simpl st) args1 args2)
@@ -223,8 +293,8 @@ and try_reduce_record_projection
 
   try
     if not (
-      st.st_ri.iota 
-      && EcEnv.Op.is_projection st.st_env p
+      st.st_ri.iota
+      && is_projection st p
       && not (Args.isempty args)
     ) then raise Bailout;
 
@@ -232,8 +302,8 @@ and try_reduce_record_projection
 
     match mk.f_node with
     | Fapp ({ f_node = Fop (mkp, _) }, mkargs)
-        when (EcEnv.Op.is_record_ctor st.st_env mkp) ->
-      let v = oget (EcEnv.Op.by_path_opt p st.st_env) in
+        when (is_record_ctor st mkp) ->
+      let v = oget (oper st p) in
       let v = proj3_2 (EcDecl.operator_as_proj v) in
       Some (app_red st (List.nth mkargs v) args1)
 
@@ -250,11 +320,11 @@ and try_reduce_fixdef
   let exception Bailout in
 
   try
-    if not (st.st_ri.iota && EcEnv.Op.is_fix_def st.st_env p) then
+    if not (st.st_ri.iota && is_fix_def st p) then
       raise Bailout;
 
     let Args.{ resty = ty; stack = args; } = args in
-    let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
+    let op  = oget (oper st p) in
     let fix = EcDecl.operator_as_fix op in
 
     if List.length args < snd (fix.EcDecl.opf_struct) then
@@ -263,25 +333,25 @@ and try_reduce_fixdef
     let args, eargs = List.split_at (snd (fix.EcDecl.opf_struct)) args in
 
     let vargs = Array.of_list args in
-    let pargs = List.fold_left (fun (opb, acc) v ->
+    let pargs = List.fold_left (fun (opb, acc, idxs) v ->
         let v = vargs.(v) in
 
           match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
-          | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
-              let idx = EcEnv.Op.by_path p st.st_env in
-              let idx = snd (EcDecl.operator_as_ctor idx) in
+          | (Fop (p, _), cargs) when is_dtype_ctor st p -> begin
+              let idx = ctor_index st p in
                 match opb with
                 | EcDecl.OPB_Leaf   _  -> assert false
                 | EcDecl.OPB_Branch bs ->
-                  ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc)
+                  ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc, idx :: idxs)
             end
           | _ -> raise Bailout)
-      (fix.EcDecl.opf_branches, []) (fst fix.EcDecl.opf_struct)
+      (fix.EcDecl.opf_branches, [], []) (fst fix.EcDecl.opf_struct)
     in
 
-    let pargs, (bds, body) =
+    let pargs, idxs, (bds, body) =
       match pargs with
-      | EcDecl.OPB_Leaf (bds, body), cargs -> (List.rev cargs, (bds, body))
+      | EcDecl.OPB_Leaf (bds, body), cargs, idxs ->
+        (List.rev cargs, List.rev idxs, (bds, body))
       | _ -> assert false
     in
 
@@ -298,9 +368,15 @@ and try_reduce_fixdef
             subst bds cargs)
         subst bds pargs in
 
-    let body = EcFol.form_of_expr body in
     let body =
-      Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+      let key = (p, tys, idxs) in
+      match HFix.find_opt st.st_cache.c_fix key with
+      | Some body -> body
+      | None ->
+        let body = EcFol.form_of_expr body in
+        let body = Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+        HFix.add st.st_cache.c_fix key body; body
+    in
 
     Some (cbv st subst body (Args.create ty eargs))
 
@@ -316,14 +392,31 @@ and app_red st f1 args =
 
   (* op reduction (ι-reduction / delta / user-defined rules) *)
   | Fop (p, tys) ->
-    List.find_map_opt
-      (fun f -> f st (p, tys) args)
-      [ try_reduce_record_projection
-      ; try_reduce_fixdef]
-    |> ofdfl (fun () -> reduce_user_delta st f1 p tys args)
+    (* Memoize the evaluation of closed applications: within one cbv run
+       the environment, hypotheses and reduction flags are fixed, so the
+       result of reducing a term without free (local, memory, module)
+       identifiers is a pure function of the term itself. Computation
+       proofs evaluate the same closed subterms (table lookups, powers,
+       word constants) a huge number of times. *)
+    let f2 = f_app f1 args.stack args.resty in
+    if Mid.is_empty f2.f_fv then begin
+      match HForm.find_opt st.st_cache.c_norm f2 with
+      | Some r -> r
+      | None ->
+        let r = app_red_op st f1 p tys args in
+        HForm.add st.st_cache.c_norm f2 r; r
+    end
+    else app_red_op st f1 p tys args
 
   | _ ->
     f_app f1 args.stack args.resty
+
+and app_red_op st f1 p tys args =
+  List.find_map_opt
+    (fun f -> f st (p, tys) args)
+    [ try_reduce_record_projection
+    ; try_reduce_fixdef]
+  |> ofdfl (fun () -> reduce_user_delta st f1 p tys args)
 
 and reduce_user_delta st f1 p tys args =
   let f2 = f_app f1 args.stack args.resty in
@@ -334,9 +427,22 @@ and reduce_user_delta st f1 p tys args =
     let mode = st.st_ri.delta_p p in
     let nargs = List.length args.stack in
     match mode with
-    | #Op.redmode as mode when Op.reducible ~mode ~nargs st.st_env p ->
-      let f = Op.reduce ~mode ~nargs st.st_env p tys in
-      cbv st Subst.subst_id f args
+    | #Op.redmode as mode -> begin
+        match obind (EcDecl.operator_body ~mode ~nargs) (oper st p) with
+        | Some body ->
+          let f =
+            let key = (p, tys) in
+            match HInst.find_opt st.st_cache.c_plain key with
+            | Some f -> f
+            | None ->
+              let op = oget (oper st p) in
+              let f =
+                Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+              HInst.add st.st_cache.c_plain key f; f
+          in
+          cbv st Subst.subst_id f args
+        | None -> f2
+      end
     | _ -> f2
 
 (* -------------------------------------------------------------------- *)
@@ -410,9 +516,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       if st.st_ri.iota then
         let cf = cbv_init st s cf in
         match fst_map f_node (destr_app cf) with
-        | Fop (p, _), cargs when EcEnv.Op.is_dtype_ctor st.st_env p ->
-            let idx = EcEnv.Op.by_path p st.st_env in
-            let idx = snd (EcDecl.operator_as_ctor idx) in
+        | Fop (p, _), cargs when is_dtype_ctor st p ->
+            let idx = ctor_index st p in
             let br  = oget (List.nth_opt bs idx) in
             cbv st s br (Args.pushn cargs args)
 
@@ -587,9 +692,15 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 (* FIXME : initialize the subst with let in hyps *)
 let norm_cbv (ri : reduction_info) hyps f =
   let st = {
-    st_hyps = hyps;
-    st_env  = LDecl.toenv hyps;
-    st_ri   = ri
+    st_hyps  = hyps;
+    st_env   = LDecl.toenv hyps;
+    st_ri    = ri;
+    st_cache = {
+      c_ops   = EcPath.Hp.create 127;
+      c_plain = HInst.create 127;
+      c_fix   = HFix.create 127;
+      c_norm  = HForm.create 1023;
+    };
   } in
 
   let add_hyp s (x,k) =

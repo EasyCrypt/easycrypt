@@ -2741,23 +2741,9 @@ module Op = struct
   let core_reduce ?(mode = `IfTransparent) ?(nargs = 0) env p =
     let op = oget (by_path_opt p env) in
 
-    match op.op_kind with
-    | OB_oper (Some (OP_Plain f))
-    | OB_pred (Some (PR_Plain f)) -> begin
-        let f =
-          match mode with
-          | `Force ->
-             f
-          | `IfTransparent when not op.op_opaque.reduction ->
-             f
-          | `IfApplied when nargs >= odfl max_int op.op_unfold ->
-             f
-          | _ ->
-             raise NotReducible
-      in (op, f)
-    end
-
-    | _ -> raise NotReducible
+    match EcDecl.operator_body ~mode ~nargs op with
+    | Some f -> (op, f)
+    | None -> raise NotReducible
 
   let reducible ?mode ?nargs env p =
     if Option.is_some (by_path_opt p env) then

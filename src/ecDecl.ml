@@ -208,6 +208,27 @@ let is_abbrev op =
   | OB_nott _ -> true
   | _ -> false
 
+(* The delta-reduction policy: the (uninstantiated) body of a plain
+   operator or predicate, provided the reduction mode allows unfolding
+   it. The single point of truth for both EcEnv.Op.reduce and the cbv
+   evaluator. *)
+let operator_body
+  ~(mode : [`Force | `IfTransparent | `IfApplied]) ~(nargs : int)
+  (op : operator) : form option
+=
+  match op.op_kind with
+  | OB_oper (Some (OP_Plain f))
+  | OB_pred (Some (PR_Plain f)) ->
+    let ok =
+      match mode with
+      | `Force         -> true
+      | `IfTransparent -> not op.op_opaque.reduction
+      | `IfApplied     -> nargs >= odfl max_int op.op_unfold
+    in
+    if ok then Some f else None
+
+  | _ -> None
+
 let is_prind op =
   match op.op_kind with
   | OB_pred (Some (PR_Ind _)) -> true
