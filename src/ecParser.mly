@@ -101,14 +101,14 @@
     if l = [] then
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
-        plogic = true; pdelta = None;
+        plogic = true; pdelta = { pd_all = true; pd_ops = []; };
         pmodpath = true; puser = true; phint = hint; }
     else
       let doarg acc = function
-        | `Delta l ->
-            if   l = [] || acc.pdelta = None
-            then { acc with pdelta = None }
-            else { acc with pdelta = Some (oget acc.pdelta @ l) }
+        | `Delta pd ->
+            let pd_all = acc.pdelta.pd_all || pd.pd_all in
+            let pd_ops = acc.pdelta.pd_ops @  pd.pd_ops in
+            { acc with pdelta = { pd_all; pd_ops; } }
 
         | `Zeta    -> { acc with pzeta    = true }
         | `Iota    -> { acc with piota    = true }
@@ -121,7 +121,7 @@
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
-            plogic = false; pdelta = Some [];
+            plogic = false; pdelta = { pd_all = false; pd_ops = []; };
             pmodpath = false; puser = false; phint = hint; } l
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
@@ -2525,13 +2525,19 @@ genpattern:
    head filter is NOT allowed here: those tokens are bullet operators and
    only a keyword ([simplify]/[cbv]) lets them be read as a head filter. *)
 simplify_arg:
-| DELTA l=qoident* { `Delta l }
+| DELTA l=qoident* { `Delta { pd_all = (l = []); pd_ops = l; } }
+| d=delta_arg      { `Delta d }
 | ZETA             { `Zeta }
 | IOTA             { `Iota }
 | BETA             { `Beta }
 | ETA              { `Eta }
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
+
+(* [delta[f g]]: unfold every transparent definition and force [f] and
+   [g], opaque or not. Plain [delta] is the bracket-less case. *)
+%inline delta_arg:
+| DELTA l=bracket(qoident+) { { pd_all = true; pd_ops = l; } }
 
 %inline pmode:
 | PLUS  { `Plus  }
@@ -2586,17 +2592,21 @@ simplify:
 | SIMPLIFY hint=simplify_mod
     { mk_simplify ~hint simplify_red }
 | SIMPLIFY l=qoident+ hint=simplify_mod
-    { mk_simplify ~hint (`Delta l  :: simplify_red) }
+    { mk_simplify ~hint (`Delta { pd_all = false; pd_ops = l; } :: simplify_red) }
 | SIMPLIFY DELTA hint=simplify_mod
-    { mk_simplify ~hint (`Delta [] :: simplify_red) }
+    { mk_simplify ~hint (`Delta { pd_all = true; pd_ops = []; } :: simplify_red) }
+| SIMPLIFY d=delta_arg hint=simplify_mod
+    { mk_simplify ~hint (`Delta d :: simplify_red) }
 
 cbv:
 | CBV hint=simplify_mod
     { mk_simplify ~hint simplify_red }
 | CBV l=qoident+ hint=simplify_mod
-    { mk_simplify ~hint (`Delta l  :: simplify_red) }
+    { mk_simplify ~hint (`Delta { pd_all = false; pd_ops = l; } :: simplify_red) }
 | CBV DELTA hint=simplify_mod
-    { mk_simplify ~hint (`Delta [] :: simplify_red) }
+    { mk_simplify ~hint (`Delta { pd_all = true; pd_ops = []; } :: simplify_red) }
+| CBV d=delta_arg hint=simplify_mod
+    { mk_simplify ~hint (`Delta d :: simplify_red) }
 
 conseq:
 | empty                            { None, None }

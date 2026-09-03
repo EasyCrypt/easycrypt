@@ -70,10 +70,12 @@ user reduction restricted to the selected operators.
 
 The `hint` clause is independent of the reduction arguments that
 `simplify` and `cbv` already accept: a bare `simplify` performs full
-simplification, `simplify delta` additionally unfolds all definitions,
-`simplify f g` unfolds the operators `f` and `g`, and a keyword-less list
-such as `beta zeta` performs only the named reductions. A `hint` clause
-may follow any of these (for example `simplify delta hint +[f]`).
+simplification, `simplify delta` additionally unfolds all transparent
+definitions, `simplify delta[f g]` does the same and also unfolds `f` and
+`g` even when they are declared `[opaque]`, `simplify f g` unfolds only
+the operators `f` and `g`, and a keyword-less list such as `beta zeta`
+performs only the named reductions. A `hint` clause may follow any of
+these (for example `simplify delta hint +[f]`).
 
 ------------------------------------------------------------------------
 Proof-local commands
