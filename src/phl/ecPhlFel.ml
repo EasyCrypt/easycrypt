@@ -157,6 +157,22 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     f_real_le v bd
   in
 
+  (* Soundness side-condition: the per-step failure weight [ash] must be
+     non-negative over the WHOLE counter range [0, q).  The bound proven by
+     [fel] is the sum of [ash] over the full range, which must dominate the
+     sum over the counter values actually visited.  Without this obligation a
+     counter that jumps (skipping indices) combined with negative weights at
+     the skipped indices makes the full-range sum smaller than the visited
+     sum, which is unsound (e.g. weights (1, -1) with a 0 -> 2 jump would let
+     [fel] "prove" Pr[bad] <= 0). *)
+  let nonneg_goal =
+    let i_id = EcIdent.create "i" in
+    let i    = f_local i_id tint in
+    let hyp  = f_and (f_int_le f_i0 i) (f_int_lt i q) in
+    let body = f_real_le f_r0 (f_app_simpl ash [i] treal) in
+    f_forall_simpl [i_id, GTty tint] (f_imp hyp body)
+  in
+
   (* we must quantify over memories *)
   let post_goal =
     let lev = map_ss_inv2 f_and f_event (map_ss_inv1 (fun cnt -> f_int_le cnt q) cntr) in
@@ -246,7 +262,10 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let os_goals =
     List.concat (List.map oracle_goal (Sx.ntr_elements os)) in
 
-  let concls = bound_goal :: post_goal :: init_goal :: os_goals in
+  (* [nonneg_goal] is placed LAST so that existing [fel] proof scripts keep
+     their subgoals (bound, post, init, oracles) in the same positions; the
+     new obligation simply surfaces as a trailing goal. *)
+  let concls = bound_goal :: post_goal :: init_goal :: os_goals @ [nonneg_goal] in
   let res = FApi.xmutate1 tc (`Fel (cntr, ash, q, f_event, pred_specs)) concls in
   res
 

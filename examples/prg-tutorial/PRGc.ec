@@ -523,6 +523,8 @@ section Lemma1.
   (* When condition does not hold, the counter value does not decrease
      and bad is not triggered *)
   done.
+  (* F003: non-negativity of the per-step weight over the whole range *)
+  by move=> i; smt(mu_bounded).
   qed.
 end section Lemma1.
 
