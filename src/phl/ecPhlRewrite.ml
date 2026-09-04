@@ -11,31 +11,24 @@ module L  = EcLocation
 module PT = EcProofTerm
 
 (* -------------------------------------------------------------------- *)
-let t_change
-    (side : side option)
-    (pos  : EcMatching.Position.codepos)
-    (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
-    (tc   : tcenv1)
+(* [t_change_range side range expr tc] applies [expr] to every expression
+   of the instructions selected by [range] (the whole statement when
+   [range] is [None]), recursing into the bodies of [if]/[while]/[match].
+   [expr] receives the hypotheses extended with the match-arm locals in
+   scope and returns [None] to leave an expression untouched.
+
+   One equality side goal is emitted per rewritten expression, in program
+   order, followed by the rewritten program-logic goal. Each side goal is
+   of the form [forall &m, forall locals, e = e'] and is returned along
+   with the identifiers to introduce to reach the equality. *)
+let t_change_range
+    (side  : side option)
+    (range : EcMatching.Position.codegap_range option)
+    (expr  : expr -> LDecl.hyps * memenv -> ('a * expr) option)
+    (tc    : tcenv1)
 =
   let hyps, concl = FApi.tc1_flat tc in
-
-  let change (m : memenv) (i : instr) =
-    let e, _, mk =
-      EcUtils.ofdfl
-        (fun () ->
-           tc_error !!tc
-             "targetted instruction should contain an expression")
-        (get_expression_of_instruction i)
-    in
-
-    let data, e' = expr e (hyps, m) in
-    let mid = EcMemory.memory m in
-
-    let f  = ss_inv_of_expr mid e in
-    let f' = ss_inv_of_expr mid e' in
-
-    (data, [EcSubst.f_forall_mems_ss_inv m (map_ss_inv2 f_eq f f')]), [mk e']
-  in
+  let env = FApi.tc1_env tc in
 
   let kinds = [`Hoare `Stmt; `EHoare `Stmt; `PHoare `Stmt; `Equiv `Stmt] in
 
@@ -45,30 +38,76 @@ let t_change
       (hoare | ehoare | phoare | equiv)";
 
   let m, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let (data, goals), s =
-    EcMatching.Zipper.map (FApi.tc1_env tc) pos (change m) s in
+  let mid = EcMemory.memory m in
+
+  (* Match-arm locals are renamed apart from the hypotheses for the side
+     goal; the program keeps its own binders. *)
+  let change (locals : (EcIdent.t * ty) list) acc (e : expr) =
+    let ids =
+      LDecl.fresh_ids hyps (List.map (fun (x, _) -> EcIdent.name x) locals) in
+    let fresh = List.map2 (fun id (_, ty) -> (id, ty)) ids locals in
+    let hyps =
+      List.fold_left
+        (fun hyps (id, ty) -> LDecl.add_local id (LD_var (ty, None)) hyps)
+        hyps fresh in
+
+    let rename (froms : (EcIdent.t * ty) list) (tos : (EcIdent.t * ty) list) =
+      let subst =
+        List.fold_left2
+          (fun subst (x, _) (y, ty) ->
+            EcCoreSubst.bind_elocal subst x (EcTypes.e_local y ty))
+          EcCoreSubst.Fsubst.f_subst_id froms tos
+      in EcCoreSubst.e_subst subst in
+
+    let e = rename locals fresh e in
+
+    match expr e (hyps, m) with
+    | None ->
+        acc, rename fresh locals e
+
+    | Some (data, e') ->
+        let f  = ss_inv_of_expr mid e in
+        let f' = ss_inv_of_expr mid e' in
+        let goal = map_ss_inv2 f_eq f f' in
+        let goal =
+          map_ss_inv1
+            (f_forall (List.map (fun (x, ty) -> (x, GTty ty)) fresh))
+            goal in
+        let goal = EcSubst.f_forall_mems_ss_inv m goal in
+        ((data, mid :: ids), goal) :: acc, rename fresh locals e'
+  in
+
+  let rec locals_of_path (path : EcMatching.Zipper.ipath) =
+    match path with
+    | ZTop -> []
+    | ZWhile  (_, (_, path))
+    | ZIfThen (_, (_, path), _)
+    | ZIfElse (_, _, (_, path)) -> locals_of_path path
+    | ZMatch  (_, (_, path), ctxt) -> locals_of_path path @ ctxt.locals
+  in
+
+  let acc, s =
+    match range with
+    | None ->
+        s_fold_map_expr change [] s
+
+    | Some range ->
+        let zpr, (_, body, epilog), _ =
+          try
+            EcMatching.Zipper.zipper_and_split_of_cgap_range env range s
+          with EcMatching.Position.InvalidCPos ->
+            tc_error !!tc "invalid code position"
+        in
+        let locals = locals_of_path zpr.z_path in
+        let acc, body =
+          List.fold_left_map (i_fold_map_expr ~locals change) [] body in
+        acc, EcMatching.Zipper.zip { zpr with z_tail = body @ epilog }
+  in
+
+  let data, goals = List.split (List.rev acc) in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   data, FApi.xmutate1 tc `ProcChange (goals @ [concl])
-
-(* -------------------------------------------------------------------- *)
-let process_change
-    (side : side option)
-    (pos  : pcodepos)
-    (form : pexpr)
-    (tc   : tcenv1)
-=
-  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
-
-  let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
-    let hyps = LDecl.push_active_ss m hyps in
-    let e =
-      EcProofTyping.pf_process_exp
-        !!tc hyps `InProc (Some e.e_ty) form
-    in (), e
-  in
-
-  let (), tc = t_change side pos expr tc in tc
 
 (* -------------------------------------------------------------------- *)
 let try_rewrite_patterns
@@ -103,73 +142,93 @@ let try_rewrite_patterns
   in List.find_map_opt try1 pts
 
 (* -------------------------------------------------------------------- *)
+let tc1_process_range
+  (tc   : tcenv1)
+  (side : side option)
+  (pos  : pcodepos_or_range option)
+=
+  Option.map
+    (fun pos -> EcLowPhlGoal.tc1_process_codepos_or_range tc (side, pos))
+    pos
+
+(* -------------------------------------------------------------------- *)
 let process_rewrite_rw
     (side : side option)
-    (pos  : pcodepos)
+    (pos  : pcodepos_or_range option)
     (pt   : ppterm)
     (tc   : tcenv1)
 =
   let hyps = FApi.tc1_hyps tc in
-  let ptenv = EcProofTerm.ptenv_of_penv hyps !!tc in
-  let pt = EcProofTerm.process_full_pterm ptenv pt in
 
-  let pts = EcHiGoal.LowRewrite.find_rewrite_patterns `LtoR pt in
+  (* Each expression gets its own instance of the proof term, so that the
+     pattern variables can be instantiated independently. *)
+  let patterns (hyps : LDecl.hyps) =
+    let ptenv = EcProofTerm.ptenv_of_penv hyps !!tc in
+    let pt = EcProofTerm.process_full_pterm ptenv pt in
+    EcHiGoal.LowRewrite.find_rewrite_patterns `LtoR pt in
 
-  let change (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
-    let e = form_of_expr ~m:(fst m) e in
+  let change (hyps : LDecl.hyps) (m : memenv) (e : expr) =
+    let f = form_of_expr ~m:(fst m) e in
+    try_rewrite_patterns hyps (patterns hyps) f
+    |> Option.map (fun (data, f) ->
+         data, expr_of_ss_inv { m = fst m; inv = f; }) in
 
-    let data, e =
-      EcUtils.ofdfl
-        (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
-        (try_rewrite_patterns hyps pts e) in
-
-    (m, data), (expr_of_ss_inv { m = fst m; inv = e; })
-  in
-
-  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
-  let (m, (pt, mode, cpos)), tc = t_change side pos change tc in
-  let cpos = EcMatching.FPosition.reroot [1] cpos in
-
-  let discharge (tc : tcenv1) =
-    let tc = EcLowGoal.t_intros_i_1 [fst m] tc in
+  let discharge ((pt, mode, cpos), ids) (tc : tcenv1) =
+    let cpos = EcMatching.FPosition.reroot [1] cpos in
+    let tc = EcLowGoal.t_intros_i_1 ids tc in
     FApi.t_seq
       (EcLowGoal.t_rewrite ~mode pt (`LtoR, Some cpos))
       EcLowGoal.t_reflex
       tc
   in
 
-  FApi.t_first discharge tc
+  (* Fail early on an ill-formed proof term, even if no expression gets
+     rewritten. *)
+  ignore (patterns hyps : _ list);
+
+  let range = tc1_process_range tc side pos in
+
+  let change (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
+    change hyps m e in
+
+  let data, tce = t_change_range side range change tc in
+
+  if List.is_empty data then
+    tc_error !!tc "cannot find a pattern to rewrite";
+
+  FApi.t_sub (List.map discharge data @ [EcLowGoal.t_id]) tce
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite_simpl
   (side : side option)
-  (pos  : pcodepos)
+  (pos  : pcodepos_or_range option)
   (tc   : tcenv1)
 =
-let ri = EcReduction.nodelta in
+  let ri = EcReduction.nodelta in
 
-let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
+  let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
     let f = ss_inv_of_expr (fst me) e in
     let f = map_ss_inv1 (EcCallbyValue.norm_cbv ri hyps) f in
-    let e = expr_of_ss_inv f in
-    (fst me, f), e
+    let e' = expr_of_ss_inv f in
+    if e_equal e e' then None else Some (f, e')
   in
 
-  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
-  let (m, f), tc = t_change side pos change tc in
-
-  FApi.t_first (
+  let discharge (f, ids) =
     FApi.t_seqs [
-      EcLowGoal.t_intro_s (`Ident m);
+      EcLowGoal.t_intros_i ids;
       EcLowGoal.t_change ~ri (map_ss_inv2 f_eq f f).inv;
       EcLowGoal.t_reflex
     ]
-  ) tc
+  in
+
+  let range = tc1_process_range tc side pos in
+  let data, tc = t_change_range side range change tc in
+  FApi.t_sub (List.map discharge data @ [EcLowGoal.t_id]) tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite
   (side : side option)
-  (pos  : pcodepos)
+  (pos  : pcodepos_or_range option)
   (rw   : prrewrite)
   (tc   : tcenv1)
 =
