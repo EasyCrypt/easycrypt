@@ -200,22 +200,60 @@ let i_iter (f : instr -> unit) =
   in fun (i : instr) -> i_iter i
 
 (* -------------------------------------------------------------------- *)
-let i_map_expr (tx : expr -> expr) =
-  let rec doit (i : instr) =
-    match i.i_node with
-    | Sasgn (lv, e) -> i_asgn (lv, (tx e))
-    | Sif (c, t, f) -> i_if (tx c, doit_s t, doit_s f)
-    | Smatch (e, cs) -> i_match (tx e, List.map (snd_map doit_s) cs)
-    | Swhile (c, bd) -> i_while (tx c, doit_s bd)
-    | Srnd (lv, e) -> i_rnd (lv, tx e)
-    | Sraise e -> i_raise (tx e)
-    | Sabstract (_ : memory) -> i
-    | Scall (lv, f, args) -> i_call (lv, f, List.map tx args)
+let rec i_fold_map_expr
+  ?(locals : (EcIdent.t * ty) list = [])
+   (tx     : (EcIdent.t * ty) list -> 'a -> expr -> 'a * expr)
+   (acc    : 'a)
+   (i      : instr)
+=
+  let tx1 = tx locals in
+  let txs = s_fold_map_expr ~locals tx in
 
-  and doit_s (s : stmt) =
-    stmt (List.map doit s.s_node) in
+  match i.i_node with
+  | Sasgn (lv, e) ->
+      let acc, e = tx1 acc e in
+      acc, i_asgn (lv, e)
 
-  fun i -> doit i
+  | Srnd (lv, e) ->
+      let acc, e = tx1 acc e in
+      acc, i_rnd (lv, e)
+
+  | Scall (lv, f, args) ->
+      let acc, args = List.fold_left_map tx1 acc args in
+      acc, i_call (lv, f, args)
+
+  | Sif (c, t, f) ->
+      let acc, c = tx1 acc c in
+      let acc, t = txs acc t in
+      let acc, f = txs acc f in
+      acc, i_if (c, t, f)
+
+  | Swhile (c, bd) ->
+      let acc, c  = tx1 acc c in
+      let acc, bd = txs acc bd in
+      acc, i_while (c, bd)
+
+  | Smatch (e, bs) ->
+      let acc, e = tx1 acc e in
+      let acc, bs =
+        List.fold_left_map (fun acc (xs, s) ->
+          let acc, s = s_fold_map_expr ~locals:(locals @ xs) tx acc s in
+          acc, (xs, s)) acc bs in
+      acc, i_match (e, bs)
+
+  | Sraise e ->
+      let acc, e = tx1 acc e in
+      acc, i_raise e
+
+  | Sabstract (_ : memory) ->
+      acc, i
+
+and s_fold_map_expr ?(locals = []) tx acc (s : stmt) =
+  let acc, is = List.fold_left_map (i_fold_map_expr ~locals tx) acc s.s_node in
+  acc, stmt is
+
+let i_map_expr (tx : expr -> expr) (i : instr) =
+  snd (i_fold_map_expr (fun _ () e -> (), tx e) () i)
 
 (* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)

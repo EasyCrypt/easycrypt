@@ -902,7 +902,7 @@ type phltactic =
   | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
-  | Pprocrewrite   of side option * pcodepos * prrewrite
+  | Pprocrewrite   of side option * pcodepos_or_range option * prrewrite
   | Pprocrewriteat of psymbol * ppterm
   | Pchangestmt    of side option * ptybindings option * prange1_or_insert * pstmt
   | Phoaresplit

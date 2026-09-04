@@ -3396,10 +3396,13 @@ direction:
 | PROC CHANGE side=side? pos=codegap COLON b=option(bracket(ptybindings)) s=brace(stmt)
     { Pchangestmt (side, b, Gap pos, s) }
 
-| PROC REWRITE side=side? pos=codepos f=pterm
-    { Pprocrewrite (side, pos, `Rw f) }
+| PROC REWRITE side=side? pos=codepos_or_range f=pterm
+    { Pprocrewrite (side, Some pos, `Rw f) }
 
-| PROC REWRITE side=side? pos=codepos SLASHEQ
+| PROC REWRITE side=side? f=gpterm(form_h?)
+    { Pprocrewrite (side, None, `Rw f) }
+
+| PROC REWRITE side=side? pos=codepos_or_range? SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
 | PROC REWRITE AT tg=ident f=pterm
