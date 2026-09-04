@@ -9,7 +9,7 @@ module M = {
 }.
 
 lemma dep_bound : phoare[M.run : M.b ==> !M.b] = (b2i M.b)%r.
-proof. by proc; auto => &hr ->. qed.
+proof. by proc; auto => &hr; rewrite le_fromint b2i_ge0 /= => ->. qed.
 
 equiv triv_equiv : M.run ~ M.run : true ==> ={M.b}.
 proof. proc; auto. qed.
