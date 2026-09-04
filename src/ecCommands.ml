@@ -139,6 +139,7 @@ module Loader : sig
 
   val addidir : ?namespace:namespace -> ?recursive:bool -> string -> loader -> unit
   val aslist  : loader -> ((namespace option * string) * idx_t) list
+  val setidirs : ((namespace option * string) * idx_t) list -> loader -> unit
   val locate  : ?namespaces:namespace option list -> string ->
                   loader -> (namespace option * string * kind) option
 
@@ -198,6 +199,9 @@ end = struct
 
   let aslist (ld : loader) =
     EcLoader.aslist ld.ld_core
+
+  let setidirs (idirs : ((namespace option * string) * idx_t) list) (ld : loader) =
+    EcLoader.setidirs idirs ld.ld_core
 
   let locate ?namespaces (path : string) (ld : loader) =
     EcLoader.locate ?namespaces path ld.ld_core
@@ -442,8 +446,24 @@ let check_opname_validity (scope : EcScope.scope) (x : string) =
       "operator `%s' cannot be used in infix mode" x
 
 (* -------------------------------------------------------------------- *)
+(* Where [print] renders. The batch compiler and the interactive
+   terminals want the process's stdout, which is what this defaults to.
+   A front-end that frames its replies ([llm], [mcp]) cannot let the
+   engine write outside the frame, so it installs a formatter of its
+   own -- [search] and [locate] already come back through the notifier,
+   and this is what puts [print] on the same footing. Routing it
+   through the notifier instead would have been the smaller patch, but
+   the notifier drops `Info under the batch compiler's log level, so
+   `ec compile' would have stopped printing altogether. *)
+let print_formatter = ref Format.std_formatter
+
+let set_print_formatter (fmt : Format.formatter) =
+  print_formatter := fmt
+
 let process_print scope p =
-  process_pr Format.std_formatter scope p
+  let fmt = !print_formatter in
+  process_pr fmt scope p;
+  Format.pp_print_flush fmt ()
 
 (* -------------------------------------------------------------------- *)
 let process_expect scope (expected, p) =
@@ -916,6 +936,21 @@ let addidir ?namespace ?recursive (idir : string) =
 let loadpath () =
   List.map fst (Loader.aslist loader)
 
+(* The include path lives in this one process-global loader and only
+   ever grows: [addidir] never removes anything, and [initialize] --
+   [~restart:true] included -- does not rebuild it. A front-end that
+   loads unrelated files one after another therefore needs a way back,
+   or each loaded file's own directory stays searchable for every later
+   load. The batch compiler loads one file and exits, so it never wants
+   this. *)
+type loadpath_mark = ((Loader.namespace option * string) * Loader.idx_t) list
+
+let loadpath_mark () : loadpath_mark =
+  Loader.aslist loader
+
+let loadpath_reset (mark : loadpath_mark) =
+  Loader.setidirs mark loader
+
 let set_current_path (path : string) =
   Loader.set_current_path path loader
 
@@ -1000,6 +1035,69 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
+(* Rotate the focus of the currently active proof so that the goal at
+   1-based index [k] becomes the focused one. The change is persisted
+   in the context with a new uuid so UNDO/REVERT can roll it back.
+   Returns the new number of open goals on success, or an error
+   message on failure. *)
+let focus_goal (k : int) : (int, string) result =
+  match !context with
+  | None -> Error "no active context"
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> Error "no active proof"
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> Error "no active proof"
+      | Some (pac, pct) ->
+        match pac.EcScope.puc_jdg with
+        | EcScope.PSNoCheck -> Error "proof is in no-check mode"
+        | EcScope.PSCheck pf ->
+          let n = List.length (EcCoreGoal.all_hd_opened pf) in
+          if n = 0 then Error "no open goals"
+          else if k < 1 || k > n then
+            Error (Printf.sprintf
+              "focus: index %d out of range (1..%d)" k n)
+          else if k = 1 then Ok n
+          else begin
+            let pf = EcCoreGoal.rotate_focus k pf in
+            let pac = { pac with EcScope.puc_jdg = EcScope.PSCheck pf } in
+            let puc =
+              { puc with EcScope.puc_active = Some (pac, pct) } in
+            let scope = EcScope.set_xgoal ctxt.ct_current puc in
+            context := Some (push_context scope ctxt);
+            Ok n
+          end
+
+(* Disable bullet enforcement for REPL-driven phrases. Drops the global
+   pragma so newly-opened proofs have no bullet stack, and clears the
+   stack on any currently active proof so REPL phrases are not checked
+   against it. Idempotent. Does not advance the undo level. Returns
+   the stack that was in place (if any) at the moment the active
+   proof's bullets were first cleared; returns [None] on idempotent
+   calls (where the stack is already gone). Callers use the returned
+   stack to drive bullet-character selection in [COMMIT]. *)
+let disable_repl_bullets () : EcBullets.stack option =
+  pragma_strict_bullets false;
+  match !context with
+  | None -> None
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> None
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> None
+      | Some (pac, pct) ->
+        match pac.EcScope.puc_bullets with
+        | None -> None
+        | Some _ as prior ->
+          let pac = { pac with EcScope.puc_bullets = None } in
+          let puc = { puc with EcScope.puc_active = Some (pac, pct) } in
+          let scope = EcScope.set_xgoal ctxt.ct_current puc in
+          context := Some { ctxt with ct_current = scope };
+          prior
+
+(* -------------------------------------------------------------------- *)
 let initialize ~restart ~undo ~boot ~checkmode ~checkproof =
   assert (restart || EcUtils.is_none !context);
   if restart then Pragma.set dpragma;
@@ -1054,6 +1152,21 @@ let undo (olduuid : int) =
     for _ = (uuid ()) - 1 downto olduuid do
       context := Some (pop_context (oget !context))
     done
+
+(* -------------------------------------------------------------------- *)
+(* [undo] only pops, so it cannot undo an [undo]: input that lowered the
+   uuid before failing leaves it at the wrong state, not the one it
+   started from. A caller that has to put the engine back *exactly*
+   where it was takes a mark first. The context is an immutable record
+   -- current scope, undo stack, uuid -- so this is a snapshot, not a
+   replay: restoring it moves forward as readily as backward. *)
+type undo_mark = context
+
+let undo_mark () : undo_mark =
+  oget !context
+
+let undo_restore (mark : undo_mark) =
+  context := Some mark
 
 (* -------------------------------------------------------------------- *)
 let doc_comment (doc : [`Global | `Item] * string) : unit =
@@ -1139,8 +1252,50 @@ let pp_current_goal ?(all = false) stream =
   end
 
 (* -------------------------------------------------------------------- *)
+let in_proof () =
+  Option.is_some (S.xgoal (current ()))
+
+(* Return the list of open-goal handles at the top level of the active
+   proof, focused-first, or [] if no proof is active. *)
+let open_handles () : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.all_hd_opened pf
+  | _ -> []
+
+(* The proof environment of the active proof, or [None] if no proof is
+   active. A [proofenv] is immutable and cumulative, so a snapshot taken
+   while the proof was open keeps answering DAG queries after [qed] has
+   discarded the active proof. *)
+let current_proofenv () : EcCoreGoal.proofenv option =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    Some (EcCoreGoal.proofenv_of_proof pf)
+  | _ -> None
+
+(* Direct DAG children of [h] in the active proof. [] if no proof. *)
+let children_of (h : EcCoreGoal.handle) : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.children_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> []
+
+(* Parent of [h] in the active proof's DAG, or [None] if [h] is the
+   root or no proof is active. *)
+let parent_of (h : EcCoreGoal.handle) : EcCoreGoal.handle option =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.parent_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> None
+
 let pp_current_goal_or_noproof ?(all = false) stream =
-  if Option.is_some (S.xgoal (current ())) then
+  if in_proof () then
     pp_current_goal ~all stream
   else
     Format.fprintf stream "No active proof.@\n%!"
@@ -1177,4 +1332,37 @@ let pp_all_goals () =
         Buffer.contents buffer) goals
   end
 
+  | _ -> []
+
+(* -------------------------------------------------------------------- *)
+type goal_entry = {
+  ge_index   : int;
+  ge_focused : bool;
+  ge_text    : string;
+}
+
+(* Render the open goals of the active proof, focused first. *)
+let pp_tree ?(all = false) () : goal_entry list =
+  let scope = current () in
+  match S.xgoal scope with
+  | Some { S.puc_active = Some ({ puc_jdg = S.PSCheck pf }, _) } -> begin
+    match EcCoreGoal.opened pf with
+    | None -> []
+    | Some _ ->
+      let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+      let goals = EcCoreGoal.all_opened pf in
+      List.mapi (fun i { EcCoreGoal.g_hyps; EcCoreGoal.g_concl } ->
+        let text =
+          if all then
+            let buf = Buffer.create 256 in
+            let hc  = (EcEnv.LDecl.tohyps g_hyps, g_concl) in
+            Format.fprintf
+              (Format.formatter_of_buffer buf)
+              "%a@?" (EcPrinting.pp_goal1 ppe) hc;
+            Buffer.contents buf
+          else
+            Format.asprintf "%a" (EcPrinting.pp_form ppe) g_concl
+        in
+        { ge_index = i + 1; ge_focused = i = 0; ge_text = text; }) goals
+  end
   | _ -> []

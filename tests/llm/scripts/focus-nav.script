@@ -1,0 +1,17 @@
+# exit: 1
+# FOCUS with a dotted path, on a frame (error), out of range (error),
+# with a non-integer path (parse error), then NEXT.
+LOAD "fixtures/nested.ec" 6
+QUIET ON
+split.
+split.
+split.
+QUIET OFF
+TREE
+FOCUS 1.2
+FOCUS 1
+FOCUS 9
+FOCUS foo
+FOCUS
+NEXT
+TREE

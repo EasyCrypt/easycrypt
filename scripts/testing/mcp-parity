@@ -1,0 +1,200 @@
+#! /usr/bin/env python3
+
+# --------------------------------------------------------------------
+# Parity check: `easycrypt llm' and `easycrypt mcp' are two front-ends
+# over one core, so the same operation must produce the same answer on
+# both wires.
+#
+#   mcp-parity [--bin PATH] [-v]
+#
+# One representative operation per tool family is played, in order,
+# against two sessions -- a REPL one driven with `llm -eval', an MCP
+# one driven with a JSON-RPC script -- started from the same working
+# directory on the same fixture. For each step the checker asserts:
+#
+#   * the engine uuid matches: the REPL's `[uuid:N]' envelope tag
+#     against the MCP result's structuredContent.uuid;
+#   * the payload matches: the REPL's reply body (what it prints
+#     between the OK/ERROR line and `<END>') against the MCP result's
+#     content[0].text.
+#
+# The payload comparison is up to one trailing newline, which the REPL
+# appends to a body that lacks one so that `<END>' starts a line of its
+# own. That is the only licensed difference; see tests/mcp/README.md
+# for the two structural asymmetries this check deliberately does not
+# span (envelope tags, and notices on failures).
+# --------------------------------------------------------------------
+
+import json
+import os
+import subprocess
+import sys
+
+# --------------------------------------------------------------------
+# The operations, as (label, REPL line, MCP tool name, MCP arguments).
+# One per tool family, plus a failing phrase, played in this order
+# against both sessions.
+
+STEPS = [
+    ("load",       'LOAD "fixtures/simple.ec" 6',
+                   "ec_load",       {"file": "fixtures/simple.ec", "line": 6}),
+    ("step",       'split.',
+                   "ec_step",       {"phrase": "split."}),
+    ("goals",      'GOALS ALL',
+                   "ec_goals",      {"all": True}),
+    ("tree",       'TREE',
+                   "ec_tree",       {}),
+    ("focus",      'FOCUS 2',
+                   "ec_focus",      {"path": "2"}),
+    ("undo",       'UNDO',
+                   "ec_undo",       {}),
+    ("checkpoint", 'CHECKPOINT c0',
+                   "ec_checkpoint", {"name": "c0"}),
+    ("step/2",     'trivial.',
+                   "ec_step",       {"phrase": "trivial."}),
+    ("revert",     'REVERT c0',
+                   "ec_revert",     {"target": "c0"}),
+    ("search",     'SEARCH (b2i _)',
+                   "ec_search",     {"pattern": "(b2i _)"}),
+    ("commit",     'COMMIT',
+                   "ec_commit",     {}),
+    ("failure",    'apply nosuchlemma.',
+                   "ec_step",       {"phrase": "apply nosuchlemma."}),
+    # The two load options that change what the engine does. Both
+    # reset the session, so they come last. `trace' is the one whose
+    # reply body the core builds itself, rather than handing back the
+    # goals -- the most front-end-independent body there is, and the
+    # one most worth pinning across both wires.
+    ("load/nosmt", 'LOAD "fixtures/simple.ec" 6 -nosmt',
+                   "ec_load",       {"file": "fixtures/simple.ec",
+                                     "line": 6, "nosmt": True}),
+    ("load/trace", 'LOAD "fixtures/midproof.ec" -trace',
+                   "ec_load",       {"file": "fixtures/midproof.ec",
+                                     "trace": True}),
+]
+
+
+# --------------------------------------------------------------------
+def repl_replies(binary, cwd):
+    """Run the REPL script and return one (uuid, body) per reply.
+
+    The REPL wire is a sequence of blocks, each opened by an
+    `OK [uuid:N]<tag>' or `ERROR [uuid:N]' line and closed by a lone
+    `<END>'. The opening READY block is dropped."""
+
+    script = "\n".join(line for (_, line, _, _) in STEPS)
+    out = subprocess.run(
+        [binary, "llm", "-eval", script],
+        cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    ).stdout.decode()
+
+    replies, head, body = [], None, []
+    for line in out.split("\n")[:-1]:
+        if head is None:
+            head = line
+        elif line == "<END>":
+            replies.append((head, "".join(l + "\n" for l in body)))
+            head, body = None, []
+        else:
+            body.append(line)
+
+    def uuid_of(head):
+        return int(head.split("[uuid:")[1].split("]")[0])
+
+    return [(uuid_of(h), b) for (h, b) in replies][1:]
+
+
+# --------------------------------------------------------------------
+def mcp_results(binary, cwd):
+    """Run the MCP script and return one (uuid, text) per tools/call."""
+
+    script = "".join(
+        json.dumps({
+            "jsonrpc": "2.0", "id": i + 1, "method": "tools/call",
+            "params": {"name": tool, "arguments": args},
+        }) + "\n"
+        for (i, (_, _, tool, args)) in enumerate(STEPS)
+    )
+    out = subprocess.run(
+        [binary, "mcp"], input=script.encode(),
+        cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    ).stdout.decode()
+
+    results = []
+    for line in out.splitlines():
+        result = json.loads(line)["result"]
+        results.append((result["structuredContent"]["uuid"],
+                        result["content"][0]["text"]))
+    return results
+
+
+# --------------------------------------------------------------------
+def main():
+    root = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    binary = os.path.join(root, "_build", "default", "src", "ec.exe")
+    verbose = False
+
+    args = sys.argv[1:]
+    while args:
+        if args[0] == "--bin":
+            binary, args = args[1], args[2:]
+        elif args[0].startswith("--bin="):
+            binary, args = args[0][len("--bin="):], args[1:]
+        elif args[0] in ("-v", "--verbose"):
+            verbose, args = True, args[1:]
+        elif args[0] in ("-h", "--help"):
+            print("usage: mcp-parity [--bin PATH] [-v]")
+            return 0
+        else:
+            print(f"mcp-parity: unknown option: {args[0]}", file=sys.stderr)
+            return 2
+
+    binary = os.path.abspath(binary)
+    if not os.access(binary, os.X_OK):
+        print(f"mcp-parity: no such executable: {binary}", file=sys.stderr)
+        return 2
+
+    # Both sessions run from tests/llm, so they name the fixture the
+    # same way and no path difference can leak into a reply.
+    cwd = os.path.join(root, "tests", "llm")
+
+    repl = repl_replies(binary, cwd)
+    mcp = mcp_results(binary, cwd)
+
+    nfail = 0
+
+    if len(repl) != len(STEPS) or len(mcp) != len(STEPS):
+        print(f"FAIL (reply count: {len(STEPS)} steps, "
+              f"{len(repl)} REPL replies, {len(mcp)} MCP results)")
+        return 1
+
+    for ((label, line, tool, _), (ruuid, body), (muuid, text)) in \
+            zip(STEPS, repl, mcp):
+        # The REPL ends a non-empty body with a newline so that `<END>'
+        # starts a line; MCP has no sentinel and so does not.
+        normalized = text if text.endswith("\n") or text == "" else text + "\n"
+
+        problems = []
+        if ruuid != muuid:
+            problems.append(f"uuid: REPL {ruuid}, MCP {muuid}")
+        if normalized != body:
+            problems.append(f"body:\n  REPL {body!r}\n  MCP  {normalized!r}")
+
+        if problems:
+            print(f"FAIL {label} ({line!r} vs {tool})")
+            for problem in problems:
+                print("    " + problem)
+            nfail += 1
+        else:
+            print(f"PASS {label} (uuid {ruuid})")
+            if verbose:
+                print("".join("    | " + l + "\n" for l in body.splitlines()))
+
+    print("----")
+    print(f"{len(STEPS) - nfail} passed, {nfail} failed")
+    return 1 if nfail else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

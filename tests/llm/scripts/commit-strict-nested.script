@@ -1,0 +1,13 @@
+# exit: 0
+# The LOAD prefix of fixtures/strictnested.ec stops under two open
+# bullet frames (`-` then `+`) with four goals open. COMMIT must reuse
+# `-` for the outer frame's next sibling, `+` for the inner frame's,
+# and pick `*` fresh for the level the prefix never opened.
+LOAD "fixtures/strictnested.ec"
+QUIET ON
+trivial.
+trivial.
+trivial.
+trivial.
+QUIET OFF
+COMMIT

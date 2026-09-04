@@ -7,6 +7,7 @@ type command = [
   | `Why3Config
   | `DocGen of doc_option
   | `Llm of llm_option
+  | `Mcp of mcp_option
 ]
 
 and options = {
@@ -45,10 +46,14 @@ and doc_option = {
 }
 
 and llm_option = {
-  llmo_input     : string;
   llmo_provers   : prv_options;
-  llmo_lastgoals : bool;
-  llmo_upto      : (int * int option) option;
+  llmo_help      : bool;
+  llmo_eval      : string option;
+}
+
+and mcp_option = {
+  mcpo_provers   : prv_options;
+  mcpo_help      : bool;
 }
 
 and prv_options = {
@@ -65,8 +70,12 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string * bool) list;
-  ldro_boot  : bool;
+  ldro_idirs  : (string option * string * bool) list;
+  ldro_boot   : bool;
+  ldro_stdlib : string list;
+    (* When non-empty, these directories replace the built-in
+       [Sites.theories] for prelude and recursive-System namespace
+       loading. Empty means "use the built-in stdlib". *)
 }
 
 and glb_options = {
@@ -98,6 +107,16 @@ type ini_context = {
 exception InvalidIniFile of (int * string)
 
 val read_ini_file : string -> ini_options
+
+(* -------------------------------------------------------------------- *)
+(* Overlay project INI settings discovered at run time (e.g. by the LLM
+   REPL's [LOAD]) on top of already-parsed prover options, mirroring
+   the precedence of option parsing with a known project file. *)
+val prv_options_with_ini : ini_context list -> prv_options -> prv_options
+
+(* The load path contributed by INI contexts, in [ldro_idirs] shape:
+   (namespace, dir, recursive). *)
+val ini_loadpath : ini_context list -> (string option * string * bool) list
 
 val parse_cmdline :
      ?ini:(string option -> ini_context list)

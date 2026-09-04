@@ -158,7 +158,7 @@ let main () =
   let (module Sites) = EcRelocate.sites in
 
   (* Parse command line arguments *)
-  let conffiles, options =
+  let conffiles, projini, options =
     let sysfile =
       let xdgini =
         XDG.Config.file
@@ -220,6 +220,19 @@ let main () =
           exit 1
     in
 
+    (* The [easycrypt.project] context of a file (walking up from the
+       file's directory; from the cwd when no file is given). Also used
+       by the LLM REPL to reconfigure per loaded file. *)
+    let projini (path : string option) =
+      Option.bind (projfile path) (fun conffile ->
+        Option.map
+          (fun ini -> {
+             inic_ini  = ini;
+             inic_root = Some (Filename.dirname conffile);
+          })
+          (read_ini_file conffile)
+      ) in
+
     let getini (path : string option) =
       let inisys =
         List.filter_map
@@ -230,20 +243,9 @@ let main () =
           conffiles
       in
 
-      let iniproj =
-        Option.bind (projfile path) (fun conffile ->
-          Option.map
-            (fun ini -> {
-               inic_ini  = ini;
-               inic_root = Some (Filename.dirname conffile);
-            })
-            (read_ini_file conffile)
-        )
-      in
+      List.ocons (projini path) inisys in
 
-      List.ocons iniproj inisys in
-
-    (conffiles, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
+    (conffiles, projini, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
 
   (* Execution of eager commands *)
   begin
@@ -328,6 +330,11 @@ let main () =
               ["-boot"]
             else [] in
 
+          let stdlib =
+            options.o_options.o_loader.ldro_stdlib
+            |> List.map (fun d -> ["-stdlib"; d])
+            |> List.flatten in
+
           let idirs =
             options.o_options.o_loader.ldro_idirs
             |> List.map (fun (pfx, name, rec_) ->
@@ -341,7 +348,7 @@ let main () =
             maxjobs; timeout; cpufactor; ppwidth;
             provers; quorum ; pragmas  ; checkall;
             profile; why3srv  ; why3    ;
-            reloc  ; noevict; boot     ; idirs   ;
+            reloc  ; noevict; boot     ; stdlib  ; idirs   ;
           ]
         in
 
@@ -420,11 +427,20 @@ let main () =
   let ldropts = options.o_options.o_loader in
 
   begin
+    (* [-stdlib DIR] (repeatable) fully replaces the built-in
+       [Sites.theories] roots. This is stronger than [-boot], which
+       only skips the recursive-System add but still injects
+       [<Sites.theories>/prelude]. *)
+    let theories =
+      match ldropts.ldro_stdlib with
+      | [] -> Sites.theories
+      | ds -> ds
+    in
     List.iter (fun theory ->
       EcCommands.addidir ~namespace:`System (Filename.concat theory "prelude");
       if not ldropts.ldro_boot then
         EcCommands.addidir ~namespace:`System ~recursive:true theory
-    ) Sites.theories;
+    ) theories;
     List.iter (fun (onm, name, isrec) ->
         EcCommands.addidir
           ?namespace:(omap (fun nm -> `Named nm) onm)
@@ -449,7 +465,6 @@ let main () =
       (*---*) gccompact   : int option;
       (*---*) docgen      : bool;
       (*---*) outdirp     : string option;
-      (*---*) upto        : (int * int option) option;
       mutable trace       : trace1 list option;
     }
 
@@ -528,7 +543,6 @@ let main () =
         ; gccompact   = None
         ; docgen      = false
         ; outdirp     = None
-        ; upto        = None
         ; trace       = None }
 
     end
@@ -564,39 +578,15 @@ let main () =
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
         ; outdirp     = None
-        ; upto        = None
         ; trace       = trace0 }
 
       end
 
-    | `Llm llmopts -> begin
-        let name = llmopts.llmo_input in
+    | `Llm llmopts ->
+        EcLlm.run ~relocdir ~boot:ldropts.ldro_boot ~projini llmopts
 
-        begin try
-          let ext = Filename.extension name in
-          ignore (EcLoader.getkind ext : EcLoader.kind)
-        with EcLoader.BadExtension ext ->
-          Format.eprintf "do not know what to do with %s@." ext;
-          exit 1
-        end;
-
-        let lastgoals = llmopts.llmo_lastgoals in
-        let terminal =
-          lazy (T.from_channel ~name ~progress:`Silent ~lastgoals (open_in name))
-        in
-
-        { prvopts     = llmopts.llmo_provers
-        ; input       = Some name
-        ; terminal    = terminal
-        ; interactive = false
-        ; eco         = true
-        ; gccompact   = None
-        ; docgen      = false
-        ; outdirp     = None
-        ; upto        = llmopts.llmo_upto
-        ; trace       = None }
-
-      end
+    | `Mcp mcpopts ->
+        EcMcp.run ~relocdir ~boot:ldropts.ldro_boot ~projini mcpopts
 
     | `Runtest _ ->
         (* Eagerly executed *)
@@ -638,7 +628,6 @@ let main () =
         ; gccompact   = None
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
-        ; upto        = None
         ; trace       = None }
       end
 
@@ -658,7 +647,7 @@ let main () =
         EcCommands.set_current_path current_path);
 
   (* Check if the .eco is up-to-date and exit if so *)
-  (if not state.docgen && state.upto = None then
+  (if not state.docgen then
     oiter
       (fun input -> if EcCommands.check_eco input then exit 0)
       state.input);
@@ -745,16 +734,6 @@ let main () =
   (* Warn about GC-regressed OCaml versions (5.0-5.3) *)
   warn_ocaml_version terminal;
 
-  (* Check if a location is past the -upto point *)
-  let past_upto (loc : EcLocation.t) =
-    match state.upto with
-    | None -> false
-    | Some (line, col) ->
-        let (sl, sc) = loc.loc_start in
-        sl > line || (sl = line && match col with
-          | None -> true
-          | Some c -> sc >= c) in
-
   try
     if T.interactive terminal then Sys.catch_break true;
 
@@ -823,13 +802,6 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
-
-                   (* -upto: if this command starts past the target, print goals and exit *)
-                   if past_upto loc then begin
-                     T.finalize terminal;
-                     EcCommands.pp_current_goal_or_noproof ~all:true Format.std_formatter;
-                     exit 0
-                   end;
 
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in

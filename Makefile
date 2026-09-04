@@ -11,6 +11,12 @@ CHECK     += --bin=./ec.native
 CHECK     += --jobs="$(ECJOBS)"
 CHECK     += $(foreach arg,$(ECARGS),--bin-args="$(arg)")
 CHECK     += $(ECEXTRA) config/tests.config
+LLMCHECK  := scripts/testing/llm-golden
+LLMCHECK  += --bin=./ec.native
+MCPCHECK  := scripts/testing/mcp-golden
+MCPCHECK  += --bin=./ec.native
+MCPPARITY := scripts/testing/mcp-parity
+MCPPARITY += --bin=./ec.native
 NIX       ?= nix --extra-experimental-features "nix-command flakes"
 PROFILE   ?= dev
 
@@ -20,6 +26,7 @@ UNAME_S = $(shell uname -s)
 
 # --------------------------------------------------------------------
 .PHONY: default build byte native tests check examples
+.PHONY: test-llm test-mcp
 .PHONY: nix-build nix-build-with-provers nix-develop
 .PHONY: clean install uninstall
 
@@ -49,7 +56,14 @@ stdlib: build
 examples: build
 	$(CHECK) examples mee-cbc
 
-check: unit stdlib examples
+test-llm: build
+	$(LLMCHECK)
+
+test-mcp: build
+	$(MCPCHECK)
+	$(MCPPARITY)
+
+check: unit stdlib examples test-llm test-mcp
 	@true
 
 nix-build:
