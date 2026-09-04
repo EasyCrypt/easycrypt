@@ -11,6 +11,7 @@ Type variables: <none>
 OK [uuid:4] [focus: 1/2]
 * In [operators, predicates or exceptions]:
 
+(* Int.b2i (shorten name: b2i) *)
 op b2i (b : bool) : int = if b then 1 else 0.
 
 Current goal (remaining: 2)
