@@ -2106,7 +2106,7 @@ module Reduction = struct
 
         let red_info =
           EcReduction.User.compile ~opts ~prio:idx (env scope) ax_p in
-        (ax_p, opts, Some red_info) in
+        (ax_p, opts, red_info) in
 
       let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
       List.flatten rules

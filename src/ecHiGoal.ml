@@ -112,8 +112,9 @@ let process_local_hint (hint : plocalhint) (tc : tcenv1) =
         let simpl =
           List.fold_left (fun simpl lemma ->
             let path = EcEnv.Ax.lookup_path (unloc lemma) env in
-            let rule = EcReduction.User.compile ~opts ~prio:0 env path in
-            EcEnv.SimplifyContext.add_rules [(path, rule)] simpl)
+            let rules = EcReduction.User.compile ~opts ~prio:0 env path in
+            EcEnv.SimplifyContext.add_rules
+              (List.map (fun rule -> (path, rule)) rules) simpl)
             simpl h.ph_lemmas
         in
 
@@ -198,8 +199,9 @@ let process_simplify_info ri (tc : tcenv1) =
     let opts = EcTheory.{ ur_delta = false; ur_eqtrue = false; } in
     List.fold_left (fun simpl lemma ->
       let path = EcEnv.Ax.lookup_path (unloc lemma) env in
-      let rule = EcReduction.User.compile ~opts ~prio:0 env path in
-      EcEnv.SimplifyContext.add_rules [(path, rule)] simpl
+      let rules = EcReduction.User.compile ~opts ~prio:0 env path in
+      EcEnv.SimplifyContext.add_rules
+        (List.map (fun rule -> (path, rule)) rules) simpl
     ) simpl hint.ph_lemmas
   in
 

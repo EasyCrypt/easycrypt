@@ -1532,9 +1532,7 @@ module Reduction = struct
   (* The default-database name is owned by [EcSimplifyContext]. *)
   let dname : symbol = EcSimplifyContext.dname
 
-  let add_rule ((src, rule) : path * rule option) (db : mredinfo) =
-    match rule with None -> db | Some rule ->
-
+  let add_rule ((src, rule) : path * rule) (db : mredinfo) =
     let p : topsym =
       match rule.rl_ptn with
       | Rule (`Op p, _)   -> `Path (fst p)
@@ -1557,22 +1555,24 @@ module Reduction = struct
 
       Some { ri_priomap; ri_list }) p db
 
-  let add_rules (rules : (path * rule option) list) (db : mredinfo) =
+  let add_rules (rules : (path * rule) list) (db : mredinfo) =
     List.fold_left ((^~) add_rule) db rules
 
-  let updatedb ?(base : symbol option) (rules : (path * rule option) list) (db : mredinfo Msym.t) =
+  let updatedb ?(base : symbol option) (rules : (path * rule) list) (db : mredinfo Msym.t) =
     let nbase = odfl dname base in
     let base = Msym.find_def Mrd.empty nbase db in
     Msym.add nbase (add_rules rules base) db
 
   let add ?(import = true) ({ red_base; red_rules } : reduction_rule) (env : env) =
-    let rstrip = List.map (fun (x, _, y) -> (x, y)) red_rules in
+    let rstrip =
+      List.concat_map (fun (x, _, rules) ->
+        List.map (fun rule -> (x, rule)) rules) red_rules in
 
     { env with
         env_redbase = updatedb ?base:red_base rstrip env.env_redbase;
         env_item = mkitem ~import (Th_reduction { red_base; red_rules }) :: env.env_item; }
 
-  let add1 ?base (prule : path * rule_option * rule option) (env : env) =
+  let add1 ?base (prule : path * rule_option * rule list) (env : env) =
     add { red_base = base; red_rules = [prule] } env
 
   let get_entries ?base (p : topsym) (env : env) =
@@ -3592,7 +3592,9 @@ module Theory = struct
   let bind_rd_th =
     let for1 _path db = function
       | Th_reduction { red_base; red_rules } ->
-         let rules = List.map (fun (x, _, y) -> (x, y)) red_rules in
+         let rules =
+           List.concat_map (fun (x, _, rules) ->
+             List.map (fun rule -> (x, rule)) rules) red_rules in
          Some (Reduction.updatedb ?base:red_base rules db)
       | _ -> None
 

@@ -448,7 +448,7 @@ module Reduction : sig
   (* Name of the default database (the empty name). *)
   val dname : symbol
   val all : env -> (base * (topsym * rule list) list) list
-  val add1 : ?base:symbol -> path * rule_option * rule option -> env -> env
+  val add1 : ?base:symbol -> path * rule_option * rule list -> env -> env
   val add  : ?import:bool -> reduction_rule -> env -> env
   val get  : ?base:symbol -> topsym -> env -> rule list
   val get_entries : ?base:symbol -> topsym -> env -> entry list

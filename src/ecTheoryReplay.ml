@@ -1072,22 +1072,24 @@ and replay_reduction
   (ove : _ ovrenv) (subst, ops, proofs, scope)
   (import, ({ red_rules } as red) : _ * EcTheory.reduction_rule)
 =
-  let for1 (p, opts, rule) =
+  let for1 (p, opts, rules) =
     let exception Removed in
 
     let p = EcSubst.subst_path subst p in
 
-    let rule =
-      obind (fun rule ->
+    let rules =
+      match rules with
+      | [] -> []
+      | rule :: _ ->
         let env = EcSection.env (ove.ovre_hooks.henv scope) in
 
         try
           if not (is_some (EcEnv.Ax.by_path_opt p env)) then
             raise Removed;
-          Some (EcReduction.User.compile ~opts ~prio:rule.rl_prio env p)
-        with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
+          EcReduction.User.compile ~opts ~prio:rule.rl_prio env p
+        with EcReduction.User.InvalidUserRule _ | Removed -> []
 
-    in (p, opts, rule) in
+    in (p, opts, rules) in
 
   let red_rules = List.map for1 red_rules in
   let scope = ove.ovre_hooks.hadd_item scope ~import (Th_reduction { red with red_rules }) in
