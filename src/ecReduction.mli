@@ -53,7 +53,7 @@ module User : sig
 
   type rule = EcEnv.Reduction.rule
 
-  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule
+  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule list
 end
 
 (* -------------------------------------------------------------------- *)

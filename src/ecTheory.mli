@@ -69,7 +69,7 @@ and rule_option = {
 
 and reduction_rule = {
   red_base : symbol option;
-  red_rules : (path * rule_option * rule option) list;
+  red_rules : (path * rule_option * rule list) list;
 }
 
 and auto_rule = {
