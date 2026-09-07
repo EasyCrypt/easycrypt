@@ -175,6 +175,12 @@ let create ~relocdir ~boot ~projini ~prvopts =
      messages, [search] and [locate] included, already arrive. *)
   EcCommands.set_print_formatter (Format.formatter_of_buffer st.notices);
 
+  (* A session reloads: LOAD rebuilds the scope on every call, and so
+     does [pragma restart.]. Without this each one re-reads every
+     theory the file requires, which is nearly all of what a LOAD
+     costs. *)
+  EcCommands.enable_theory_cache ();
+
   do_initialize st; st
 
 (* -------------------------------------------------------------------- *)
@@ -1014,9 +1020,18 @@ let load (st : state) ~file ~upto ~nosmt ~noproof ~trace =
         ~recursive:isrec dir)
       (EcOptions.ini_loadpath ini);
 
-    reset_session st;
+    (* The file's own directory joins the include path *before* the
+       session is rebuilt, not after. The theory cache is keyed on the
+       include path as it stands at the rebuild -- change it and a name
+       may resolve to another file, so the cache is dropped -- and the
+       directory being loaded from is exactly the part of it that a
+       LOAD of a file elsewhere changes. Added afterwards, it would sit
+       outside the key, and two files of the same name in two
+       directories would be served each other's theories. *)
     EcCommands.addidir (Filename.dirname filename);
     EcCommands.set_current_path (Filename.dirname filename);
+
+    reset_session st;
 
     (* -noproof: read the prefix the way a [require] is read, with
        proof checking off, so every lemma it declares is admitted as it

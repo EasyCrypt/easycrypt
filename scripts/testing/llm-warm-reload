@@ -1,0 +1,216 @@
+#! /usr/bin/env python3
+
+# --------------------------------------------------------------------
+# The theory cache the interactive front-ends run with (EcCommands'
+# ThCache) keeps elaborated theories across the scope rebuild a LOAD
+# does, so that reloading a file does not re-read everything it
+# requires. What it must never do is serve a theory the sources no
+# longer describe, and that cannot be checked from a `-eval' script:
+# the file has to change *between* two LOADs of one session. So this
+# harness drives the REPL over stdin instead.
+#
+#   llm-warm-reload [--bin PATH] [-v]
+#
+# Four scenarios, on a fixture tree written into a temporary
+# directory. Each asserts the same invariant, which is the whole
+# contract of the cache: a warm session answers exactly what a cold
+# process answers on the same sources, byte for byte.
+#
+#   quiet      no edit at all -- the reload the cache exists for
+#   direct     a required file is edited
+#   deep       a file required only through another one is edited
+#   shadowed   the include path changes so a name resolves elsewhere
+#
+# The edited scenarios also assert the answer *moved*: an invariant
+# that only says "warm equals cold" is satisfied by a session that
+# reports the same stale thing a cold process would, and a fixture
+# whose edit is invisible would pass while testing nothing.
+# --------------------------------------------------------------------
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+# --------------------------------------------------------------------
+BASE = """require import AllCore.
+op k : int = %s.
+"""
+
+MID = """require import AllCore Base.
+op m : int = k + 1.
+"""
+
+TOP = """require import AllCore Mid.
+
+lemma target : m = k + 1.
+proof.
+rewrite /m.
+trivial.
+qed.
+"""
+
+# `Mid' as the shadowing directory writes it: same theory, other body.
+MID_SHADOW = """require import AllCore Base.
+op m : int = k + 99.
+"""
+
+
+# --------------------------------------------------------------------
+class Session:
+    """A `llm' REPL driven over stdin, one command at a time."""
+
+    def __init__(self, binary, cwd):
+        self.p = subprocess.Popen(
+            [binary, 'llm'], cwd=cwd, text=True, bufsize=1,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL)
+        self.reply()                            # the READY frame
+
+    def reply(self):
+        out = []
+        while True:
+            line = self.p.stdout.readline()
+            if line == '':
+                raise SystemExit('llm-warm-reload: the engine died')
+            if line.rstrip('\n') == '<END>':
+                return ''.join(out)
+            out.append(line)
+
+    def send(self, command):
+        self.p.stdin.write(command + '\n')
+        self.p.stdin.flush()
+        return self.reply()
+
+    def quit(self):
+        self.p.stdin.write('QUIT\n')
+        self.p.stdin.flush()
+        self.p.wait()
+
+
+# What a session is asked, in every scenario: reload the file, then
+# look at the two theories under it -- one required directly, one only
+# through the other.
+def probe(session, entry='Top.ec'):
+    return (session.send('LOAD "%s" 5' % entry)
+            + session.send('print Base.k.')
+            + session.send('print Mid.m.'))
+
+
+def cold(binary, cwd, entry='Top.ec'):
+    session = Session(binary, cwd)
+    answer  = probe(session, entry)
+    session.quit()
+    return answer
+
+
+# --------------------------------------------------------------------
+def scenario(binary, root, name, verbose):
+    cwd = os.path.join(root, name)
+    os.makedirs(cwd)
+    for (path, text) in [('Base.ec', BASE % '1'), ('Mid.ec', MID),
+                         ('Top.ec', TOP)]:
+        with open(os.path.join(cwd, path), 'w') as stream:
+            stream.write(text)
+
+    entry   = 'Top.ec'
+    session = Session(binary, cwd)
+    before  = probe(session)
+
+    if name == 'quiet':
+        pass
+
+    elif name == 'direct':
+        # Mid.ec is required by Top.ec itself.
+        with open(os.path.join(cwd, 'Mid.ec'), 'w') as stream:
+            stream.write(MID.replace('k + 1', 'k + 5'))
+
+    elif name == 'deep':
+        # Base.ec is not named by Top.ec at all: it is reached through
+        # Mid.ec, so serving it from the cache means having decided
+        # that Mid.ec's own dependencies still hold.
+        with open(os.path.join(cwd, 'Base.ec'), 'w') as stream:
+            stream.write(BASE % '42')
+
+    elif name == 'shadowed':
+        # No file changes: the *include path* does, and under the new
+        # one `Mid' is another file. Nothing digests differently, so
+        # only dropping the table on a load-path change gets this
+        # right.
+        other = os.path.join(cwd, 'other')
+        os.makedirs(other)
+        for (path, text) in [('Base.ec', BASE % '1'),
+                             ('Mid.ec', MID_SHADOW), ('Top.ec', TOP)]:
+            with open(os.path.join(other, path), 'w') as stream:
+                stream.write(text)
+        entry = os.path.join('other', 'Top.ec')
+
+    after = probe(session, entry)
+    session.quit()
+
+    reference = cold(binary, cwd, entry)
+
+    ok = True
+    if after != reference:
+        ok = False
+        print('FAIL %s (warm session and cold process disagree)' % name)
+        for line in _diff(reference, after):
+            print('    ' + line)
+    if name != 'quiet' and after == before:
+        ok = False
+        print('FAIL %s (the change is invisible: the fixture tests '
+              'nothing)' % name)
+    if name == 'quiet' and after != before:
+        ok = False
+        print('FAIL %s (an untouched reload moved)' % name)
+        for line in _diff(before, after):
+            print('    ' + line)
+
+    if ok:
+        print('PASS %s' % name)
+        if verbose:
+            for line in after.split('\n'):
+                print('    ' + line)
+    return ok
+
+
+def _diff(want, got):
+    import difflib
+    return list(difflib.unified_diff(
+        want.split('\n'), got.split('\n'),
+        fromfile='cold', tofile='warm', lineterm=''))
+
+
+# --------------------------------------------------------------------
+def main():
+    here   = os.path.dirname(os.path.abspath(__file__))
+    root   = os.path.dirname(os.path.dirname(here))
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--bin', default=os.path.join(root, '_build/default/src/ec.exe'))
+    parser.add_argument('-v', '--verbose', action='store_true')
+    args = parser.parse_args()
+
+    binary = os.path.abspath(args.bin)
+    if not os.access(binary, os.X_OK):
+        print('llm-warm-reload: no such executable: %s' % binary,
+              file=sys.stderr)
+        return 2
+
+    tmp = tempfile.mkdtemp(prefix='llm-warm-reload.')
+    try:
+        results = [scenario(binary, tmp, name, args.verbose)
+                   for name in ['quiet', 'direct', 'deep', 'shadowed']]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    print('----')
+    print('%d passed, %d failed'
+          % (results.count(True), results.count(False)))
+    return 0 if all(results) else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
