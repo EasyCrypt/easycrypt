@@ -109,6 +109,24 @@ sentence's source verbatim; that sentence hides a bare `<END>` and a
 bare `OK [uuid:99]` in a comment. The MCP front-end needs no such rule:
 its frame is a JSON string.
 
+## Strict mode
+
+`strict-stop` plays the scenario the mode exists for: a phrase fails
+after having moved the engine, the phrase after it is refused rather
+than run against a state nobody meant, `GOALS` answers all the same,
+and `RESUME` releases it. The `COMMIT` at the end is part of the
+point — the body it emits carries no trace of either the failed phrase
+or the refused one.
+
+`strict-resume-unstopped` pins the two ways `RESUME` refuses, which
+are one mistake seen twice: a client resuming a session that was never
+stopped does not know where it is.
+
+The MCP side has its own `strict-stop`, for the one case a REPL script
+cannot show: `ec_try` is refused while stopped like anything else that
+would advance, although a failing `ec_try` never stops the session in
+the first place.
+
 ## The reload the goldens cannot reach
 
 The interactive front-ends keep the theories a `require` elaborates

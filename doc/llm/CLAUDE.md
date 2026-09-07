@@ -102,6 +102,8 @@ These are protocol-level commands, not EasyCrypt syntax:
 | `CHECKPOINT <name>` | Save current uuid under a name for later `REVERT` |
 | `SEARCH <pattern>` | Search for lemmas matching a pattern (read-only: the uuid does not move) |
 | `QUIET ON` / `QUIET OFF` | Suppress/enable automatic goal display after tactics |
+| `STRICT ON` / `STRICT OFF` | Stop the session at a failure, instead of carrying on from wherever it left the engine |
+| `RESUME` | Release a `STRICT` stop without moving the engine |
 | `<BEGIN>` / `<DONE>` | Delimit multi-line EasyCrypt input |
 | `HELP` | Print this guide |
 | `QUIT` | Exit |
@@ -373,7 +375,49 @@ is read from a snapshot taken while the proof was open.
 
 `UNDO` / `REVERT` trim the COMMIT transcript automatically.
 
-**6. Use QUIET mode to save tokens during bulk tactic application:**
+**6. Use `STRICT ON` if you send one phrase at a time:**
+
+A session behaves as a source file does: a failing phrase is reported,
+and whatever you send next runs against wherever that failure left the
+engine. Sending phrases one at a time and acting on each reply, that
+is a trap. `split.` opens two goals, the tactic after it fails, and
+the phrase after *that* lands on the first subgoal rather than where
+you wrote it for. Nothing says so; the proof simply stops making
+sense several phrases later.
+
+`STRICT ON` stops the session at the failure instead:
+
+```
+STRICT ON
+split.
+apply etrivial.    ← fails, having left two goals open
+trivial.
+→ ERROR [uuid:42]
+  strict: the session stopped at a failed phrase and has not been
+  resynchronized
+  stopped at: apply etrivial.
+  UNDO, REVERT, LOAD or RESUME to continue; GOALS, TREE, SEARCH and
+  COMMIT answer meanwhile
+```
+
+Being stopped is not being locked out: `GOALS`, `TREE`, `SEARCH`,
+`CHECKPOINT` and `COMMIT` all answer, which is the point — you are
+meant to look at the failure. What is refused is anything that would
+move the engine further. To carry on, either go somewhere definite
+(`UNDO`, `REVERT`, `LOAD`) or say you meant to stay (`RESUME`).
+
+`RESUME` fails if the session was not stopped, and so does `STRICT
+OFF` release any stop: a session that does not stop at failures cannot
+be sitting at one.
+
+Over MCP the mode is `ec_strict` and the release is `ec_resume`, and
+there `ec_try` earns its keep: a failing `ec_try` never stops the
+session, its contract being that a failure leaves the engine exactly
+where it was, so there is no drift to prevent. It is still refused
+*while* stopped, since succeeding would advance from a point you have
+not acknowledged.
+
+**7. Use QUIET mode to save tokens during bulk tactic application:**
 
 ```
 QUIET ON
@@ -384,7 +428,7 @@ QUIET OFF
 GOALS
 ```
 
-**7. Search for lemmas using patterns:**
+**8. Search for lemmas using patterns:**
 
 EasyCrypt `search` uses pattern syntax, not keywords. Use `_` as
 wildcard:
@@ -432,7 +476,7 @@ resources, no prompts, no sampling.
 
 ### Tools
 
-Eleven tools. Required arguments are marked; the others default as
+Thirteen tools. Required arguments are marked; the others default as
 noted.
 
 | Tool | Arguments | Description |
@@ -447,14 +491,16 @@ noted.
 | `ec_revert` | `target` (req) | Return the session to an earlier state, named by a uuid or by a checkpoint name |
 | `ec_checkpoint` | `name` (req) | Record the current uuid under `name`, for a later `ec_revert` |
 | `ec_commit` | — | Emit the phrases recorded since the last `ec_load` as a bulleted proof body |
+| `ec_strict` | `on` (req) | Stop the session at a failure, instead of carrying on from wherever it left the engine |
+| `ec_resume` | — | Release a strict-mode stop without moving the engine |
 | `ec_search` | `pattern` (req) | Search the environment for lemmas matching an EasyCrypt search pattern |
 
 `tools/list` carries a fuller, agent-facing `description` and a JSON
 Schema for every tool; those are the authoritative texts. The tools
 mirror the REPL meta-commands — `-nosmt`, `-noproof`, `-trace`, dotted paths,
-checkpoints, bullets and search patterns all behave exactly as
-described above, and `NEXT` folds into `ec_focus` with path `"next"` —
-plus `ec_try`, which has no REPL equivalent. The meta-commands that are
+checkpoints, bullets, strict mode and search patterns all behave
+exactly as described above, and `NEXT` folds into `ec_focus` with path
+`"next"` — plus `ec_try`, which has no REPL equivalent. The meta-commands that are
 pure console affordances have no tool: multi-line input needs no
 `<BEGIN>`/`<DONE>` (a `phrase` may simply contain newlines), `QUIET`
 has no purpose when the client decides what to display, `HELP` is this

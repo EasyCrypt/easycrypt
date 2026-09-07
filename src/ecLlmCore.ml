@@ -105,6 +105,19 @@ type state = {
      that don't collide with frames opened by the LOAD prefix.
      Cleared with the transcript on LOAD/Restart. *)
   prior_bullets : EcBullets.stack option ref;
+
+  (* Strict mode: is a failure allowed to be followed by more input?
+     Off, a session behaves as a file does -- the failure is reported
+     and whatever comes next is run against wherever it left the
+     engine. On, the session stops there instead. *)
+  strict_mode : bool ref;
+
+  (* Set, while strict, to the phrase a failure stopped the session
+     at. Every operation that could move the engine refuses until the
+     session is resynchronized ([undo], [revert], [load], [resume]),
+     so a client that sends its phrases one at a time cannot walk past
+     the failure and carry on against a state it did not mean. *)
+  stopped_at : string option ref;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -166,6 +179,8 @@ let create ~relocdir ~boot ~projini ~prvopts =
     checkpoints   = Hashtbl.create 16;
     transcript    = ref [];
     prior_bullets = ref None;
+    strict_mode   = ref false;
+    stopped_at    = ref None;
   } in
 
   (* [print] renders on the process's stdout by default, which in the
@@ -400,6 +415,62 @@ let mk_failure (st : state) ~(pre : int) (message : string) =
     reverted = false; changed = uuid <> pre; }
 
 (* -------------------------------------------------------------------- *)
+(* Strict mode.
+
+   A session is a file that is still being written: a failure is
+   reported and whatever is sent next runs against wherever it left the
+   engine, exactly as the sentences after a failure in a file would.
+   That is the right default, and it is also the trap a client that
+   sends its phrases one at a time falls into -- it keeps sending,
+   each phrase lands on a state one phrase further from the one it was
+   written against, and the drift is only noticed later.
+
+   Under strict mode the session stops instead. Any failure of an
+   operation that could have advanced arms [stopped_at] -- whether or
+   not that particular failure did advance, since the drift is in the
+   client's picture of where the session is, not in the engine: the
+   phrase after a failed one was written for the state the failed one
+   was to produce, and runs against the state before it either way.
+   Every operation that could move the engine further is then refused
+   until the session is put somewhere the client chose: [undo],
+   [revert] and [load] do that by arriving somewhere definite, and
+   [resume] by saying so. Reading is never refused -- the point is to
+   look at the failure, not to be locked out of it -- so goals, trees,
+   searches, checkpoints and COMMIT answer while stopped.
+
+   [try_step] is the one advancing operation whose failures do not arm
+   it: they restore the state the call started from and say so
+   ([reverted]), so the client's picture stays exact and there is no
+   drift to prevent. It is still refused *while* stopped, since
+   succeeding would advance from a point the client has not
+   acknowledged. *)
+module Strict = struct
+  let stopped (st : state) =
+    !(st.strict_mode) && !(st.stopped_at) <> None
+
+  (* Arm the stop. [at] is how the reply will name the phrase that
+     stopped the session. Only the first failure arms it: what the
+     client needs is where it stopped being in control, not where the
+     last refusal happened. *)
+  let arm (st : state) (at : string) =
+    if !(st.strict_mode) && !(st.stopped_at) = None then
+      st.stopped_at := Some (if at = "" then "<the last phrase>" else at)
+
+  let clear (st : state) =
+    st.stopped_at := None
+
+  (* The refusal. It carries the phrase that stopped the session and
+     the ways out, because a client that hits this has by definition
+     lost track of where the session is. *)
+  let refuse (st : state) ~(pre : int) =
+    let at = odfl "<the last phrase>" !(st.stopped_at) in
+    mk_failure st ~pre (Printf.sprintf
+      "strict: the session stopped at a failed phrase and has not been \
+       resynchronized\nstopped at: %s\nUNDO, REVERT, LOAD or RESUME to \
+       continue; GOALS, TREE, SEARCH and COMMIT answer meanwhile" at)
+end
+
+(* -------------------------------------------------------------------- *)
 (* Transcript manipulation. *)
 module Transcript = struct
   let trim (st : state) target =
@@ -421,7 +492,9 @@ end
 let reset_session (st : state) : unit =
   do_initialize st;
   Hashtbl.clear st.checkpoints;
-  Transcript.clear st
+  Transcript.clear st;
+  (* A strict stop names a phrase of a session that no longer exists. *)
+  st.stopped_at := None
 
 (* -------------------------------------------------------------------- *)
 (* Process a single EasyCrypt command, respecting [gl_fail]. When
@@ -790,6 +863,7 @@ let step (st : state) input =
   let prior_bullets = st.prior_bullets in
   let pre = EcCommands.uuid () in
   Buffer.clear notices;
+  if Strict.stopped st then Done (Error (Strict.refuse st ~pre)) else begin
   (* On the first REPL phrase of each proof, capture the bullet stack
      the LOAD prefix left so COMMIT can avoid token collisions with
      it. Subsequent calls return [None] and don't clobber the snapshot. *)
@@ -838,11 +912,13 @@ let step (st : state) input =
       reset_session st;
       Done (Ok (mk_reply st ~pre (Text "Session restarted")))
     | e ->
+      Strict.arm st !last_src;
       Done (Error (mk_failure st ~pre (Goals.format_error ~src:!last_src e)))
     end
   in
   EcIo.finalize reader;
   answer
+  end
 
 (* -------------------------------------------------------------------- *)
 (* [step] with an automatic rollback on failure. A phrase can fail
@@ -870,6 +946,7 @@ let try_step (st : state) input =
   let mark       = EcCommands.undo_mark () in
   let transcript = !(st.transcript) in
   let bullets    = !(st.prior_bullets) in
+  let stopped_at = !(st.stopped_at) in
   match step st input with
   | Quit                  -> Quit
   | Done (Ok _) as answer -> answer
@@ -877,6 +954,11 @@ let try_step (st : state) input =
     EcCommands.undo_restore mark;
     st.transcript    := transcript;
     st.prior_bullets := bullets;
+    (* Restored like the rest of the bookkeeping: strict mode stops a
+       session because a failure may have moved the engine, and this
+       one provably did not. A refusal restores the stop that produced
+       it, so being refused does not itself change anything. *)
+    st.stopped_at    := stopped_at;
     let uuid = EcCommands.uuid () in
     Done (Error { failure with
       uuid;
@@ -1340,6 +1422,8 @@ let undo (st : state) =
   if uuid > 0 then begin
     EcCommands.undo (uuid - 1);
     Transcript.trim st (uuid - 1);
+    (* Somewhere definite: the stop has been answered. *)
+    Strict.clear st;
     Ok (mk_reply_goals st ~pre)
   end else
     Error (mk_failure st ~pre "nothing to undo")
@@ -1351,6 +1435,7 @@ let focus (st : state) request =
                    and focus the matching leaf. *)
   let pre = EcCommands.uuid () in
   Buffer.clear st.notices;
+  if Strict.stopped st then Error (Strict.refuse st ~pre) else
   let resolved =
     match request with
     | `Next ->
@@ -1372,6 +1457,37 @@ let checkpoint (st : state) ~name =
   Ok (mk_reply st ~pre (Text (Printf.sprintf
     "checkpoint '%s' set at uuid %d" name (EcCommands.uuid ()))))
 
+(* Strict mode on and off. Turning it off releases a stop: a session
+   that does not stop at failures cannot be sitting at one. *)
+let strict (st : state) ~(on : bool) =
+  let pre = EcCommands.uuid () in
+  Buffer.clear st.notices;
+  st.strict_mode := on;
+  if not on then Strict.clear st;
+  Ok (mk_reply st ~pre (Text (
+    if on then
+      "strict: on -- a failure stops the session until UNDO, REVERT, \
+       LOAD or RESUME"
+    else
+      "strict: off")))
+
+(* Release a stop without going anywhere: the client has read the
+   failure and means to carry on from where it left the engine. The
+   two refusals are not pedantry -- a client that resumes a session
+   that was never stopped has lost track of it, which is the one thing
+   this mode exists to tell it. *)
+let resume (st : state) =
+  let pre = EcCommands.uuid () in
+  Buffer.clear st.notices;
+  if not !(st.strict_mode) then
+    Error (mk_failure st ~pre "RESUME: strict mode is off")
+  else if !(st.stopped_at) = None then
+    Error (mk_failure st ~pre "RESUME: the session is not stopped")
+  else begin
+    Strict.clear st;
+    Ok (mk_reply_goals st ~pre)
+  end
+
 let revert (st : state) spec =
   let pre = EcCommands.uuid () in
   Buffer.clear st.notices;
@@ -1391,6 +1507,7 @@ let revert (st : state) spec =
     else begin
       EcCommands.undo target;
       Transcript.trim st target;
+      Strict.clear st;
       Ok (mk_reply_goals st ~pre)
     end
 
