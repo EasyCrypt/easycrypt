@@ -156,10 +156,15 @@ module Schema = struct
     `Assoc [("type", `String "integer");
             ("description", `String description)]
 
-  let bool ~description ~default () =
-    `Assoc [("type", `String "boolean");
-            ("description", `String description);
-            ("default", `Bool default)]
+  (* [default] is omitted for a required property: a schema that
+     declares one and demands the property anyway says two things at
+     once, and a client is entitled to believe either. *)
+  let bool ~description ?default () =
+    `Assoc ([("type", `String "boolean");
+             ("description", `String description)]
+            @ (match default with
+               | None   -> []
+               | Some d -> [("default", `Bool d)]))
 
   let obj ?(required = []) props =
     `Assoc ([("type", `String "object");
@@ -424,6 +429,43 @@ let tools : J.t list =
       ();
 
     tool
+      ~name:"ec_strict"
+      ~description:
+        "Turn strict mode on or off. Off (the default) a session \
+         behaves as a source file does: a failing phrase is reported \
+         and the next call runs against wherever it left the engine. \
+         On, the session stops at a failure that may have moved the \
+         engine, and ec_step, ec_try and ec_focus are refused until it \
+         is resynchronized -- by ec_undo, ec_revert or ec_load, which \
+         arrive somewhere definite, or by ec_resume, which says so. \
+         Turn it on if you send one phrase per call and act on each \
+         result: without it a failure is followed by calls landing on \
+         a state you did not mean, and the drift is silent. Reads \
+         (ec_goals, ec_tree, ec_search, ec_checkpoint, ec_commit) \
+         always answer, stopped or not."
+      ~input:(Schema.obj ~required:["on"] [
+        ("on", Schema.bool
+                 ~description:"true to stop the session at a failure" ());
+      ])
+      ~annotations:[("destructiveHint", `Bool false)]
+      ~output:(Schema.output ())
+      ();
+
+    tool
+      ~name:"ec_resume"
+      ~description:
+        "Release a strict-mode stop without moving the engine: you have \
+         read the failure and mean to carry on from where it left the \
+         session. Use ec_undo or ec_revert instead when you would \
+         rather go back. Fails when the session is not stopped, or when \
+         strict mode is off -- either way you are not where you think \
+         you are, which is what strict mode is for."
+      ~input:(Schema.obj [])
+      ~annotations:[("destructiveHint", `Bool false)]
+      ~output:(Schema.output ())
+      ();
+
+    tool
       ~name:"ec_search"
       ~description:
         "Search the environment for lemmas matching an EasyCrypt search \
@@ -474,6 +516,14 @@ module Args = struct
     | None | Some `Null -> default
     | Some (`Bool b)    -> b
     | Some _            -> bad tool name "a boolean"
+
+  let bool_req tool args name =
+    match List.assoc_opt name args with
+    | Some (`Bool b) -> b
+    | Some _ -> bad tool name "a boolean"
+    | None ->
+      raise (Invalid_params
+        (Printf.sprintf "%s: missing required argument `%s'" tool name))
 
   let int_opt tool args name =
     match List.assoc_opt name args with
@@ -700,6 +750,12 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
 
     | "ec_commit" ->
       outcome (EcLlmCore.commit st)
+
+    | "ec_strict" ->
+      outcome (EcLlmCore.strict st ~on:(Args.bool_req name args "on"))
+
+    | "ec_resume" ->
+      outcome (EcLlmCore.resume st)
 
     | "ec_search" ->
       outcome (EcLlmCore.search st
