@@ -22,6 +22,17 @@ type loadpath_mark
 val loadpath_mark  : unit -> loadpath_mark
 val loadpath_reset : loadpath_mark -> unit
 
+(* Keep the theories a [require] elaborates across the scope rebuilds
+   [initialize ~restart:true] does, so that reloading a file does not
+   re-read everything it requires -- which, on a development of any
+   size, is what a reload costs. An entry is reused only while the file
+   it came from, and every file below it, digests to what it did when
+   it was read; a rebuild that starts from a different include path
+   drops the lot. Off until this is called, and there is no way back:
+   the batch compiler reads each file once per process and has nothing
+   to gain, the interactive front-ends reload all day. *)
+val enable_theory_cache : unit -> unit
+
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit
 

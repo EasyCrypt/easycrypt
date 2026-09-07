@@ -27,6 +27,11 @@ type required_info = {
 
 type required = required_info list
 
+(* An elaborated theory, as [Theory.loaded] hands it back and
+   [Theory.seed_loaded] takes it: opaque here, and only ever moved from
+   one scope to another. *)
+type thloaded
+
 type scope
 
 type proof_uc = {
@@ -197,6 +202,22 @@ module Theory : sig
    * the initial scope and is in charge of processing the required
    * theory. *)
   val require : scope -> (required_info * thmode) -> (scope -> scope) -> scope
+
+  (* [loaded scope name] is the elaborated theory [name] this scope has
+     already read, with the theories reading it required, or [None].
+     [seed_loaded scope entries] puts such entries into a scope, so that
+     a [require] naming one of them takes the loaded path and never runs
+     its loader.
+
+     They exist for a front-end that rebuilds the scope in order to
+     reload a file: the table [require] consults is part of the scope,
+     so without them every reload re-reads every required theory, which
+     is the bulk of what a reload costs. Nothing here looks at the file
+     system: a caller that seeds a theory the sources no longer describe
+     gets a session built on the stale one, so validating the entries
+     against disk before seeding them is the caller's job. *)
+  val loaded      : scope -> symbol -> (thloaded * required) option
+  val seed_loaded : scope -> (symbol * (thloaded * required)) list -> scope
 
   (* start/finish adding a new top-level required theory, not using loader
    *
