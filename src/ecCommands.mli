@@ -83,6 +83,15 @@ val undo_restore : undo_mark -> unit
 val uuid  : unit -> int
 val mode  : unit -> string
 
+(* Whether the proofs of the lemmas the engine reads from here on are
+   checked. [`Off] admits every lemma as an axiom -- its proof script is
+   skipped whole, not even typed -- which is the mode a [require]d file
+   is already read in; see [EcScope.Prover.check_mode]. The setting is
+   applied to the whole undo stack, so it behaves like a pragma rather
+   than like a scope the undo stack could take back. *)
+val check_mode     : unit -> EcScope.Prover.check_mode
+val set_check_mode : EcScope.Prover.check_mode -> unit
+
 val check_eco : string -> bool
 
 val doc_comment : [`Global | `Item] * string -> unit
