@@ -13,6 +13,8 @@ CHECK     += $(foreach arg,$(ECARGS),--bin-args="$(arg)")
 CHECK     += $(ECEXTRA) config/tests.config
 LLMCHECK  := scripts/testing/llm-golden
 LLMCHECK  += --bin=./ec.native
+LLMWARM   := scripts/testing/llm-warm-reload
+LLMWARM   += --bin=./ec.native
 MCPCHECK  := scripts/testing/mcp-golden
 MCPCHECK  += --bin=./ec.native
 MCPPARITY := scripts/testing/mcp-parity
@@ -58,6 +60,7 @@ examples: build
 
 test-llm: build
 	$(LLMCHECK)
+	$(LLMWARM)
 
 test-mcp: build
 	$(MCPCHECK)
