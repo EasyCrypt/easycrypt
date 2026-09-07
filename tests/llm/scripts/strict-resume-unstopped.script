@@ -1,0 +1,10 @@
+# exit: 1
+# The two ways RESUME refuses, which are the same mistake seen twice:
+# a client resuming a session that was never stopped does not know
+# where it is, and strict mode exists to say so. First with the mode
+# off, then with it on but nothing having failed.
+RESUME
+STRICT ON
+LOAD "fixtures/simple.ec" 5
+RESUME
+STRICT OFF
