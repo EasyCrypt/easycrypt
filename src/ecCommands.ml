@@ -1136,6 +1136,27 @@ let apply_pragma_option (x : string) =
   else apply_pragma x
 
 (* -------------------------------------------------------------------- *)
+(* Proof checking on/off, on the *current* scope. Reading and writing it
+   is how LOAD skips the proofs it was asked to skip: [`Off] is the mode
+   a [require]d file is already read in, so the lemmas it declares are
+   admitted as they stand. Both the current scope and the root are
+   updated, so the setting survives the undo stack the way a pragma
+   does -- an [undo] back into the skipped region must not resurrect a
+   checking mode the caller has since turned off. *)
+let check_mode () : EcScope.Prover.check_mode =
+  EcScope.Prover.get_check_mode (oget !context).ct_current
+
+let set_check_mode (mode : EcScope.Prover.check_mode) =
+  let ct = oget !context in
+  context := Some { ct with
+    ct_current = EcScope.Prover.set_check_mode ct.ct_current mode;
+    ct_root    = EcScope.Prover.set_check_mode ct.ct_root mode;
+    ct_stack   =
+      Option.map
+        (List.map (fun sc -> EcScope.Prover.set_check_mode sc mode))
+        ct.ct_stack; }
+
+(* -------------------------------------------------------------------- *)
 let uuid () : int =
   (oget !context).ct_level
 

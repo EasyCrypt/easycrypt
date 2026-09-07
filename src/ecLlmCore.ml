@@ -421,8 +421,15 @@ let reset_session (st : state) : unit =
 (* Process a single EasyCrypt command, respecting [gl_fail]. When
    [~record:true], append a transcript entry on success: the parent
    handle (focused goal before the phrase) and the open-handle list,
-   which together let [Commit] reconstruct bullet structure. *)
-let process_action (st : state) ?(record=false) ~src (p : EP.global) =
+   which together let [Commit] reconstruct bullet structure.
+
+   [~nofail:true] drops the [gl_fail] verdict -- the sentence is still
+   run, and a failure is still swallowed, but succeeding is no longer
+   an error. LOAD -noproof sets it inside a proof it is skipping: there
+   the tactic is not run at all, so it cannot fail, and a `fail tac.'
+   the file wrote to pin an error would otherwise fail the load. *)
+let process_action (st : state) ?(record=false) ?(nofail=false) ~src
+    (p : EP.global) =
   let transcript = st.transcript in
   let loc = p.EP.gl_action.EcLocation.pl_loc in
   let pre_uuid = EcCommands.uuid () in
@@ -454,7 +461,7 @@ let process_action (st : state) ?(record=false) ~src (p : EP.global) =
      spend a uuid, or REVERT targets and the MCP [readOnlyHint] would
      both be lying. A no-op when the query failed (nothing was pushed). *)
   if is_query then EcCommands.undo pre_uuid;
-  if !succeeded && p.EP.gl_fail then
+  if !succeeded && p.EP.gl_fail && not nofail then
     raise (EcScope.toperror_of_exn ~gloc:loc
       (EcScope.HiScopeError (None,
         "this command is expected to fail")));
@@ -872,10 +879,97 @@ let try_step (st : state) input =
       changed  = uuid <> pre; })
 
 (* -------------------------------------------------------------------- *)
+(* Is [loc] beyond the position LOAD was asked to stop at? [None] as
+   [upto] means "no bound": load the whole file. A sentence counts as
+   in-prefix when it *ends* on or before the bound, so LOAD always stops
+   on a sentence boundary. *)
+let past_upto ~upto (loc : EcLocation.t) =
+  match upto with
+  | None -> false
+  | Some (line, col) ->
+    let (el, ec) = loc.EcLocation.loc_end in
+    el > line || (el = line && match col with
+      | None   -> false
+      | Some c -> ec > c)
+
+(* -------------------------------------------------------------------- *)
+(* LOAD -noproof: which proof, if any, is the one the caller is aiming
+   at.
+
+   Skipping the proofs of a prefix is what [require] already does: it
+   reads a file with proof checking off, so every lemma is admitted as
+   it stands (see [EcScope.Prover.check_mode]). The one proof that must
+   still be checked is the one [upto] points *inside* -- seeing its goal
+   state is the whole reason for stopping there.
+
+   Which proof that is cannot be known when its opening sentence is
+   read, so it is settled beforehand, by a parse-only pass over the
+   prefix: EasyCrypt's grammar does not depend on the environment, and
+   parsing is nothing next to proving. The pass returns the location of
+   the sentence that opened the proof still open at [upto].
+
+   Only two forms leave a proof open across sentences: a [lemma] with no
+   inline proof, and a [realize] with none. [lemma ... by tac], [clone
+   ... with proof] and [instance] each open and close within their own
+   sentence, and a [clone] leaving proof obligations behind opens no
+   goal until the [realize] that discharges one. [Gsave] -- [qed],
+   [admitted], [abort] -- closes.
+
+   [`Unsupported] is the safe answer: the caller then loads with
+   checking on throughout, which is slower and never wrong. It is
+   returned for a prefix holding an [undo], whose effect on the sentence
+   stream this pass cannot replay without executing it, and for a prefix
+   that does not parse -- the real load reports that error, in its own
+   words and at its own point. *)
+let target_proof (filename : string) ~upto
+  : [`None | `At of EcLocation.t | `Unsupported]
+=
+  let reader = EcIo.from_file filename in
+  let opened = ref `None in
+  let exception Stop in
+
+  let visit (p : EP.global) =
+    let loc = p.EP.gl_action.EcLocation.pl_loc in
+    if past_upto ~upto loc then raise Stop;
+    match EcLocation.unloc p.EP.gl_action with
+    | EP.Gaxiom { EP.pa_kind = EP.PLemma None; _ } ->
+      opened := `At loc
+    | EP.Grealize { EcLocation.pl_desc = { EP.pr_proof = None; _ }; _ } ->
+      opened := `At loc
+    | EP.Gsave _ ->
+      opened := `None
+    | _ -> ()
+  in
+
+  let result =
+    try
+      while true do
+        let (_, prog) = EcIo.xparse reader in
+        match EcLocation.unloc prog with
+        | EP.P_Prog (commands, locterm) ->
+          List.iter visit commands;
+          if locterm then raise Stop
+        | EP.P_Undo _ ->
+          if past_upto ~upto (EcLocation.loc prog) then raise Stop;
+          opened := `Unsupported; raise Stop
+        | EP.P_Exit ->
+          raise Stop
+        | EP.P_DocComment _ -> ()
+      done;
+      `None
+    with
+    | Stop | End_of_file -> !opened
+    | _                  -> `Unsupported
+  in
+
+  EcIo.finalize reader; result
+
+(* -------------------------------------------------------------------- *)
 (* LOAD: run [file] up to [upto], optionally with SMT calls weakened
-   ([nosmt]) or with the last sentence of the prefix traced. The
-   argument string is parsed by the front-end. *)
-let load (st : state) ~file ~upto ~nosmt ~trace =
+   ([nosmt]), the proofs of the prefix skipped altogether ([noproof])
+   or the last sentence of the prefix traced. The argument string is
+   parsed by the front-end. *)
+let load (st : state) ~file ~upto ~nosmt ~noproof ~trace =
   let notices = st.notices in
   let cur_prvopts = st.cur_prvopts in
   let pre = EcCommands.uuid () in
@@ -884,6 +978,10 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
   let last_src = ref "" in
   let trace_prefix = ref "" in
   let exception Trace_failed of exn in
+  (* Set once -noproof has turned proof checking off, so the handlers
+     below -- which are outside the scope of that state -- can put it
+     back however the load ends. *)
+  let cleanup = ref (fun () -> ()) in
 
   try
     begin try
@@ -920,16 +1018,74 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
     EcCommands.addidir (Filename.dirname filename);
     EcCommands.set_current_path (Filename.dirname filename);
 
+    (* -noproof: read the prefix the way a [require] is read, with
+       proof checking off, so every lemma it declares is admitted as it
+       stands. The proof [upto] falls inside -- if it falls inside one
+       -- is the exception: checking goes back on at the sentence that
+       opens it, and its script is replayed for real, which is what
+       makes the goal state at [upto] the true one.
+
+       The mode is read *after* [reset_session]: that call rebuilds the
+       engine's scope from scratch, so a mode sampled before it would
+       describe a scope that no longer exists. It is put back on every
+       way out, failures included: the session goes on after LOAD, and
+       phrases typed into it are checked. *)
+    let saved_check   = EcCommands.check_mode () in
+    let skipping      = ref false in
+    let check_back_at = ref None in
+    (* Idempotent, and called on every exit path: leaving the engine in
+       [`Off] would silently admit whatever the session is fed next. *)
+    let restore_check () =
+      if !skipping then begin
+        skipping := false;
+        check_back_at := None;
+        EcCommands.set_check_mode saved_check
+      end
+    in
+
+    if noproof then begin
+      let skip loc =
+        skipping      := true;
+        check_back_at := loc;
+        EcCommands.set_check_mode `Off
+      in
+      cleanup := restore_check;
+      match target_proof filename ~upto with
+      | `Unsupported -> ()
+      | `None        -> skip None
+      | `At loc      -> skip (Some loc)
+    end;
+
     let reader = EcIo.from_file filename in
 
-    let past_upto (loc : EcLocation.t) =
-      match upto with
-      | None -> false
-      | Some (line, col) ->
-        let (el, ec) = loc.loc_end in
-        el > line || (el = line && match col with
-          | None -> false
-          | Some c -> ec > c)
+    let past_upto (loc : EcLocation.t) = past_upto ~upto loc in
+
+    (* Every sentence of the prefix goes through here, so that the
+       switch back to checked proofs happens when the target sentence is
+       *run*, not when it is read: under -trace the last sentence of the
+       prefix is deferred, and the two moments are not the same one. The
+       test is [>=] rather than an equality on locations so that a
+       target somehow stepped over still turns checking back on. *)
+    let run_action ~src (p : EP.global) =
+      begin match !check_back_at with
+      | Some (tloc : EcLocation.t)
+        when p.EP.gl_action.EcLocation.pl_loc.EcLocation.loc_bchar
+             >= tloc.EcLocation.loc_bchar ->
+        EcCommands.set_check_mode saved_check;
+        check_back_at := None
+      | _ -> ()
+      end;
+      (* A [fail tac.] inside a proof whose script is being skipped
+         pins an error that cannot happen any more, the tactic not
+         being run: honour it and the load fails on a file that
+         compiles. Outside a proof the sentence is executed for real,
+         so its verdict still holds. *)
+      let nofail =
+        p.EP.gl_fail
+        && EcCommands.check_mode () = `Off
+        && EcCommands.in_proof ()
+      in
+      process_action st ~nofail ~src p
     in
 
     (* [upto] stops the prefix at the requested position whatever kind
@@ -969,7 +1125,7 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
       | None -> ()
       | Some (src, p) ->
         last_src := src;
-        process_action st ~src p;
+        run_action ~src p;
         last_loc := Some p.EP.gl_action.EcLocation.pl_loc;
         pending := None
     in
@@ -981,7 +1137,7 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
         pending := Some (src, p)
       end else begin
         last_src := src;
-        process_action st ~src p;
+        run_action ~src p;
         last_loc := Some loc
       end
     in
@@ -1010,12 +1166,16 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
     | e ->
       EcIo.finalize reader;
       if nosmt then EcCommands.pragma_check `Check;
+      restore_check ();
       raise e
     end;
 
     EcIo.finalize reader;
 
     if nosmt then EcCommands.pragma_check `Check;
+    (* Kept for the tag below: [restore_check] clears [skipping]. *)
+    let did_skip = !skipping in
+    restore_check ();
 
     (* If -trace is set, the last in-prefix sentence is still
        pending. Run it under goal capture and build the
@@ -1060,7 +1220,7 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
           last_src := src;
           begin
             try
-              process_action st ~src p;
+              run_action ~src p;
               last_loc := Some loc;
               pending := None;
               let after_goals = EcCommands.pp_all_goals () in
@@ -1115,7 +1275,10 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
           let (el, _) = loc.EcLocation.loc_end in
           Printf.sprintf " [loaded:%s:%d]" filename el
       in
-      loaded ^ Goals.focus_tag ()
+      (* The prefix is admitted, not proved: say so, so that a
+         successful LOAD is not read as a verification of the file. *)
+      let skipped = if did_skip then " [noproof]" else "" in
+      loaded ^ skipped ^ Goals.focus_tag ()
     in
     Ok (mk_reply st ~pre ~tag (Text body))
 
@@ -1124,11 +1287,14 @@ let load (st : state) ~file ~upto ~nosmt ~trace =
     reset_session st;
     Ok (mk_reply st ~pre (Text "Session restarted"))
   | Trace_failed e ->
+    !cleanup ();
     let msg = Goals.format_error ~src:!last_src e in
     Error (mk_failure st ~pre (!trace_prefix ^ msg))
   | Failure s ->
+    !cleanup ();
     Error (mk_failure st ~pre s)
   | e ->
+    !cleanup ();
     Error (mk_failure st ~pre (Goals.format_error ~src:!last_src e))
 
 (* -------------------------------------------------------------------- *)

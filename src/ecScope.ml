@@ -216,6 +216,18 @@ module Check_mode = struct
 
   let set_fullcheck options =
     GenOptions.set options oid (Check `Forced)
+
+  (* Unconditional read/write of the mode, for a caller that wants to
+     turn checking off and later put back exactly what was there.
+     [set_checkproof] cannot do it: it is a toggle between [`On] and
+     [`Off] and silently ignores [`Forced]. *)
+  let get options =
+    match GenOptions.get options oid with
+    | Check mode -> mode
+    | _          -> `On
+
+  let set options (mode : mode) =
+    GenOptions.set options oid (Check mode)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -786,6 +798,15 @@ module Prover = struct
   (* -------------------------------------------------------------------- *)
   let check_proof scope b =
     { scope with sc_options = Check_mode.set_checkproof scope.sc_options b }
+
+  (* -------------------------------------------------------------------- *)
+  type check_mode = Check_mode.mode
+
+  let get_check_mode scope =
+    Check_mode.get scope.sc_options
+
+  let set_check_mode scope (mode : check_mode) =
+    { scope with sc_options = Check_mode.set scope.sc_options mode }
 end
 
 (* -------------------------------------------------------------------- *)
