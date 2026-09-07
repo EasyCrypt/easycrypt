@@ -60,6 +60,21 @@ STEPS = [
                    "ec_commit",     {}),
     ("failure",    'apply nosuchlemma.',
                    "ec_step",       {"phrase": "apply nosuchlemma."}),
+    # Strict mode, which is a session setting rather than an operation
+    # on the proof: turning it on and failing again stops the session,
+    # the phrase after that is refused, and both wires have to say the
+    # same thing at each of those four points. `STRICT OFF' puts the
+    # session back before the loads below, which reset it anyway.
+    ("strict/on",  'STRICT ON',
+                   "ec_strict",     {"on": True}),
+    ("strict/stop", 'apply nosuchlemma.',
+                   "ec_step",       {"phrase": "apply nosuchlemma."}),
+    ("strict/refused", 'trivial.',
+                   "ec_step",       {"phrase": "trivial."}),
+    ("resume",     'RESUME',
+                   "ec_resume",     {}),
+    ("strict/off", 'STRICT OFF',
+                   "ec_strict",     {"on": False}),
     # The two load options that change what the engine does. Both
     # reset the session, so they come last. `trace' is the one whose
     # reply body the core builds itself, rather than handing back the
