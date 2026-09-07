@@ -1,0 +1,16 @@
+# exit: 1
+# Two properties of -noproof past the prefix it skipped.
+#
+# First, a position outside any proof (the whole file here) skips every
+# proof in it: the reply is tagged [noproof] and leaves no active proof.
+#
+# Second, skipping ends with the LOAD. Proof checking is restored on
+# the way out, so the phrase typed next is checked for real and its
+# `qed.' is refused -- which is what makes the exit status 1.
+LOAD "fixtures/noproof.ec" -noproof
+<BEGIN>
+lemma unproved : false.
+proof.
+trivial.
+qed.
+<DONE>
