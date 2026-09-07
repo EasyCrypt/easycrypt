@@ -269,6 +269,19 @@ module Prover : sig
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
 
+  (* Whether lemma proofs are checked in this scope. [`Off] makes every
+     lemma an axiom: [Ax.add] starts it in [PSNoCheck], its proof script
+     is not even typed, and [qed] binds the statement as it stands. This
+     is the mode a [require]d file is read in ([`Forced] is the [-check-
+     all] override that survives that switch). Unlike [check_proof],
+     which is a toggle that ignores [`Forced], these two read and write
+     the mode as it is, so a caller can turn checking off for a while
+     and then restore exactly what was in force. *)
+  type check_mode = [`Off | `On | `Forced]
+
+  val get_check_mode : scope -> check_mode
+  val set_check_mode : scope -> check_mode -> scope
+
   val pprover_infos_to_prover_infos :
        EcEnv.env
     -> EcProvers.prover_infos
