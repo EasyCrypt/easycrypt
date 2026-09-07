@@ -73,12 +73,21 @@ val create :
 (* -------------------------------------------------------------------- *)
 (* Operations. *)
 
-(* LOAD, on already-parsed arguments. *)
+(* LOAD, on already-parsed arguments.
+
+   [noproof] reads the prefix the way a [require]d file is read: proof
+   checking off, so every lemma is admitted on its statement and its
+   script is skipped whole -- not even typed. The proof [upto] points
+   inside, if any, is the exception; checking goes back on for it, so
+   the goal state LOAD reports is the real one. The reply is tagged
+   [[noproof]] whenever proofs were skipped, a successful load of an
+   unverified prefix being no evidence about the file. *)
 val load :
      state
   -> file:string
   -> upto:(int * int option) option
   -> nosmt:bool
+  -> noproof:bool
   -> trace:bool
   -> (reply, failure) result
 

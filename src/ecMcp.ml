@@ -228,6 +228,10 @@ let tools : J.t list =
          loaded file, and tactics need the position to land inside a \
          proof. Set nosmt to weaken SMT calls while replaying a prefix \
          that was already verified, which is much faster on large files. \
+         Set noproof to go further and skip the prefix's proofs \
+         altogether, admitting every lemma before the target on its \
+         statement alone -- only the proof the position lands inside is \
+         replayed, which is the fastest way into a proof in a long file. \
          Set trace to have the reply describe the last loaded sentence as \
          BEFORE / TACTIC / AFTER / SUMMARY blocks. The reply reports \
          where compilation stopped and the resulting goal state; note the \
@@ -245,6 +249,10 @@ let tools : J.t list =
         ("nosmt", Schema.bool
                     ~description:"weaken SMT calls while compiling the \
                                   prefix" ~default:false ());
+        ("noproof", Schema.bool
+                      ~description:"skip the prefix's proofs entirely, \
+                                    admitting the lemmas before the \
+                                    target as axioms" ~default:false ());
         ("trace", Schema.bool
                     ~description:"report the proof state around the last \
                                   loaded sentence" ~default:false ());
@@ -649,6 +657,7 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
       let line  = Args.int_opt    name args "line" in
       let col   = Args.int_opt    name args "col"  in
       let nosmt = Args.bool_opt   name args "nosmt" ~default:false in
+      let noprf = Args.bool_opt   name args "noproof" ~default:false in
       let trace = Args.bool_opt   name args "trace" ~default:false in
       if line = None && col <> None then
         raise (Invalid_params "ec_load: `col' requires `line'");
@@ -656,7 +665,7 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
        | Ok ()     -> ()
        | Error msg -> raise (Tool_error msg));
       let upto = Option.map (fun line -> (line, col)) line in
-      outcome (EcLlmCore.load st ~file ~upto ~nosmt ~trace)
+      outcome (EcLlmCore.load st ~file ~upto ~nosmt ~noproof:noprf ~trace)
 
     | "ec_step" ->
       answer (EcLlmCore.step st (Args.string_req name args "phrase"))

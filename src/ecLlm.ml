@@ -85,10 +85,11 @@ module Parse = struct
     | Blank
 
   and load = {
-    ld_file  : string;
-    ld_upto  : (int * int option) option;
-    ld_nosmt : bool;
-    ld_trace : bool;
+    ld_file    : string;
+    ld_upto    : (int * int option) option;
+    ld_nosmt   : bool;
+    ld_noproof : bool;
+    ld_trace   : bool;
   }
 
   exception Parse_error of string
@@ -135,10 +136,11 @@ module Parse = struct
     in
     Search query
 
-  (* LOAD "file.ec" [LINE[:COL]] [-nosmt] [-trace]. Argument errors are
-     signalled with [failwith] and turned into [Parse_error] below, so
-     they reach the wire exactly as any other line-parse error does
-     (including the bare "int_of_string" of a malformed LINE:COL). *)
+  (* LOAD "file.ec" [LINE[:COL]] [-nosmt] [-noproof] [-trace].
+     Argument errors are signalled with [failwith] and turned into
+     [Parse_error] below, so they reach the wire exactly as any other
+     line-parse error does (including the bare "int_of_string" of a
+     malformed LINE:COL). *)
   let parse_load args =
     try
       let args = String.strip args in
@@ -171,17 +173,20 @@ module Parse = struct
        | Ok ()     -> ()
        | Error msg -> failwith msg);
 
-      (* Parse optional LINE[:COL] and flags (-nosmt, -trace). *)
-      let upto, nosmt, trace =
+      (* Parse optional LINE[:COL] and flags (-nosmt, -noproof,
+         -trace). *)
+      let upto, nosmt, noproof, trace =
         let words =
           String.split_on_char ' ' rest
             |> List.filter (fun s -> s <> "")
         in
-        let nosmt = List.mem "-nosmt" words in
-        let trace = List.mem "-trace" words in
+        let nosmt   = List.mem "-nosmt"   words in
+        let noproof = List.mem "-noproof" words in
+        let trace   = List.mem "-trace"   words in
         let words =
           List.filter
-            (fun s -> s <> "-nosmt" && s <> "-trace")
+            (fun s ->
+               s <> "-nosmt" && s <> "-noproof" && s <> "-trace")
             words
         in
         let upto = match words with
@@ -196,10 +201,10 @@ module Parse = struct
             end
           | _ -> failwith "LOAD: unexpected arguments"
         in
-        (upto, nosmt, trace)
+        (upto, nosmt, noproof, trace)
       in
-      Load { ld_file = filename; ld_upto = upto;
-             ld_nosmt = nosmt; ld_trace = trace; }
+      Load { ld_file = filename; ld_upto = upto; ld_nosmt = nosmt;
+             ld_noproof = noproof; ld_trace = trace; }
     with Failure msg -> raise (Parse_error msg)
 
   let of_line ~multi_active (raw : string) : command =
@@ -386,6 +391,7 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
           ~file:args.Parse.ld_file
           ~upto:args.Parse.ld_upto
           ~nosmt:args.Parse.ld_nosmt
+          ~noproof:args.Parse.ld_noproof
           ~trace:args.Parse.ld_trace)
       | Ec input     -> Wire.answer (EcLlmCore.step st input)
       | Begin_multi  -> do_begin_multi ()

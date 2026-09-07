@@ -89,7 +89,7 @@ These are protocol-level commands, not EasyCrypt syntax:
 
 | Command | Description |
 |---------|-------------|
-| `LOAD "file.ec" [LINE[:COL]] [-nosmt] [-trace]` | Reset state, compile file (optionally skip SMT or trace last sentence) |
+| `LOAD "file.ec" [LINE[:COL]] [-nosmt] [-noproof] [-trace]` | Reset state, compile file (optionally weaken SMT, skip the prefix's proofs, or trace the last sentence) |
 | `UNDO` | Undo the last proof step |
 | `REVERT <uuid-or-name>` | Revert to a specific state (by uuid or checkpoint name) |
 | `GOALS` | Print the current goal (first subgoal only, with remaining count) |
@@ -166,6 +166,40 @@ compilation (safe when the prefix was already verified):
 ```
 LOAD "myfile.ec" 436 -nosmt
 ```
+
+`-noproof` goes further and skips the prefix's **proofs** altogether:
+
+```
+LOAD "myfile.ec" 436 -noproof
+```
+
+Every lemma before the target is admitted on its statement alone — its
+script is not run, not even typed — exactly as a `require`d file's
+lemmas are. The one exception is the proof line 436 falls inside: that
+one is replayed for real, so the goal state you land on is the true
+one. Positions outside any proof skip the whole file.
+
+This is the fastest way into a proof in a long file, and it is a large
+margin: replaying `theories/datatypes/List.ec` up to line 1487 takes
+around 8s plainly, 1.3s under `-nosmt` and 0.5s under `-noproof`, for
+byte-identical goals. `-nosmt` only silences the provers; `-noproof`
+also skips the elaboration of every tactic in the prefix, which is
+where the rest of the time goes.
+
+What you give up is any assurance about the prefix: a `-noproof` load
+succeeds on a file whose earlier proofs are broken, so it is no
+evidence that the file compiles. Replies say so — the tag carries
+`[noproof]`:
+
+```
+OK [uuid:1295] [loaded:myfile.ec:436] [noproof] [focus: 1/2]
+```
+
+Skipping ends with the LOAD. Whatever you type next is checked
+normally, and so is anything you `COMMIT` and put back in the file. A
+prefix holding an `undo` is loaded with checking on throughout — the
+flag is then silently a no-op, which the missing `[noproof]` tag
+reports.
 
 Add `-trace` to a LOAD to inspect the proof state around the last
 loaded sentence. The reply body contains four delimited blocks:
@@ -371,7 +405,7 @@ noted.
 
 | Tool | Arguments | Description |
 |------|-----------|-------------|
-| `ec_load` | `file` (req), `line`, `col`, `nosmt` (false), `trace` (false) | Reset the session and compile `file` from the top, stopping after the last sentence that ends on or before `line` |
+| `ec_load` | `file` (req), `line`, `col`, `nosmt` (false), `noproof` (false), `trace` (false) | Reset the session and compile `file` from the top, stopping after the last sentence that ends on or before `line` |
 | `ec_step` | `phrase` (req) | Run EasyCrypt sentences — tactics, declarations, `require`, `print`, ... — against the current session |
 | `ec_try` | `phrase` (req) | Like `ec_step`, but roll the engine back to its pre-call state whenever a sentence fails |
 | `ec_goals` | `all` (false) | Print the focused subgoal, or, with `all`, every open subgoal |
@@ -385,7 +419,7 @@ noted.
 
 `tools/list` carries a fuller, agent-facing `description` and a JSON
 Schema for every tool; those are the authoritative texts. The tools
-mirror the REPL meta-commands — `-nosmt`, `-trace`, dotted paths,
+mirror the REPL meta-commands — `-nosmt`, `-noproof`, `-trace`, dotted paths,
 checkpoints, bullets and search patterns all behave exactly as
 described above, and `NEXT` folds into `ec_focus` with path `"next"` —
 plus `ec_try`, which has no REPL equivalent. The meta-commands that are
