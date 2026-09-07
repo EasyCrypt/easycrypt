@@ -2061,6 +2061,31 @@ module Theory = struct
           Msym.add ri.rqd_name (oget cth, rqs) new_.sc_loaded; } in
     bump_prelude (require_loaded ri scope)
 
+  (* The elaborated theories this scope holds, and the seeding of a
+     fresh scope with theories elaborated in an earlier one.
+
+     [sc_loaded] is what spares a session the cost of reading a theory
+     twice: [require] consults it before it runs a loader. It is per
+     scope, so it dies with the scope -- and a front-end that rebuilds
+     the scope to reload a file (the LLM REPL's LOAD does) pays every
+     [require] again, which on a development of any size is the whole
+     cost of the reload. These two let a caller carry the table across
+     that rebuild. Whether the theories are still the ones the files on
+     disk describe is the caller's to answer: nothing here re-reads a
+     file, and [seed] believes what it is given. *)
+  let loaded (scope : scope) (name : symbol) : (thloaded * required) option =
+    Msym.find_opt name scope.sc_loaded
+
+  let seed_loaded (scope : scope)
+      (entries : (symbol * (thloaded * required)) list) : scope
+  =
+    assert (scope.sc_pr_uc = None);
+    let sc_loaded =
+      List.fold_left
+        (fun loaded (name, entry) -> Msym.add name entry loaded)
+        scope.sc_loaded entries
+    in { scope with sc_loaded }
+
   let require (scope : scope) ((name, mode) : required_info * thmode) loader =
     assert (scope.sc_pr_uc = None);
 
@@ -2070,7 +2095,12 @@ module Theory = struct
       else scope
     end else
       match Msym.find_opt name.rqd_name scope.sc_loaded with
-      | Some _ -> require_loaded name scope
+      (* [bump_prelude], as on the loading path below: while the scope
+         is still the prelude's, every require it takes has to move the
+         snapshot [for_loading] later rewinds to. The loading path has
+         always done it, this one never had to -- nothing reached it
+         during the prelude -- and a seeded [sc_loaded] does. *)
+      | Some _ -> bump_prelude (require_loaded name scope)
       | None ->
         try
           let imported = require_start scope name.rqd_name mode in
