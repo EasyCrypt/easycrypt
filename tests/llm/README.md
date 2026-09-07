@@ -10,10 +10,11 @@ compared against recorded goldens.
 | Path | Contents |
 |------|----------|
 | `fixtures/*` | tiny EasyCrypt files the scripts `LOAD` (plus one non-`.ec` file, for the unknown-extension error, and one deliberately Latin-1 file used by `../mcp`) |
-| `fixtures/sub/*` | a second directory, so a scenario can check that one `LOAD`'s include path does not survive into the next |
+| `fixtures/sub/*` | a second directory, so a scenario can check that one `LOAD`'s include path does not survive into the next, and that a theory in it is elaborated once however often the file is reloaded |
 | `scripts/*.script` | the newline-separated commands passed to `-eval` |
 | `expected/*.out` | recorded stdout, one file per script |
 | `../../scripts/testing/llm-golden` | the runner |
+| `../../scripts/testing/llm-warm-reload` | a second runner, for what a `-eval` script cannot reach |
 
 ## Running
 
@@ -107,6 +108,33 @@ exactly reversible. Status lines are not bodies and are never escaped.
 sentence's source verbatim; that sentence hides a bare `<END>` and a
 bare `OK [uuid:99]` in a comment. The MCP front-end needs no such rule:
 its frame is a JSON string.
+
+## The reload the goldens cannot reach
+
+The interactive front-ends keep the theories a `require` elaborates
+across the scope rebuild a LOAD does, so that reloading a file does not
+re-read everything under it. Two halves of that have to be tested, and
+only one of them fits here.
+
+`warm-reload` covers the half that does: it LOADs one fixture twice and
+freezes both frames, which must match line for line — the cache is not
+supposed to be visible on the wire, and a golden that shows the two
+halves side by side is the plainest way to say so.
+
+The other half is what happens when a file *changes*, and it cannot be
+a `-eval` script: the change has to land between two LOADs of one
+session, and `-eval` hands the whole script over at once.
+`scripts/testing/llm-warm-reload` drives the REPL over stdin instead,
+on a fixture tree it writes into a temporary directory, and checks four
+scenarios — an untouched reload, an edit to a required file, an edit to
+a file reached only through another one, and an include path that
+changes so a name resolves elsewhere. Each asserts that the warm
+session answers exactly what a cold process answers on the same
+sources, and the edited ones also assert the answer moved, so that a
+fixture whose edit turns out to be invisible fails instead of passing
+without testing anything.
+
+`make test-llm` runs both.
 
 ## Adding a scenario
 

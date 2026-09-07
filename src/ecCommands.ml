@@ -233,6 +233,122 @@ end
 type loader = Loader.loader
 
 (* -------------------------------------------------------------------- *)
+(* Elaborated theories, kept across the scope rebuilds a reload does.
+
+   [EcScope] already declines to read a theory twice: [Theory.require]
+   consults the scope's [sc_loaded] before it runs a loader. But that
+   table is part of the scope, and a front-end that reloads a file by
+   rebuilding the scope from nothing -- the LLM REPL's LOAD, [pragma
+   restart.] -- starts from an empty one and re-reads every theory the
+   file requires. On a development of any size that *is* the reload: on
+   the goldbach sources, [require import Goldbach.] alone is 49s where
+   the file's own 470 lines are milliseconds, and none of it is proofs
+   ([require] already reads with checking off, which is the same
+   mechanism LOAD -noproof borrows).
+
+   So the theories are kept here as well, outside the scope, and a
+   rebuilt scope is seeded with the ones the sources still describe.
+   Still describe is decided by digest, transitively: a theory is
+   served from here only if the file it was read from digests to what
+   it did then, and if every theory it required is served too -- an
+   edit to a file five requires down invalidates everything above it,
+   which is the whole point of checking the closure rather than the
+   file. The load path is the other half of the key, since under a
+   different one the same name may name a different file; rather than
+   work out which names moved, a reload that starts from a different
+   load path drops the table whole.
+
+   Off unless a front-end asks for it. The batch compiler reads each
+   file once, in a process of its own, so it has nothing to gain here
+   and no reason to carry the risk of an entry that outlives its
+   source. *)
+module ThCache : sig
+  val enable : unit -> unit
+
+  (* Take the theory [ri] names out of [scope], which must be the scope
+     [Theory.require] returned for it, and file it under [file]. *)
+  val record : file:string -> EcScope.required_info -> EcScope.scope -> unit
+
+  (* Seed a freshly built scope with the entries that are still good
+     under [loadpath]. Both stamps are taken at the same point of a
+     reload, so they compare. *)
+  val seed :
+       loadpath:((Loader.namespace option * string) * Loader.idx_t) list
+    -> EcScope.scope -> EcScope.scope
+end = struct
+  type entry = {
+    ce_file   : string;             (* the file the theory was read from *)
+    ce_digest : Digest.t;           (* ... and its digest, as read *)
+    ce_deps   : EcScope.required;   (* the theories reading it required *)
+    ce_th     : EcScope.thloaded;
+  }
+
+  let enabled : bool ref = ref false
+
+  let table : (EcSymbols.symbol, entry) Hashtbl.t = Hashtbl.create 97
+
+  let stamp :
+    (((Loader.namespace option * string) * Loader.idx_t) list) option ref =
+    ref None
+
+  let enable () = enabled := true
+
+  let record ~(file : string) (ri : EcScope.required_info) scope =
+    if !enabled then
+      EcScope.Theory.loaded scope ri.EcScope.rqd_name
+        |> oiter (fun (th, deps) ->
+             Hashtbl.replace table ri.EcScope.rqd_name
+               { ce_file   = file;
+                 ce_digest = ri.EcScope.rqd_digest;
+                 ce_deps   = deps;
+                 ce_th     = th; })
+
+  (* Drop the entries the sources have moved out from under, and return
+     the names of those left. The recursion is memoized, and answers
+     [false] for a name it is still deciding: requires are acyclic
+     ([process_th_require1] refuses a cycle), and a cycle that got in
+     all the same must not be served. *)
+  let prune () =
+    let verdict : (EcSymbols.symbol, bool) Hashtbl.t = Hashtbl.create 97 in
+
+    let rec live (name : EcSymbols.symbol) =
+      match Hashtbl.find_opt verdict name with
+      | Some b -> b
+      | None ->
+        Hashtbl.replace verdict name false;
+        let b =
+          match Hashtbl.find_opt table name with
+          | None -> false
+          | Some e ->
+               (try Digest.file e.ce_file = e.ce_digest
+                with Sys_error _ -> false)
+            && List.for_all
+                 (fun (d : EcScope.required_info) -> live d.EcScope.rqd_name)
+                 e.ce_deps
+        in Hashtbl.replace verdict name b; b
+    in
+
+    let names = Hashtbl.fold (fun name _ acc -> name :: acc) table [] in
+    let (keep, drop) = List.partition live names in
+    List.iter (Hashtbl.remove table) drop;
+    keep
+
+  let seed ~loadpath scope =
+    if not !enabled then scope else begin
+      if !stamp <> Some loadpath then Hashtbl.reset table;
+      stamp := Some loadpath;
+      EcScope.Theory.seed_loaded scope
+        (List.map
+           (fun name ->
+              let e = Hashtbl.find table name in
+              (name, (e.ce_th, e.ce_deps)))
+           (prune ()))
+    end
+end
+
+let enable_theory_cache = ThCache.enable
+
+(* -------------------------------------------------------------------- *)
 let process_search scope qs =
   EcScope.Search.search scope qs
 
@@ -658,6 +774,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       in
 
       let scope = EcScope.Theory.require scope (name, kind) loader in
+      ThCache.record ~file:filename name scope;
           match io with
           | None         -> scope
           | Some `Export -> EcScope.Theory.export scope ([], name.EcScope.rqd_name)
@@ -976,12 +1093,18 @@ let initial ~checkmode ~boot ~checkproof =
     EcScope.Prover.po_quorum    = checkmode.cm_quorum;
   } in
 
+  (* Taken before [loader] is shadowed by its system-only view below:
+     the stamp the cache is keyed on is the whole include path, which
+     is what a reload of a file from another project changes. *)
+  let lpstamp = Loader.aslist loader in
+
   let perv    = (None, (mk_loc _dummy EcCoreLib.i_Pervasive, None), Some `Export) in
   let tactics = (None, (mk_loc _dummy "Tactics", None), Some `Export) in
   let prelude = (None, (mk_loc _dummy "Logic", None), Some `Export) in
   let loader  = Loader.forsys loader in
   let gstate  = EcGState.from_flags [("profile", profile)] in
   let scope   = EcScope.empty gstate in
+  let scope   = ThCache.seed ~loadpath:lpstamp scope in
   let scope   = process_th_require1 loader scope perv in
   let scope   = if boot then scope else
                   List.fold_left (process_th_require1 loader)

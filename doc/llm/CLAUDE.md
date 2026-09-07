@@ -201,6 +201,38 @@ prefix holding an `undo` is loaded with checking on throughout — the
 flag is then silently a no-op, which the missing `[noproof]` tag
 reports.
 
+**Reloading is much cheaper than loading.** What a LOAD costs is
+almost never the file: it is the theories the file `require`s, read
+from source because nothing used to keep them from one LOAD to the
+next. A session keeps them now, so the second LOAD and every one after
+it skip that work. On a 470-line development over the Jasmin
+libraries, a LOAD into the last proof went from 33s every time to 33s
+once and then 2s — and that 2s is the target proof being replayed,
+nothing else.
+
+So stay in one session and reload freely. Editing the file and
+LOADing it again is a normal move now, not the expensive one; after an
+edit it is often simpler than reverting to a checkpoint, and it is the
+only way to see the edit at all, a session holding the file as it was
+read.
+
+Edits are noticed. A theory is kept only while the file it came from,
+and every file below it, is byte-for-byte what it was when it was
+read; change any of them and it is read again. A LOAD after an edit
+therefore shows the edit, whether you edited the file being loaded, a
+theory it requires, or a theory five requires down. Changing the
+include path starts over likewise, so nothing is ever served across
+two developments that happen to name a theory the same way. That is
+narrower than it sounds: a directory the session has already searched
+is not a change, so loading file after file of one project — which is
+what a session does — keeps everything.
+
+What none of this makes cheap is `require`ing a file that does not
+compile: a file that fails produces no theory to keep, so a session
+whose dependency is mid-edit pays for it on every LOAD. Worth knowing
+when a reload that should be instant is not — the file below is
+probably failing.
+
 Add `-trace` to a LOAD to inspect the proof state around the last
 loaded sentence. The reply body contains four delimited blocks:
 
