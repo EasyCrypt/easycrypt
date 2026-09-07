@@ -64,6 +64,7 @@ gate for changes to the protocol layer.
 | `non-utf8` | engine output that is not UTF-8 comes back as U+FFFD, not as invalid JSON |
 | `try-revert` | `ec_try` rolling back a phrase that had already advanced the proof |
 | `try-undo` | `ec_try` rolling *forward* again after a phrase whose `undo` lowered the uuid |
+| `strict-stop` | `ec_strict` stopping the session at a failure: what is refused, what still answers, and that a failing `ec_try` never stops it |
 | `protocol-errors` | `-32700`, `-32600`, `-32601` and the `-32602` family |
 | `revert` | `ec_revert` by uuid and by checkpoint name |
 | `load-missing` | a missing file and an unknown extension: `isError`, *not* `-32602` |
@@ -125,8 +126,10 @@ same answer on both.
 
 It plays one representative operation per tool family — load, step,
 goals, tree, focus, undo, checkpoint, step again, revert, search,
-commit, a failing phrase, and finally a `nosmt` load and a `trace` load
-(both reset the session, hence last) — in that order, against two
+commit, a failing phrase, then strict mode (on, a failure that stops
+the session, a refused phrase, resume, off), and finally a `nosmt`
+load and a `trace` load (both reset the session, hence last) — in that
+order, against two
 sessions started from the same directory (`tests/llm`, so both name the fixture
 identically and no path difference can leak into a reply): a REPL
 session driven with `llm -eval`, and an MCP session driven with a

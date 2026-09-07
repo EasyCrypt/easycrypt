@@ -110,6 +110,31 @@ val step : state -> string -> answer
    advanced. *)
 val try_step : state -> string -> answer
 
+(* Strict mode. Off, a session behaves as a file does: a failure is
+   reported and the next input runs against wherever it left the
+   engine. On, the session stops at any failure of an operation that
+   could have advanced, and every operation that could advance it
+   further is refused until the session is resynchronized -- by
+   [undo], [revert] or [load], which arrive somewhere definite, or by
+   [resume], which says so. Reads are never refused: [goals], [tree], [search], [checkpoint]
+   and [commit] answer while stopped, the point being to look at the
+   failure rather than be locked out of it.
+
+   It is the client sending one phrase per call that this is for. Such
+   a client keeps sending after a failure, and each phrase runs against
+   a state it was not written for -- the one the failed phrase was
+   meant to leave, and never reached. The drift is silent and is
+   noticed much later. [try_step]'s failures do not arm the stop, since
+   they restore the state the call started from and report having done
+   so, but it is refused while stopped like anything else that would
+   advance.
+
+   [resume] fails if the session is not stopped, or if strict mode is
+   off: a client resuming a session that was never stopped has lost
+   track of it, which is what this mode is here to say. *)
+val strict : state -> on:bool -> (reply, failure) result
+val resume : state -> (reply, failure) result
+
 val goals      : state -> all:bool -> (reply, failure) result
 val tree       : state -> all:bool -> (reply, failure) result
 val focus      : state -> [`Next | `Path of int list] -> (reply, failure) result

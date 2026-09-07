@@ -1,0 +1,74 @@
+READY [uuid:0]
+<END>
+OK [uuid:0]
+strict: on -- a failure stops the session until UNDO, REVERT, LOAD or RESUME
+<END>
+OK [uuid:2] [loaded:fixtures/simple.ec:5]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:3] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+ERROR [uuid:3]
+: line 1 (0-15): unknown lemma `etrivial'
+source: apply etrivial.
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+ERROR [uuid:3]
+strict: the session stopped at a failed phrase and has not been resynchronized
+stopped at: apply etrivial.
+UNDO, REVERT, LOAD or RESUME to continue; GOALS, TREE, SEARCH and COMMIT answer meanwhile
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:3] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:3] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:4]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+2 = 2
+<END>
+OK [uuid:5]
+No more goals
+<END>
+OK [uuid:5]
+split.
+- trivial.
+- trivial.
+<END>

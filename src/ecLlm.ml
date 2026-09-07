@@ -76,6 +76,8 @@ module Parse = struct
     | Checkpoint of string
     | Revert     of string   (* uuid-or-name; the core resolves *)
     | Quiet      of bool
+    | Strict     of bool
+    | Resume
     | Search     of string   (* trailing "." already stripped *)
     | Load       of load     (* parsed LOAD arguments *)
     | Ec         of string   (* fall-through: raw EasyCrypt input *)
@@ -227,6 +229,9 @@ module Parse = struct
       | "NEXT"      -> Next
       | "QUIET ON"  -> Quiet true
       | "QUIET OFF" -> Quiet false
+      | "STRICT ON" -> Strict true
+      | "STRICT OFF"-> Strict false
+      | "RESUME"    -> Resume
       | _ ->
         match keyword_arg "FOCUS"      line with Some a -> parse_focus      a | None ->
         match keyword_arg "CHECKPOINT" line with Some a -> parse_checkpoint a | None ->
@@ -385,6 +390,8 @@ let run ~relocdir ~boot ~projini (llmopts : EcOptions.llm_option) =
       | Checkpoint n -> Wire.reply (EcLlmCore.checkpoint st ~name:n)
       | Revert s     -> Wire.reply (EcLlmCore.revert st s)
       | Quiet on     -> do_quiet on
+      | Strict on    -> Wire.reply (EcLlmCore.strict st ~on)
+      | Resume       -> Wire.reply (EcLlmCore.resume st)
       | Search q     -> Wire.reply (EcLlmCore.search st ~pattern:q)
       | Load args    ->
         Wire.reply (EcLlmCore.load st
