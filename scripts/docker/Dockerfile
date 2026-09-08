@@ -53,7 +53,7 @@ ENV PATH="/home/charlie/bin:$PATH"
 FROM ${BASE_BUILD_LAYER} AS build
 
 RUN \
-	version=2.6.3 && \
+	version=2.6.4 && \
   wget -O alt-ergo https://github.com/OCamlPro/alt-ergo/releases/download/v${version}/alt-ergo-v${version}-x86_64-linux-musl && \
   sudo install -m 0755 alt-ergo /usr/local/bin/alt-ergo-${version} && \
   rm -f alt-ergo
