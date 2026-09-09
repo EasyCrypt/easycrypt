@@ -1,55 +1,163 @@
+(*^
+
+# Pseudo-Random Permutations: Syntax and Security
+
+Given a domain type `D`, this abstract theory defines:
+- the syntax of oracles and distinguishers for weak
+  ([`abstract theory WeakPRP`](#WeakPRP)) and strong PRPs
+  ([`abstract theory PRP`](#PRP)), as well as indistinguishability
+  experiments for each;
+- a lazily-sampled random permutation on `D`, given a lossless
+  distribution `dD` over `D`; ([`abstract theory RP`](#RP) and
+- given an additional type `K` of keys, the syntax of PRPs over `D`
+  indexed by `K`, and the standard way to wrap them as oracles to be
+  distinguished from the truly random permutation. ([`abstract theory
+  PseudoRP`](#PseudoRP)
+
+We do not assume that the PRP's `keygen` can be reduced to sampling in
+`K`.  We do not assume that the PRP itself can be computed by a
+deterministic function or that the forward and inverse directions
+share state in any particular way. Proofs that require such
+assumptions should make them explicit locally, and can then reason
+about a concrete instance of the pseudorandom permutation.
+^*)
+
 require import AllCore Distr.
 
 pragma +implicits.
 
-(** A PRP is a family of permutations F on domain D indexed by a
-    keyspace K equipped with a (lossless) distribution dK. **)
+(*^
+
+## Parameters and syntax
+
+This abstract theory *must* be instantiated with a domain type `D`,
+and defines oracle and adversary syntax, as well as indistinguishability
+experiments for both weak and strong PRPs.
+
+^*)
+
+(*&
+Parameter: Type `D` for the domain.
+&*)
 type D.
 
-(** Security notions **)
+(*^
+
+## Weak PRP Security Notion
+
+A weak PRP only gives the adversary access to the forward direction
+of the permutation. This section defines the relevant module types
+and indistinguishability experiment.
+^*)
 (* -------------------------------------------------------------------- *)
 abstract theory WeakPRP.
-module type PRP = {
+
+(*&
+The PRP oracle, parameterized by an initialization procedure and
+a forward evaluation procedure `f`.
+&*)
+module type WeakPRP = {
   proc init(): unit
   proc f(_ : D): D
 }.
 
-module type PRP_Oracles = {
+(*&
+Only the PRP oracle itself is presented to the adversary. This
+module type captures this.
+&*)
+module type WeakPRP_Oracles = {
   proc f(_ : D): D
 }.
 
-module type Distinguisher (P : PRP_Oracles) = {
+(*&
+A distinguisher, given an oracle `f(_: D): D`, is an algorithm
+taking no further input and outputting a boolean.
+&*)
+module type Distinguisher (P : WeakPRP_Oracles) = {
   proc distinguish(): bool
 }.
 
-module IND (P : PRP) (D:Distinguisher) = {
+(*&
+Our indistinguishability experiment pits a distinguisher `D` against
+a PRP oracle with initialization `P`. It simply calls `P`'s
+initialization, then runs `D` with access to the weak PRP oracle and
+outputs its result.
+&*)
+module IND (P : WeakPRP) (D:Distinguisher) = {
   proc main(): bool = {
     var b;
 
          P.init();
     b <@ D(P).distinguish();
     return b;
+  }
+}.
+
+(*&
+We also define a single wrapper for query counting.
+&*)
+module Count (P : WeakPRP) : WeakPRP = {
+  var c : int
+
+  proc init() = {
+    P.init();
+    c <- 0;
+  }
+
+  proc f(x) = {
+    var r;
+
+    r <@ P.f(x);
+    c <- c + 1;
+    return r;
   }
 }.
 end WeakPRP.
 
+(*^
+
+## PRP Security Notion
+
+A (strong) PRP additionally gives the adversary access to the inverse
+direction of the permutation. This section defines the relevant
+module types and indistinguishability experiment.
+^*)
 (* -------------------------------------------------------------------- *)
-abstract theory StrongPRP.
+abstract theory PRP.
+
+(*&
+The strong PRP oracle, parameterized by an initialization procedure,
+a forward evaluation procedure `f`, and an inverse evaluation
+procedure `fi`.
+&*)
 module type PRP = {
   proc init(): unit
   proc f(_ : D): D
   proc fi(_ : D): D
 }.
 
-module type SPRP_Oracles = {
+(*&
+The strong PRP oracles presented to the adversary, providing both
+the forward and inverse directions of the permutation.
+&*)
+module type PRP_Oracles = {
   proc f(_ : D): D
   proc fi(_ : D): D
 }.
 
-module type Distinguisher (P : SPRP_Oracles) = {
+(*&
+A distinguisher, given both `f` and `fi` oracles, is an algorithm
+taking no further input and outputting a boolean.
+&*)
+module type Distinguisher (P : PRP_Oracles) = {
   proc distinguish(): bool
 }.
 
+(*&
+Indistinguishability experiment for strong PRPs. Initializes the
+permutation, then runs the distinguisher with access to both the
+forward and inverse oracles.
+&*)
 module IND (P : PRP) (D:Distinguisher) = {
   proc main(): bool = {
     var b;
@@ -59,17 +167,74 @@ module IND (P : PRP) (D:Distinguisher) = {
     return b;
   }
 }.
-end StrongPRP.
 
-(** Ideal and Real functionalities **)
+(*&
+We also define a single wrapper for query counting.
+&*)
+module Count (P : PRP) : PRP = {
+  var c  : int
+  var ci : int
+
+  proc init() = {
+    P.init();
+    c  <- 0;
+    ci <- 0;
+  }
+
+  proc f(x) = {
+    var r;
+
+    r <@ P.f(x);
+    c <- c + 1;
+    return r;
+  }
+
+  proc fi(y) = {
+    var r;
+
+    r <@ P.fi(y);
+    ci <- ci + 1;
+    return r;
+  }
+}.
+end PRP.
+
+(*^
+
+## Lazily-Sampled Random Permutation
+
+This abstract sub-theory defines the "random permutation" instantiation
+of the PRP oracles with initialization, which is used as the "ideal"
+functionality in PRP security proofs.
+
+A random permutation on `D` is lazily sampled: the first time an input
+`x` is queried in the forward direction, a fresh *new* output `y` is
+sampled, and the pair `(x, y)` is recorded in both the forward map `m`
+and the inverse map `mi`. The inverse direction is handled
+symmetrically.
+^*)
 (* -------------------------------------------------------------------- *)
 abstract theory RP.
 require import FMap FSet.
 require import Dexcepted.
 (*---*) import StdOrder.RealOrder RField.
 
+(*&
+Parameter: a lossless distribution `dD` over `D`, from which fresh
+outputs are sampled when extending the permutation.
+&*)
 op dD: { D distr | is_lossless dD } as dD_ll.
 
+(*&
+The ideal random permutation module. Maintains two maps:
+- `m`  : forward map, from inputs to outputs;
+- `mi` : inverse map, from outputs to inputs.
+
+Fresh outputs are sampled from `dD` excluding the current range of
+the forward map; fresh inputs are sampled from `dD` excluding the
+current range of the inverse map, ensuring the permutation property
+is preserved.
+&*)
 module RP = {
   var m : (D,D) fmap
   var mi: (D,D) fmap
@@ -102,41 +267,54 @@ module RP = {
   }
 }.
 
-(* -------------------------------------------------------------------- *)
+(*^
+## Useful properties of lazily sampled random permutations
+^*)
+
+(*&
+Predicate characterizing when `m` and `mi` form a valid permutation
+pair: looking up the image of `x` in `m` and then inverting it via
+`mi` returns `x`, and conversely for `y` in `mi`.
+&*)
 pred is_permutation (m mi : (D,D) fmap) =
      (forall x, x \in m => mi.[oget m.[x]] = Some x)
   /\ (forall x, x \in mi => m.[oget mi.[x]] = Some x).
 
-(* -------------------------------------------------------------------- *)
-equiv f_perm: RP.f ~ RP.f:
-     ={glob RP, x}
-  /\ is_permutation RP.m{1} RP.mi{1}
-  ==>    ={glob RP, res}
-      /\ is_permutation RP.m{1} RP.mi{1}.
+hoare RP_f_is_perm: RP.f:
+  is_permutation RP.m RP.mi ==> is_permutation RP.m RP.mi.
 proof.
-proc; if=> //=; auto=> |> &2 is_perm x_notin_m yL.
-rewrite supp_dexcepted rngE /= negb_exists=>- [] _ /= m__neq_yL.
+proc; if; auto=> |> &0 is_perm x_notin_m y /supp_dexcepted [] y_in_D.
+rewrite rngE=> /= /negb_exists mX_neq_y.
 split=> [x'|y']; rewrite !get_setE !mem_set.
-+ case: (x' = x{2})=> //= x'_neq_x.
-  have [] mmi mim ^ /mmi mimx':= is_perm.
-  by rewrite mimx' domE; elim: (RP.m{2}.[x']) (m__neq_yL x')=> //= x0 ->.
-by case: (y' = yL)=> //=; smt(domE).
++ by case: (x' = x{0})=> /#.
+by case: (y' = y)=> /#.
+qed.
+
+hoare RP_fi_is_perm: RP.fi:
+  is_permutation RP.m RP.mi ==> is_permutation RP.m RP.mi.
+proof.
+proc; if; auto=> |> &0 is_perm y_notin_mi x /supp_dexcepted [] x_in_D.
+rewrite rngE=> /= /negb_exists miX_neq_x.
+split=> [x'|y']; rewrite !get_setE !mem_set.
++ by case: (x' = x)=> /#.
+by case: (y' = y{0})=> /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-equiv fi_perm: RP.fi ~ RP.fi:
-     ={glob RP, y}
-  /\ is_permutation RP.m{1} RP.mi{1}
-  ==>    ={glob RP, res}
-      /\ is_permutation RP.m{1} RP.mi{1}.
+equiv f_perm: RP.f ~ RP.f:
+  ={glob RP, x} /\ is_permutation RP.m{1} RP.mi{1}
+  ==> ={glob RP, res} /\ is_permutation RP.m{1} RP.mi{1}.
 proof.
-proc; if=> //=; auto=> |> &2 is_perm y_notin_mi xL.
-rewrite supp_dexcepted rngE /= negb_exists=>- [] _ /= mi__neq_xL.
-split=> [x'|y']; rewrite !get_setE !mem_set.
-+ case: (x' = xL)=> //=; smt(domE).
-case: (y' = y{2})=> //= y'_neq_y.
-have [] mmi mim ^ /mim mmiy':= is_perm.
-by rewrite mmiy' domE; elim: (RP.mi{2}.[y']) (mi__neq_xL y')=> //= y0 ->.
+conseq (: ={glob RP, x} ==> ={glob RP, res}) RP_f_is_perm.
+by sim.
+qed.
+
+equiv fi_perm: RP.fi ~ RP.fi:
+  ={glob RP, y} /\ is_permutation RP.m{1} RP.mi{1}
+  ==> ={glob RP, res} /\ is_permutation RP.m{1} RP.mi{1}.
+proof.
+conseq (: ={glob RP, y} ==> ={glob RP, res}) RP_fi_is_perm.
+by sim.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -191,6 +369,9 @@ have ->: card (fset1 x `&` frng m) = if x \in (frng m) then 1 else 0.
 by move: x_notin_m; rewrite -mem_fdom; smt (leq_card_rng_dom @FSet).
 qed.
 
+(*&
+Losslessness lemma for `RP.f`: when `dD` is full, `RP.f` is lossless.
+&*)
 lemma f_ll: is_full dD => islossless RP.f.
 proof.
 move=> dD_fu.
@@ -209,6 +390,9 @@ by apply/mu_sub=> x ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*&
+Losslessness lemma for `RP.fi`: when `dD` is full, `RP.fi` is lossless.
+&*)
 lemma fi_ll: is_full dD => islossless RP.fi.
 proof.
 move=> dD_fu.
@@ -225,505 +409,57 @@ apply/(ltr_le_trans (mu dD (pred1 y0))).
 + by apply: dD_fu.
 by apply/mu_sub=> y ->.
 qed.
-
-abstract theory RP_RF.
-require import List.
-require (*--*) PRF Birthday.
-op q : { int | 0 <= q } as ge0_q.
-
-axiom dD_funi: is_funiform dD.
-
-lemma dD_fu: is_full dD.
-proof.
-apply: funi_ll_full.
-+ exact/dD_funi.
-exact/dD_ll.
-qed.
-
-lemma dD_uni: is_uniform dD.
-proof. exact/funi_uni/dD_funi. qed.
-
-clone import PRF as PRFt with
-  type D <- D,
-  type R <- D.
-
-clone import RF as PRFi with
-  op   dR _ <- dD
-proof * by smt(dD_ll)
-rename "RF" as "PRFi".
-
-(** The proof starts with some useful definitions and lemmas **)
-(* In the proof, we consider the following bad event (applied to the
-    PRF's internal map):
-      "A collision occurs in map m whenever there exist distinct x and
-      x' that are both in m's domain and have the same image by m." *)
-pred collision (m:(D,D) fmap) = exists x x',
-  x' <> x /\
-  x \in m /\ x' \in m /\ m.[x] = m.[x'].
-
-(* Some useful facts about the bad event *)
-lemma no_collision (m:(D,D) fmap):
-  !collision m <=>
-  forall x x',
-    x' = x \/
-    !x \in m  \/
-    !x' \in m \/
-    m.[x] <> m.[x'].
-proof.
-rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
-by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
-qed.
-
-lemma collision_add (m:(D,D) fmap) x y:
-  !x \in m =>
-  collision m.[x <- y] <=> collision m \/ rng m y.
-proof.
-move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
-+ rewrite !mem_set !get_setE=> -[z_in_m] [z'_in_m] mz_eq_mz'.
-  case (rng m y)=> //= y_notin_rngm.
-  by exists z z'; smt().
-move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
-+ exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
-  move/contra: (congr1 (dom m) z x); rewrite x_notin_m z_in_m=> -> //=.
-  by move/contra: (congr1 (dom m) z' x); rewrite x_notin_m z'_in_m=> -> //=.
-rewrite rngE=> - /= [x'] mx'_y.
-by exists x x'; rewrite !get_setE !mem_set /#.
-qed.
-
-lemma collision_stable (m:(D,D) fmap) y y':
-  collision m =>
-  y \notin m =>
-  collision m.[y <- y'].
-proof. by move=> h /collision_add /= ->; rewrite h. qed.
-
-(** To factor out the difficult step, we parameterize the PRP by a
-    procedure that samples its output, and provide two instantiations
-    of it. **)
-module type Sample_t = {
-  proc sample(X:D -> bool): D
-}.
-
-module Direct = {
-  proc sample(X:D -> bool): D = {
-    var r;
-
-    r <$ dD \ X;
-    return r;
-  }
-}.
-
-module Indirect = {
-  proc sample(X:D -> bool): D = {
-    var r;
-
-    r <$ dD;
-    if (X r) {
-      r <$ dD \ X;
-    }
-    return r;
-  }
-}.
-
-module PRPi'(S:Sample_t) = {
-  proc init =  RP.init
-
-  proc f(x:D): D = {
-    var r;
-    if (x \notin RP.m) {
-      r <@ S.sample(rng RP.m);
-      RP.m.[x] <- r;
-    }
-    return oget RP.m.[x];
-  }
-}.
-
-lemma notin_supportIP (P : 'a -> bool) (d : 'a distr):
-  (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
-proof.
-rewrite (@mu_split _ predT P) /predI /predT /predC /=.
-rewrite (@exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ a \in d)) /=.
-+ by move=> a /=; rewrite andbC.
-by rewrite -(@witness_support (predC P)) -/(predC _) /#.
-qed.
-
-(* Some losslessness lemmas *)
-lemma excepted_lossless (m:(D,D) fmap):
-  (exists x, x \notin m) =>
-  mu (dD \ (rng m)) predT = 1%r.
-proof.
-move=> /endo_dom_rng [x h]; rewrite dexcepted_ll 1:dD_ll //.
-by rewrite -dD_ll; apply/notin_supportIP; exists x=> />; exact/dD_fu.
-qed.
-
-lemma excepted_lossless_mem (m:(D,D) fmap):
-  (exists x, x \notin m) =>
-  is_lossless (dD \ (mem (frng m))).
-proof.
-have ->: mem (frng m) = rng m.
-+ by apply/fun_ext=> a; rewrite mem_frng.
-exact/excepted_lossless.
-qed.
-
-phoare Indirect_ll: [Indirect.sample: exists x, support dD x /\ !X x ==> true] = 1%r.
-proof.
-proc; seq  1: (exists x, support dD x /\ !X x)=> //=.
-+ by rnd (predT); auto; rewrite dD_ll /#.
-if=> //=.
-+ rnd (predT); auto=> /> &m x _ x_notin_X _.
-  rewrite dexcepted_ll 1:dD_ll // -dD_ll; apply/notin_supportIP; exists x.
-  by rewrite dD_fu.
-by hoare; auto=> />.
-qed.
-
-lemma PRPi'_Indirect_ll: islossless PRPi'(Indirect).f.
-proof.
-proc; if=> //=; wp; call Indirect_ll.
-auto=> /> &m x_notin_m.
-have:= excepted_lossless (RP.m{m}) _.
-+ by exists x{m}.
-rewrite weight_dexcepted.
-case (weight dD = mu dD (rng RP.m{m}))=> //=.
-rewrite notin_supportIP /=.
-by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
-qed.
-
-(** The proof is cut into 3 parts (sections):
-      - We first focus on proving
-         Pr[IND(PRPi'(Indirect),D).main() @ &m: res]
-         <= Pr[IND(PRFi,D).main() @ &m: res]
-          + Pr[IND(PRFi,D).main() @ &m: collision PRFi.m].
-      - Second, we concretely bound (when the PRF oracle stops
-        answering queries after the q-th):
-          Pr[IND(PRFi,D).main() @ &m: collision PRFi.m]
-          <= q^2 * Pr[x = $uD: x = witness]
-      - We conclude by proving (difficult!)
-         Pr[IND(PRPi,D).main() @ &m: res]
-         = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
- **)
-section Upto.
-  declare module D <: PRFt.Distinguisher {-RP, -PRFi}.
-  declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
-
-  local module PRP_indirect_bad = {
-    var bad : bool
-
-    proc init(): unit = {
-             RP.init();
-      bad <- false;
-    }
-
-    proc sample(X:D -> bool): D = {
-      var r;
-
-      r <$ dD;
-      if (X r) {
-        bad <- true;
-        r <$ dD \ X;
-      }
-      return r;
-    }
-
-    proc f(x:D): D = {
-      var r;
-      if (x \notin RP.m) {
-        r <@ sample(rng RP.m);
-        RP.m.[x] <- r;
-      }
-      return oget RP.m.[x];
-    }
-  }.
-
-  local lemma PRPi'_Indirect_eq &m:
-    Pr[IND(PRPi'(Indirect),D).main() @ &m: res]
-    = Pr[IND(PRP_indirect_bad,D).main() @ &m: res].
-  proof. by byequiv=> //=; proc; inline *; sim. qed.
-
-  (** Upto failure: if a collision does not occur in PRFi.m, then the
-      programs are equivalent **)
-  lemma pr_PRPi'_Indirect_PRFi &m:
-    `|Pr[IND(PRPi'(Indirect),D).main() @ &m: res] - Pr[IND(PRFi,D).main() @ &m: res]|
-    <= Pr[IND(PRFi,D).main() @ &m: collision PRFi.m].
-  proof.
-  rewrite (PRPi'_Indirect_eq &m).
-  byequiv: PRP_indirect_bad.bad=> //=; 2:by smt().
-  proc.
-  call (_: collision PRFi.m,
-           ={m}(RP,PRFi) /\ (PRP_indirect_bad.bad{1} <=> collision PRFi.m{2}),
-           PRP_indirect_bad.bad{1} <=> collision PRFi.m{2}).
-  + exact D_ll.
-  + proc.
-    if=> //=; inline *.
-    swap{1} 1.
-    seq  1  2: (={x} /\
-                x{1} \notin RP.m{1} /\
-                PRFi.m{2} = RP.m.[x <- r0]{1} /\
-                ((PRP_indirect_bad.bad \/ rng RP.m r0){1} <=> collision PRFi.m{2})).
-    + auto => /> &1 &2 coll _ x_notin_m r _; split=> [|x0 x'].
-      + rewrite rngE /= /collision=> - [x'] mx'.
-        by exists x{2} x'; rewrite !mem_set !get_setE /#.
-      smt (rngE get_setE).
-    sp; if{1}.
-    + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
-      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt(dD_ll excepted_lossless).
-    by auto=> /> /#.
-    move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
-    + by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
-    proc; if=> //=; inline *.
-    seq  2: (X = rng RP.m /\ x \notin RP.m) 1%r 1%r 0%r _=> //=;
-         [auto|if=> //=; auto|hoare; auto]=> />;rewrite ?dD_ll //.
-    by move=> &hr x_notin_m r_in_rng_m; apply excepted_lossless; exists x{hr}.
-    move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
-    proc; if; auto=> />; rewrite dD_ll //=.
-    move=> &0 x x' x'_neq_x x_in_m x'_in_m x_coll_x' x0_notin_m v _.
-    by exists x x'=> />; rewrite !mem_set x_in_m x'_in_m /= !get_set_neqE 1,2:/#.
-  inline *; auto=> />; split=> [|_].
-  + by rewrite no_collision=> x x'; rewrite mem_empty.
-  move=> /> rL rR DL b mL DR mR [-> //| /#].
-  qed.
-end section Upto.
-
-(** This section proves the equivalence between the Ideal PRP and the
-    module PRPi'(Indirect) used in section Upto. **)
-section PRPi_PRPi'_Indirect.
-  local clone include Dexcepted.TwoStepSampling with
-    type i    <- unit,
-    type t    <- D,
-    op   dt _ <- dD
-  proof *.
-
-  (* The key is in proving that Direct.sample and Indirect.sample
-     define the same distribution. We do this by extensional equality
-     of distributions:
-       forall a, Pr[Direct.sample: res = a] = Pr[Indirect.sample: res = a]. *)
-  equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
-  proof.
-  proc.
-  outline {1} 1 by { r <@ S.direct((), fun _ => X); }.
-  rewrite equiv[{1} 1 ll_direct_indirect_eq ((), fun _ => X :@ r)].
-  + auto=> />; exact dD_ll.
-  inline S.indirect.
-  by sp; seq 1 1 : (#pre /\ r0{1} = r{2}); auto; if; auto.
-  qed.
-
-  (* The rest is easy *)
-  local equiv eq_PRPi_PRPi'_Indirect: RP.f ~ PRPi'(Indirect).f:
-    ={x, RP.m} ==> ={res, RP.m}.
-  proof.
-  transitivity PRPi'(Direct).f (={RP.m,x} ==> ={RP.m,res}) (={RP.m,x} ==> ={RP.m,res}).
-  + by move=> &1 &2 [->> ->>]; exists RP.m{2} x{2}.
-  + done.
-  + by proc; inline *; if=> //=; auto.
-  + by proc; if=> //=; wp; call eq_Direct_Indirect.
-  qed.
-
-  declare module D <: Distinguisher { -RP }.
-
-  lemma pr_PRPi_PRPi'_Indirect &m:
-    Pr[IND(RP,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
-  proof.
-  byequiv=> //=.
-  proc.
-  call (_: ={RP.m}).
-    by apply eq_PRPi_PRPi'_Indirect.
-  by inline*; auto.
-  qed.
-end section PRPi_PRPi'_Indirect.
-
-section CollisionProbability.
-  declare module D <: Distinguisher {-RP, -PRFi}.
-
-  declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
-  declare axiom D_bounded  : hoare [D(PRFi).distinguish : PRFi.m = empty ==> card (fdom PRFi.m) <= q].
-
-  local clone import Birthday as BBound with
-    op   q <- q,
-    type T <- D,
-    op   uT <- dD
-  proof *.
-  realize ge0_q by apply ge0_q.
-
-  (* We construct a Birthday Bound adversary from the IND
-     experiment. *)
-  local module (A:Adv) (S:ASampler) = {
-    (* We simulate an f-oracle using the s-oracle *)
-    module F = {
-      proc init = PRFi.init
-
-      proc f(x:D): D = {
-        var r;
-        if (x \notin PRFi.m) {
-          r <@ S.s();
-          PRFi.m.[x] <- r;
-        }
-        return oget PRFi.m.[x];
-      }
-    }
-
-    (* Recall from the Birthday clone that Birthday Bound adversaries
-       are restricted to make at most q oracle queries. *)
-    module IND = IND(F,D)
-
-    proc a(): unit = {
-      var b:bool;
-      b <@ IND.main();
-    }
-  }.
-
-  local lemma A_ll (S <: ASampler {-A}): islossless S.s => islossless A(S).a.
-  proof.
-  move=> S_ll; proc; inline*; wp.
-  call (_: true).
-  + exact D_ll.
-  + by proc; inline*; do!(sp; if=> //=; auto); wp; call S_ll.
-  by inline*; auto.
-  qed.
-
-  local equiv IND_Exp : 
-     A(Sample).a ~ IND(PRFi,D).main : ={glob D} /\ size Sample.l{1} = 0 ==>
-         (collision PRFi.m{2} <=> !uniq Sample.l{1}) /\
-         size Sample.l{1} = card (fdom PRFi.m){2}.
-  proof.
-  proc; inline*; wp.
-  call (_: ={PRFi.m} /\
-           size Sample.l{1} = card (fdom PRFi.m){2} /\
-           (forall x, rng PRFi.m x <=> mem Sample.l x){1} /\
-           (collision PRFi.m{2} <=> !uniq Sample.l{1})).
-  + proc; inline*.
-    if => //=.
-    auto => /> &1 &2 h1 h2 h3 h4 r _.
-    rewrite fdom_set fcardUI_indep 2:fcard1; 1:by rewrite fsetI1 mem_fdom h4.
-    split; 1:smt().
-    split.
-    + move=> v; rewrite -h2 !rngE /=; split.
-      + move=> [] x0; rewrite get_setE; case: (x0 = x{2})=> /> _ m_x0.
-        by right; exists x0.
-      + case=> />.
-        + by exists x{2}; rewrite get_set_sameE.
-        + move=> x0 m_x0; exists x0; rewrite get_set_neqE //.
-          rewrite domE in h4; rewrite -negP=> <<-.
-          by move: h4; rewrite m_x0.
-    + smt(collision_add).
-  by auto; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
-  qed.
-
-  local hoare IND_bounded : IND(PRFi,D).main : true ==> card (fdom PRFi.m) <= q.
-  proof. proc; call D_bounded; inline *;auto. qed.
-
-  lemma pr_PRFi_collision &m:
-    Pr[IND(PRFi,D).main() @ &m: collision PRFi.m]
-    <= (q*(q-1))%r/2%r * mu1 dD witness.
-  proof.
-  have ->: mu1 dD witness = mu1 dD maxu by apply /rnd_funi /dD_funi.
-  apply (ler_trans (Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l])).
-  + byequiv => //.
-    symmetry; proc *; inline Exp(Sample, A).main.
-    by call IND_Exp; inline *; auto => /#.
-  apply (pr_collision A A_ll _ &m).
-  conseq IND_Exp IND_bounded => /#.
-  qed.
-
-  lemma Conclusion &m:
-    `|Pr[IND(RP, D).main() @ &m: res]- Pr[IND(PRFi,D).main() @ &m: res]|
-      <= (q*(q-1))%r/2%r * mu1 dD witness.
-  proof.
-    move: (pr_PRPi_PRPi'_Indirect D &m) (pr_PRPi'_Indirect_PRFi D D_ll &m) (pr_PRFi_collision &m) => /#.
-  qed.
-
-end section CollisionProbability.
-
-module FBounder (F : PRF_Oracles) = {
-  var c:int
-
-  proc f(x:D): D = {
-   var r <- witness;
-
-   if (c < q) {
-     r <@ F.f(x);
-     c <- c + 1;
-   }
-   return r;
- }
-}.
-
-module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
- 
-  proc distinguish(): bool = {
-    var b;
-    FBounder.c <- 0;
-    b <@ D(FBounder(F)).distinguish();
-    return b;
-  }
-}.
-
-section BOUNDER.
-
-declare module D <: Distinguisher {-RP, -PRFi, -DBounder}.
-declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
-
-lemma DBounder_ll (O <: PRF_Oracles{-DBounder(D)}): 
-  islossless O.f => islossless DBounder(D, O).distinguish.
-proof.
-  move=> hll; islossless.
-  by apply (D_ll (FBounder(O))); islossless.
-qed.
-
-hoare DBounder_card : DBounder(D, PRFi).distinguish : PRFi.m = empty ==> card (fdom PRFi.m) <= q.
-proof.
-  proc.
-  call (: card (fdom PRFi.m) <= FBounder.c /\ FBounder.c <= q).
-  + proc; sp; if => //.
-    inline *; sp; wp; if; auto; smt(fdom_set fcardU fcard1 fcard_ge0).
-  auto; smt(fdom0 fcards0 ge0_q).
-qed.
-
-lemma Conclusion_DBounder &m:
-  `|Pr[IND(RP, DBounder(D)).main() @ &m: res]- Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
-     <= (q*(q-1))%r/2%r * mu1 dD witness.
-proof. apply (Conclusion (DBounder(D)) DBounder_ll DBounder_card &m). qed.
-
-end section BOUNDER.
-
-end RP_RF.
 end RP.
 
+(*^
+
+## Pseudorandom Permutation
+
+This abstract sub-theory defines an abstract "pseudorandom permutation"
+instantiation of the PRP oracles with initialization.
+^*)
 (* -------------------------------------------------------------------- *)
 abstract theory PseudoRP.
+
+(*^
+Parameter: A type `K` of keys.
+^*)
 type K.
-op dK: { K distr | is_lossless dK } as dK_ll.
 
-op p : K -> D -> D.
-op pi: K -> D -> D.
-
-axiom pK k:
-  support dK k =>
-     cancel (p k) (pi k)
-  /\ cancel (pi k) (p k).
-
+(*&
+The module type for pseudorandom permutations: key generation,
+forward evaluation, and inverse evaluation.
+&*)
 module type PseudoRP = {
   proc keygen(): K
-  proc f(_ : K * D): D
-  proc fi(_ : K * D): D
+  proc p(_ : K * D): D
+  proc pi(_ : K * D): D
 }.
 
-module PseudoRP = {
-  proc keygen() = {
-    var k;
+(*&
+A wrapper, which wraps any given concrete PRP as a PRP oracle with
+initialization, as expected by the indistinguishability experiment.
 
-    k <$ dK;
-    return k;
-  }
-
-  proc f(k, x) = { return p k x; }
-
-  proc fi(k, x) = { return pi k x; }
-}.
-
-module PRP = {
+Initialization generates a key, which is then used with the `p` and
+`pi` operations to answer forward and inverse oracle queries.
+&*)
+module PRP (P : PseudoRP) = {
   var k : K
 
-  proc init() = { k <$ dK; }
-  proc f(x : D) = { return p k x; }
-  proc fi(x : D) = { return pi k x; }  
-}.
+  proc init() = { k <@ P.keygen(); }
 
+  proc f(x : D) = {
+    var r;
+
+    r <@ P.p(k, x);
+    return r;
+  }
+
+  proc fi(y : D) = {
+    var r;
+
+    r <@ P.pi(k, y);
+    return r;
+  }
+}.
 end PseudoRP.
