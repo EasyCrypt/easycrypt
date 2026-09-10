@@ -585,6 +585,9 @@ let main () =
     | `Llm llmopts ->
         EcLlm.run ~relocdir ~boot:ldropts.ldro_boot ~projini llmopts
 
+    | `Mcp mcpopts when mcpopts.mcpo_sessions ->
+        EcMcpMux.run mcpopts
+
     | `Mcp mcpopts ->
         EcMcp.run ~relocdir ~boot:ldropts.ldro_boot ~projini mcpopts
 

@@ -58,6 +58,9 @@ and llm_option = {
 and mcp_option = {
   mcpo_provers   : prv_options;
   mcpo_help      : bool;
+  mcpo_sessions  : bool;
+  mcpo_idle      : int option;
+  mcpo_logdir    : string option;
 }
 
 and prv_options = {
@@ -396,7 +399,10 @@ let specs = {
     ("mcp", "Model Context Protocol server (stdio)", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("help", `Flag  , "Print the MCP server usage and exit")]);
+      `Spec  ("help", `Flag  , "Print the MCP server usage and exit");
+      `Spec  ("sessions", `Flag, "Run one engine per named session, in child processes");
+      `Spec  ("idle", `Int   , "With -sessions: kill a session unused for <n> minutes (default 180)");
+      `Spec  ("logdir", `String, "With -sessions: write the sessions' logs to <dir> (default $TMPDIR)")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -636,7 +642,10 @@ let llm_options_of_values ini values =
 
 let mcp_options_of_values ini values =
   { mcpo_provers   = prv_options_of_values ini values;
-    mcpo_help      = get_flag "help" values; }
+    mcpo_help      = get_flag "help" values;
+    mcpo_sessions  = get_flag "sessions" values;
+    mcpo_idle      = get_int "idle" values;
+    mcpo_logdir    = get_string "logdir" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =

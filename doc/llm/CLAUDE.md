@@ -457,11 +457,14 @@ protocol, as a debug console, or for `-eval` scripting.
 
 ```
 easycrypt mcp [OPTIONS]
+easycrypt mcp -sessions [-idle <minutes>] [-logdir <dir>] [OPTIONS]
 ```
 
-The same loader and prover options as `llm` are available (`-I`,
-`-timeout`, `-p`, `-stdlib`, etc.). Use `-help` to print this section
-and exit:
+The first form is one engine for one client; the second, one engine
+per named session behind one server, for clients that run several
+agents at once (see "Multi-agent sessions" below). The same loader
+and prover options as `llm` are available in both (`-I`, `-timeout`,
+`-p`, `-stdlib`, etc.). Use `-help` to print this section and exit:
 
 ```
 easycrypt mcp -help
@@ -477,7 +480,9 @@ resources, no prompts, no sampling.
 ### Tools
 
 Thirteen tools. Required arguments are marked; the others default as
-noted.
+noted. Under `-sessions`, every one of them takes a required `session`
+as well, and two more tools appear, `ec_sessions` and `ec_close`; see
+"Multi-agent sessions" below.
 
 | Tool | Arguments | Description |
 |------|-----------|-------------|
@@ -530,8 +535,9 @@ under both, and is recorded for `ec_commit` in both.
 ### State and uuids
 
 The state model is the REPL's, unchanged. One client is one process is
-one engine state: there is no multiplexing, and tool calls run strictly
-in arrival order even when a client pipelines them. Every result
+one engine state: tool calls run strictly in arrival order even when a
+client pipelines them. Several agents sharing one client need one
+engine each; that is what `-sessions` provides (see below). Every result
 reports in its `structuredContent` the `uuid` the call left behind —
 the same monotonically increasing state identifier the REPL prints as
 `[uuid:N]`, advancing only on calls that change engine state — and
@@ -599,6 +605,67 @@ Add loader options to `args` as needed, e.g. `["mcp", "-I",
 
 ```
 claude mcp add easycrypt -- easycrypt mcp
+```
+
+### Multi-agent sessions
+
+An MCP client such as Claude Code opens one connection per configured
+server and lets every agent it runs share it, and the stdio transport
+carries no caller identity. Two agents driving one `easycrypt mcp`
+therefore clobber each other's goals. The fix is at the protocol
+level:
+
+```
+easycrypt mcp -sessions [-idle <minutes>] [-logdir <dir>]
+```
+
+runs a *multiplexer* instead of an engine: the same tools, each with
+one more required argument, `session`, naming the engine the call
+runs in. The first call naming a session starts a child
+`easycrypt mcp` — the single-engine server above, with the loader and
+prover options the multiplexer received — and every later call naming
+it is forwarded there. Sessions are independent processes: their own
+loaded file, uuids, checkpoints, strict mode and memory. Calls to
+different sessions run in parallel; calls to the same session run in
+arrival order, as before. `initialize`, `tools/list` and `ping` are
+answered by the multiplexer itself, under the same server name, so a
+client's approval of the server carries over.
+
+**The rule for agents: one session name per agent, and never another
+agent's.** Use your agent tag, or any name that is yours alone, in
+every call. A call without `session` is refused with a tool-level
+error, as is a name that is not made of letters, digits, `_`, `-` and
+`.` (at most 64 characters). Two agents that share a name share an
+engine and are back to clobbering each other.
+
+Two tools belong to the multiplexer:
+
+| Tool | Arguments | Description |
+|------|-----------|-------------|
+| `ec_sessions` | — | List the live sessions, one line each: `NAME  pid PID  idle Ns`, with `(dead)` appended when the engine has exited; or `no live session` |
+| `ec_close` | `session` (req) | Kill that session's engine and forget it; answers `closed NAME` or ``no session `NAME'`` |
+
+A session unused for `-idle` minutes (default 180) is killed, unless a
+call is running in it; a loaded large development is a lot of resident
+memory, and only a process exit gives it back. Close your own session
+with `ec_close` when you are done with it. A session whose engine died
+— killed, timed out, or stopped by an `exit.` phrase — is dropped, and
+the next call naming it starts a fresh engine, which needs an
+`ec_load` again; a call that finds the engine gone says so in a
+tool-level error rather than failing silently.
+
+Each child's stderr — the engine's own chatter, which the single
+server also writes to stderr — goes to `<dir>/ec-mcp-<session>.log`,
+with `-logdir` defaulting to `$TMPDIR`, else `/tmp`. The
+multiplexer's stdout carries the protocol and nothing else. When the
+client closes the connection, or the multiplexer is terminated, every
+child is killed with it.
+
+A ready-to-use client configuration:
+
+```json
+{"mcpServers": {"easycrypt": {"command": "easycrypt",
+                              "args": ["mcp", "-sessions"]}}}
 ```
 
 ## EasyCrypt proof strategy
