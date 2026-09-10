@@ -54,6 +54,9 @@ and llm_option = {
 and mcp_option = {
   mcpo_provers   : prv_options;
   mcpo_help      : bool;
+  mcpo_sessions  : bool;
+  mcpo_idle      : int option;
+  mcpo_logdir    : string option;
 }
 
 and prv_options = {

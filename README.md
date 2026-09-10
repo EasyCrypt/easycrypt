@@ -170,7 +170,9 @@ Besides these, EasyCrypt ships an interface aimed at LLM agents rather
 than at humans: `easycrypt llm`, an interactive REPL speaking a
 machine-friendly protocol, and `easycrypt mcp`, a
 [Model Context Protocol](https://modelcontextprotocol.io/) server over
-stdio. Both drive the same proof engine, and both are documented in
+stdio (`easycrypt mcp -sessions` serves one engine per named session,
+for clients that run several agents at once). Both drive the same
+proof engine, and both are documented in
 [doc/llm/CLAUDE.md](doc/llm/CLAUDE.md).
 
 ### Proof-General (Emacs)
