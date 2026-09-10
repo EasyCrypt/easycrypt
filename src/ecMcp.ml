@@ -9,7 +9,9 @@
    implementation shortcut but the correctness anchor: the proof engine
    is a global mutable singleton and uuid ordering is what makes
    [ec_revert] meaningful, so tool calls must run strictly in arrival
-   order even when a client pipelines them. *)
+   order even when a client pipelines them. Several agents behind one
+   client get one such process each from [EcMcpMux] ([mcp -sessions]),
+   which forwards to children running this very loop. *)
 
 module J = Yojson.Safe
 
@@ -142,6 +144,71 @@ let utf8_repair (s : string) =
     in
     copy 0; Buffer.contents buf
   end
+
+(* -------------------------------------------------------------------- *)
+(* The wire: one JSON value per line, flushed at once. Yojson escapes
+   newlines inside strings, so a message never contains one, as the
+   stdio transport requires.
+
+   The encoding is shared with the session multiplexer ([EcMcpMux]),
+   which is why it lives at module level: [Over] instantiates the reply
+   helpers over whatever [send] the caller has -- a bare channel here,
+   a mutex-guarded one there. *)
+module Wire = struct
+  (* Repair every string in the message rather than the reply text
+     alone: this is the one point every byte leaves through, so no
+     future tool or error path can put invalid UTF-8 on the wire by
+     forgetting to sanitize. *)
+  (* Only the constructors we build are named: [Tuple] and [Variant]
+     are non-standard extensions we never emit, and yojson 3 dropped
+     them from the type, so naming them here would not compile there. *)
+  let rec repair (msg : J.t) : J.t =
+    match msg with
+    | `String s -> `String (utf8_repair s)
+    | `List l   -> `List (List.map repair l)
+    | `Assoc l  -> `Assoc (List.map (fun (k, v) -> (k, repair v)) l)
+    | msg       -> msg
+
+  let writer (oc : out_channel) (msg : J.t) =
+    output_string oc (J.to_string (repair msg));
+    output_char oc '\n';
+    flush oc
+
+  let result_msg id (result : J.t) : J.t =
+    `Assoc [
+      ("jsonrpc", `String "2.0");
+      ("id", id);
+      ("result", result);
+    ]
+
+  let error_msg ?data id code message : J.t =
+    `Assoc [
+      ("jsonrpc", `String "2.0");
+      ("id", id);
+      ("error", `Assoc ([
+         ("code", `Int code);
+         ("message", `String message);
+       ] @ (match data with None -> [] | Some d -> [("data", d)])));
+    ]
+
+  module Over (C : sig val send : J.t -> unit end) = struct
+    let send = C.send
+    let result id result = send (result_msg id result)
+    let error ?data id code message = send (error_msg ?data id code message)
+  end
+end
+
+(* stdout carries the protocol and nothing else. Rather than trust
+   every code path under the engine to stay silent, keep a private
+   descriptor for the protocol and point the process's stdout at
+   stderr, so a stray [print_string] anywhere lands in the client's
+   log instead of corrupting the message stream. The descriptor is
+   close-on-exec: no process we start (a prover, a session engine)
+   has any business holding the client's pipe. *)
+let wire_stdout () =
+  let fd = Unix.dup ~cloexec:true Unix.stdout in
+  Unix.dup2 Unix.stderr Unix.stdout;
+  Unix.out_channel_of_descr fd
 
 (* -------------------------------------------------------------------- *)
 (* JSON schema fragments for the tool declarations. *)
@@ -483,6 +550,63 @@ let tools : J.t list =
   ]
 
 (* -------------------------------------------------------------------- *)
+(* The same table as the session multiplexer advertises it: every tool
+   takes a required [session] naming the engine the call runs in. A
+   pure function of [tools], kept next to it so that the two cannot
+   drift apart. *)
+let session_property : J.t =
+  Schema.str
+    ~description:"the name of YOUR engine session (e.g. your agent tag); \
+                  the first call creates it, later calls reuse it. Never \
+                  use another agent's name." ()
+
+let session_suffix =
+  " [Runs in the engine of the `session' you name; sessions are \
+   independent.]"
+
+let tools_with_session : J.t list =
+  let add_session (tool : J.t) : J.t =
+    match tool with
+    | `Assoc fields ->
+      let fields =
+        List.map (fun (k, v) ->
+          match k, v with
+          | "description", `String d ->
+            (k, `String (d ^ session_suffix))
+          | "inputSchema", `Assoc schema ->
+            let props =
+              match List.assoc_opt "properties" schema with
+              | Some (`Assoc props) -> props
+              | _ -> []
+            and required =
+              match List.assoc_opt "required" schema with
+              | Some (`List l) -> l
+              | _ -> []
+            in
+            let schema =
+              List.filter (fun (k, _) -> k <> "properties" && k <> "required")
+                schema
+            in
+            let schema =
+              (* Keep the field order of [Schema.obj]: type, properties,
+                 required, additionalProperties. *)
+              let head, tail =
+                List.partition (fun (k, _) -> k = "type") schema in
+              head
+              @ [("properties", `Assoc (props @ [("session", session_property)]));
+                 ("required", `List (required @ [`String "session"]))]
+              @ tail
+            in
+            (k, `Assoc schema)
+          | _ -> (k, v))
+          fields
+      in
+      `Assoc fields
+    | tool -> tool
+  in
+  List.map add_session tools
+
+(* -------------------------------------------------------------------- *)
 (* Argument access. Everything here reports through [Invalid_params]:
    these are failures to satisfy the declared input schema, which the
    spec classifies as protocol errors, not tool-execution errors. *)
@@ -532,6 +656,28 @@ module Args = struct
     | Some _            -> bad tool name "an integer"
 end
 
+(* The [initialize] result. Spec: answer with the requested version
+   when we speak it, otherwise with the latest one we do speak. *)
+let initialize_result (params : J.t option) : J.t =
+  let requested =
+    match List.assoc_opt "protocolVersion" (Args.of_params params) with
+    | Some (`String v) -> Some v
+    | _                -> None
+  in
+  let negotiated =
+    match requested with
+    | Some v when List.mem v protocol_supported -> v
+    | _ -> protocol_latest
+  in
+  `Assoc [
+    ("protocolVersion", `String negotiated);
+    ("capabilities", `Assoc [("tools", `Assoc [])]);
+    ("serverInfo", `Assoc [
+       ("name", `String server_name);
+       ("version", `String server_version);
+     ]);
+  ]
+
 (* The [ec_focus] path is a string in the schema, so its shape is ours
    to check: "next", or a dotted sequence of positive integers. Only
    "next" is MCP's own -- the REPL spells it as a separate command --
@@ -550,16 +696,7 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
     exit 0
   end;
 
-  (* stdout carries the protocol and nothing else. Rather than trust
-     every code path under the engine to stay silent, keep a private
-     descriptor for the protocol and point the process's stdout at
-     stderr, so a stray [print_string] anywhere lands in the client's
-     log instead of corrupting the message stream. *)
-  let wire =
-    let fd = Unix.dup Unix.stdout in
-    Unix.dup2 Unix.stderr Unix.stdout;
-    Unix.out_channel_of_descr fd
-  in
+  let wire = wire_stdout () in
 
   let prvopts = mcpopts.mcpo_provers in
 
@@ -570,47 +707,7 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
       exit 1
   in
 
-  (* ------------------------------------------------------------------ *)
-  (* The wire: one JSON value per line, flushed at once. Yojson escapes
-     newlines inside strings, so a message never contains one, as the
-     stdio transport requires. *)
-  let module Wire = struct
-    (* Repair every string in the message rather than the reply text
-       alone: this is the one point every byte leaves through, so no
-       future tool or error path can put invalid UTF-8 on the wire by
-       forgetting to sanitize. *)
-    (* Only the constructors we build are named: [Tuple] and [Variant]
-       are non-standard extensions we never emit, and yojson 3 dropped
-       them from the type, so naming them here would not compile there. *)
-    let rec repair (msg : J.t) : J.t =
-      match msg with
-      | `String s -> `String (utf8_repair s)
-      | `List l   -> `List (List.map repair l)
-      | `Assoc l  -> `Assoc (List.map (fun (k, v) -> (k, repair v)) l)
-      | msg       -> msg
-
-    let send (msg : J.t) =
-      output_string wire (J.to_string (repair msg));
-      output_char wire '\n';
-      flush wire
-
-    let result id (result : J.t) =
-      send (`Assoc [
-        ("jsonrpc", `String "2.0");
-        ("id", id);
-        ("result", result);
-      ])
-
-    let error ?data id code message =
-      send (`Assoc [
-        ("jsonrpc", `String "2.0");
-        ("id", id);
-        ("error", `Assoc ([
-           ("code", `Int code);
-           ("message", `String message);
-         ] @ (match data with None -> [] | Some d -> [("data", d)])));
-      ])
-  end in
+  let module Wire = Wire.Over (struct let send = Wire.writer wire end) in
 
   (* ------------------------------------------------------------------ *)
   (* Rendering [EcLlmCore] outcomes as tool results. *)
@@ -767,34 +864,11 @@ let run ~relocdir ~boot ~projini (mcpopts : EcOptions.mcp_option) =
 
   (* ------------------------------------------------------------------ *)
   (* Requests. *)
-  let initialize (params : J.t option) =
-    let requested =
-      match List.assoc_opt "protocolVersion" (Args.of_params params) with
-      | Some (`String v) -> Some v
-      | _                -> None
-    in
-    (* Spec: answer with the requested version when we speak it,
-       otherwise with the latest one we do speak. *)
-    let negotiated =
-      match requested with
-      | Some v when List.mem v protocol_supported -> v
-      | _ -> protocol_latest
-    in
-    `Assoc [
-      ("protocolVersion", `String negotiated);
-      ("capabilities", `Assoc [("tools", `Assoc [])]);
-      ("serverInfo", `Assoc [
-         ("name", `String server_name);
-         ("version", `String server_version);
-       ]);
-    ]
-  in
-
   let request id (meth : string) (params : J.t option) =
     try
       match meth with
       | "initialize" ->
-        Wire.result id (initialize params)
+        Wire.result id (initialize_result params)
       | "ping" ->
         Wire.result id (`Assoc [])
       | "tools/list" ->
