@@ -1,0 +1,8 @@
+# exit: 1
+# An `exit.` phrase ends the session too, and likewise must not swallow
+# the ERROR that came before it. As above, the trailing GOALS is there
+# to show the session did stop at `exit.`.
+LOAD "fixtures/simple.ec" 6
+nosuchtactic.
+exit.
+GOALS

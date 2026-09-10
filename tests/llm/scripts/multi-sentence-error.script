@@ -1,0 +1,10 @@
+# exit: 1
+# File semantics for a multi-sentence line: the sentences before the
+# failing one stay applied. `split.' succeeds, `apply nosuchlemma.'
+# fails, and the trailing `trivial.' never runs -- so the session is
+# left with the two goals `split.' opened, and COMMIT holds `split.'
+# alone.
+LOAD "fixtures/simple.ec" 6
+split. apply nosuchlemma. trivial.
+TREE
+COMMIT

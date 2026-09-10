@@ -1,0 +1,19 @@
+# exit: 0
+# Two complete lemmas in one session. Bullet structure and indentation
+# are per proof: the first lemma keeps its bullets once the second is
+# started, and the second neither inherits the first's depth nor its
+# reserved tokens.
+LOAD "fixtures/simple.ec" 6
+QUIET ON
+split.
+trivial.
+trivial.
+qed.
+lemma two_and : 3 = 3 /\ 4 = 4.
+proof.
+split.
+trivial.
+trivial.
+qed.
+QUIET OFF
+COMMIT

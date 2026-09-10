@@ -1,0 +1,21 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/simple.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:6]
+No more goals
+<END>
+OK [uuid:6]
+No more goals
+<END>
+OK [uuid:6]
+split.
+- trivial.
+- trivial.
+<END>

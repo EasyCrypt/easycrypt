@@ -1,0 +1,10 @@
+# exit: 1
+# A checkpoint names a uuid, and `pragma restart.' destroys the uuid
+# space it was taken in. The restart must therefore drop the checkpoint
+# table too: REVERT may not resolve the name at all afterwards, let
+# alone reach a state of the session that no longer exists.
+LOAD "fixtures/simple.ec" 6
+split.
+CHECKPOINT c
+pragma restart.
+REVERT c

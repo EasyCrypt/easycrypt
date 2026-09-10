@@ -1,0 +1,27 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/simple.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:4]
+: line 1 (7-25): unknown lemma `nosuchlemma'
+source: apply nosuchlemma.
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:4] [focus: 1/2]
+[1] 1 = 1 <- focused
+[2] 2 = 2
+<END>
+OK [uuid:4] [focus: 1/2]
+split.
+<END>

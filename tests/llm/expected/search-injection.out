@@ -1,0 +1,53 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/simple.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:3]
+SEARCH: the argument must be a single search pattern
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:3]
+<END>
+OK [uuid:3]
+(* RField.ofintS *)
+lemma ofintS:
+  forall (i : int), 0 <= i => RField.ofint (i + 1) = 1%r + RField.ofint i.
+(* RField.ofintR *)
+lemma ofintR: forall (i : int), RField.ofint i = i%r.
+(* RField.ofintN *)
+lemma ofintN: forall (i : int), RField.ofint (-i) = - RField.ofint i.
+(* RField.ofint1 *)
+lemma ofint1: RField.ofint 1 = 1%r.
+(* RField.ofint0 *)
+lemma ofint0: RField.ofint 0 = 0%r.
+(* RField.mulr_intr *)
+lemma mulr_intr:
+  forall (x : real) (z : int), x * RField.ofint z = RField.intmul x z.
+(* RField.mulr_intl *)
+lemma mulr_intl:
+  forall (x : real) (z : int), RField.ofint z * x = RField.intmul x z.
+(* RField.mul1r2z *)
+lemma mul1r2z: forall (x : real), x * RField.ofint 2 = x + x.
+(* RField.mul1r1z *)
+lemma mul1r1z: forall (x : real), x * RField.ofint 1 = x.
+(* RField.mul1r0z *)
+lemma mul1r0z: forall (x : real), x * RField.ofint 0 = 0%r.
+
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>

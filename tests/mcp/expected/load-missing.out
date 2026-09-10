@@ -1,0 +1,3 @@
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"easycrypt","version":"VERSION"}}}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"LOAD: no such file: ../llm/fixtures/nosuchfile.ec"}],"structuredContent":{"text":"LOAD: no such file: ../llm/fixtures/nosuchfile.ec","uuid":0,"changed":false},"isError":true}}
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"unknown file extension: .txt\nNo active proof.\n"}],"structuredContent":{"text":"unknown file extension: .txt\nNo active proof.\n","uuid":0,"changed":false},"isError":true}}

@@ -1,0 +1,25 @@
+READY [uuid:0]
+<END>
+ERROR [uuid:1]
+trace: target sentence is not in a proof context
+No active proof.
+<END>
+OK [uuid:1]
+No active proof.
+<END>
+OK [uuid:2]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+b2i true = 1
+<END>
+OK [uuid:2]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+b2i true = 1
+<END>

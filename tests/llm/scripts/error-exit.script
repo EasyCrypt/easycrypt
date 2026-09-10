@@ -1,0 +1,3 @@
+# exit: 1
+# A script whose only command errors: the process must exit 1.
+UNDO

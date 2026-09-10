@@ -1,0 +1,8 @@
+# exit: 0
+# QUIET ON suppresses goal bodies; QUIET OFF restores them.
+LOAD "fixtures/simple.ec" 6
+QUIET ON
+split.
+trivial.
+QUIET OFF
+GOALS
