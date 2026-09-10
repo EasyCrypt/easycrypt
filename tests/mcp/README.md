@@ -19,6 +19,7 @@ up in both sets of goldens — that is the point.
 | `../llm/fixtures/*` | the EasyCrypt files the scripts load (shared with the REPL harness, never duplicated) |
 | `../../scripts/testing/mcp-golden` | the runner |
 | `../../scripts/testing/mcp-parity` | the REPL/MCP parity checker (see below) |
+| `../../scripts/testing/mcp-sessions` | the `-sessions` multiplexer checker (see below) |
 | `../../scripts/testing/mcp-inspector-check` | manual smoke test against a real client (see below) |
 
 ## Running
@@ -31,6 +32,7 @@ scripts/testing/mcp-golden         # run every scenario
 scripts/testing/mcp-golden happy-path protocol-errors
 scripts/testing/mcp-golden --bin /path/to/ec.exe
 scripts/testing/mcp-parity -v          # the parity check, alone
+scripts/testing/mcp-sessions -v        # the multiplexer check, alone
 ```
 
 The runner defaults to `_build/default/src/ec.exe`, resolved relative
@@ -286,3 +288,20 @@ python3 -m json.tool < <(head -n 1 tests/mcp/expected/tools-list.out)
    here) if none fits.
 3. `scripts/testing/mcp-golden --record NAME`.
 4. Read `expected/NAME.out` and check it is what you meant to freeze.
+
+## Sessions
+
+`make test-mcp` ends with `scripts/testing/mcp-sessions`, which checks
+the multiplexer behind `easycrypt mcp -sessions` (`src/ecMcpMux.ml`):
+one child `easycrypt mcp` per session name, tool calls forwarded to
+the session they name. It is not a golden: the multiplexer answers
+concurrently, in whatever order the children finish, and the pids and
+idle times of `ec_sessions` are not reproducible. The checker drives
+it as a client would, matching replies by id, and asserts the
+contract documented in `doc/llm/CLAUDE.md`, "Multi-agent sessions":
+the tool table carries `session` on every tool, two sessions load
+different files at the same time without seeing each other, the
+multiplexer's own errors are tool-level while the engine's protocol
+errors pass through, `ec_sessions` and `ec_close` behave, an engine
+that exits is reported dead and restarted by the next call, and no
+child survives the multiplexer -- on end of input or on SIGTERM.
