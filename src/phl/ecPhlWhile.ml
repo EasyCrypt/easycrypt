@@ -149,8 +149,23 @@ let t_bdhoare_while_r inv vrnt tc =
   let post = generalize_mod_ss_inv env modi post in
   let post = map_ss_inv2 f_and_simpl inv post in
   let concl = f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (bhs_bd bhs) in
+  (* From a memory satisfying [post] (invariant + generalized termination
+     and exit conditions), the loop terminates with probability 1 in a
+     memory satisfying the post-condition, so [Pr[s; while] >= Pr[s : post]]
+     always holds. For [<=] and [=], the runs of [s] that reach the loop
+     OUTSIDE [post] contribute an unknown probability (the loop may then
+     diverge, or terminate anywhere), so we additionally require that no
+     terminating run of [s] does so -- except when the bound is [1%r], as
+     [Pr[s; while] <= 1%r] holds unconditionally. *)
+  let inv_concl =
+    match bhs.bhs_cmp with
+    | FHge -> []
+    | FHle | FHeq ->
+      if   f_equal (bhs_bd bhs).inv f_r1
+      then []
+      else [f_hoareS mt (bhs_pr bhs) s (POE.lift post)] in
 
-  FApi.xmutate1 tc `While [b_concl; concl]
+  FApi.xmutate1 tc `While ([b_concl; concl] @ inv_concl)
 
 (* -------------------------------------------------------------------- *)
 (* Rule for <= *)
@@ -569,7 +584,12 @@ let process_while side winfos tc =
       | Some vrnt, None ->
           let _, phi = TTC.tc1_process_Xhl_formula tc phi in
           let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
-          t_bdhoare_while phi vrnt tc
+          (* [t_bdhoare_while] emits, for [<=] and [=], the extra hoare goal
+             stating that the prefix establishes the invariant; try to close
+             it automatically so trivial cases stay effort-free. *)
+          FApi.t_onalli
+            (function 2 -> FApi.t_try EcPhlAuto.t_pl_trivial | _ -> t_id)
+            (t_bdhoare_while phi vrnt tc)
 
       | Some vrnt, Some (`Bd (k, eps)) ->
         let _, phi = TTC.tc1_process_Xhl_formula tc phi in
