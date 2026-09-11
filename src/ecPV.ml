@@ -539,9 +539,9 @@ and i_write_r ?(except=Sx.empty) env w i =
   | Sraise _      -> w
 
   | Scall(lp,f,_) ->
-    if Sx.mem f except then w else
-      let w  = match lp with None -> w | Some lp -> lp_write_r env w lp in
-      f_write_r ~except env w f
+    (* The lvalue is written by the caller, even when [f] is excepted *)
+    let w = ofold (fun lp w -> lp_write_r env w lp) w lp in
+    if Sx.mem f except then w else f_write_r ~except env w f
 
   | Sif (_, s1, s2) ->
       List.fold_left (s_write_r ~except env) w [s1; s2]
