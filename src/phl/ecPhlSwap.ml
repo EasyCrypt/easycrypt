@@ -18,24 +18,15 @@ type swap_kind = {
 
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
-  let check_swap (pf : proofenv) (env : EcEnv.env) (s1 : stmt) (s2 : stmt) =
-    let is_contains_raise =
-      let exception HasRaise in
+  let check_swap tc (env : EcEnv.env) (s1 : stmt) (s2 : stmt) =
 
-      let rec i_contains_raise (i : instr) =
-        match i.i_node with
-        | Sraise _ -> raise HasRaise
-        | _ -> EcModules.i_iter i_contains_raise i in
-
-      fun (s : stmt) ->
-        try
-          List.iter i_contains_raise s.s_node;
-          false
-        with HasRaise -> true in
-
-    if List.exists is_contains_raise [s1; s2] then
-      tc_error pf "cannot swap blocks that contain exceptions";
-
+    let concl = FApi.tc1_goal tc in
+    match concl.f_node with
+    | FhoareS h ->
+      if not (POE.is_empty (hs_po h).hsi_inv) then
+        tc_error !!tc "Swaping blocks with exceptions not allowed"
+    | _  ->  ()
+                   ;
     let m1,m2 = s_write env s1, s_write env s2 in
     let r1,r2 = s_read  env s1, s_read  env s2 in
     (* FIXME: this is not sufficient *)
@@ -44,7 +35,7 @@ module LowInternal = struct
     let m1r2 = PV.interdep env m1 r2 in
 
     let error mode d =
-      tc_error_lazy pf (fun fmt ->
+      tc_error_lazy !!tc (fun fmt ->
         Format.fprintf fmt
           "the two statements are not independent, %t"
           (fun fmt ->
@@ -64,7 +55,7 @@ module LowInternal = struct
 
 
   let swap_stmt
-    (pf   : proofenv   )
+    tc
     (env  : EcEnv.env  )
     (info : swap_kind  )
     (s    : stmt       )
@@ -73,7 +64,7 @@ module LowInternal = struct
       let (cpath, (start, fin)) = info.interval in
       normalize_cgap_range env (cpath, (start, fin)) s 
     with InvalidCPos ->
-      tc_error_lazy pf (fun fmt ->
+      tc_error_lazy !!tc (fun fmt ->
         let ppe = EcPrinting.PPEnv.ofenv env in
         Format.fprintf fmt "invalid range: %a" (EcPrinting.pp_codegap_range ppe) info.interval
       )
@@ -82,7 +73,7 @@ module LowInternal = struct
     let target = try
       resolve_gap_offset env (start, fin) info.offset s
     with InvalidCPos ->
-      tc_error pf "invalid offset for swap"
+      tc_error !!tc "invalid offset for swap"
     in
 
     match split_by_nmcgaps
@@ -91,7 +82,7 @@ module LowInternal = struct
       else [start; fin; target]
       ) s
     with 
-    | [hd; s1; s2; tl] -> check_swap pf env (stmt s1) (stmt s2);
+    | [hd; s1; s2; tl] -> check_swap tc env (stmt s1) (stmt s2);
       stmt (List.flatten [hd; s2; s1; tl])
     | _ -> assert false
 end
@@ -100,7 +91,7 @@ end
 let t_swap_r (side : oside) (info : swap_kind) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
-  let stmt = LowInternal.swap_stmt !!tc env info stmt in
+  let stmt = LowInternal.swap_stmt tc env info stmt in
   FApi.xmutate1 tc `Swap [EcLowPhlGoal.hl_set_stmt side (FApi.tc1_goal tc) stmt]
 
 (* -------------------------------------------------------------------- *)
