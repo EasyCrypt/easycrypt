@@ -185,19 +185,38 @@ let t_bdhoare_while_rev_r inv tc =
       f_imp while_jgmt unfolded_while_jgmt
   in
 
-  (* 2. Sub-goal *)
-  let rem_concl =
-    let modi = s_write env lp_body in
+  (* 2. Sub-goal: the prefix establishes the invariant *)
+  let rem_concl = f_hoareS mt b_pre rem_s (POE.lift inv) in
+
+  (* 3. Sub-goal: on exit with the post-condition, the bound is 1.
+     4. Sub-goal: the bound is non-negative.
+
+     Both are conditions on the bound that justify the transformation, not
+     conditions on the behaviour of [rem_s]: they are needed for every memory
+     the loop may start from (3, 4) and, since a non-terminating run of
+     [rem_s] contributes probability 0 to the conclusion, for every memory
+     satisfying the pre-condition (4). They are therefore emitted quantified
+     over all memories and NOT inside the (partial-correctness) post-condition
+     of sub-goal 2, which only has to hold on terminating runs of [rem_s]. *)
+  let exit_concl =
     let term_post = map_ss_inv2 f_imp
       (map_ss_inv2 f_and inv (map_ss_inv2 f_and (map_ss_inv1 f_not lp_guard) b_post))
       (map_ss_inv2 f_eq bound {m;inv=f_r1}) in
-    let term_post = generalize_mod_ss_inv env modi term_post in
-    let term_post = map_ss_inv2 f_and inv term_post in
-    let post = { hsi_m = term_post.m; hsi_inv = POE.empty term_post.inv; } in
-    f_hoareS mt b_pre rem_s post
+    EcSubst.f_forall_mems_ss_inv mem term_post
   in
 
-  FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
+  let nonneg_concl =
+    let nonneg = map_ss_inv2 f_imp
+      (map_ss_inv2 f_or b_pre inv)
+      (map_ss_inv2 f_real_le {m;inv=f_r0} bound) in
+    EcSubst.f_forall_mems_ss_inv mem nonneg
+  in
+
+  FApi.xmutate1_hyps tc `While
+    [(hyps', body_concl  );
+     (hyps , rem_concl   );
+     (hyps , exit_concl  );
+     (hyps , nonneg_concl)]
 
 (* -------------------------------------------------------------------- *)
 (* Rule for = or >= *)
@@ -580,7 +599,12 @@ let process_while side winfos tc =
         t_bdhoare_while_rev_geq phi vrnt k eps tc
       | None, None ->
           let _, phi = TTC.tc1_process_Xhl_formula tc phi in
-          t_bdhoare_while_rev phi tc
+          (* [t_bdhoare_while_rev] emits the bound side-conditions (exit
+             bound, non-negativity) as the last two goals; try to close them
+             automatically so trivial cases stay effort-free. *)
+          FApi.t_onalli
+            (function 2 | 3 -> FApi.t_try t_trivial | _ -> t_id)
+            (t_bdhoare_while_rev phi tc)
 
       | None, Some _ ->
         tc_error !!tc "invalid arguments"
