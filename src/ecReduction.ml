@@ -292,6 +292,16 @@ end) = struct
     List.for_all2 (for_module_sig_body_item env) b1 b2
 
   (* ------------------------------------------------------------------ *)
+  (* Allowed oracle calls are compared as sets, per procedure. *)
+  and for_oracle_infos env ~norm ois1 ois2 =
+    let allowed oi =
+      let calls = OI.allowed oi in
+      let calls = if norm then List.map (NormMp.norm_xfun env) calls else calls in
+      Sx.of_list calls in
+    EcSymbols.Msym.equal
+      (fun oi1 oi2 -> Sx.equal (allowed oi1) (allowed oi2)) ois1 ois2
+
+  (* ------------------------------------------------------------------ *)
   and for_module_sig env ~norm ms1 ms2 =
     let p1 = ms1.mis_params in
     let p2 = ms2.mis_params in
@@ -300,7 +310,10 @@ end) = struct
     let env, s = add_modules env p2 p1 in
     let body1 = ms1.mis_body in
     let body2 = EcSubst.subst_modsig_body s ms2.mis_body in
-    for_module_sig_body env body1 body2
+    for_module_sig_body env body1 body2 &&
+    let ois1 = ms1.mis_oinfos in
+    let ois2 = EcSubst.subst_oracle_infos s ms2.mis_oinfos in
+    for_oracle_infos env ~norm ois1 ois2
 
   (* ------------------------------------------------------------------ *)
   let for_variable env v1 v2 =
