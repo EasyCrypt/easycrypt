@@ -50,6 +50,7 @@ type sub_moddef = {
 type subst = {
   sb_module   : EcPath.mpath Mid.t;
   sb_path     : EcPath.path Mp.t;
+  sb_ctor     : EcPath.path Mp.t;
   sb_tyvar    : ty Mid.t;
   sb_elocal   : expr option Lazy.t Mid.t;
   sb_flocal   : EcCoreFol.form Mid.t;
@@ -63,6 +64,7 @@ type subst = {
 let empty : subst = {
   sb_module   = Mid.empty;
   sb_path     = Mp.empty;
+  sb_ctor     = Mp.empty;
   sb_tyvar    = Mid.empty;
   sb_elocal   = Mid.empty;
   sb_flocal   = Mid.empty;
@@ -75,6 +77,7 @@ let empty : subst = {
 let is_empty s =
   Mid.is_empty s.sb_module
   && Mp.is_empty s.sb_path
+  && Mp.is_empty s.sb_ctor
   && Mid.is_empty s.sb_tyvar
   && Mid.is_empty s.sb_elocal
   && Mid.is_empty s.sb_flocal
@@ -340,6 +343,10 @@ let subst_memtype (s : subst) ((m, mt) : EcMemory.memenv) =
 let add_path (s : subst) ~src ~dst =
   assert (Mp.find_opt src s.sb_path = None);
   { s with sb_path = Mp.add src dst s.sb_path }
+
+(* -------------------------------------------------------------------- *)
+let add_ctor (s : subst) ~src ~dst =
+  { s with sb_ctor = Mp.add src dst s.sb_ctor }
 
 let add_tydef (s : subst) p (ids, ty) =
   assert (Mp.find_opt p s.sb_tydef = None);
@@ -1010,7 +1017,15 @@ and subst_branches (s : subst) = function
   | OPB_Branch bs ->
       let for1 b =
         let (ctorp, ctori) = b.opb_ctor in
-          { opb_ctor = (subst_path s ctorp, ctori);
+        (* A branch constructor is stored as a bare path. When the datatype's
+           type has been overridden while cloning, it is redirected to the
+           target datatype's constructor, which is recorded separately from
+           the path substitution: the latter also rewrites the paths that its
+           entries qualify, which a constructor must not do. *)
+        let ctorp =
+          Option.value (Mp.find_opt ctorp s.sb_ctor)
+            ~default:(subst_path s ctorp) in
+          { opb_ctor = (ctorp, ctori);
             opb_sub  = subst_branches s b.opb_sub; }
       in
         OPB_Branch (Parray.map for1 bs)
