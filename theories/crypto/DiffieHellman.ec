@@ -160,9 +160,10 @@ theory List_CDH.
       seq  1: (mem s (g ^ (LCDH'.x * LCDH'.y)) /\ size s <= n) p (1%r/n%r) _ 0%r => //.
         (* The first part is dealt with by equivalence with LCDH. *)
         conseq (_: _: =p). (* strengthening >= into = for simplicity*)
+          by rewrite /= /p Pr[mu_ge0]. 
         call (_: (glob A) = (glob A){m}  ==>
                    mem res (g ^ (LCDH'.x * LCDH'.y)) /\ size res <= n)=> //.
-        bypr; progress; rewrite /p.
+        bypr; rewrite /p Pr[mu_ge0] => /> &hr gl_eq.
         byequiv (_: )=> //.
         by proc *; inline *; wp; call (_: true); auto.
       (* The second part is just arithmetic, but smt needs some help. *)

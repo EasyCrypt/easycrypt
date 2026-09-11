@@ -97,7 +97,7 @@ qed.
 
 phoare phoare_direct x' X' P:
   [ S.direct: x = x' /\ X = X' ==> P res ] = (mu (dt x' \ X' x') P).
-proof. by bypr=> &m [] -> ->; exact/(@pr_direct &m x' X' P). qed.
+proof. bypr=> &m; rewrite ge0_mu /= => [#] -> ->; exact/(@pr_direct &m x' X' P). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma pr_indirect &m x' X' P:
@@ -106,7 +106,9 @@ proof.
 byphoare (: x = x' /\ X = X' ==> _)=> //=.
 case: (forall x, (x \in dt x' => !P x) \/ !(P x /\ !X' x' x)).
 + move=> P_nsub_supp; hoare.
-  + move=> &m' [#] <<*>; rewrite eq_sym dexceptedE mulf_eq0; right.
+  + move=> &m'; split.
+    + smt(ge0_mu).
+    move => [#] <<*>; rewrite eq_sym dexceptedE mulf_eq0; right.
     rewrite mulf_eq0; left; apply/mu0_false.
     move=> x @/predI @/predC x_in_dt.
     by case: (P_nsub_supp x)=> [/(_ x_in_dt) ->|].
@@ -122,7 +124,9 @@ proc. alias 2 r0 = r.
 phoare split (mu (dt x) (predI P (predC (X' x'))))
              (mu (dt x) (X x) * mu (dt x \ X x) P)
              : (P r0 /\ !X' x' r0).
-+ move=> /= &m' [] ->> ->> {&m'}; rewrite dexceptedE.
++ move=> /= &m'; split.
+  + smt(ge0_mu).
+  move => [] ->> ->> {&m'}; rewrite dexceptedE.
   rewrite -{1}(mulr1 (mu (dt x') (predI _ _))).
   rewrite -(@divrr (weight (dt x') - mu (dt x') (X' x'))).
   + rewrite -mu_not; apply/ltr0_neq0.
@@ -150,7 +154,7 @@ qed.
 phoare phoare_indirect x' X' P:
   [ S.indirect: x = x' /\ X = X' ==> P res ]
   = (weight (dt x) * mu (dt x \ X x) P).
-proof. by bypr=> &m [] -> ->; rewrite (@pr_indirect &m x' X' P). qed.
+proof. bypr=> &m; smt(pr_indirect ge0_mu). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma ll_pr_indirect &m x' X' P:
@@ -162,8 +166,7 @@ phoare ll_phoare_indirect x' X' P:
   [ S.indirect: x = x' /\ X = X' /\ is_lossless (dt x') ==> P res ]
   = (mu (dt x \ X x) P).
 proof.
-by bypr=> &m [] -> [] -> dt_ll; rewrite (@ll_pr_indirect &m x' X' P).
-qed.
+by bypr=> &m; smt(ll_pr_indirect ge0_mu). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma indirect_direct &m x X P:
@@ -248,7 +251,7 @@ qed.
 
 lemma phoare_sampleE P :
   phoare [SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m _; apply (@pr_sampleE &m i{m} test{m} P). qed.
+proof. by bypr=> &m; smt(ge0_mu pr_sampleE). qed.
 
 (* -------------------------------------------------------------------- *)
 section.
@@ -271,7 +274,7 @@ end section.
 
 phoare phoare_sampleI P :
   [ SampleI.sample : is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m; apply (@pr_sampleI &m i{m} test{m} P). qed.
+proof. by bypr=> &m; smt(pr_sampleI ge0_mu). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma pr_sampleWi &m x y X P :
@@ -289,12 +292,12 @@ case: (X x y)=> [y_in_Xx|y_notin_Xx]; last first.
 byphoare (: i = x /\ r = y /\ test = X ==> P res)=> //; proc=> /=.
 case @[ambient]: (mu (dt x) (X x) = weight (dt x))=> Hpt.
 + hoare.
-  + by move=> />; rewrite dexceptedE Hpt.
+  + by rewrite ge0_mu => />; rewrite dexceptedE Hpt.
   while (X x r /\ i = x /\ test = X)=> //=.
   auto=> &m' [#] _ -> -> _ r; move: (mu_in_weight (X x) (dt x) r).
   by rewrite Hpt.
 conseq (: _: =(if X x r then mu (dt x \ X x) P else b2r (P r))).
-+ by move=> />; rewrite y_in_Xx.
++ smt(ge0_mu b2r_ge0). 
 conseq (_ : i = x /\ test = X ==> _) => //.
 while (i = x /\ test = X) (if test x r then 1 else 0) 1 (mu (dt x) (predC (X x)))=> //=.
 + smt().
@@ -305,7 +308,8 @@ while (i = x /\ test = X) (if test x r then 1 else 0) 1 (mu (dt x) (predC (X x))
   phoare split (mu (dt x) (predI P (predC (X x))))
                (mu (dt x) (X x) * mu (dt x \ X x) P)
                : (P r0 /\ !X x r0).
-  + move=> &m' [#] -> -> -> /=; rewrite dexceptedE.
+  + move=> &m'; split; 1:smt(dexceptedE ge0_mu). 
+    move => [#] -> -> -> /=; rewrite dexceptedE.
     rewrite -{1}(mulr1 (mu (dt x) (predI _ _))).
     rewrite -(@divrr (weight (dt x) - mu (dt x) (X x))).
     + smt().
@@ -327,17 +331,21 @@ while (i = x /\ test = X) (if test x r then 1 else 0) 1 (mu (dt x) (predC (X x))
   + case: (P r0); last by conseq ih=> />.
     by hoare; conseq (: true)=> />.
   + by wp; rnd.
-  by conseq ih=> &m' />; rewrite dexceptedE.
+  by conseq ih=> &m' />; smt(ge0_mu dexceptedE).
 + by auto.
 split.
 + by move=> &m' />; rewrite mu_not #smt:(mu_bounded).
-by move=> z; conseq (: _ ==> !X x r)=> />; rnd; skip.
+move=> z; conseq (: _ ==> !X x r)=> />.
+by rnd; skip.
 qed.
 
 lemma phoare_sampleWi P :
     phoare [SampleWi.sample : is_lossless (dt i) ==> P res]
   = (if test i r then mu (dt i \ test i) P else b2r (P r)).
-proof. by bypr=> &m'; exact/(@pr_sampleWi &m' i{m'} r{m'} test{m'} P). qed.
+proof. 
+bypr=> &m'; split; 1:smt(ge0_mu b2r_ge0). 
+exact/(@pr_sampleWi &m' i{m'} r{m'} test{m'} P). 
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma pr_sampleW &m x X P :
@@ -348,18 +356,18 @@ move=> dt_ll.
 byphoare (: i = x /\ test = X ==> P res)=> //; proc=> /=.
 case @[ambient]: (mu (dt x) (X x) = weight (dt x))=> Hpt.
 + conseq (: : = 0%r)=> //.
-  + by move=> &m' _; rewrite dexceptedE Hpt.
+  + by move=> &m'; rewrite ge0_mu dexceptedE Hpt.
   seq 1 : true _ 0%r 0%r _ (i = x /\ test = X /\ X x r)=> //.
   + auto=> &m' [#] -> -> r; move: (mu_in_weight (X x) (dt x) r).
     by rewrite Hpt.
   call (: is_lossless (dt x) /\ i = x /\ test = X /\ X x r ==> P res)=> //.
-  by conseq (phoare_sampleWi P)=> // &m' [#] _ -> -> ->; rewrite dexceptedE Hpt.
+  by conseq (phoare_sampleWi P)=> // &m' /= [#] _ -> -> ->; rewrite dexceptedE Hpt.
 alias 2 r0 = r.
 (** TRANSITIVITY FOR PHOARE!! **)
 phoare split (mu (dt x) (predI P (predC (X x))))
              (mu (dt x) (X x) * mu (dt x \ X x) P)
              : (P r0 /\ !X x r0).
-+ move=> &m' _ /=; rewrite dexceptedE.
++ move=> &m'; rewrite ge0_mu /= dexceptedE => _.
   rewrite -{1}(mulr1 (mu (dt x) (predI _ _))).
   rewrite -(@divrr (weight (dt x) - mu (dt x) (X x))).
   + smt().
@@ -387,7 +395,7 @@ qed.
 
 phoare phoare_sampleW P :
   [ SampleW.sample: is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m; exact/(@pr_sampleW &m i{m} test{m} P). qed.
+proof. bypr=> &m; rewrite ge0_mu /= => ll; exact(@pr_sampleW &m i{m} test{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample :
@@ -506,7 +514,7 @@ proof. by rewrite (@sampleE_fixed &m x P) (@WS.pr_sampleE &m x test P). qed.
 
 phoare phoare_sampleE P :
   [ SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m _; exact/(@pr_sampleE &m i{m} P). qed.
+proof. by bypr=> &m; rewrite ge0_mu /=; exact/(@pr_sampleE &m i{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 local lemma sampleI_fixed &m x P :
@@ -529,7 +537,7 @@ qed.
 
 phoare phoare_sampleI P :
   [ SampleI.sample: is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
-proof. bypr=> &m; exact/(@pr_sampleI &m i{m} P). qed.
+proof. bypr=> &m; rewrite ge0_mu; exact/(@pr_sampleI &m i{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 local lemma sampleWi_fixed &m x y P :
@@ -553,7 +561,7 @@ qed.
 phoare phoare_sampleWi P :
   [ SampleWi.sample : is_lossless (dt i) ==> P res ]
   = (if test i r then mu (dt i \ test i) P else b2r (P r)).
-proof. by bypr=> &m; exact/(@pr_sampleWi &m i{m} r{m} P). qed.
+proof. by bypr=> &m; split; [smt(ge0_mu b2r_ge0)|]; exact/(@pr_sampleWi &m i{m} r{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 local lemma sampleW_fixed &m x P :
@@ -576,7 +584,7 @@ qed.
 
 phoare phoare_sampleW P :
   [ SampleW.sample: is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m; exact/(@pr_sampleW &m i{m} P). qed.
+proof. by bypr=> &m; rewrite ge0_mu; exact/(@pr_sampleW &m i{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample :

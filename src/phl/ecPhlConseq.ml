@@ -271,33 +271,48 @@ let t_bdHoareS_conseq (pre : ss_inv) (post : ss_inv) (tc : tcenv1) =
 
 (* bdHoareF bound change rule:
  *
- *   ∀m, P m ⇒ (bd' cmp' bd)    phoare[f] P ==> Q cmp' bd'
+ *   ∀m, 0 <= bd /\ (P m ⇒ (bd' cmp' bd))    phoare[f] P ==> Q cmp' bd'
  *   ————————————————————————————————————————————————————————
  *              phoare[f] P ==> Q cmp bd
  *
  * Changes the bound and/or comparison operator. *)
 let t_bdHoareF_conseq_bd (cmp : hoarecmp) (bd : ss_inv) (tc : tcenv1) =
-  let env = FApi.tc1_env tc in
+  let hyps = FApi.tc1_hyps tc in
   let bhf = tc1_as_bdhoareF tc in
+  let env = FApi.tc1_env tc in
   let bd = ss_inv_rebind bd bhf.bhf_m in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_m bhf.bhf_f env in
   let bd_goal =  bd_goal tc bhf.bhf_cmp (bhf_bd bhf) cmp bd in
   let concl = f_bdHoareF (bhf_pr bhf) bhf.bhf_f (bhf_po bhf) cmp bd in
   let goal = map_ss_inv2 f_imp (bhf_pr bhf) bd_goal in
-  let bd_goal = f_forall_mems_ss_inv mpr goal in
-  FApi.xmutate1 tc `HlConseq [bd_goal; concl]
+  (* TODO: Refactor callsites so we can avoid emitting
+    `goal` if the bound does not change. *)
+  let goal = if cmp = bhf.bhf_cmp && ss_inv_alpha_eq hyps bd (bhf_bd bhf) then
+    goal
+  else
+    map_ss_inv2 f_and (map_ss_inv1 (f_real_le f_r0) (bhf_bd bhf)) goal
+ in
+  let goal = f_forall_mems_ss_inv mpr goal in
+  FApi.xmutate1 tc `HlConseq [goal; concl]
 
 (* -------------------------------------------------------------------- *)
 
 (* bdHoareS bound change rule: same as bdHoareF_conseq_bd for statements. *)
 let t_bdHoareS_conseq_bd (cmp : hoarecmp) (bd : ss_inv) (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
   let bhs = tc1_as_bdhoareS tc in
   let bd = ss_inv_rebind bd (fst bhs.bhs_m) in
   let bd_goal = bd_goal tc bhs.bhs_cmp (bhs_bd bhs) cmp bd in
   let concl = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) bhs.bhs_s (bhs_po bhs) cmp bd in
-  let imp = map_ss_inv2 f_imp (bhs_pr bhs) bd_goal in
-  let bd_goal = f_forall_mems_ss_inv bhs.bhs_m imp in
-  FApi.xmutate1 tc `HlConseq [bd_goal; concl]
+  let goal = map_ss_inv2 f_imp (bhs_pr bhs) bd_goal in
+  (* TODO: Refactor callsites so we can avoid emitting
+    `goal` if the bound does not change. *)
+  let goal = if cmp = bhs.bhs_cmp && ss_inv_alpha_eq hyps bd (bhs_bd bhs) then
+    goal
+  else
+    map_ss_inv2 f_and (map_ss_inv1 (f_real_le f_r0) (bhs_bd bhs)) goal in
+  let goal = f_forall_mems_ss_inv bhs.bhs_m goal in
+  FApi.xmutate1 tc `HlConseq [goal; concl]
 
 (* -------------------------------------------------------------------- *)
 

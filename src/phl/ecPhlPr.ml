@@ -37,6 +37,7 @@ let t_bdhoare_ppr_r tc =
     bd in
   let pre   = ss_inv_rebind pre m in
   let concl = map_ss_inv2 f_imp pre concl in
+  let concl = map_ss_inv2 f_and (map_ss_inv1 (f_real_le f_r0) bd) concl in
   let concl = EcSubst.f_forall_mems_ss_inv (m,snd penv) concl in
   FApi.xmutate1 tc `PPR [concl]
 

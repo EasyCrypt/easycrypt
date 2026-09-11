@@ -512,6 +512,8 @@ section.
   conseq (_ : _ : <= (if Bad P.logP F.m then 1%r else
       (sumid (qF + size P.logP) (qF + n))%r / Support.card%r)).
   + move=> /> &hr.
+    split.
+    + smt(Support.card_gt0 ge0_qP ge0_qF).
     have /= -> /= szlog_le_qP szm_le_qF := negBadE A AaL [] F.m{hr}.
     apply/ler_wpmul2r; first smt w=Support.card_gt0. apply/le_fromint.
     rewrite -{1}(@add0z qF) big_addn /= /predT -/predT.
@@ -524,7 +526,12 @@ section.
   while (n <= qP /\ card (fdom F.m) <= qF).
   + move=> Hw; exists* P.logP, F.m; elim* => logPw m.
     case: (Bad P.logP F.m).
-    + by conseq (_ : _ : <= (1%r))=> // /#.
+    + conseq (_ : _ : <= (1%r))=> //= &hr.
+      split => [|/#].
+      case (Bad P.logP{hr} F.m{hr}) => //=.
+      apply divr_ge0; 2: smt(Support.card_gt0).
+      apply/le_fromint/sumr_ge0_seq.
+      smt(mem_range size_ge0 ge0_qF).
     seq 2: (Bad P.logP F.m)
            ((qF + size logPw)%r / Support.card%r) 1%r 1%r
            ((sumid (qF + (size logPw + 1)) (qF + n))%r / Support.card%r)
@@ -536,6 +543,9 @@ section.
       + by apply: invr_ge0; smt(Support.card_gt0).
       by rewrite !fromintD ler_add2r.
     + conseq Hw; progress=> //.
+      + apply divr_ge0; 2: smt(Support.card_gt0).
+        apply/le_fromint/sumr_ge0_seq.
+        smt(mem_range size_ge0 ge0_qF).
       by rewrite H1 /= (Ring.IntID.addrC 1) lerr.
     progress=> //; rewrite H2 /= -mulrDl addrA -fromintD.
     rewrite

@@ -132,7 +132,7 @@ fel 2 Experiment.WO.cO g qO (Experiment.WO.bad)
   + by hoare; auto=> /#.
   swap 1 1; wp.
   exists* Experiment.WO.cO; elim* => cO.
-  conseq (: _ : (g cO))=> //.
+  conseq (: _ : (g cO))=> //; 1:smt().
   exists* Experiment.WO.bad; elim* => b.
   call (hbound_bad cO); auto; smt().
 + move=> c; proc; sp; if=> //; wp.

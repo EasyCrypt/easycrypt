@@ -3205,10 +3205,10 @@ seq 1 : (k = kt) pr_dec_skc pr_dec_skcp _ 0%r (#pre) => //.
   rewrite Pr[mu_not] (: Pr[S.decaps(sk{m'}, c{m'}) @ &m' : true] = 1%r); 1: by byphoare S_decaps_ll => //.
   by rewrite RField.subr_eq0 eq_sym; byphoare (S_decaps_sl (glob S){m}) => //. 
 + call (: glob S = (glob S){m} /\ arg = (skt, ct) ==> res = kt); 2: by skip.
-  rewrite /pr_dec_skc; bypr => /> &m' glS.
+  rewrite /pr_dec_skc; bypr => /> &m'; rewrite Pr[mu_ge0] /= => glS.
   by byequiv => //; proc true. 
 + call (: glob S = (glob S){m} /\ arg = (skt', ct') ==> res = kt'); 2: by skip => />.
-  rewrite /pr_dec_skcp; bypr=> &m' [glS ->] /=.
+  rewrite /pr_dec_skcp; bypr=> &m'; rewrite Pr[mu_ge0] /= => -[glS ->] /=.
   by byequiv => //; proc true.
 by hoare; call (: true); skip => />. 
 qed.
