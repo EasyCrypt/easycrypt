@@ -512,7 +512,8 @@ section Lemma1.
     by inline *; auto.
     (* Probability of bad during cth iteration is bounded by "bound c" *)
     proc=> //=; inline *; wp.
-    rnd (fun (str : state * output)=> mem D_PRF.log str.`1); auto=> /> &hr.
+    rnd (fun (str : state * output)=> mem D_PRF.log str.`1); last by move=> &hr />; smt(mu_bounded).
+    auto=> /> &hr.
     rewrite (@dprodE (mem (SRG.st::D_PRF.log){hr}) predT) dout_ll /=.
     move=> ge0_szlog ltqN_szlog st_notin_log uniq_log.
     apply/(ler_trans ((size (SRG.st::D_PRF.log){hr})%r * pr_dstate)).

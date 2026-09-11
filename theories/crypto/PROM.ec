@@ -301,6 +301,7 @@ fel 1 (fsize RO.m) (fun x => x%r * Pc) q (fcoll f RO.m)
   rewrite i_neq_j eq_f.
   move: i_in_mVx; rewrite i_neq_x=> /= -> /=.
   by move: j_in_mVx; rewrite j_neq_x=> /= -> /=.
+- by move=> &hr />; smt(Pc_ge0).
 - move => c; proc; auto => />; smt(get_setE fsize_set).
 - move => b c; proc; by auto.
 qed.
