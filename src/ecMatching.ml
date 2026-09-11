@@ -642,8 +642,7 @@ module Zipper = struct
    *) 
   let zipper_and_split_of_cgap_range (env: env) (path, (start, fin) : codegap_range) (s: stmt) : zipper * _ * nm_codegap_range =
     let (zpr, ((cpath, _), s)) = zipper_of_cgap_r env (path, start) s in
-    let start = normalize_cgap1 env start s in
-    let fin = normalize_cgap1 env fin s in
+    let (start, fin) = normalize_cgap1_range env (start, fin) s in
     let ss = split_by_nmcgap_range (start, fin) s in
     (zpr, ss, (cpath, (start, fin)))
 

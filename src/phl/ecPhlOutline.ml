@@ -73,6 +73,8 @@ let process_outline info tc =
       let mode = if alias then `Alias else `Exact in
       t_outline side range (OV_Proc (mode, f)) tc
   with
+  | EcMatching.Position.InvalidCPos ->
+     tc_error !!tc "Outline: invalid code position"
   | UnificationError (UE_UnificationFailArg x) ->
      tc_error !!tc "Outline: unable to unify arg `%s`." x
   | UnificationError (UE_UnificationFailPv x) ->

@@ -312,7 +312,11 @@ let t_change_stmt
   let mt = odfl metc mt in
 
   let zpr, (_,stmt, epilog), _nmr =
-    EcMatching.Zipper.zipper_and_split_of_cgap_range env pos stmt in
+    try
+      EcMatching.Zipper.zipper_and_split_of_cgap_range env pos stmt
+    with EcMatching.Position.InvalidCPos ->
+      tc_error !!tc "invalid code position"
+  in
 
   (* Collect the variables that may be modified by the surrounding context,
      excluding the fragment being replaced. *)
