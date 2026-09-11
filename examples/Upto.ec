@@ -142,4 +142,6 @@ move=> b c; proc; sp; if=> //.
 swap 1 1; wp.
 exists* Experiment.WO.cO; elim* => cO.
 by call (hf2 cO); auto=> /> /#.
+(* F003: non-negativity of the per-step weight over the whole range *)
+by move=> i; move: (hg i); smt().
 qed.

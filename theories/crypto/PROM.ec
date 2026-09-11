@@ -303,6 +303,8 @@ fel 1 (fsize RO.m) (fun x => x%r * Pc) q (fcoll f RO.m)
   by move: j_in_mVx; rewrite j_neq_x=> /= -> /=.
 - move => c; proc; auto => />; smt(get_setE fsize_set).
 - move => b c; proc; by auto.
+(* F003: non-negativity of the per-step weight over the whole range *)
+- by move=> i; smt(Pc_ge0).
 qed.
 
 end section Collision.

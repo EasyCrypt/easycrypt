@@ -2257,7 +2257,9 @@ section PROOFS.
       inline*; wp; rnd; auto=> &h /> *.
       by apply pr_TPI_ok_filter=> //=.
     + by move=> c; proc; sp; inline*; sp; if; auto=> /#.
-    + by move=> b c; proc; inline*; sp; rcondf 1; auto. 
+    + by move=> b c; proc; inline*; sp; rcondf 1; auto.
+    + (* F003: non-negativity of the per-step weight over the whole range *)
+      by move=> i; smt(size_ge0 ge0_pr_zeropol).
     + (* compute sum of probabilities *)
       have hn1: n1 = size (filter (fun n => (n, C.ofintd 0) \in roout) (map (fun (c:ciphertext) => c.`1) l)).
       + by rewrite /n1 !size_filter count_map /preim.
@@ -2294,6 +2296,8 @@ section PROOFS.
     + move=> c; proc; inline*; sp; rcondt 1; 1: auto=> />.
       by wp -1=> />; conseq(:_==> true); auto; smt().
     + by move=> b c; proc; inline*; sp; rcondf 1; auto=> />.
+    + (* F003: non-negativity of the per-step weight over the whole range *)
+      by move=> i; smt(size_ge0 mu_bounded).
     + have hn2: n2 = size (filter (fun n => (n, C.ofintd 0) \notin roout) (map (fun (c:ciphertext) => c.`1) l)).
       + by rewrite /n2 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r; 1:smt(mu_bounded).
@@ -2734,7 +2738,9 @@ section PROOFS.
     rcondt 2; 1: auto; wp=> />; rnd=> />; skip=> /> &hr *.
     by have <- //=:=dpoly_out_funi witness ti{hr}.
   + move=> c; proc; auto=> />; smt().
-  by move=> b c; proc; auto.
+  + by move=> b c; proc; auto.
+  (* F003: non-negativity of the per-step weight over the whole range *)
+  by move=> i; smt(mu_bounded).
   qed.
 
 
