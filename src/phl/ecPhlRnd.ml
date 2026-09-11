@@ -212,6 +212,17 @@ module Core = struct
         let bd = {m;inv=f_local bd_id treal} in
         bd, map_ss_inv2 f_eq (bhs_bd bhs) bd, [(bd_id,GTty treal)]
     in
+    (* For [<=], the bound check [mu distr event <= bd] is lifted into the
+       post-condition of a (partial-correctness) hoare judgment on the prefix
+       [s], which only has to hold on terminating runs of [s]. That is sound
+       for the mass of the terminating runs, but the non-terminating runs of
+       [s] contribute probability 0 to the conclusion, which is bounded by
+       [bd] only if [bd] is non-negative: emit [0 <= bd] as a separate (last)
+       goal, quantified over all memories satisfying the pre-condition. *)
+    let nonneg_concl =
+      f_forall_mems_ss_inv bhs.bhs_m
+        (map_ss_inv2 f_imp (bhs_pr bhs)
+           (map_ss_inv2 f_real_le {m;inv=f_r0} (bhs_bd bhs))) in
     let subgoals = match tac_info, bhs.bhs_cmp with
       | PNoRndParams, FHle ->
         if is_post_indep then
@@ -227,7 +238,7 @@ module Core = struct
           let post = POE.lift post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
-          [concl]
+          [concl; nonneg_concl]
       | PNoRndParams, _ ->
         if is_post_indep then
           (* event is true *)
@@ -253,7 +264,7 @@ module Core = struct
           let post = POE.lift post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
-          [concl]
+          [concl; nonneg_concl]
       | PSingleRndParam event, _ ->
           let event = event ty_distr in
           let bounded_distr = map_ss_inv2 f_cmp (map_ss_inv2 (f_mu env) distr event) bound in
@@ -682,7 +693,19 @@ let process_rnd
 
       | _ -> tc_error !!tc "invalid arguments"
     in
-      t_bdhoare_rnd tac_info tc
+    (* For [<=] with an event, [t_bdhoare_rnd] emits the non-negativity of
+       the bound as a last, pure side-condition: try to close it so trivially
+       non-negative bounds stay effort-free (a genuinely negative bound is
+       left as an unprovable goal). *)
+    let t_side tc =
+      match (FApi.tc1_goal tc).f_node with
+      | FhoareS _ | FbdHoareS _ | FeHoareS _ | FequivS _ -> t_id tc
+      | _ -> FApi.t_try t_trivial tc in
+    let t_side =
+      match tac_info, (tc1_as_bdhoareS tc).bhs_cmp with
+      | (PNoRndParams | PSingleRndParam _), FHle -> t_side
+      | _ -> t_id in
+    FApi.t_last t_side (t_bdhoare_rnd tac_info tc)
 
   | _, _, _ when is_equivS concl ->
     let process_form f ty1 ty2 =

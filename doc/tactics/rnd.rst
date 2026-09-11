@@ -121,6 +121,13 @@ If the conclusion is a probabilistic Hoare logic statement judgement whose progr
     which can be provided explicitly. When `E`` is not
     specified, it is inferred from the current postcondition.
 
+    The upper bound is checked in the (partial-correctness) postcondition,
+    which only constrains the terminating runs of the program preceding the
+    sampling. The non-terminating runs contribute probability 0, so the
+    tactic additionally requires the bound to be non-negative, as a separate
+    goal quantified over all memories satisfying the precondition. That goal
+    is closed automatically when it is trivial.
+
 .. ecproof::
    :title: Probabilistic Hoare logic example (upper bound)
 
@@ -145,9 +152,11 @@ If the conclusion is a probabilistic Hoare logic statement judgement whose progr
         (* The post now has two clauses, the first is to prove the
            probability upper bound on the event, and the second one is to
            prove that the event holding implies the
-           previous postcondition. *)
-     skip => *;split.
-     + by smt(dbool1E). 
+           previous postcondition. A second goal requires the bound to
+           be non-negative. *)
+     + skip => *;split.
+       + by smt(dbool1E).
+       by smt().
      by smt().
    qed.
 

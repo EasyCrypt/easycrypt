@@ -280,7 +280,8 @@ abstract theory AdversaryN.
     + proc;inline *;sp 1;if;last by hoare.
       sp 3;wp;if;last by hoare.
       wp;conseq (_ : _ ==> r1 \in X1)=> [ /# | ].
-      rnd;auto => &hr /> ??? Hs.
+      rnd; last by move=> &hr />; smt(p_pos n_pos).
+      auto => &hr /> ??? Hs.
       apply (ler_trans (BRA.big predT (fun (x : t) => 1%r/n%r) X{hr})).
       + apply (ler_trans _ _ _ (mu_mem_le (d i{hr}) X{hr})).
         by apply ler_sum_seq => /= ??;rewrite d_uni.

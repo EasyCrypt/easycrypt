@@ -2254,7 +2254,8 @@ section PROOFS.
     + auto=> /> /#.
     + proc; sp 2.
       if; last by hoare; auto; smt(size_ge0 ge0_pr_zeropol).
-      inline*; wp; rnd; auto=> &h /> *.
+      inline*; wp; rnd; last by move=> &h />; smt(size_ge0 ge0_pr_zeropol).
+      auto=> &h /> *.
       by apply pr_TPI_ok_filter=> //=.
     + by move=> c; proc; sp; inline*; sp; if; auto=> /#.
     + by move=> b c; proc; inline*; sp; rcondf 1; auto. 
@@ -2285,7 +2286,8 @@ section PROOFS.
     + by move=> />.
     + by auto=> /> /#.
     + proc; inline*; sp 2; if; 2: auto=> />.
-      wp; rnd=> />; sp; conseq(:_==> true); 2: by auto. 
+      wp; rnd; last by move=> &h />; smt(size_ge0 ge0_mu1).
+      move=> />; sp; conseq(:_==> true); 2: by auto.
       move=> &h /> *. 
       pose lc := List.map _ _.
       have h := mu_mem_le_mu1 dpoly_out lc pr1_poly_out _; 1: smt(dpoly_out_funi).
@@ -2731,7 +2733,8 @@ section PROOFS.
   + by rewrite /= BRA.big_int1 /=. 
   + by auto=> />.
   + proc. 
-    rcondt 2; 1: auto; wp=> />; rnd=> />; skip=> /> &hr *.
+    rcondt 2; 1: auto; wp=> />; rnd; last by move=> &hr />; smt(ge0_mu1).
+    move=> />; skip=> /> &hr *.
     by have <- //=:=dpoly_out_funi witness ti{hr}.
   + move=> c; proc; auto=> />; smt().
   by move=> b c; proc; auto.
