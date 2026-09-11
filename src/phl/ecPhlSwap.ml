@@ -69,15 +69,17 @@ module LowInternal = struct
     (info : swap_kind  )
     (s    : stmt       )
   =
-    let (env, s), (_, (start, fin)) = try 
-      let (cpath, (start, fin)) = info.interval in
-      normalize_cgap_range env (cpath, (start, fin)) s 
+    let zpr, _, (_, (start, fin)) = try
+      EcMatching.Zipper.zipper_and_split_of_cgap_range env info.interval s
     with InvalidCPos ->
       tc_error_lazy pf (fun fmt ->
         let ppe = EcPrinting.PPEnv.ofenv env in
         Format.fprintf fmt "invalid range: %a" (EcPrinting.pp_codegap_range ppe) info.interval
       )
     in
+
+    let env = odfl env zpr.z_env in
+    let s = stmt (List.rev_append zpr.z_head zpr.z_tail) in
 
     let target = try
       resolve_gap_offset env (start, fin) info.offset s
@@ -92,7 +94,8 @@ module LowInternal = struct
       ) s
     with 
     | [hd; s1; s2; tl] -> check_swap pf env (stmt s1) (stmt s2);
-      stmt (List.flatten [hd; s2; s1; tl])
+      EcMatching.Zipper.zip
+        { zpr with z_head = []; z_tail = List.flatten [hd; s2; s1; tl] }
     | _ -> assert false
 end
 
