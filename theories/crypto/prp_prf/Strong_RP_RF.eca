@@ -487,6 +487,8 @@ section CollisionProbability.
       by rewrite !fdom_set !fcardU !fcard1; smt(fcard_ge0).
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
+  (* F003: non-negativity of the per-step weight over the whole range *)
+  + by move=> i; smt(mu_bounded).
   qed.
 end section CollisionProbability.
 

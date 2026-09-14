@@ -78,6 +78,8 @@ section.
       apply (Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu1 uT maxu)). 
       by move=> x _;rewrite maxuP.
     by move=> c; proc; auto=> /#.
+    (* F003: non-negativity of the per-step weight over the whole range *)
+    by move=> i; smt(mu_bounded).
   qed.
 
   lemma pr_Sample_le_q2 &m:
