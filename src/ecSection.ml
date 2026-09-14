@@ -1249,7 +1249,7 @@ let check_tyd scenv prefix name tyd =
     check_section scenv from;
     check_polymorph scenv from tyd.tyd_params;
     check_abstract scenv from (is_abstract_ty tyd.tyd_type)
-  | `Global ->
+  | `Global when scenv.sc_insec ->
     let cd = {
         d_ty    = [`Declare; `Global];
         d_op    = [`Global];
@@ -1260,6 +1260,7 @@ let check_tyd scenv prefix name tyd =
         d_tc    = [`Global];
       } in
     on_tydecl (mkaenv scenv.sc_env (cb scenv from cd)) tyd
+  | `Global -> ()
 
 let is_abstract_op op =
   match op.op_kind with
@@ -1288,6 +1289,7 @@ let check_op scenv prefix name op =
     on_opdecl (mkaenv scenv.sc_env (cb scenv from cd)) op
 
   | `Global ->
+    if scenv.sc_insec then
     let cd = {
         d_ty    = [`Declare; `Global];
         d_op    = [`Declare; `Global];

@@ -284,8 +284,17 @@ module UniEnv = struct
     List.map (fun tv -> subst (tvar tv)) params
 
   let openty_r (ue : unienv) (params : ty_params) (tvi : tvar_inst option) =
-    let subst = f_subst_init ~tv:(opentvi ue params tvi) () in
-      (subst, subst_tv (ty_subst subst) params)
+    match params, tvi with
+    | [], None ->
+        (* No type parameter to open: the substitution is the identity
+           and there is no instance to report. Worth special-casing,
+           [openty_r] is called once per overloading candidate. A
+           non-[None] [tvi] is left to the general path, which reports
+           an arity mismatch instead of silently ignoring it. *)
+        (Fsubst.f_subst_id, [])
+    | _ ->
+      let subst = f_subst_init ~tv:(opentvi ue params tvi) () in
+        (subst, subst_tv (ty_subst subst) params)
 
   let opentys (ue : unienv) (params : ty_params) (tvi : tvar_inst option) (tys : ty list) =
     let (subst, tvs) = openty_r ue params tvi in
@@ -470,13 +479,21 @@ let select_op_outcomes
     (path, instance, op.D.op_ty, f)
   in
 
+  (* The expected type does not depend on the candidate, so build it
+     once in a scratch environment that every candidate is then forked
+     from. Building it per candidate allocated one throw-away
+     unification variable (and one arrow type) per candidate, which is
+     pure waste on the overloaded symbols: on a Jasmin extraction the
+     unary minus of an integer literal has nine candidates, eight of
+     which are discarded. *)
+  let ue0 = UniEnv.copy ue in
+  let texpected = tfun_expected ue0 ?retty psig in
+
   let select (path, op) =
-    let subue = UniEnv.copy ue in
+    let subue = UniEnv.copy ue0 in
 
     let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
     let top = ty_subst tip op.D.op_ty in
-
-    let texpected = tfun_expected subue ?retty psig in
 
     match unify env subue top texpected with
     | () -> mk_ok (path, op) tip tvs top subue
