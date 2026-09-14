@@ -52,7 +52,7 @@
 
    ========================================================================== *)
 
-require import AllCore List Distr DList StdOrder StdBigop RealSeries.
+require import AllCore List Distr DList DProd StdOrder StdBigop RealSeries.
 require import RDiv.
 require import BoundedPreSample.
 (*---*) import RField RealOrder Bigreal.BRA.
@@ -84,7 +84,8 @@ op d2 : param_t -> out_t distr.
    condition [d_param] (see [RDivOracleValid] below for the packaged
    valid-predicate surface).  Restricting to a subset of good *samples*
    (validity decided per draw) is a different shape: see
-   [RDivOracleGuarded] at the end of this file. *)
+   [RDivOracleGuarded] (validity on the whole sample) and [RDivOracleQ]
+   (validity on a per-query auxiliary value, pre-samplable) below. *)
 axiom d1_ll : forall p, p \in d_param => is_lossless (d1 p).
 axiom d2_ll : forall p, p \in d_param => is_lossless (d2 p).
 
@@ -435,7 +436,7 @@ end RDivOracle.
    sampling guarantee holds except for a negligible set of bad keys.  In
    [RDivOracle] that restriction is an instantiation: condition [d_param].
    (Validity decided per SAMPLE rather than per parameter is a different
-   shape, packaged by [RDivOracleGuarded] below.)
+   shape, packaged by [RDivOracleGuarded] and [RDivOracleQ] below.)
    This theory packages that instantiation for the common shape where the
    consumer's games sample from the FULL distribution [d_full] (the real
    key-generation) and excise bad parameters at the event level:
@@ -1032,3 +1033,407 @@ proof. exact (Core.rdiv_bound_sampler A A_ll A_bound1 A_bound2 E &m). qed.
 end section.
 
 end RDivOracleGuarded.
+
+(* ==========================================================================
+
+   Per-query auxiliary sample: validity decided per query, pre-samplable.
+
+   [RDivOracleGuarded] decides validity on the whole sample and needs the
+   raw kernels lossless everywhere.  The common cryptographic shape is
+   finer: each query first draws an auxiliary value [q] (a hash output, a
+   nonce, a per-signature linear map) from a fixed distribution [dq];
+   validity is a property of [(p, q)] alone; and the interesting kernels
+   [k_i p q] are only meaningful — and only lossless — at valid [q].  The
+   consumer's games may also PRE-SAMPLE the [q]s as a list at the start
+   (MAYO round 3 does), which is where [BoundedPreSample.RefL] enters.
+
+   Tagged kernels, drawing [x] only at valid [q]:
+
+     kt_i p q = if valid p q then dmap (k_i p q) (fun x => Some (q, x))
+                             else dunit None
+     dg_i p   = dlet dq (kt_i p)
+
+   Dominance of [dg1 p] by [dg2 p] needs the kernel dominance at valid
+   [(p, q)] ([k1_dominated_k2]) and, at [None] — where both sides carry the
+   same mass [mu dq (predC (valid p))] — [1 <= M] ([M_ge1]; derivable
+   whenever some valid [q] has positive mass, taken as a parameter).
+
+   Two game families are exported:
+     [Game_i]  (= [Core.Game_i]) — fresh [(q, x)] per query, one draw;
+     [GameP_i] — the sampler [OX_i(BPSq.RefL)]: the [q]s pre-sampled as
+                 [dlist dq N] and consumed in order (fresh past the list),
+                 then one draw [r <$ kt_i p q] per query.
+   [GameP_i_eq_Game_i] identifies them per event with no hypothesis on A
+   (via [RefL]); the public bound is stated on [GameP_i]:
+
+     [rdiv_bound_sampler] :
+       Pr[GameP1(A) : E res] <= M ^ N * Pr[GameP2(A) : E res].
+
+   PROOF MAP (side 1; side 2 mirrors with 1 -> 2):
+     GameP1(A)  ≡ [GameP1_GB]    BPSq.G(RefL,  AQ1).main(p)   (shape)
+                ≡ [GB_RefL_Fresh] BPSq.G(Fresh, AQ1).main(p)  (RefL ≡ Fresh)
+                ≡ [GB_Game1]     Core.Game1(A)                (q then kt = dlet:
+                                                               DLetSampling)
+   where [AQ1(Q) = A(OX1(Q))] is A seen as a BPSq-adversary.
+
+   ========================================================================== *)
+
+abstract theory RDivOracleQ.
+
+type q_t, x_t.
+type param_t.
+
+clone import BPS_Iface as Iface with
+  type out_t   <= (q_t * x_t) option,
+  type param_t <= param_t.
+
+op [lossless] d_param : param_t distr.
+op [lossless] dq      : q_t distr.
+
+(* Validity of the per-query value [q] at parameter [p]. *)
+op valid : param_t -> q_t -> bool.
+
+op k1 : param_t -> q_t -> x_t distr.
+op k2 : param_t -> q_t -> x_t distr.
+
+axiom k1_ll : forall p q, p \in d_param => valid p q => is_lossless (k1 p q).
+axiom k2_ll : forall p q, p \in d_param => valid p q => is_lossless (k2 p q).
+
+op N : { int  | 0   <= N } as N_ge0.
+op M : { real | 1%r <= M } as M_ge1.
+
+axiom k1_dominated_k2 :
+  forall p q, p \in d_param => valid p q =>
+    forall x, mu1 (k1 p q) x <= M * mu1 (k2 p q) x.
+
+lemma M_ge0 : 0%r <= M.
+proof. smt(M_ge1). qed.
+
+(* -- Tagged kernels -------------------------------------------------------- *)
+
+op kt (k : param_t -> q_t -> x_t distr) (p : param_t) (q : q_t)
+   : (q_t * x_t) option distr =
+  if valid p q then dmap (k p q) (fun x => Some (q, x)) else dunit None.
+
+op dgq (k : param_t -> q_t -> x_t distr) (p : param_t) : (q_t * x_t) option distr =
+  dlet dq (kt k p).
+
+op dg1 = dgq k1.
+op dg2 = dgq k2.
+
+lemma kt_ll k p q : (valid p q => is_lossless (k p q)) => is_lossless (kt k p q).
+proof.
+rewrite /kt; case (valid p q) => [_ k_ll | _ _]; last exact dunit_ll.
+by apply dmap_ll; apply k_ll.
+qed.
+
+lemma dgq_ll k p :
+  (forall q, valid p q => is_lossless (k p q)) => is_lossless (dgq k p).
+proof.
+move => k_ll; apply dlet_ll; first exact dq_ll.
+by move => q _; apply kt_ll; exact (k_ll q).
+qed.
+
+(* Pointwise mass: a valid tagged sample carries [mu1 dq q * mu1 (k p q) x];
+   all invalid mass sits on [None]. *)
+lemma dgqE_some k p q x :
+  mu1 (dgq k p) (Some (q, x)) = if valid p q then mu1 dq q * mu1 (k p q) x else 0%r.
+proof.
+rewrite /dgq dlet1E (@sumE_fin _ [q]) //=.
+- move => q' /=; apply contraR => /= q'_ne.
+  rewrite /kt; case (valid p q') => _ /=; last by rewrite dunit1E.
+  rewrite dmap1E (mu_eq (k p q') _ pred0) 2:mu0 2:mulr0 // => x'.
+  by rewrite /pred1 /(\o) /pred0 /=; smt().
+rewrite big_seq1 /= /kt; case (valid p q) => v_q /=; last by rewrite dunit1E /= ?mulr0.
+by congr; rewrite dmap1E; apply mu_eq => x'; rewrite /pred1 /(\o) /=; smt().
+qed.
+
+lemma dgqE_none k p :
+  mu1 (dgq k p) None = mu dq (predC (valid p)).
+proof.
+rewrite /dgq dlet1E muE; apply eq_sum => q /=.
+rewrite /kt; case (valid p q) => v_q /=.
+- by rewrite dmap1E (mu_eq (k p q) _ pred0) 2:mu0 2:mulr0.
+- by rewrite dunit1E /= ?mulr1.
+qed.
+
+(* The tagged kernels are dominated EVERYWHERE: at [Some (q, x)] by the
+   kernel axiom (or trivially at invalid [q]), at [None] by [M >= 1]. *)
+lemma dg1_dominated_dg2 :
+  forall p, p \in d_param =>
+    forall y, mu1 (dg1 p) y <= M * mu1 (dg2 p) y.
+proof.
+move => p p_in [|[q x]]; rewrite /dg1 /dg2.
+- by rewrite !dgqE_none; smt(M_ge1 ge0_mu).
+- rewrite !dgqE_some; case (valid p q) => v_q /=; last by smt(mulr0).
+  rewrite mulrCA; apply ler_wpmul2l; first exact ge0_mu1.
+  exact (k1_dominated_k2 p q p_in v_q x).
+qed.
+
+clone RDivOracle as Core with
+  type out_t   <- (q_t * x_t) option,
+  type param_t <- param_t,
+  theory Iface <- Iface,
+  op d_param   <- d_param,
+  op d1        <- dg1,
+  op d2        <- dg2,
+  op N         <- N,
+  op M         <- M
+  proof *.
+realize d_param_ll by exact d_param_ll.
+realize d1_ll by move => p p_in; rewrite /dg1; apply dgq_ll => q; exact (k1_ll p q p_in).
+realize d2_ll by move => p p_in; rewrite /dg2; apply dgq_ll => q; exact (k2_ll p q p_in).
+realize N_ge0 by exact N_ge0.
+realize M_ge0 by exact M_ge0.
+realize d1_dominated_d2 by exact dg1_dominated_dg2.
+
+(* Public names (aliases of the Core samplers and one-draw games). *)
+module Sampler1 = Core.Sampler1.
+module Sampler2 = Core.Sampler2.
+module Game1 = Core.Game1.
+module Game2 = Core.Game2.
+
+lemma Sampler1_dE p : p \in d_param => Core.dtot1 p = dg1 p.
+proof. by apply Core.dtot1E. qed.
+
+lemma Sampler2_dE p : p \in d_param => Core.dtot2 p = dg2 p.
+proof. by apply Core.dtot2E. qed.
+
+(* -- Pre-sampled-q games --------------------------------------------------- *)
+
+(* The q-source: [BoundedPreSample] at [dq] (parameter-independent). *)
+clone BoundedPreSample as BPSq with
+  type out_t   <- q_t,
+  type param_t <- param_t,
+  op   d       <- fun (_ : param_t) => dq,
+  op   N       <- N
+  proof *.
+realize d_ll  by move => _; exact dq_ll.
+realize N_ge0 by exact N_ge0.
+
+(* [OX_i(Q)]: the consumer-facing sampler — a [q] from the source [Q], then
+   one draw from the tagged kernel.  [OX_i(BPSq.RefL)] is the pre-sampled
+   sampler of [GameP_i]; [OX_i(BPSq.Fresh)] is [Sampler_i] in disguise. *)
+module OX1 (Q : BPSq.Iface.Oracle) : Oracle = {
+  var p : param_t
+
+  proc get() : (q_t * x_t) option = {
+    var q, r;
+    q <@ Q.get();
+    r <$ kt k1 p q;
+    return r;
+  }
+}.
+
+module OX2 (Q : BPSq.Iface.Oracle) : Oracle = {
+  var p : param_t
+
+  proc get() : (q_t * x_t) option = {
+    var q, r;
+    q <@ Q.get();
+    r <$ kt k2 p q;
+    return r;
+  }
+}.
+
+module GameP1 (A : Adv) = {
+  proc main() : bool = {
+    var p, r;
+    p <$ d_param;
+    BPSq.RefL.init(p);
+    OX1.p <- p;
+    r <@ A(OX1(BPSq.RefL)).main(p);
+    return r;
+  }
+}.
+
+module GameP2 (A : Adv) = {
+  proc main() : bool = {
+    var p, r;
+    p <$ d_param;
+    BPSq.RefL.init(p);
+    OX2.p <- p;
+    r <@ A(OX2(BPSq.RefL)).main(p);
+    return r;
+  }
+}.
+
+(* -- Section: pre-sampled ≡ one-draw, and the public bound -------------------
+   MIRRORING: side-2 items are verbatim mirrors of their side-1 twins. *)
+
+section.
+
+declare module A <: Adv
+  { -Core.Sampler1, -Core.Sampler2, -Core.BPS1.Count, -Core.BPS2.Count,
+    -Core.BPS1.Ref, -Core.BPS2.Ref,
+    -BPSq.Fresh, -BPSq.RefL, -BPSq.Count, -OX1, -OX2 }.
+
+declare axiom A_ll :
+  forall (O <: Oracle { -A }),
+    islossless O.get => islossless A(O).main.
+
+declare axiom A_bound1 :
+  hoare[ A(Core.BPS1.Count(Core.Sampler1)).main :
+    Core.BPS1.Count.n = 0 ==> Core.BPS1.Count.n <= N ].
+
+declare axiom A_bound2 :
+  hoare[ A(Core.BPS2.Count(Core.Sampler2)).main :
+    Core.BPS2.Count.n = 0 ==> Core.BPS2.Count.n <= N ].
+
+(* A seen as a BPSq-adversary: it runs behind [OX_i]. *)
+local module AQ1 (Q : BPSq.Iface.Oracle) = {
+  proc main(p : param_t) : bool = {
+    var r;
+    OX1.p <- p;
+    r <@ A(OX1(Q)).main(p);
+    return r;
+  }
+}.
+
+local module AQ2 (Q : BPSq.Iface.Oracle) = {
+  proc main(p : param_t) : bool = {
+    var r;
+    OX2.p <- p;
+    r <@ A(OX2(Q)).main(p);
+    return r;
+  }
+}.
+
+(* The BPSq games with the parameter draw in front. *)
+local module GB1 (Q : BPSq.Iface.Sampler) = {
+  proc main() : bool = {
+    var p, r;
+    p <$ d_param;
+    r <@ BPSq.G(Q, AQ1).main(p);
+    return r;
+  }
+}.
+
+local module GB2 (Q : BPSq.Iface.Sampler) = {
+  proc main() : bool = {
+    var p, r;
+    p <$ d_param;
+    r <@ BPSq.G(Q, AQ2).main(p);
+    return r;
+  }
+}.
+
+(* Shape: [GameP_i] is [GB_i(RefL)]. *)
+local lemma GameP1_GB (E : bool -> bool) &m :
+  Pr[GameP1(A).main() @ &m : E res] = Pr[GB1(BPSq.RefL).main() @ &m : E res].
+proof.
+byequiv => //; proc; inline *; wp.
+call (: ={OX1.p, BPSq.RefL.p, BPSq.RefL.xs}); first by sim.
+by auto.
+qed.
+
+local lemma GameP2_GB (E : bool -> bool) &m :
+  Pr[GameP2(A).main() @ &m : E res] = Pr[GB2(BPSq.RefL).main() @ &m : E res].
+proof.
+byequiv => //; proc; inline *; wp.
+call (: ={OX2.p, BPSq.RefL.p, BPSq.RefL.xs}); first by sim.
+by auto.
+qed.
+
+(* RefL ≡ Fresh, lifted through the parameter draw (per-p via bypr). *)
+local lemma GB1_RefL_Fresh (E : bool -> bool) &m :
+  Pr[GB1(BPSq.RefL).main() @ &m : E res] = Pr[GB1(BPSq.Fresh).main() @ &m : E res].
+proof.
+byequiv => //; proc.
+seq 1 1 : (={glob A, p}); first by auto.
+call (_: ={glob A, arg} ==> ={res}); last by auto.
+proc*; call (_: ={glob A, arg} ==> ={res}); first last; first by auto.
+bypr (res{1}) (res{2}) => /> &1 &2 ga gA.
+have ->: Pr[BPSq.G(BPSq.RefL, AQ1).main(arg{2}) @ &1 : res = ga]
+       = Pr[BPSq.G(BPSq.RefL, AQ1).main(arg{2}) @ &2 : res = ga].
++ by byequiv (_: ={arg, glob A} ==> ={res}) => //; sim.
+by rewrite -(BPSq.eq_pr_fresh_refl AQ1 (fun r => r = ga) arg{2} &2).
+qed.
+
+local lemma GB2_RefL_Fresh (E : bool -> bool) &m :
+  Pr[GB2(BPSq.RefL).main() @ &m : E res] = Pr[GB2(BPSq.Fresh).main() @ &m : E res].
+proof.
+byequiv => //; proc.
+seq 1 1 : (={glob A, p}); first by auto.
+call (_: ={glob A, arg} ==> ={res}); last by auto.
+proc*; call (_: ={glob A, arg} ==> ={res}); first last; first by auto.
+bypr (res{1}) (res{2}) => /> &1 &2 ga gA.
+have ->: Pr[BPSq.G(BPSq.RefL, AQ2).main(arg{2}) @ &1 : res = ga]
+       = Pr[BPSq.G(BPSq.RefL, AQ2).main(arg{2}) @ &2 : res = ga].
++ by byequiv (_: ={arg, glob A} ==> ={res}) => //; sim.
+by rewrite -(BPSq.eq_pr_fresh_refl AQ2 (fun r => r = ga) arg{2} &2).
+qed.
+
+(* One-draw vs "q then kt": [DLetSampling]. *)
+local clone import DProd.DLetSampling as DLS with
+  type t <- q_t,
+  type u <- (q_t * x_t) option
+  proof *.
+
+local equiv OX1_Sampler1 : OX1(BPSq.Fresh).get ~ Core.Sampler1.get :
+     BPSq.Fresh.p{1} = OX1.p{1} /\ OX1.p{1} = Core.Sampler1.p{2} /\ OX1.p{1} \in d_param
+  ==> ={res} /\ BPSq.Fresh.p{1} = OX1.p{1} /\ OX1.p{1} = Core.Sampler1.p{2} /\ OX1.p{1} \in d_param.
+proof.
+proc; inline BPSq.Fresh.get.
+proc change {1} [1 .. 3] : [ (du0 : q_t -> (q_t * x_t) option distr) ]
+  { du0 <- kt k1 OX1.p; q <$ dq; r <$ du0 q; }; first by auto.
+outline {1} [2 .. 3] ~ DLS.SampleDep.sample.
+rewrite equiv [{1} 2 SampleDepDLet].
+inline {1} DLS.SampleDLet.sample.
+wp; rnd; auto => /> &1 &2 *.
+by rewrite Core.dtot1E // /dg1 /dgq.
+qed.
+
+local equiv OX2_Sampler2 : OX2(BPSq.Fresh).get ~ Core.Sampler2.get :
+     BPSq.Fresh.p{1} = OX2.p{1} /\ OX2.p{1} = Core.Sampler2.p{2} /\ OX2.p{1} \in d_param
+  ==> ={res} /\ BPSq.Fresh.p{1} = OX2.p{1} /\ OX2.p{1} = Core.Sampler2.p{2} /\ OX2.p{1} \in d_param.
+proof.
+proc; inline BPSq.Fresh.get.
+proc change {1} [1 .. 3] : [ (du0 : q_t -> (q_t * x_t) option distr) ]
+  { du0 <- kt k2 OX2.p; q <$ dq; r <$ du0 q; }; first by auto.
+outline {1} [2 .. 3] ~ DLS.SampleDep.sample.
+rewrite equiv [{1} 2 SampleDepDLet].
+inline {1} DLS.SampleDLet.sample.
+wp; rnd; auto => /> &1 &2 *.
+by rewrite Core.dtot2E // /dg2 /dgq.
+qed.
+
+local lemma GB1_Game1 (E : bool -> bool) &m :
+  Pr[GB1(BPSq.Fresh).main() @ &m : E res] = Pr[Game1(A).main() @ &m : E res].
+proof.
+byequiv => //; proc; inline *; wp.
+call (: BPSq.Fresh.p{1} = OX1.p{1} /\ OX1.p{1} = Core.Sampler1.p{2}
+        /\ OX1.p{1} \in d_param); first by conseq OX1_Sampler1.
+by auto.
+qed.
+
+local lemma GB2_Game2 (E : bool -> bool) &m :
+  Pr[GB2(BPSq.Fresh).main() @ &m : E res] = Pr[Game2(A).main() @ &m : E res].
+proof.
+byequiv => //; proc; inline *; wp.
+call (: BPSq.Fresh.p{1} = OX2.p{1} /\ OX2.p{1} = Core.Sampler2.p{2}
+        /\ OX2.p{1} \in d_param); first by conseq OX2_Sampler2.
+by auto.
+qed.
+
+(* -- PUBLIC ---------------------------------------------------------------- *)
+
+lemma GameP1_eq_Game1 (E : bool -> bool) &m :
+  Pr[GameP1(A).main() @ &m : E res] = Pr[Game1(A).main() @ &m : E res].
+proof. by rewrite (GameP1_GB E &m) (GB1_RefL_Fresh E &m) (GB1_Game1 E &m). qed.
+
+lemma GameP2_eq_Game2 (E : bool -> bool) &m :
+  Pr[GameP2(A).main() @ &m : E res] = Pr[Game2(A).main() @ &m : E res].
+proof. by rewrite (GameP2_GB E &m) (GB2_RefL_Fresh E &m) (GB2_Game2 E &m). qed.
+
+lemma rdiv_bound_sampler (E : bool -> bool) &m :
+  Pr[GameP1(A).main() @ &m : E res] <=
+    M ^ N * Pr[GameP2(A).main() @ &m : E res].
+proof.
+rewrite (GameP1_eq_Game1 E &m) (GameP2_eq_Game2 E &m).
+exact (Core.rdiv_bound_sampler A A_ll A_bound1 A_bound2 E &m).
+qed.
+
+end section.
+
+end RDivOracleQ.

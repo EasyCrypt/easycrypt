@@ -36,6 +36,12 @@
    pre-sampled list (e.g., RDiv.DistinguisherList for Rényi-∞, or direct
    coupling arguments).
 
+   Hypothesis-free variant: [RefL] pre-samples the same list but samples
+   fresh once it is exhausted; [eq_pr_fresh_refl] equates it with [Fresh]
+   for EVERY adversary (no query bound, no losslessness), since only the
+   eager/lazy step remains.  Use it when the consumer's own reasoning
+   already prevents reading past the list.
+
    ========================================================================== *)
 
 require import AllCore List Distr DList FMap.
@@ -136,6 +142,32 @@ module Ref : Oracle = {
     var r;
     r  <- head witness xs;
     xs <- behead xs;
+    return r;
+  }
+}.
+
+(* Pre-sampled list with a lazy tail: pops the N pre-sampled draws while
+   they last, then samples fresh.  Unlike [Ref] it matches [Fresh] with NO
+   hypothesis on the adversary ([eq_pr_fresh_refl]): past the list both
+   sides sample on demand, so no query bound is needed. *)
+module RefL : Sampler = {
+  var p  : param_t
+  var xs : out_t list
+
+  proc init(p0) = {
+    p  <- p0;
+    xs <$ dlist (d p0) N;
+  }
+
+  proc get() = {
+    var r;
+
+    if (xs <> []) {
+      r  <- head witness xs;
+      xs <- behead xs;
+    } else {
+      r <$ d p;
+    }
     return r;
   }
 }.
@@ -546,6 +578,168 @@ have -> : Pr[G(Fresh, A).main(p_val) @ &m : E res]
 have -> : Pr[G(Ref, A).main(p_val) @ &m : E res]
         = Pr[G(Ref, A).main(p_val) @ &m : false] by rewrite Pr[mu_eq] // /#.
 by rewrite Pr[mu_false] Pr[mu_false].
+qed.
+
+end section.
+
+(* -- Section: the hypothesis-free variant ------------------------------------
+
+   [eq_pr_fresh_refl]: [Fresh] and [RefL] are Pr-equal per event with no
+   hypothesis on A — no query bound, no losslessness.  With a lazy tail the
+   guard of the bounded proof is unnecessary, and so is its upto-bad step:
+
+     Fresh                          one fresh draw per query
+       | [pr_Fresh_ROlazyL]         lockstep: query i reads RO cell (p, i)
+     ROSamplerL(LRO)                lazily-sampled indexed RO, unguarded
+       | [pr_ROlazyL_ROeagerL]      eager sampling [FullEager.RO_LRO_D]
+     ROSamplerL(RO)                 cells (p, 0..N-1) pre-sampled, rest lazy
+       | [pr_RefL_ROeagerL]         pre-sampled cells = the list; past N
+     RefL                           both sides sample on demand
+   ------------------------------------------------------------------------- *)
+
+section.
+
+declare module A <: Adv { -Count, -Fresh, -RefL }.
+
+local clone import PROM.FullRO as RFL with
+  type in_t    <- param_t * int,
+  type out_t   <- out_t,
+  op   dout    <- fun (ab : _ * _) => d ab.`1,
+  type d_in_t  <- param_t,
+  type d_out_t <- bool
+proof *.
+
+local clone DList.ParametricProgram as PPL with
+  type t <- out_t
+proof *.
+
+(* Unguarded indexed-RO sampler: query n reads cell (p, n). *)
+local module ROSamplerL (O : RO) = {
+  proc init(p) = {
+    var i;
+
+    Fresh.p <- p;
+    Count.n <- 0;
+    O.init();
+
+    i <- 0;
+    while (i < N) {
+      O.sample(p, i);
+      i <- i + 1;
+    }
+  }
+
+  proc get() = {
+    var r;
+
+    r <@ O.get(Fresh.p, Count.n);
+    Count.n <- Count.n + 1;
+    return r;
+  }
+}.
+
+local lemma pr_Fresh_ROlazyL (E : bool -> bool) p_val &m:
+    Pr[G(Fresh, A).main(p_val) @ &m: E res]
+  = Pr[G(ROSamplerL(LRO), A).main(p_val) @ &m: E res].
+proof.
+byequiv=> //; proc.
+call (: ={Fresh.p}
+     /\ (0 <= Count.n){2}
+     /\ (forall i, 0 <= i < Count.n <=> (Fresh.p, i) \in RO.m){2}).
++ proc; inline *.
+  rcondt {2} 3; 1:by auto=> /#.
+  auto=> |> &2 ge0_n inv r _.
+  rewrite get_set_sameE //=.
+  by split=> [/#|i]; rewrite !mem_set // -inv //= /#.
+inline *.
+kill {2} 6.
++ while (true) (N - i).
+  + by auto=> |> &2 /#.
+  by auto=> |> /#.
+by auto=> |>; smt(emptyE).
+qed.
+
+local module RODistL (RO : RO) = {
+  proc distinguish = G(ROSamplerL(RO), A).main
+}.
+
+local lemma pr_ROlazyL_ROeagerL (E : bool -> bool) p_val &m:
+    Pr[G(ROSamplerL(LRO), A).main(p_val) @ &m: E res]
+  = Pr[G(ROSamplerL(RO), A).main(p_val) @ &m: E res].
+proof.
+rewrite eq_sym.
+byequiv (: ={glob A, glob RO, glob Count, glob Fresh, arg} ==> _)=> //.
+conseq (FullEager.RO_LRO_D RODistL _)=> |>.
+by move=> [] |> +; exact: d_ll.
+qed.
+
+local lemma pr_RefL_ROeagerL (E : bool -> bool) p_val &m:
+    Pr[G(RefL, A).main(p_val) @ &m: E res]
+  = Pr[G(ROSamplerL(RO), A).main(p_val) @ &m: E res].
+proof.
+byequiv=> //; proc.
+call (: RefL.p{1} = Fresh.p{2}
+     /\ (0 <= Count.n){2}
+     /\ (size RefL.xs){1} = max 0 (N - Count.n{2})
+     /\ (forall i, Count.n{2} <= i < N
+                => RO.m.[Fresh.p, i]{2} = Some (nth witness RefL.xs{1} (i - Count.n{2})))
+     /\ (forall i, 0 <= i < N => (Fresh.p, i) \in RO.m){2}
+     /\ (forall i, max N Count.n <= i => (Fresh.p, i) \notin RO.m){2}).
++ proc; inline *.
+  case ((Count.n < N){2}).
+  + rcondt {1} 1; 1:by auto=> |> &2; smt(size_eq0).
+    rcondf {2} 3; 1:by auto=> /#.
+    auto=> |> &1 &2 ge0_n sz inv dom_lt dom_ge n_lt_N.
+    rewrite d_ll inv //= nth0_head=> /= _ _.
+    do !split; smt(size_behead nth_behead).
+  rcondf {1} 1; 1:by auto=> |> &2; smt(size_eq0).
+  rcondt {2} 3; 1:by auto=> /#.
+  auto=> |> &1 &2 ge0_n sz inv dom_lt dom_ge n_ge_N r _.
+  rewrite get_set_sameE //=.
+  do !split; smt(get_setE mem_set).
+inline *; wp; sp.
+conseq (: _ ==> RefL.p{1} = Fresh.p{2} /\ (size RefL.xs = N){1}
+             /\ (forall i, 0 <= i < N => RO.m.[Fresh.p, i]{2} = Some (nth witness RefL.xs{1} i))
+             /\ (forall i, 0 <= i < N <=> (Fresh.p, i) \in RO.m){2}).
++ by auto=> |>; smt(N_ge0).
+proc change {1} 1: [ (i: int) (r0: out_t) ]
+{
+  RefL.xs <- [];
+  i <- 0;
+  while (i < N) {
+    r0 <$ d p0;
+    RefL.xs <- RefL.xs ++ [r0];
+    i <- i + 1;
+  }
+}.
++ outline {1} 1 ~ PPL.Sample.sample.
+  rewrite equiv [{1} 1 PPL.Sample_LoopSnoc_eq].
+  inline {1} ^RefL.xs<@.
+  by wp; while (={i} /\ l{1} = RefL.xs{2} /\ n{1} = N /\ d{1} = BoundedPreSample.d p0{2}); auto.
+while (={i}
+    /\ p0{1} = p{2}
+    /\ (p = Fresh.p){2}
+    /\ RefL.p{1} = Fresh.p{2}
+    /\ (size RefL.xs = i){1}
+    /\ (forall j, 0 <= j < i{2} => RO.m.[Fresh.p, j]{2} = Some (nth witness RefL.xs{1} j))
+    /\ (0 <= i <= N){1}
+    /\ (forall j, 0 <= j < i <=> (Fresh.p, j) \in RO.m){2}).
++ rcondt {2} 4; 1:by auto=> /#.
+  auto=> |> &1 &2 inv ge0_i _ dom_ro i_lt_N r _.
+  split; 1:by rewrite size_cat.
+  split=> [j|]; 2:split=> [/#|j].
+  + by rewrite get_setE cats1 nth_rcons; case: (j = size RefL.xs{1})=> |> /#.
+  by rewrite mem_set; case: (j = size RefL.xs{1})=> |> /#.
+by auto=> |>; smt(N_ge0 emptyE).
+qed.
+
+(* Event-generic export, hypothesis-free: a plain equiv chain, so any event
+   over the result transports. *)
+lemma eq_pr_fresh_refl (E : bool -> bool) p_val &m:
+    Pr[G(Fresh, A).main(p_val) @ &m: E res]
+  = Pr[G(RefL,  A).main(p_val) @ &m: E res].
+proof.
+by rewrite (pr_Fresh_ROlazyL E) (pr_ROlazyL_ROeagerL E) -(pr_RefL_ROeagerL E).
 qed.
 
 end section.

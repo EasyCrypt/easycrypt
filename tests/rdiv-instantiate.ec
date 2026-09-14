@@ -58,3 +58,23 @@ realize N_ge0 by trivial.
 realize M_ge0 by trivial.
 realize d1_dominated_d2_valid by move => *; smt().
 realize invalid_mass_dominated by move => *; smt(ge0_mu).
+
+clone RDivOracleQ as TrivQ with
+  type q_t     <- bool,
+  type x_t     <- bool,
+  type param_t <- unit,
+  op d_param   <- dunit tt,
+  op dq        <- dunit true,
+  op valid     <- fun (_ : unit) (_ : bool) => true,
+  op k1        <- fun (_ : unit) (_ : bool) => dunit true,
+  op k2        <- fun (_ : unit) (_ : bool) => dunit true,
+  op N         <- 1,
+  op M         <- 1%r
+  proof *.
+realize d_param_ll by exact dunit_ll.
+realize dq_ll by exact dunit_ll.
+realize k1_ll by move => *; exact dunit_ll.
+realize k2_ll by move => *; exact dunit_ll.
+realize N_ge0 by trivial.
+realize M_ge1 by trivial.
+realize k1_dominated_k2 by move => *; smt().
