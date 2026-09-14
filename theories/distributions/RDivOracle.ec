@@ -82,7 +82,9 @@ op d2 : param_t -> out_t distr.
    — the parameters the games can actually draw.  Restricting the theorem
    to a subset of "good" parameters is therefore an *instantiation*:
    condition [d_param] (see [RDivOracleValid] below for the packaged
-   valid-predicate surface). *)
+   valid-predicate surface).  Restricting to a subset of good *samples*
+   (validity decided per draw) is a different shape: see
+   [RDivOracleGuarded] at the end of this file. *)
 axiom d1_ll : forall p, p \in d_param => is_lossless (d1 p).
 axiom d2_ll : forall p, p \in d_param => is_lossless (d2 p).
 
@@ -432,6 +434,8 @@ end RDivOracle.
    dominance) on a subset of "good" parameters — e.g. MAYO's rejection-
    sampling guarantee holds except for a negligible set of bad keys.  In
    [RDivOracle] that restriction is an instantiation: condition [d_param].
+   (Validity decided per SAMPLE rather than per parameter is a different
+   shape, packaged by [RDivOracleGuarded] below.)
    This theory packages that instantiation for the common shape where the
    consumer's games sample from the FULL distribution [d_full] (the real
    key-generation) and excise bad parameters at the event level:
@@ -834,3 +838,197 @@ qed.
 end section.
 
 end RDivOracleValid.
+
+(* ==========================================================================
+
+   Guarded layer: sample-level validity.
+
+   [RDivOracleValid] restricts the theorem to good PARAMETERS: validity is
+   decided once, when [p] is drawn, and the games condition [d_param].
+   Some developments instead have the per-parameter hypotheses only on a
+   subset of good SAMPLES — validity is decided per draw, and the samplers
+   may hand out a bad draw with small probability (e.g. a rejection-sampling
+   guarantee that holds except at a negligible set of hash outputs).
+   Conditioning per query does not work there: with an adaptive number of
+   queries the two sides pick up different, run-dependent normalisation
+   factors, and the raw kernels are simply not dominated at bad points.
+
+   The packaged shape makes invalidity ADVERSARY-OBSERVABLE: the samplers
+   return [Some x] for a valid draw and [None] for an invalid one, i.e.
+   they sample the guarded kernels
+
+     dg_i p = dmap (d_i p) (fun x => if valid p x then Some x else None).
+
+   Pointwise dominance of [dg1 p] by [dg2 p] then needs exactly two things,
+   both parameters of this theory:
+     - dominance of [d1 p] by [d2 p] at VALID points
+       ([d1_dominated_d2_valid]);
+     - dominance of the total INVALID mass ([invalid_mass_dominated]),
+         mu (d1 p) (predC (valid p)) <= M * mu (d2 p) (predC (valid p)),
+       which is the only place an [M >= 1] flavour may enter — explicitly.
+       [invalid_mass_of_eq] discharges it from equal invalid masses on both
+       sides plus [1 <= M] (the common case: validity depends on a component
+       whose marginal is the same in both kernels).
+
+   Everything else is inherited: [Core] is [RDivOracle] cloned at
+   [out_t option] with the guarded kernels, and the user-facing lemma is
+   the event-generic
+
+     [rdiv_bound_sampler] :
+       Pr[Game1(A) : E res] <= M ^ N * Pr[Game2(A) : E res].
+
+   Since the adversary sees [None] on a bad draw, "no bad draw was
+   returned" is a property of A's own view: consumers fold it into A's
+   boolean result (their real game skipping the query on a bad draw is
+   exactly [A] receiving [None]), and the usual bookkeeping is monotone in
+   both directions — a stronger "all presampled draws valid" event on the
+   source side implies it, and it is dropped freely on the target side.
+
+   ========================================================================== *)
+
+abstract theory RDivOracleGuarded.
+
+type out_t.
+type param_t.
+
+(* The adversary's oracle returns [out_t option].  Same sharing story as
+   [RDivOracle.Iface] — see the note there. *)
+clone import BPS_Iface as Iface with
+  type out_t   <= out_t option,
+  type param_t <= param_t.
+
+op [lossless] d_param : param_t distr.
+
+(* Validity of a SAMPLE [x] drawn at parameter [p]. *)
+op valid : param_t -> out_t -> bool.
+
+op d1 : param_t -> out_t distr.
+op d2 : param_t -> out_t distr.
+
+axiom d1_ll : forall p, p \in d_param => is_lossless (d1 p).
+axiom d2_ll : forall p, p \in d_param => is_lossless (d2 p).
+
+op N : { int | 0 <= N } as N_ge0.
+op M : { real | 0%r <= M } as M_ge0.
+
+(* Dominance is required at valid samples only ... *)
+axiom d1_dominated_d2_valid :
+  forall p, p \in d_param =>
+    forall x, valid p x => mu1 (d1 p) x <= M * mu1 (d2 p) x.
+
+(* ... plus dominance of the invalid mass as a whole. *)
+axiom invalid_mass_dominated :
+  forall p, p \in d_param =>
+    mu (d1 p) (predC (valid p)) <= M * mu (d2 p) (predC (valid p)).
+
+(* Discharging [invalid_mass_dominated] when both kernels put the same
+   mass on invalid samples: the condition reduces to [1 <= M]. *)
+lemma invalid_mass_of_eq (M' : real) (da db : out_t distr) (S : out_t -> bool) :
+  1%r <= M' => mu da (predC S) = mu db (predC S) =>
+  mu da (predC S) <= M' * mu db (predC S).
+proof. by move => ge1_M ->; smt(ge0_mu). qed.
+
+(* -- Guarded kernels ------------------------------------------------------ *)
+
+op guard (p : param_t) (x : out_t) : out_t option =
+  if valid p x then Some x else None.
+
+op dg1 = fun p => dmap (d1 p) (guard p).
+op dg2 = fun p => dmap (d2 p) (guard p).
+
+(* Pointwise mass of a guarded kernel: valid samples keep their mass under
+   [Some]; the whole invalid mass collapses onto [None]. *)
+lemma guardE_some (d : out_t distr) p x :
+  mu1 (dmap d (guard p)) (Some x) = if valid p x then mu1 d x else 0%r.
+proof.
+rewrite dmap1E; case (valid p x) => v_x.
+- by apply mu_eq => z; rewrite /pred1 /(\o) /guard; smt().
+- by rewrite (mu_eq _ _ pred0) 2:mu0 // => z; rewrite /pred1 /(\o) /guard /pred0; smt().
+qed.
+
+lemma guardE_none (d : out_t distr) p :
+  mu1 (dmap d (guard p)) None = mu d (predC (valid p)).
+proof.
+by rewrite dmap1E; apply mu_eq => z; rewrite /pred1 /(\o) /guard /predC; smt().
+qed.
+
+lemma dg1_ll p : p \in d_param => is_lossless (dg1 p).
+proof. by move => p_in; apply dmap_ll; exact (d1_ll p p_in). qed.
+
+lemma dg2_ll p : p \in d_param => is_lossless (dg2 p).
+proof. by move => p_in; apply dmap_ll; exact (d2_ll p p_in). qed.
+
+(* The guarded kernels are dominated EVERYWHERE: at [Some x] by the
+   valid-point axiom (or trivially, when [x] is invalid and both masses
+   are 0), at [None] by the invalid-mass axiom. *)
+lemma dg1_dominated_dg2 :
+  forall p, p \in d_param =>
+    forall y, mu1 (dg1 p) y <= M * mu1 (dg2 p) y.
+proof.
+move => p p_in [|x]; rewrite /dg1 /dg2 /=.
+- by rewrite !guardE_none; exact (invalid_mass_dominated p p_in).
+- rewrite !guardE_some; case (valid p x) => v_x.
+  + exact (d1_dominated_d2_valid p p_in x v_x).
+  + by rewrite mulr0.
+qed.
+
+clone RDivOracle as Core with
+  type out_t   <- out_t option,
+  type param_t <- param_t,
+  theory Iface <- Iface,
+  op d_param   <- d_param,
+  op d1        <- dg1,
+  op d2        <- dg2,
+  op N         <- N,
+  op M         <- M
+  proof *.
+realize d_param_ll by exact d_param_ll.
+realize d1_ll by exact dg1_ll.
+realize d2_ll by exact dg2_ll.
+realize N_ge0 by exact N_ge0.
+realize M_ge0 by exact M_ge0.
+realize d1_dominated_d2 by exact dg1_dominated_dg2.
+
+(* Public names (aliases of the Core samplers and games). *)
+module Sampler1 = Core.Sampler1.
+module Sampler2 = Core.Sampler2.
+module Game1 = Core.Game1.
+module Game2 = Core.Game2.
+
+(* Consumer-facing kernel identities: on the support of [d_param] the
+   samplers draw exactly the guarded kernels.  Cite these (with
+   [guardE_some]/[guardE_none]) instead of unfolding [Core.dtot_i]. *)
+lemma Sampler1_dE p : p \in d_param => Core.dtot1 p = dg1 p.
+proof. by apply Core.dtot1E. qed.
+
+lemma Sampler2_dE p : p \in d_param => Core.dtot2 p = dg2 p.
+proof. by apply Core.dtot2E. qed.
+
+section.
+
+declare module A <: Adv
+  { -Core.Sampler1, -Core.Sampler2, -Core.BPS1.Count, -Core.BPS2.Count,
+    -Core.BPS1.Ref, -Core.BPS2.Ref }.
+
+declare axiom A_ll :
+  forall (O <: Oracle { -A }),
+    islossless O.get => islossless A(O).main.
+
+declare axiom A_bound1 :
+  hoare[ A(Core.BPS1.Count(Core.Sampler1)).main :
+    Core.BPS1.Count.n = 0 ==> Core.BPS1.Count.n <= N ].
+
+declare axiom A_bound2 :
+  hoare[ A(Core.BPS2.Count(Core.Sampler2)).main :
+    Core.BPS2.Count.n = 0 ==> Core.BPS2.Count.n <= N ].
+
+(* -- PUBLIC: the sample-restricted bound, per event ---------------------- *)
+
+lemma rdiv_bound_sampler (E : bool -> bool) &m :
+  Pr[Game1(A).main() @ &m : E res] <=
+    M ^ N * Pr[Game2(A).main() @ &m : E res].
+proof. exact (Core.rdiv_bound_sampler A A_ll A_bound1 A_bound2 E &m). qed.
+
+end section.
+
+end RDivOracleGuarded.
