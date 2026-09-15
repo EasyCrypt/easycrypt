@@ -168,7 +168,7 @@ let t_eager_seq_r (i, j) s (r2, r1) tc =
 
   let (_, ml_ty), (_, mr_ty) = (eC.es_ml, eC.es_mr) in
   let c1, c2 = s_split env i c and c1', c2' = s_split env j c' in
-  let m = EcIdent.create "m" in
+  let m = EcIdent.create "&m" in
   let existsP = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr eC) in
   let eqMem1 =
     map_ts_inv2 f_and
@@ -248,7 +248,7 @@ let t_eager_while_r i tc =
   if (not (ER.EqTest.for_expr env e (sub_to_left_mem _e))) then
     tc_error !!tc "eager: both while guards must be syntactically equal";
   
-  let m = EcIdent.create "m" in
+  let m = EcIdent.create "&m" in
   let existsI = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr es) in
   let eqMem1 =
     map_ts_inv2 f_and
