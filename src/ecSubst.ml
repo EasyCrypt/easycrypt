@@ -884,6 +884,8 @@ and subst_module (s : subst) (m : module_expr) =
             add_module s a (EcPath.mident a'), decl)
         s m.me_params in
 
+  if is_empty sbody then m else
+
   let me_body = subst_module_body sbody m.me_body in
   let me_comps = subst_module_comps sbody m.me_comps in
   let me_sig_body = subst_modsig_body sbody m.me_sig_body in

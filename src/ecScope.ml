@@ -371,7 +371,7 @@ let get_gdocstrings (sc : scope) : string list =
   sc.sc_globdoc
 
 let get_ldocentities (sc : scope) : docentity list =
-  sc.sc_locdoc.docentities
+  List.rev sc.sc_locdoc.docentities
 
 module DocState = struct
   let empty : docstate =
@@ -414,7 +414,7 @@ module DocState = struct
     { state with srcstringbl = state.srcstringbl @ [srcs] }
 
   let add_entity (state : docstate) (docent : docentity) : docstate =
-    { state with docentities = state.docentities @ [docent] }
+    { state with docentities = docent :: state.docentities }
 
   let add_item (state : docstate) : docstate =
     let state =
@@ -431,7 +431,7 @@ module DocState = struct
       if state.currentproc
       then
         add_entity state (SubDoc ((state.docstringbl, (oget state.currentmode, oget state.currentkind, oget state.currentname, state.srcstringbl)),
-                                 (substate.docentities)))
+                                 (List.rev substate.docentities)))
       else
         state
     in
