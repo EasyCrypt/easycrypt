@@ -204,7 +204,12 @@ let process_rewrite_simpl
   (pos  : pcodepos_or_range option)
   (tc   : tcenv1)
 =
-  let ri = EcReduction.nodelta in
+  (* thread the proof-local simplify overlay (hint +db, local rules) so
+     that [hint ...] and [with hint ... (proc rewrite /=)] are honored,
+     as they are by [simplify]/[cbv] *)
+  let ri =
+    { EcReduction.nodelta with
+        EcReduction.user_local = FApi.tc1_simplify_context tc } in
 
   let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
     let f = ss_inv_of_expr (fst me) e in
