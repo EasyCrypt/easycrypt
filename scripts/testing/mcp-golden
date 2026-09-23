@@ -1,0 +1,140 @@
+#! /bin/sh
+
+# --------------------------------------------------------------------
+# Golden-output regression harness for the `easycrypt mcp' server.
+#
+#   mcp-golden [--bin PATH] [--record] [NAME...]
+#
+# Each tests/mcp/scripts/NAME.script holds the newline-delimited
+# JSON-RPC messages fed to `ec.exe mcp' on stdin. Lines starting with
+# `#' are stripped before the script is handed to the server; the first
+# such line must be `# exit: N', the expected process exit status.
+# Stdout -- the protocol stream, one JSON message per line -- is
+# compared against tests/mcp/expected/NAME.out.
+#
+# Scripts run with tests/mcp as the working directory, so fixture paths
+# stay relative and no golden bakes in a developer's home directory.
+# The fixtures are the ones the REPL harness uses, under
+# ../llm/fixtures.
+#
+# One field of the stream is not reproducible: serverInfo.version is a
+# git-describe string. It is rewritten to "VERSION" before diffing.
+# --------------------------------------------------------------------
+
+set -u
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+bin="$root/_build/default/src/ec.exe"
+record=0
+names=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --bin)
+      [ $# -ge 2 ] || { echo "mcp-golden: --bin needs an argument" >&2; exit 2; }
+      bin=$2; shift 2 ;;
+    --bin=*)
+      bin=${1#--bin=}; shift ;;
+    --record)
+      record=1; shift ;;
+    -h|--help)
+      echo "usage: mcp-golden [--bin PATH] [--record] [NAME...]"; exit 0 ;;
+    -*)
+      echo "mcp-golden: unknown option: $1" >&2; exit 2 ;;
+    *)
+      names="$names $1"; shift ;;
+  esac
+done
+
+case "$bin" in
+  /*) ;;
+  *) bin=$(CDPATH= cd -- "$(dirname -- "$bin")" && pwd)/$(basename -- "$bin") ;;
+esac
+
+if [ ! -x "$bin" ]; then
+  echo "mcp-golden: no such executable: $bin" >&2
+  exit 2
+fi
+
+tests="$root/tests/mcp"
+scripts="$tests/scripts"
+expected="$tests/expected"
+
+if [ -z "$names" ]; then
+  names=$(cd "$scripts" && ls *.script 2>/dev/null | sed 's/\.script$//')
+fi
+
+mkdir -p "$expected"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/mcp-golden.XXXXXX") || exit 2
+trap 'rm -rf "$tmp"' EXIT INT TERM
+
+nfail=0
+npass=0
+
+for name in $names; do
+  script="$scripts/$name.script"
+  gold="$expected/$name.out"
+
+  if [ ! -f "$script" ]; then
+    echo "FAIL $name (no such script: $script)"
+    nfail=$((nfail + 1))
+    continue
+  fi
+
+  want_exit=$(sed -n 's/^# *exit: *\([0-9][0-9]*\).*$/\1/p' "$script" | head -n 1)
+  if [ -z "$want_exit" ]; then
+    echo "FAIL $name (script has no '# exit: N' line)"
+    nfail=$((nfail + 1))
+    continue
+  fi
+
+  grep -v '^#' "$script" > "$tmp/rpc.in"
+
+  (cd "$tests" && "$bin" mcp < "$tmp/rpc.in") \
+    > "$tmp/raw" 2> "$tmp/err"
+  got_exit=$?
+
+  sed 's/\("serverInfo":{"name":"easycrypt","version":\)"[^"]*"/\1"VERSION"/' \
+    "$tmp/raw" > "$tmp/out"
+
+  if [ "$record" = 1 ]; then
+    cp "$tmp/out" "$gold"
+    if [ "$got_exit" != "$want_exit" ]; then
+      echo "RECORD $name (exit $got_exit, script declares $want_exit)"
+      nfail=$((nfail + 1))
+    else
+      echo "RECORD $name"
+      npass=$((npass + 1))
+    fi
+    continue
+  fi
+
+  ok=1
+
+  if [ ! -f "$gold" ]; then
+    echo "FAIL $name (no golden: $gold; re-run with --record)"
+    ok=0
+  elif ! diff -u "$gold" "$tmp/out" > "$tmp/diff"; then
+    echo "FAIL $name (stdout differs)"
+    sed 's/^/    /' "$tmp/diff"
+    ok=0
+  fi
+
+  if [ "$got_exit" != "$want_exit" ]; then
+    echo "FAIL $name (exit $got_exit, expected $want_exit)"
+    ok=0
+  fi
+
+  if [ "$ok" = 1 ]; then
+    echo "PASS $name"
+    npass=$((npass + 1))
+  else
+    nfail=$((nfail + 1))
+  fi
+done
+
+echo "----"
+echo "$npass passed, $nfail failed"
+
+[ "$nfail" = 0 ]

@@ -1,0 +1,43 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/simple.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:3]
+(* RField.signr_odd *)
+lemma signr_odd:
+  forall (n : int), 0 <= n => (- 1%r) ^ b2i (odd n) = (- 1%r) ^ n.
+lemma b2rE: forall (b : bool), b2r b = (b2i b)%r.
+lemma le_b2i: forall (b1 b2 : bool), (b1 => b2) <=> b2i b1 <= b2i b2.
+lemma b2i_or:
+  forall (b1 b2 : bool), b2i (b1 \/ b2) = b2i b1 + b2i b2 - b2i b1 * b2i b2.
+lemma b2i_le1: forall (b : bool), b2i b <= 1.
+lemma b2i_ge0: forall (b : bool), 0 <= b2i b.
+lemma b2i_eq1: forall (b : bool), b2i b = 1 <=> b.
+lemma b2i_eq0: forall (b : bool), b2i b = 0 <=> !b.
+lemma b2i_and: forall (b1 b2 : bool), b2i (b1 /\ b2) = b2i b1 * b2i b2.
+lemma b2i1: b2i true = 1.
+lemma b2i0: b2i false = 0.
+lemma signr_odd: forall (n : int), 0 <= n => (-1) ^ b2i (odd n) = (-1) ^ n.
+
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:3]
+SEARCH: missing query
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>

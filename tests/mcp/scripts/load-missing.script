@@ -1,0 +1,8 @@
+# exit: 0
+# A file the tool cannot find is an EasyCrypt-level failure, so it
+# comes back as an isError result and NOT as a -32602: the arguments
+# satisfy the schema, it is the world that does not. Same for a file
+# whose extension the loader does not know.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/nosuchfile.ec"}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/notec.txt"}}}

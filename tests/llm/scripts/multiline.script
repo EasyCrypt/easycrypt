@@ -1,0 +1,16 @@
+# exit: 0
+# <BEGIN> / <DONE> multi-line EasyCrypt input.
+LOAD "fixtures/simple.ec" 3
+<BEGIN>
+lemma multi :
+  1 = 1 /\
+  2 = 2.
+<DONE>
+QUIET ON
+split.
+trivial.
+trivial.
+QUIET OFF
+GOALS
+qed.
+COMMIT

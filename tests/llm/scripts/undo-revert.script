@@ -1,0 +1,16 @@
+# exit: 1
+# UNDO, REVERT by numeric uuid, CHECKPOINT + REVERT by name, and the
+# CHECKPOINT/REVERT argument errors.
+LOAD "fixtures/simple.ec" 6
+CHECKPOINT start
+split.
+UNDO
+split.
+trivial.
+REVERT 4
+REVERT 3
+CHECKPOINT
+REVERT
+REVERT start
+REVERT nosuch
+REVERT 999

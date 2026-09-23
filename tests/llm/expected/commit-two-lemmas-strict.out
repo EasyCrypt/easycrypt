@@ -1,0 +1,48 @@
+READY [uuid:0]
+<END>
+OK [uuid:6] [loaded:fixtures/strict.ec:11] [focus: 1/3]
+Current goal (remaining: 3)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:7] [focus: 1/2]
+<END>
+OK [uuid:8]
+<END>
+OK [uuid:9]
+<END>
+OK [uuid:10]
+added lemma: `strict_and'
+<END>
+OK [uuid:11]
+<END>
+OK [uuid:12]
+<END>
+OK [uuid:13] [focus: 1/2]
+<END>
+OK [uuid:14]
+<END>
+OK [uuid:15]
+<END>
+OK [uuid:16]
+added lemma: `strict_two'
+<END>
+OK [uuid:16]
+<END>
+OK [uuid:16]
+  + trivial.
+  + trivial.
+- trivial.
+qed.
+lemma strict_two : 3 = 3 /\ 4 = 4.
+proof.
+split.
+- trivial.
+- trivial.
+qed.
+<END>

@@ -1,0 +1,7 @@
+# exit: 0
+# `exit.' ends the session: the response still goes out, then the
+# process stops. The ping after it is never read, so it must not
+# appear in the golden.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"exit."}}}
+{"jsonrpc":"2.0","id":3,"method":"ping"}

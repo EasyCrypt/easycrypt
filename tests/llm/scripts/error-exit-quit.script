@@ -1,0 +1,8 @@
+# exit: 1
+# The same error, followed by QUIT -- the natural way to end a script.
+# QUIT leaves through the same exit-status logic as end of input, so
+# the ERROR is still reported. The trailing GOALS proves QUIT really
+# ended the session: its reply is absent from the golden.
+UNDO
+QUIT
+GOALS
