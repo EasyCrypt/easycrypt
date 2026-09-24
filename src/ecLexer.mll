@@ -381,6 +381,9 @@ rule main = parse
   | newline      { Lexing.new_line lexbuf; main lexbuf }
   | blank+       { main lexbuf }
   | lident as id { try [Hashtbl.find keywords id] with Not_found -> [LIDENT id] }
+  (* [Exp] is a keyword only when it opens an expectation [Exp[...]]:
+     several theories use it as a module name. *)
+  | "Exp" blank* '[' { [EXP; LBRACKET] }
   | uident as id { try [Hashtbl.find keywords id] with Not_found -> [UIDENT id] }
   | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }

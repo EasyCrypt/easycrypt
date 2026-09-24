@@ -257,6 +257,7 @@ and pformula_r =
   | PFequivF   of psymbol option * psymbol option * pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of psymbol option * psymbol option * pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of psymbol option * pgamepath * (pformula list) * pmemory * pformula
+  | PFexpect   of psymbol option * pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of psymbol option * pformula * pgamepath * pformula * phoarecmp * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty

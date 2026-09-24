@@ -2183,7 +2183,8 @@ and pp_form_core_r
       let me = EcEnv.Fun.prF_memenv pr.pr_event.m pr.pr_fun ppe.PPEnv.ppe_env in
       let ppep = PPEnv.create_and_push_mem ppe ~active:true me in
       let pm = debug_mode || pr.pr_event.m.id_symb <> "&hr" in
-      Format.fprintf fmt "Pr[@[%a@[%t@] %a@@ %a :@ %a@]]"
+      let kw = match pr.pr_kind with PrProb -> "Pr" | PrExpect -> "Exp" in
+      Format.fprintf fmt "%s[@[%a@[%t@] %a@@ %a :@ %a@]]" kw
         (pp_funname ppe) pr.pr_fun
         (match pr.pr_args.f_node with
          | Ftuple _ ->

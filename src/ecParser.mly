@@ -452,6 +452,7 @@
 %token EXIST
 %token EXIT
 %token EXLIM
+%token EXP
 %token EXPECT
 %token EXPORT
 %token EXTENS
@@ -1148,6 +1149,12 @@ sform_u(P):
     COLON event=form_r(P)
   RBRACKET
     { PFprob (m, mp, args, pn, event) }
+
+| EXP LBRACKET
+    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) m=brace(mident)? AT pn=mident
+    COLON event=form_r(P)
+  RBRACKET
+    { PFexpect (m, mp, args, pn, event) }
 
 | r=loc(RBOOL)
     { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }

@@ -1805,6 +1805,7 @@ let top_is_mem_binding pf = match pf with
   | PFequivF   _
   | PFeagerF   _
   | PFprob     _
+  | PFexpect   _
   | PFBDhoareF _
   | PFehoareF  _ -> true
 
@@ -3594,9 +3595,15 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror psubf.pl_loc env (AmbiguousProji (i, ty))
     end
 
-    | PFprob (m, gp, args, pr_m, event) ->
+    | PFprob   (m, gp, args, pr_m, event)
+    | PFexpect (m, gp, args, pr_m, event) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Pr);
+
+        let expct, mk =
+          match f.pl_desc with
+          | PFexpect _ -> txreal, f_expect
+          | _          -> tbool , f_pr in
 
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_xpath fpath env in
@@ -3608,8 +3615,8 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let m = EcIdent.create m in
         let env = EcEnv.Fun.prF m fpath env in
         let event' = {m;inv=transf env event} in
-        unify_or_fail env ue event.pl_loc ~expct:tbool event'.inv.f_ty;
-        f_pr memid fpath (f_tuple args) event'
+        unify_or_fail env ue event.pl_loc ~expct event'.inv.f_ty;
+        mk memid fpath (f_tuple args) event'
 
     | PFhoareF (m, pre, gp, post) ->
         if mode <> `Form then
