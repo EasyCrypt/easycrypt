@@ -1,0 +1,66 @@
+(* ==================================================================== *)
+require import AllCore List.
+require Bigop TypeWithBot.
+
+(* ==================================================================== *)
+(* Generic big-fold of [max] over a list, built atop [Bigop] using the  *)
+(* max-monoid induced by a [TypeWithBot] instance.                      *)
+(* ==================================================================== *)
+
+clone include TypeWithBot.
+
+(* -------------------------------------------------------------------- *)
+op maxr (x y : t) : t = if x <= y then y else x.
+
+lemma maxrA : associative maxr.
+proof. by move=> x y z; rewrite /maxr; smt(le_refl le_trans le_anti le_total). qed.
+
+lemma maxrC : commutative maxr.
+proof. by move=> x y; rewrite /maxr; smt(le_anti le_total). qed.
+
+lemma max0r : left_id bot maxr.
+proof. by move=> x; rewrite /maxr bot_le. qed.
+
+lemma maxrr (x : t) : maxr x x = x.
+proof. by rewrite /maxr; case (x <= x). qed.
+
+lemma maxr_lel (x y : t) : x <= y => maxr x y = y.
+proof. by rewrite /maxr => ->. qed.
+
+lemma maxr_ler (x y : t) : y <= x => maxr x y = x.
+proof. by rewrite /maxr => H; case (x <= y) => Hxy //; smt(le_anti). qed.
+
+lemma maxr_ge_l (x y : t) : x <= maxr x y.
+proof. by rewrite /maxr; case (x <= y) => // ?; apply le_refl. qed.
+
+lemma maxr_ge_r (x y : t) : y <= maxr x y.
+proof. by rewrite /maxr; case (x <= y) => H; [apply le_refl | smt(le_total)]. qed.
+
+lemma maxr_le_max (x y b : t) : x <= b => y <= b => maxr x y <= b.
+proof. by rewrite /maxr; case (x <= y). qed.
+
+lemma maxr_le_max_iff (x y b : t) : (maxr x y <= b) <=> (x <= b /\ y <= b).
+proof.
+split; last by case=> *; apply maxr_le_max.
+move=> H; split; smt(maxr_ge_l maxr_ge_r le_trans).
+qed.
+
+(* -------------------------------------------------------------------- *)
+clone include Bigop with
+  type t <- t,
+    op Support.idm   <- bot,
+    op Support.( + ) <- maxr
+proof Support.Axioms.* by smt(maxrA maxrC max0r).
+
+(* -------------------------------------------------------------------- *)
+(* Soundness: the big-max is bounded above iff every element is.        *)
+
+lemma big_le_iff (P : 'a -> bool) (F : 'a -> t) (s : 'a list) (b : t) :
+  big P F s <= b <=> bot <= b /\ forall x, x \in s => P x => F x <= b.
+proof.
+elim: s => [|x xs IH] /=.
+- by rewrite big_nil; smt().
+rewrite big_cons; case (P x) => Px /=.
+- rewrite maxr_le_max_iff IH; smt().
+- by rewrite IH; smt().
+qed.
