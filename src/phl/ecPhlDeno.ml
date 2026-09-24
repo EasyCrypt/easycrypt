@@ -85,18 +85,31 @@ let t_phoare_deno_r pre post tc =
 
 
 (* -------------------------------------------------------------------- *)
+(* The goal is either a probability bound [Pr[f(a) @ &m : ev] <= bd] with
+   [bd : real] and the real order, or an expectation bound
+   [Exp[f(a) @ &m : e] <= bd] with [bd : xreal] and the xreal order. *)
+let destr_ehoare_deno_goal concl =
+  match concl.f_node with
+  | Fapp ({f_node = Fop (op, _)}, [f; bd])
+      when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
+    Some (f, bd)
+
+  | Fapp ({f_node = Fop (op, _)}, [f; bd])
+      when is_expect f && EcPath.p_equal op EcCoreLib.CI_Xreal.p_xle ->
+    Some (f, bd)
+
+  | _ -> None
+
+(* -------------------------------------------------------------------- *)
 let t_ehoare_deno_r pre post tc =
   let m = pre.m in
   assert (m = post.m);
   let env, _, concl = FApi.tc1_eflat tc in
 
   let f, bd =
-    match concl.f_node with
-    | Fapp ({f_node = Fop (op, _)}, [f; bd])
-        when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-      (f, bd)
-
-    | _ -> tc_error !!tc "invalid goal shape"
+    match destr_ehoare_deno_goal concl with
+    | Some (f, bd) -> (f, bd)
+    | None -> tc_error !!tc "invalid goal shape"
   in
 
   let pr = destr_pr f in
@@ -107,18 +120,27 @@ let t_ehoare_deno_r pre post tc =
   let sargs = PVM.add env pv_arg m pr.pr_args PVM.empty in
   let smem = Fsubst.f_bind_mem Fsubst.f_subst_id m pr.pr_mem in
   let pre = Fsubst.f_subst smem (PVM.subst env sargs pre.inv) in
-  let concl_pr = f_xreal_le pre (f_r2xr bd) in
 
-  (* forall m, ev%r%xr <= post *)
   let ev = pr.pr_event in
   let ev = ss_inv_rebind ev m in
-  let concl_po = map_ss_inv2 f_xreal_le (map_ss_inv1 f_b2xr ev) post in
+
+  let concl_pr, ev, concl_nn =
+    match pr.pr_kind with
+    | PrProb ->
+      (* pre <= bd%xr, ev%xr <= post and the non-negativity of the real
+         bound (the coercion to xreal clamps negative reals to 0) *)
+      (f_xreal_le pre (f_r2xr bd), map_ss_inv1 f_b2xr ev, [f_real_le f_r0 bd])
+    | PrExpect ->
+      (* pre <= bd and e <= post, both in xreal: xreal is non-negative,
+         hence no side-condition on the bound *)
+      (f_xreal_le pre bd, ev, [])
+  in
+
+  (* forall m, ev%xr <= post   (resp. forall m, e <= post) *)
+  let concl_po = map_ss_inv2 f_xreal_le ev post in
   let concl_po = f_forall_mems_ss_inv mpo concl_po in
 
-  (* 0%r <= bd *)
-  let concl_nn = f_real_le f_r0 bd in
-
-  FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po; concl_nn]
+  FApi.xmutate1 tc `HlDeno ([concl_e; concl_pr; concl_po] @ concl_nn)
 
 (* -------------------------------------------------------------------- *)
 let cond_pre env prl prr pre =
@@ -231,16 +253,14 @@ let process_phoare_deno info tc =
 (* -------------------------------------------------------------------- *)
 let process_ehoare_deno info tc =
   let error () =
-    tc_error !!tc "the conclusion is not a suitable Pr expression" in
+    tc_error !!tc "the conclusion is not a suitable Pr or Exp expression" in
 
   let process_cut (pre, post) =
     let hyps, concl = FApi.tc1_flat tc in
     let f, bd =
-      match concl.f_node with
-      | Fapp({f_node = Fop (op, _)}, [f1; f2])
-          when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le && is_pr f1 ->
-          (f1, f2) (* f1 <= f2 *)
-      | _ -> error ()
+      match destr_ehoare_deno_goal concl with
+      | Some (f, bd) -> (f, bd) (* f <= bd *)
+      | None -> error ()
     in
 
     let { pr_fun = f } as pr = destr_pr f in
@@ -248,10 +268,18 @@ let process_ehoare_deno info tc =
     let m = event.m in
     let penv, qenv = LDecl.hoareF m f hyps in
     let smem = Fsubst.f_bind_mem Fsubst.f_subst_id pr.pr_mem m in
-    let dpre = {m;inv=f_r2xr (Fsubst.f_subst smem bd)} in
+    let bd = Fsubst.f_subst smem bd in
+
+    (* default pre: the bound (coerced to xreal for a probability);
+       default post: the event (coerced to xreal for a probability) *)
+    let dpre, dpost =
+      match pr.pr_kind with
+      | PrProb   -> ({m;inv=f_r2xr bd}, map_ss_inv1 f_b2xr event)
+      | PrExpect -> ({m;inv=bd}, event)
+    in
 
     let pre  = pre  |> omap_dfl (fun p -> {m;inv=TTC.pf_process_xreal !!tc penv p}) dpre  in
-    let post = post |> omap_dfl (fun p -> {m;inv=TTC.pf_process_xreal !!tc qenv p}) (map_ss_inv1 f_b2xr event) in
+    let post = post |> omap_dfl (fun p -> {m;inv=TTC.pf_process_xreal !!tc qenv p}) dpost in
 
     f_eHoareF pre f post
   in
@@ -265,10 +293,18 @@ let process_ehoare_deno info tc =
       (ehf_pr hf, ehf_po hf)
   in
 
-  (* [t_ehoare_deno] always emits the [0%r <= bd] non-negativity goal last; try
-     to close it automatically so trivially non-negative bounds stay effort-free
-     (a genuinely negative bound is left as an unprovable goal). *)
-  FApi.t_last (FApi.t_try t_trivial)
+  (* On a probability goal, [t_ehoare_deno] emits the [0%r <= bd]
+     non-negativity goal last; try to close it automatically so trivially
+     non-negative bounds stay effort-free (a genuinely negative bound is left
+     as an unprovable goal). On an expectation goal there is no such goal
+     (the last goal is then [forall &hr, e <= post]) and nothing is tried. *)
+  let t_close_nn =
+    match destr_ehoare_deno_goal (FApi.tc1_goal tc) with
+    | Some (f, _) when is_pr f -> FApi.t_last (FApi.t_try t_trivial)
+    | _ -> (fun tc -> tc)
+  in
+
+  t_close_nn
     (FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_ehoare_deno pre post tc))
 
 
