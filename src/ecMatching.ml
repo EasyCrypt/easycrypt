@@ -1548,7 +1548,7 @@ module FPosition = struct
           | Fpr pr ->
               let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event.inv]) in
               let m = pr.pr_event.m in
-              f_pr pr.pr_mem pr.pr_fun args' {m;inv=event'}
+              f_pr_r { pr with pr_args = args'; pr_event = {m;inv=event'} }
 
           | FhoareF hf ->
               let hf_pr = as_seq1 (doit p [(hf_pr hf).inv]) in

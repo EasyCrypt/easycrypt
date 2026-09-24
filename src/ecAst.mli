@@ -308,7 +308,12 @@ and ss_inv = {
   inv : form;
 }
 
+(* Pr[f(args) @ &m : ev] with ev : bool, of type real, or
+ * Exp[f(args) @ &m : e] with e : xreal, of type xreal *)
+and pr_kind = PrProb | PrExpect
+
 and pr = {
+  pr_kind  : pr_kind;
   pr_mem   : memory;
   pr_fun   : EcPath.xpath;
   pr_args  : form;

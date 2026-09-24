@@ -349,10 +349,15 @@ let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
                 eg_sl; eg_fl; eg_fr; eg_sr; eg_po=eg_po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
-let f_pr_r pr = mk_form (Fpr pr) treal
+let f_pr_r pr =
+  let ty = match pr.pr_kind with PrProb -> treal | PrExpect -> txreal in
+  mk_form (Fpr pr) ty
 
 let f_pr pr_mem pr_fun pr_args (pr_event: ss_inv) =
-  f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
+  f_pr_r { pr_kind = PrProb; pr_mem; pr_fun; pr_args; pr_event; }
+
+let f_expect pr_mem pr_fun pr_args (pr_event: ss_inv) =
+  f_pr_r { pr_kind = PrExpect; pr_mem; pr_fun; pr_args; pr_event; }
 
 (* -------------------------------------------------------------------- *)
 let fop_int_opp   = f_op EcCoreLib.CI_Int.p_int_opp [] (toarrow [tint]       tint)
@@ -912,7 +917,10 @@ let is_eHoareS   f = is_from_destr destr_eHoareS   f
 let is_eHoareF   f = is_from_destr destr_eHoareF   f
 let is_bdHoareS  f = is_from_destr destr_bdHoareS  f
 let is_bdHoareF  f = is_from_destr destr_bdHoareF  f
-let is_pr        f = is_from_destr destr_pr        f
+let is_pr        f =
+  match f.f_node with Fpr { pr_kind = PrProb   } -> true | _ -> false
+let is_expect    f =
+  match f.f_node with Fpr { pr_kind = PrExpect } -> true | _ -> false
 let is_eq_or_iff f = (is_eq f) || (is_iff f)
 
 (* -------------------------------------------------------------------- *)

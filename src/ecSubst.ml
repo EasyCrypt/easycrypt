@@ -684,13 +684,13 @@ let rec subst_form (s : subst) (f : form) =
      let eg_po = map_ts_inv1 (subst_form s) (eg_po eg) in
      f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
-  | Fpr { pr_mem; pr_fun; pr_args; pr_event } ->
+  | Fpr ({ pr_mem; pr_fun; pr_args; pr_event } as pr) ->
      let pr_mem = subst_mem s pr_mem in
      let pr_fun = subst_xpath s pr_fun in
      let pr_args = subst_form s pr_args in
      let s = add_memory s pr_event.m pr_event.m in
      let pr_event = map_ss_inv1 (subst_form s) pr_event in
-     f_pr pr_mem pr_fun pr_args pr_event
+     f_pr_r { pr with pr_mem; pr_fun; pr_args; pr_event }
 
   | Fif _ | Fint _ | Ftuple _ | Fproj _ | Fapp _ ->
      f_map (subst_ty s) (subst_form s) f

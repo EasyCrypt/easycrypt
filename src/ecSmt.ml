@@ -720,8 +720,9 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
   | Fglob (m,mem) -> trans_glob env m mem
 
-  | Fpr pr        -> trans_pr env pr
+  | Fpr ({ pr_kind = PrProb } as pr) -> trans_pr env pr
 
+  | Fpr { pr_kind = PrExpect }    (* FIXME: translate as Ep *)
   | FeagerF _
   | FhoareF  _  | FhoareS   _
   | FeHoareF   _ | FeHoareS   _
@@ -909,7 +910,7 @@ and trans_mem (genv,lenv) ~forglobal mem =
     (assert has_locals; wfst genv wmem)
 
 (* -------------------------------------------------------------------- *)
-and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
+and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event; _} =
   let wmem = trans_mem env ~forglobal:true pr_mem in
   let warg = trans_form_b env pr_args in
 

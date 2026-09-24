@@ -686,7 +686,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let pr_args  = norm st s pr.pr_args in
     let pr_event = norm st s pr.pr_event.inv in
     let (m,_) = norm_me s (abstract pr.pr_event.m) in
-    f_pr pr_mem pr_fun pr_args {m;inv=pr_event}
+    f_pr_r { pr with pr_mem; pr_fun; pr_args; pr_event = {m;inv=pr_event} }
 
 (* -------------------------------------------------------------------- *)
 (* FIXME : initialize the subst with let in hyps *)

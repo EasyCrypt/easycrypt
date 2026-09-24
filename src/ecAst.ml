@@ -285,7 +285,12 @@ and ss_inv = {
   inv : form;
 }
 
+(* Pr[f(args) @ &m : ev] with ev : bool, of type real, or
+ * Exp[f(args) @ &m : e] with e : xreal, of type xreal *)
+and pr_kind = PrProb | PrExpect
+
 and pr = {
+  pr_kind  : pr_kind;
   pr_mem   : memory;
   pr_fun   : EcPath.xpath;
   pr_args  : form;
@@ -1116,7 +1121,8 @@ let egf_equal eg1 eg2 =
   && mem_equal eg1.eg_mr eg2.eg_mr
 
 let pr_equal pr1 pr2 =
-     EcIdent.id_equal pr1.pr_mem pr2.pr_mem
+     pr1.pr_kind = pr2.pr_kind
+  && EcIdent.id_equal pr1.pr_mem pr2.pr_mem
   && EcPath.x_equal   pr1.pr_fun pr2.pr_fun
   && f_equal          pr1.pr_event.inv pr2.pr_event.inv
   && f_equal          pr1.pr_args pr2.pr_args
@@ -1197,7 +1203,9 @@ let eg_hash eg =
 
 let pr_hash pr =
   Why3.Hashcons.combine3
-    (EcIdent.id_hash pr.pr_mem)
+    (Why3.Hashcons.combine
+       (match pr.pr_kind with PrProb -> 0 | PrExpect -> 1)
+       (EcIdent.id_hash pr.pr_mem))
     (EcPath.x_hash   pr.pr_fun)
     (f_hash          pr.pr_args)
     (Why3.Hashcons.combine (f_hash pr.pr_event.inv) (mem_hash pr.pr_event.m))

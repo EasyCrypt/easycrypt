@@ -145,8 +145,9 @@ val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
 val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form
 
 (* soft-constructors - Pr *)
-val f_pr_r : pr -> form
-val f_pr   : memory -> xpath -> form -> ss_inv -> form
+val f_pr_r   : pr -> form
+val f_pr     : memory -> xpath -> form -> ss_inv -> form
+val f_expect : memory -> xpath -> form -> ss_inv -> form
 
 (* soft-constructors - unit *)
 val f_tt : form
@@ -280,7 +281,7 @@ val destr_eHoareF   : form -> eHoareF
 val destr_eHoareS   : form -> eHoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
-val destr_pr        : form -> pr
+val destr_pr        : form -> pr     (* both Pr[...] and Exp[...] *)
 val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> zint
 
@@ -314,7 +315,8 @@ val is_eHoareF   : form -> bool
 val is_eHoareS   : form -> bool
 val is_bdHoareF  : form -> bool
 val is_bdHoareS  : form -> bool
-val is_pr        : form -> bool
+val is_pr        : form -> bool  (* Pr[...] only  *)
+val is_expect    : form -> bool  (* Exp[...] only *)
 val is_eq_or_iff : form -> bool
 
 (* -------------------------------------------------------------------- *)
