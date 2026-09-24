@@ -221,7 +221,7 @@ let destr_event f =
 let t_uptobad_r tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let pr1, pr2 =
-    try t2_map destr_pr (destr_eq concl)
+    try t2_map destr_prob (destr_eq concl)
     with DestrError _ ->
       tc_error !!tc ~who:"byupto" "expecting a formula of the form \"Pr[_] = Pr[_]\""
   in
@@ -291,7 +291,7 @@ tc_error !!tc
 let destr_sub f1 f2 =
   let fe1, fe2 = DestrReal.sub f1 in
   let fe1b, fe2b = DestrReal.sub f2 in
-  let pre1, pre2, prb1 = t3_map destr_pr (fe1, fe2, fe1b) in
+  let pre1, pre2, prb1 = t3_map destr_prob (fe1, fe2, fe1b) in
   let e, fbad = map_ss_inv_destr2 destr_and prb1.pr_event in
   let fnbad = map_ss_inv1 f_not fbad in
   let fenb = map_ss_inv2 f_and e fnbad in
@@ -302,7 +302,7 @@ let destr_sub f1 f2 =
 let destr_sub_maxr f1 f2 =
   let fe1, fe2 = DestrReal.sub f1 in
   let fe1b', fe2b' = destr_maxr f2 in
-  let pre1, pre2, prb1_ = t3_map destr_pr (fe1, fe2, fe1b') in
+  let pre1, pre2, prb1_ = t3_map destr_prob (fe1, fe2, fe1b') in
   let bad =
     let b = try snd (map_ss_inv_destr2 destr_and prb1_.pr_event) with DestrError _ -> prb1_.pr_event in
     destr_bad b in
@@ -350,12 +350,12 @@ let process_uptobad tc =
 
   | SFop((o,_), [f1; f]) when EcPath.p_equal o p_real_le ->
     begin match sform_of_form f1 with
-    | SFpr pr1 ->
+    | SFpr ({ pr_kind = PrProb } as pr1) ->
       (* Pr[G1 : E] <= Pr[G2 : E [/\ !bad]] + Pr[G1: [E /\] bad] *)
       let f2, fb = DestrReal.add f in
       let pr2, e, bad =
         try
-          let pr2, prb = t2_map destr_pr (f2, fb) in
+          let pr2, prb = t2_map destr_prob (f2, fb) in
           let bad =
             try destr_bad (prb.pr_event)
             with DestrError _ -> destr_bad (snd (map_ss_inv_destr2 destr_and prb.pr_event))

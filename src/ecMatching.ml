@@ -1117,6 +1117,8 @@ let f_match_core ?(conv_ri = EcReduction.full_compat) opts hyps (ue, ev) f1 f2 =
       end
 
       | Fpr pr1, Fpr pr2 -> begin
+          if pr1.pr_kind <> pr2.pr_kind then
+            failure ();
           if not (EcReduction.EqTest.for_xp env pr1.pr_fun pr2.pr_fun) then
             failure ();
           doit_mem env mxs pr1.pr_mem pr2.pr_mem;

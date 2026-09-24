@@ -632,6 +632,7 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
       check_s env subst eg1.eg_sr eg2.eg_sr
 
     | Fpr pr1, Fpr pr2 ->
+      if pr1.pr_kind <> pr2.pr_kind then error ();
       check_mem subst pr1.pr_mem pr2.pr_mem;
       check_xp env subst pr1.pr_fun pr2.pr_fun;
       let subst = check_m_binding subst pr1.pr_event.m pr2.pr_event.m in
@@ -1660,7 +1661,8 @@ let rec conv ri env f1 f2 stk =
       force_head ri env f1 f2 stk
 
   | Fpr pr1, Fpr pr2 ->
-    if EcMemory.mem_equal pr1.pr_mem pr2.pr_mem &&
+    if pr1.pr_kind = pr2.pr_kind &&
+         EcMemory.mem_equal pr1.pr_mem pr2.pr_mem &&
          EqTest_i.for_xp env pr1.pr_fun pr2.pr_fun then
       let ev2 = (ss_inv_rebind pr2.pr_event pr1.pr_event.m).inv in
       conv ri env pr1.pr_args pr2.pr_args (zhl f1 [pr1.pr_event.inv] [ev2] stk)

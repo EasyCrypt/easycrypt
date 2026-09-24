@@ -282,6 +282,7 @@ val destr_eHoareS   : form -> eHoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
 val destr_pr        : form -> pr     (* both Pr[...] and Exp[...] *)
+val destr_prob      : form -> pr     (* Pr[...] only *)
 val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> zint
 

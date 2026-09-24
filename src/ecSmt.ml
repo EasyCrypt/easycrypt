@@ -722,7 +722,14 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
   | Fpr ({ pr_kind = PrProb } as pr) -> trans_pr env pr
 
-  | Fpr { pr_kind = PrExpect }    (* FIXME: translate as Ep *)
+  (* Exp[...] is translated as [Ep d (fun m => e)]; this needs the [Ep]
+     operator of the Xreal theory (it is only missing if the expectation
+     was built while Xreal is not loaded, then keep it opaque) *)
+  | Fpr ({ pr_kind = PrExpect } as pr)
+      when is_some (Op.by_path_opt CI_Xreal.p_Ep genv.te_env) ->
+    trans_pr env pr
+
+  | Fpr { pr_kind = PrExpect }
   | FeagerF _
   | FhoareF  _  | FhoareS   _
   | FeHoareF   _ | FeHoareS   _
@@ -910,7 +917,7 @@ and trans_mem (genv,lenv) ~forglobal mem =
     (assert has_locals; wfst genv wmem)
 
 (* -------------------------------------------------------------------- *)
-and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event; _} =
+and trans_pr ((genv,lenv) as env) {pr_kind; pr_mem; pr_fun; pr_args; pr_event} =
   let wmem = trans_mem env ~forglobal:true pr_mem in
   let warg = trans_form_b env pr_args in
 
@@ -933,12 +940,25 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event; _} =
 
   let d = WTerm.t_app ls [warg; wmem] (Some tyr) in
 
-  let wev =
-    let lenv, wbd = trans_binding genv lenv (pr_event.m, GTmem mt) in
-    let wbody = trans_form_b (genv,lenv) pr_event.inv in
-    trans_lambda genv [wbd] wbody
+  match pr_kind with
+  | PrProb ->
+    (* Pr[f(a) @ &m : ev]  is  mu d (fun m => ev) *)
+    let wev =
+      let lenv, wbd = trans_binding genv lenv (pr_event.m, GTmem mt) in
+      let wbody = trans_form_b (genv,lenv) pr_event.inv in
+      trans_lambda genv [wbd] wbody
 
-  in WTerm.t_app_infer fs_mu [d; wev]
+    in WTerm.t_app_infer fs_mu [d; wev]
+
+  | PrExpect ->
+    (* Exp[f(a) @ &m : e]  is  Ep d (fun m => e), with [Ep] the ordinary
+       operator of the Xreal theory, translated as any other operator *)
+    let wev =
+      let lenv, wbd = trans_binding genv lenv (pr_event.m, GTmem mt) in
+      let wbody = trans_form (genv,lenv) pr_event.inv in
+      trans_lambda genv [wbd] wbody
+
+    in apply_wop genv (trans_op genv CI_Xreal.p_Ep) [mty] [d; wev]
 
 (* -------------------------------------------------------------------- *)
 and trans_gen ((genv, lenv) as env :  tenv * lenv) (fp : form) =
@@ -1444,6 +1464,7 @@ module Frequency = struct
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
+        if pr.pr_kind = PrExpect then sp := Sp.add CI_Xreal.p_Ep !sp;
         doit pr.pr_event.inv; doit pr.pr_args in
     doit f;
     if not (Sx.is_empty !sf) then sp := Sp.add CI_Distr.p_mu !sp;
@@ -1523,7 +1544,10 @@ module Frequency = struct
       | Fapp     (e, es)      -> List.iter add (e :: es)
       | Ftuple   es           -> List.iter add es
       | Fproj    (e, _)       -> add e
-      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event.inv;add pr.pr_args
+      | Fpr      pr           ->
+        addx pr.pr_fun;
+        if pr.pr_kind = PrExpect then addp CI_Xreal.p_Ep;
+        add pr.pr_event.inv; add pr.pr_args
       | _ -> () in
     add form
 

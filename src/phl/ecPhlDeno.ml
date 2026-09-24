@@ -276,7 +276,7 @@ let process_ehoare_deno info tc =
 let destr_deno_bad env f =
   try
     let fpr1, (fpr2, fpr3) = snd_map DestrReal.add (DestrReal.le f) in
-    let _, pr2, pr3 = t3_map destr_pr (fpr1, fpr2, fpr3) in
+    let _, pr2, pr3 = t3_map destr_prob (fpr1, fpr2, fpr3) in
 
     if not (NormMp.x_equal env pr2.pr_fun pr3.pr_fun) then
       raise (DestrError "");
@@ -294,7 +294,7 @@ let t_pr_pos tc =
   let pr =
     try
       let _, fpr = DestrReal.le (tc1_goal tc) in
-      destr_pr fpr
+      destr_prob fpr
     with DestrError _ -> tc_error !!tc "invalid goal shape" in
   let prf = f_pr_r {pr with pr_event = {m=pr.pr_event.m; inv=f_false}} in
   (t_real_le_trans prf @+
@@ -345,7 +345,7 @@ let destr_deno_bad2 env f =
   try
     let lhs , rhs  = DestrReal.le f in
     let fpr1, fpr2 = DestrReal.sub (DestrReal.abs lhs) in
-    let _pr1, pr2, prb = t3_map destr_pr (fpr1, fpr2, rhs) in
+    let _pr1, pr2, prb = t3_map destr_prob (fpr1, fpr2, rhs) in
       if not (NormMp.x_equal env pr2.pr_fun prb.pr_fun) then
         raise (DestrError "pr");
       (fpr1, fpr2, rhs)

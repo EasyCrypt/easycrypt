@@ -142,11 +142,14 @@ let pr_has_le f_pr =
   f_real_le f_pr f_sum
 
 (* -------------------------------------------------------------------- *)
+(* The selectors below only pick probabilities [Pr[...]]: the lemmas of
+   [pr_rewrite_lemma] are about [mu] and do not apply to expectations
+   [Exp[...]], which are left untouched. *)
 exception FoundPr of form
 
 let select_pr on_ev sid f =
   match f.f_node with
-  | Fpr { pr_event = ev } ->
+  | Fpr { pr_kind = PrProb; pr_event = ev } ->
       if on_ev ev && Mid.set_disjoint f.f_fv sid then raise (FoundPr f)
       else false
   | _ -> false
@@ -154,7 +157,9 @@ let select_pr on_ev sid f =
 let select_pr_cmp on_cmp sid f =
   match f.f_node with
   | Fapp
-      ({ f_node = Fop (op, _) }, [ { f_node = Fpr pr1 }; { f_node = Fpr pr2 } ])
+      ({ f_node = Fop (op, _) },
+       [ { f_node = Fpr ({ pr_kind = PrProb } as pr1) };
+         { f_node = Fpr ({ pr_kind = PrProb } as pr2) } ])
     ->
       if on_cmp op
         && EcIdent.id_equal pr1.pr_mem pr2.pr_mem
@@ -167,7 +172,7 @@ let select_pr_cmp on_cmp sid f =
 
 let select_pr_ge0 sid f =
   match f.f_node with
-  | Fapp ({ f_node = Fop (op, _) }, [ f'; { f_node = Fpr _ } ]) ->
+  | Fapp ({ f_node = Fop (op, _) }, [ f'; { f_node = Fpr { pr_kind = PrProb } } ]) ->
       if EcPath.p_equal EcCoreLib.CI_Real.p_real_le op
         && f_equal f' f_r0
         && Mid.set_disjoint f.f_fv sid
@@ -177,7 +182,7 @@ let select_pr_ge0 sid f =
 
 let select_pr_le1 sid f =
   match f.f_node with
-  | Fapp ({ f_node = Fop (op, _) }, [ { f_node = Fpr _ }; f' ]) ->
+  | Fapp ({ f_node = Fop (op, _) }, [ { f_node = Fpr { pr_kind = PrProb } }; f' ]) ->
       if EcPath.p_equal EcCoreLib.CI_Real.p_real_le op
         && f_equal f' f_r1
         && Mid.set_disjoint f.f_fv sid
@@ -187,7 +192,8 @@ let select_pr_le1 sid f =
 
 let select_pr_muhasle sid f =
   match f.f_node with
-  | Fapp ({ f_node = Fop (op, _) }, [ { f_node = Fpr pr } as f_pr; _ ]) ->
+  | Fapp ({ f_node = Fop (op, _) },
+          [ { f_node = Fpr ({ pr_kind = PrProb } as pr) } as f_pr; _ ]) ->
       if EcPath.p_equal EcCoreLib.CI_Real.p_real_le op then
         match destr_pr_has pr with
         | Some (_, _, f_l) when

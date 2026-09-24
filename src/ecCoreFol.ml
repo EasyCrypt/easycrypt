@@ -763,6 +763,11 @@ let destr_pr f =
   | Fpr pr -> pr
   | _ -> destr_error "pr"
 
+let destr_prob f =
+  match f.f_node with
+  | Fpr ({ pr_kind = PrProb } as pr) -> pr
+  | _ -> destr_error "prob"
+
 let destr_programS side f =
   match side, f.f_node with
   | None  , FhoareS   hs  -> (hs.hs_m, hs.hs_s)
