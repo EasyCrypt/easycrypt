@@ -74,7 +74,8 @@ section.
     fel 1 (size Sample.l) (fun x, x%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
     + by rewrite -Bigreal.BRA.mulr_suml  Bigreal.sumidE 1:ge0_q.
     + by inline*; auto.
-    + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.
+    + proc;wp; rnd (mem Sample.l); last by move=> &hr />; smt(size_ge0 ge0_mu1).
+      skip=> // /> &hr ???.
       apply (Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu1 uT maxu)). 
       by move=> x _;rewrite maxuP.
     by move=> c; proc; auto=> /#.

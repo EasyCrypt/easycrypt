@@ -538,7 +538,8 @@ section.
            (F.m = m /\ r::logPw = P.logP /\
             n <= qP /\ card (fdom F.m) <= qF)=> //.
     + by wp; rnd=> //.
-    + wp; rnd; auto=> /> &0 _ /le_fromint domF_le_qF _ /pr_newbad ->.
+    + wp; rnd; last by move=> &hr />; smt(Support.card_gt0 size_ge0 ge0_qF).
+      auto=> /> &0 _ /le_fromint domF_le_qF _ /pr_newbad ->.
       apply: ler_wpmul2r.
       + by apply: invr_ge0; smt(Support.card_gt0).
       by rewrite !fromintD ler_add2r.
