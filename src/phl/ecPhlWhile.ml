@@ -208,19 +208,30 @@ let t_bdhoare_while_rev_r inv tc =
       f_imp while_jgmt unfolded_while_jgmt
   in
 
-  (* 2. Sub-goal *)
-  let rem_concl =
-    let modi = s_write env lp_body in
+  (* 2. Sub-goal: the prefix establishes the invariant *)
+  let rem_concl = f_hoareS mt b_pre rem_s (POE.lift inv) in
+
+  (* 3. Sub-goal: on exit with the post-condition, the bound is 1. *)
+  let exit_concl =
     let term_post = map_ss_inv2 f_imp
       (map_ss_inv2 f_and inv (map_ss_inv2 f_and (map_ss_inv1 f_not lp_guard) b_post))
       (map_ss_inv2 f_eq bound {m;inv=f_r1}) in
-    let term_post = generalize_mod_ss_inv env modi term_post in
-    let term_post = map_ss_inv2 f_and inv term_post in
-    let post = { hsi_m = term_post.m; hsi_inv = POE.empty term_post.inv; } in
-    f_hoareS mt b_pre rem_s post
+    EcSubst.f_forall_mems_ss_inv mem term_post
   in
 
-  FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
+  (* 4. Sub-goal: the bound is non-negative. *)
+  let nonneg_concl =
+    EcSubst.f_forall_mems_ss_inv mem
+      (map_ss_inv2 f_real_le {m;inv=f_r0} bound)
+  in
+
+  (* sub-goals 3 and 4 are closed here when trivial *)
+  FApi.t_lasts (FApi.t_try t_trivial) 2
+    (FApi.xmutate1_hyps tc `While
+       [(hyps', body_concl  );
+        (hyps , rem_concl   );
+        (hyps , exit_concl  );
+        (hyps , nonneg_concl)])
 
 (* -------------------------------------------------------------------- *)
 (* Rule for = or >= *)
