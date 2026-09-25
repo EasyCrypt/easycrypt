@@ -466,7 +466,8 @@ let trans_matchfix
         match destr_app e with
         | ({ e_node = Elocal x }, args) when x = opname -> begin
           match List.nth_opt args pos with
-          | Some { e_node = Elocal a } when Sid.mem a pvars -> ()
+          | Some { e_node = Elocal a } when Sid.mem a pvars ->
+            List.iter check_body args
           | _ -> fxerror loc env TT.FXE_SynCheckFailure
           end
         | _ -> EcTypes.e_iter check_body e
