@@ -492,12 +492,13 @@ section Lemma1.
   (* We comment on the fel tactic. Its first parameter is the length
      of the initialization code. *)
   fel 1 (C_PRG.c)                       (* the query counter *)
-        (fun i=> (i + 1)%r * pr_dstate) (* probability of bad first occurring during ith query *)
+        (fun i=> (max 0 i + 1)%r * pr_dstate) (* probability of bad first occurring during ith query *)
         qN                              (* the bound on the counter (after which we stop caring) *)
         (!uniq (SRG.st::D_PRF.log))     (* the bad event *)
         []                              (* condition(s) under which the oracle(s) do not respond *)
         (size D_PRF.log = C_PRG.c).     (* general unconditional invariants *)
     (* The resulting sum is less than the specified bound *)
+    rewrite (@eq_big_seq _ (fun i=> (i + 1)%r * pr_dstate)) 1:#smt:(mem_range).
     rewrite -mulr_suml mulrAC ler_wpmul2r 1:#smt:(mu_bounded).
     rewrite (@big_reindex _ _ ([-]%Int \o ((-) 1)) ((+) 1)) 1:#smt:[ml=0].
     rewrite predTofV (@eq_bigr _ _ CoreReal.from_int) 1:#smt:[ml=0].
@@ -512,7 +513,8 @@ section Lemma1.
     by inline *; auto.
     (* Probability of bad during cth iteration is bounded by "bound c" *)
     proc=> //=; inline *; wp.
-    rnd (fun (str : state * output)=> mem D_PRF.log str.`1); auto=> /> &hr.
+    rnd (fun (str : state * output)=> mem D_PRF.log str.`1); last by move=> &hr />; smt(mu_bounded).
+    auto=> /> &hr.
     rewrite (@dprodE (mem (SRG.st::D_PRF.log){hr}) predT) dout_ll /=.
     move=> ge0_szlog ltqN_szlog st_notin_log uniq_log.
     apply/(ler_trans ((size (SRG.st::D_PRF.log){hr})%r * pr_dstate)).
