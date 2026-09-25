@@ -212,13 +212,16 @@ module Core = struct
         let bd = {m;inv=f_local bd_id treal} in
         bd, map_ss_inv2 f_eq (bhs_bd bhs) bd, [(bd_id,GTty treal)]
     in
-    let subgoals = match tac_info, bhs.bhs_cmp with
+    let nonneg_concl =
+      f_forall_mems_ss_inv bhs.bhs_m
+        (map_ss_inv2 f_real_le {m;inv=f_r0} (bhs_bd bhs)) in
+    match tac_info, bhs.bhs_cmp with
       | PNoRndParams, FHle ->
         if is_post_indep then
           (* event is true *)
           let concl = f_bdHoareS (snd bhs.bhs_m)
             (bhs_pr bhs) s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
-          [concl]
+          FApi.xmutate1 tc `Rnd [concl]
         else
           let event = {m; inv=mk_event ty_distr} in
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
@@ -227,7 +230,9 @@ module Core = struct
           let post = POE.lift post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
-          [concl]
+          (* the hoare post only constrains the terminating runs of [s]: also
+             require [0%r <= bd] (in every memory); closed here when trivial *)
+          FApi.t_last (FApi.t_try t_trivial) (FApi.xmutate1 tc `Rnd [concl; nonneg_concl])
       | PNoRndParams, _ ->
         if is_post_indep then
           (* event is true *)
@@ -236,7 +241,7 @@ module Core = struct
           let bounded_distr = map_ss_inv2 f_eq (map_ss_inv2 (f_mu env) distr event) f_r1 in
           let post = map_ss_inv2 f_and (bhs_po bhs) bounded_distr in
           let concl = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s post bhs.bhs_cmp (bhs_bd bhs) in
-          [concl]
+          FApi.xmutate1 tc `Rnd [concl]
         else
           let event = {m;inv=mk_event ty_distr} in
           let bounded_distr = map_ss_inv2 f_cmp (map_ss_inv2 (f_mu env) distr event) bound in
@@ -244,7 +249,7 @@ module Core = struct
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
           let concl = f_bdHoareS (snd bhs.bhs_m) pre s post bhs.bhs_cmp {m;inv=f_r1} in
           let concl = f_forall_simpl binders concl in
-          [concl]
+          FApi.xmutate1 tc `Rnd [concl]
       | PSingleRndParam event, FHle ->
           let event = event ty_distr in
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
@@ -253,7 +258,9 @@ module Core = struct
           let post = POE.lift post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
-          [concl]
+          (* the hoare post only constrains the terminating runs of [s]: also
+             require [0%r <= bd] (in every memory); closed here when trivial *)
+          FApi.t_last (FApi.t_try t_trivial) (FApi.xmutate1 tc `Rnd [concl; nonneg_concl])
       | PSingleRndParam event, _ ->
           let event = event ty_distr in
           let bounded_distr = map_ss_inv2 f_cmp (map_ss_inv2 (f_mu env) distr event) bound in
@@ -261,7 +268,7 @@ module Core = struct
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
           let concl = f_bdHoareS (snd bhs.bhs_m) pre s post FHeq {m;inv=f_r1} in
           let concl = f_forall_simpl binders concl in
-          [concl]
+          FApi.xmutate1 tc `Rnd [concl]
       | PMultRndParams ((phi,d1,d2,d3,d4),event), _ ->
         let event = match event ty_distr with
           | None -> {m;inv=mk_event ~simpl:false ty_distr} | Some event -> event
@@ -286,12 +293,9 @@ module Core = struct
           map_ss_inv f_ands (List.map f_inbound [d1; d2; d3; d4])
         in
         let sgoal5 = f_forall_mems_ss_inv (bhs.bhs_m) sgoal5 in
-        [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4;sgoal5]
+        FApi.xmutate1 tc `Rnd [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4;sgoal5]
 
       | _, _ -> tc_error !!tc "invalid arguments"
-    in
-
-    FApi.xmutate1 tc `Rnd subgoals
 
   (* -------------------------------------------------------------------- *)
   let semrnd tc mem used (s : instr list) : EcMemory.memenv * instr list =

@@ -77,10 +77,17 @@ let t_auto_rnd =
 let rec t_auto_phl_r tc =
   FApi.t_seqs
     [ EcPhlWp.t_wp None;
-      FApi.t_ors [ FApi.t_seq t_auto_rnd t_auto_phl_r;
+      FApi.t_ors [ FApi.t_seq t_auto_rnd t_auto_phl_rnd_r;
                    EcPhlSkip.t_skip;
                    t_id ]]
     tc
+
+(* Recursion guard: a non-trivial [0%r <= bd] left by [bdhoare-rnd] would make
+   [t_wp] fail and [auto] silently give up on [rnd]: only recurse into phl goals. *)
+and t_auto_phl_rnd_r tc =
+  match (FApi.tc1_goal tc).f_node with
+  | FhoareS _ | FbdHoareS _ | FequivS _ -> t_auto_phl_r tc
+  | _ -> t_id tc
 
 let t_auto_phl = FApi.t_low0 "auto-phl" t_auto_phl_r
 
