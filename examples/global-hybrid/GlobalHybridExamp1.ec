@@ -188,7 +188,7 @@ seq 3 :
   (1%r - (1%r / (2 ^ n)%r))
   0%r.
 + by auto.
-+ by wp; rnd (pred1 def); auto; smt(mu1_dt).
++ by wp; rnd (pred1 def); auto; smt(mu1_dt StdOrder.IntOrder.expr_gt0).
 + conseq (: _ ==> _ : = 1%r).
   while (true) (m - i) => [z |].
   + by auto; smt(dt_ll).
