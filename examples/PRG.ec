@@ -551,7 +551,11 @@ section.
     rewrite
       (@BIA.big_cat_int (qF + size P.logP{hr} + 1) (_ + List.size _))
       ?BIA.big_int1 /#.
-  by skip; progress=> /#.
+  + by skip; progress=> /#.
+  + by move=> &hr [#] _ _ _ ->.
+  move=> &hr; case: (Bad P.logP{hr} F.m{hr})=> //=.
+  apply/divr_ge0; 2:smt(Support.card_gt0).
+  by apply/le_fromint/Bigint.sumr_ge0_seq=> a /mem_range; smt(ge0_qF size_ge0).
   qed.
 
   lemma conclusion &m:
