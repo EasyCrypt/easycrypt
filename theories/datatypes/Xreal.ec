@@ -1,4 +1,4 @@
-require import AllCore RealSeries List Distr StdBigop DBool DInterval.  
+require import AllCore RealSeries List Distr StdBigop DBool DInterval Set List.  
 require import StdOrder.
 require Subtype Bigop.
 import Bigreal Bigint RealOrder Biased.
@@ -70,8 +70,8 @@ abbrev (%r) = to_real.
 abbrev (%rp) = of_reald.
 
 lemma of_realKd_ge0 (x : real): 0%r <= x => x%rp%r = x.
-proof. smt(of_realdK to_realP). qed.
-
+    proof. smt(of_realdK to_realP). qed.
+  
 lemma of_reald_pinj (x y:real):
   0%r <= x => 0%r <= y => x%rp = y%rp => x = y.
 proof.
@@ -110,6 +110,11 @@ abbrev (/) (x y : realp) : realp = x * inv y.
 abbrev (<=) (x y : realp) = x%r <= y%r.
 abbrev (<) (x y : realp)  = x%r < y%r.
 
+
+lemma zK : 0%rp%r = 0%r.
+proof. rewrite !of_realKd_ge0 ?addr_ge0 //.
+qed.
+
 lemma addrpA: associative Rp.(+).
 proof.
 move=> x y z; rewrite /(+).
@@ -122,9 +127,12 @@ proof.
 move=> x y; rewrite /(+).
 by congr; exact: RField.addrC.
 qed.
+    
 
 lemma add0rp: left_id 0%rp (+).
-proof. done. qed.
+proof.
+  move => x; apply/to_real_inj; rewrite /(+) zK //=.
+qed.  
 
 lemma mulrpA: associative Rp.( * ).
 proof.
@@ -140,7 +148,9 @@ by congr; exact: RField.mulrC.
 qed.
 
 lemma mul1rp: left_id 1%rp Rp.( * ).
-proof. done. qed.
+proof.
+move => x. apply/to_real_inj; rewrite /( *) (of_realKd_ge0 1%r) //.
+qed.
 
 lemma one_neq0_rp: 1%rp <> 0%rp.
 proof. by rewrite -negP=> eq_10; move: (of_reald_pinj 1%r 0%r _ _). qed.
@@ -184,7 +194,7 @@ proof. smt (of_realdK to_realP). qed.
 lemma to_realI x : (inv x)%r = inv x%r.
 proof. smt (of_realdK to_realP Real.invr0). qed.
 
-hint simplify to_realD, to_realM, to_realI.
+hint simplify to_realD, to_realM , to_realI.
 
 lemma of_realD x y : 0.0 <= x => 0.0 <= y => 
    (x + y)%rp = x%rp + y%rp.
@@ -195,13 +205,8 @@ lemma of_realM x y : 0.0 <= x => 0.0 <= y =>
 proof. smt (of_realdK to_realP). qed.
 
 lemma of_realI (x:real) : (inv x)%rp = inv x%rp.
-proof.
-case: (0%r <= x)=> [ge0_x|/ltrNge lt0_x].
-+ rewrite -{1}(of_realdK x) 1:#smt:(divr0).
-  by rewrite -to_realI to_realKd.
-by rewrite (of_real_neg x) // of_real_neg // invr_lt0.
-qed.
-hint simplify of_realI.
+proof. smt (of_realdK to_realP  of_real_neg divr0). qed.
+(* hint simplify of_realI. *) (* TODO !! loop with to_realI *)
 
 op (%pos) (x:real) = if 0.0 <= x then x else 0.0.
 
@@ -210,13 +215,13 @@ proof. by rewrite /(%pos) => ->. qed.
 hint simplify to_pos_pos @10.
 
 lemma le_pos (x y : real) : x <= y => x%pos <= y%pos
-by smt(). 
+by smt().
 
 lemma inv_pos x : inv x%pos = (inv x)%pos
 by smt(divr0).
 
 lemma to_real_of_real (x:real) : x%rp%r = x%pos.
-proof. by rewrite to_real_of_reald witness_0. qed.
+proof. by rewrite to_real_of_reald witness_0 zK. qed.
 hint simplify to_real_of_real.
 
 lemma to_pos_mu ['a] (d : 'a distr) (e: 'a -> bool) : 
@@ -366,6 +371,16 @@ lemma smulrp x y : x ** rp y =  rp (x * y).
 proof. by rewrite /( ** ); case: (x = of_reald 0.0). qed.
 hint simplify smulrp.
 
+lemma msmulmAC (x y :realp) (z : xreal) : x * y ** z = x ** (y ** z).
+    proof.
+  case (x = 0%rp) => [-> | hx ] //=.
+  case (y = 0%rp) => [-> | hy ] //=.
+  case z => [ r | ] //=; first by rewrite mulmA.
+  rewrite /( **) hx hy //=. print of_reald_pinj.
+  have -> : (x * y <> 0%rp). rewrite /( *). by smt(@Rp). (* ??? *)
+  done.  
+qed.  
+
 (* -------------------------------------------------------------- *)
 
 lemma xle0x x : 0%xr <= x.
@@ -383,7 +398,7 @@ proof. by move=> ->; rewrite xlexx. qed.
 lemma xlexoo_simpl x : x <= oo = true.
 proof. by case: x. qed.
 
-hint simplify xlexx_simpl, xlexoo_simpl.
+hint simplify xle0x, xlexx_simpl, xlexoo_simpl.
 
 lemma xltxx x : !x < x.
 proof. by case: x. qed.
@@ -393,9 +408,42 @@ proof. by move=> ->; rewrite xltxx. qed.
 
 hint simplify xltxx_simpl.
 
+
 lemma xle_trans (y x z : xreal) : x <= y => y <= z => x <= z.
+proof. case: z => // z; case: y => // y; case: x => //=; smt(@Rp). qed.
+
+lemma xlt_le_trans (y x z : xreal) : x < y => y <= z => x < z.
+proof. case: z => //; case: y => //; case: x => //=; smt(@Rp). qed.
+
+lemma xle_lt_trans (y x z : xreal) : x <= y => y < z => x < z.
+proof. case: z => //; case: y => //; case: x => //=; smt(@Rp). qed.
+
+lemma xle_tot (x y : xreal) : x <= y \/ y <= x.
+proof. case: x => // x; case: y => // y; smt(@Rp). qed.
+
+lemma xle_antisym (x y : xreal) : x <= y => y <= x <=> x = y.
+proof. case: x => //; case: y => //; smt(@Rp). qed.
+
+lemma xle_le  (a b : realp) : a%xr <= b%xr <=> to_real a <= to_real b.
+proof. by []. qed.    
+
+lemma nxlt_xle (x y : xreal) : !(y < x) <=> x <= y.
+proof. by move=> *; case: (xle_tot x y) => //; smt(@Rp). qed.
+
+lemma xle_nxlt (x y : xreal) : x <= y => !(y < x).
+proof. by move=> *; case: (xle_tot x y) => //; smt(@Rp). qed.
+
+lemma xle_eps (x y : xreal) :
+  (forall eps, 0%r < eps => x <= y + eps%xr) => x <= y.
 proof.
-  case: z => // z; case: y => // y; case: x => //=; smt(@Rp).
+  move=> h.
+  case: x h => [rx | ] h.
+  - case: y h => [ry | ] h.
+    + rewrite -nxlt_xle //=; apply contraT => *.
+      have := h ((to_real rx - to_real ry) / 2%r) _; by smt().
+    + by [].
+  - case: y h => [ry | ] h => //.
+    by have := h 1%r _ => //.
 qed.
 
 lemma xle_add_r x y : x <= x + y.
@@ -442,8 +490,8 @@ proof.
 rewrite (of_realdK 0%r) //.
 move=> hx y z; case: z => // z; case: y => // y.
 by rewrite /= -!to_realM !to_realM ler_pmul2r.
-qed.
-
+qed
+.
 lemma xler_wpmul2r (x : realp) (y z : xreal) :
   y <= z => y * x%xr <= z * x%xr.
 proof. case: z => // z; case: y => // y; smt(to_realP). qed.
@@ -702,50 +750,645 @@ lemma mulr_sumr ['a] (P : 'a -> bool) (F : 'a -> xreal) (s : 'a list) (x : realp
 proof. apply (big_comp (fun y => x ** y)) => //=; apply smulmDr. qed.
 
 
+lemma big_sub_le (f : 'a -> xreal) (I U : 'a list) :
+  uniq I => (forall i, mem I i => mem U i) => 
+  big predT f I <= big predT f U.
+proof.
+elim: I U => [| i I' IH] U.
+- by move=> _ _ /=; rewrite big_nil.
+- move=> /= [hniI' huniqI'] hsub.
+  have hiU : mem U i by apply hsub; left.
+  have hp : perm_eq U (i :: rem i U) by apply perm_to_rem.
+  rewrite (eq_big_perm _ _ _ _ hp) !big_cons /predT //=.
+  apply xler_addl; apply IH => //=.
+  + move=> j hjI'. have := hsub j _. right. done.
+    by smt( perm_eq_mem).
+qed.
+
+lemma big_le (f,g : 'a -> xreal) (P : 'a -> bool) (I : 'a list) :
+    (forall a, P a => f a <= g a) => big P f I <= big P g I.
+proof.
+  move => h.    
+  elim I.
+  - by rewrite !big_nil.
+  - move => a I IH.
+  rewrite !big_cons; case (P a) => *; [apply xler_add; [exact (h a) | exact IH] | exact IH].
+qed.
 (* -------------------------------------------------------------------- *)
 
-op psuminf ['a] (f : 'a -> xreal) =
-  if summable (to_real f) then (sum (to_real f))%xr else oo.
+op xlub (P : xreal -> bool) : xreal.
 
-op Ep ['a] (d : 'a distr) (f : 'a -> xreal) =
-  let g = d ** f in
-  if is_real g then psuminf g else oo.
+axiom xlub_ub (P : xreal -> bool) (x : xreal) :
+  P x => x <= xlub P.
 
-lemma psuminfZ ['a] (c:realp) (f: 'a -> xreal) :
-  is_real f => c <> of_reald 0.0 =>
-  psuminf (fun x => rp c * f x) = rp c * psuminf f.
+axiom xlub_le (P : xreal -> bool) (b : xreal) :
+    (forall x, P x => x <= b) => xlub P <= b.
+
+lemma xlub_adherent (P : xreal -> bool) (c : xreal) :
+  c < xlub P => (exists b, P b /\ c < b).
 proof.
-  move=> hf hc; have heq := summableZ_iff (to_real f) (to_real c) _; 1:smt(@Rp).
-  rewrite /psuminf to_realZ -heq. 
-  case: (summable (to_real f)) => // hs.
-  rewrite sumZ of_realM //.
-  by apply ge0_sum => /= x; apply to_realP.
+  move=> hzlt.
+  apply/contraT => *.
+  have hub : forall x, P x => x <= c by smt().
+  have := xlub_le P c hub.
+  smt().
 qed.
 
-lemma psumifD (f1 f2 : 'a -> xreal) : 
-  is_real f1 => is_real f2 => 
-  psuminf (fun x => f1 x + f2 x) = psuminf f1 + psuminf f2.
+lemma xle_xlub (P : xreal -> bool) (w x : xreal) :
+  P w => x <= w => x <= xlub P.
+proof. by move=> *; apply (xle_trans w); [ done | exact xlub_ub]. qed.
+
+
+lemma xlt_xlub  (P : xreal -> bool)  (w x : xreal) :
+  P w => x < w => x < xlub P.
+proof. by move=> *; apply (xlt_le_trans w); [ done | exact xlub_ub]. qed.
+
+lemma xlub_eq (B A : xreal -> bool) :
+  (forall r, A r = B r) => xlub A = xlub B.
+proof. move => *. congr; apply fun_ext. done. qed.
+
+lemma xlub_mono (P Q : xreal -> bool) :
+  (forall x, P x => Q x) => xlub P <= xlub Q.
+  proof. by move=> h; apply xlub_le => x /h hQx; apply xlub_ub. qed.
+
+lemma xlub_mono_dom (A B : xreal -> bool) :
+  (forall a, A a => exists b, B b /\ a <= b) => xlub A <= xlub B.
 proof.
-  move=> h1 h2; rewrite /psuminf; rewrite to_realD //.
-  case: (summable (fun (x : 'a) => to_real (f1 x) + to_real (f2 x))) => hs.
-  + have hs1 := summable_le _ (to_real f1) hs _; 1: smt(Rpbar.to_realP).
-    have hs2 := summable_le _ (to_real f2) hs _; 1: smt(Rpbar.to_realP).
-    by rewrite hs1 hs2 /= sumD // of_realD //; apply ge0_sum => x /=; apply to_realP.
-  by case: (summable (to_real f1)); case (summable (to_real f2)) => // hs1 hs2 /=; apply/hs/summableD.
+  move=> hdom; apply xlub_le => a hAa.
+  have [b [hBb hab]] := hdom a hAa.
+  apply (xle_trans b); [exact hab | by apply xlub_ub].
 qed.
 
-lemma le_psuminf (f g : 'a -> xreal) :
-  (forall (x : 'a), f x <= g x) => 
-  is_real g => 
-  psuminf f <= psuminf g.
+
+lemma xlub_set0 : xlub set0 = 0%xr.
+proof. apply xle_antisym. apply xlub_le => //=. done. qed.
+
+lemma xlub_set1 x : xlub (set1 x) = x.
+proof. apply xle_antisym; [by apply xlub_le | by apply xlub_ub]. qed.
+
+
+lemma xlub_top (P : xreal -> bool) : P oo => xlub P = oo.
+proof. move=> hPoo; apply xle_antisym; [done | exact xlub_ub]. qed.
+  
+
+lemma xlub_xlub (A : 'a -> bool) (S : 'a -> xreal -> bool) :
+  xlub ((fun a => xlub (S a)) `$` A) = xlub (bigcup A S).
 proof.
-  rewrite /psuminf => h hg.
-  case: (summable (to_real g)) => // hgs.
-  have h1 : forall (x : 'a), 0%r <= to_real f x && to_real f x <= to_real g x by smt(Rp.to_realP).
-  have -> /= := summable_le_pos (to_real f) (to_real g) hgs h1.
-  have:= ler_sum_pos (to_real f) (to_real g) h1 hgs.
-  exact: le_pos.
+  apply xle_antisym.
+  - apply xlub_le => z [a [hAa ->]].
+    by apply xlub_le => w hSaw; apply xlub_ub; exists a.
+  - apply xlub_le => z [a [hAa hSaz]].
+    apply (xle_trans (xlub (S a))); first by apply xlub_ub.
+    by apply xlub_ub; exists a.
 qed.
+
+lemma xlub_prod (A: 'a -> bool) (B : 'b -> bool) (f : 'a -> 'b -> xreal):
+  xlub ((fun a => xlub ((fun b => f a b) `$` B)) `$` A)  = xlub ((fun (p : 'a * 'b) => f p.`1 p.`2) `$` (Set.(`*`) A B)).
+proof.
+  rewrite xlub_xlub prod_eq_bigcup bigcup_image //=.
+  congr; rewrite /bigcup fun_ext => r.
+  apply eq_iff; split.
+  - move => [a [Aa //= /imageP [b [Bx -> ]]]].
+    by exists b; rewrite /(`$`) Bx //=; exists (a,b); smt().
+  - move => [b [bB /imageP [p [/imageP [a [Aa //= *]] *]]]]. 
+    by exists a; rewrite /(`$`) Aa //=; exists p.`2; smt().
+qed.
+
+
+lemma xlub_addl (a : xreal) (P : xreal -> bool) :
+  (exists p, P p) =>
+  a + xlub P = xlub ((fun p => a + p) `$` P). 
+proof.
+move=> [p0 hp0].
+  apply xle_antisym.
+  - case: a => /=.
+    + move=> ra.
+      have Ecases : xlub P = oo \/ exists (rp : realp), xlub P = rp%xr by smt(). 
+      case: Ecases => [Eoo | [lubP Efin]].
+      * apply (xle_trans (xlub P)); first by rewrite Eoo; auto.
+        apply xlub_mono_dom => x Px. exists (ra%xr + x) => //=.
+        split; [ by exists x |  apply xle_add_l]. 
+      * pose L := xlub ((+) ra%xr `$` P).
+        apply nxlt_xle; apply negP => hlt.
+        have [x Ex] : exists (x : realp), L = x%xr.
+        by case: L hlt => [x | ] *; [exists x | smt()].
+        move: hlt; rewrite Ex Efin => hlt.
+        have *: ra%xr <= x%xr by rewrite -Ex; apply (xle_trans (ra%xr + p0)); [apply xle_add_r | apply xlub_ub; exists p0; auto ].
+        have below : (x%r - ra%r)%xr < xlub P. smt(@Rp).
+        have [p [hPp hpz]] := (xlub_adherent _ _ below).
+        have * : ra%xr + p <= x%xr by rewrite -Ex; apply xlub_ub; exists p.
+        smt(@Rp).
+    + by apply xlub_ub; exists p0.
+  - by apply xlub_le => z [p [hPp ->]] //=; apply xler_addl; apply xlub_ub.
+qed.
+
+lemma xlub_addr (a : xreal) (P : xreal -> bool) :
+   (exists p, P p) =>
+   xlub P + a = xlub ((fun p => p + a) `$` P).
+proof.
+  move=> hex.
+  rewrite addmC (xlub_addl a P hex).
+  by congr; smt(addmC).
+qed.
+
+lemma xlub_add (A B : xreal -> bool) :
+  (exists a, A a) => (exists b, B b) =>
+    xlub A + xlub B = xlub ((fun (p : xreal * xreal) => p.`1 + p.`2) `$` (A `*` B)).
+proof.
+  move=> [a aA] [b bB].
+  rewrite xlub_addl; first by exists b.
+  have ->: xlub ((fun (p : xreal) => xlub A + p) `$` B)
+               = xlub ((fun p => xlub ((fun q => q + p) `$` A)) `$` B).
+                + congr; apply fun_ext => q; apply eq_iff; apply exists_eq => x //=.
+                 by rewrite -xlub_addr; first by exists a.
+  rewrite xlub_xlub prod_eq_bigcup bigcup_image.
+  by congr; apply bigcup_eq => r //= Br; apply fun_ext => s; rewrite !imageP; smt().
+qed.
+
+lemma xlub_bigsum (f : 'a -> xreal set) (J : 'a list) :
+  uniq J => (forall a, mem J a => nonempty (f a)) =>
+  big predT (fun a => xlub (f a)) J =
+    xlub ((fun g => big predT g J) `$` (mem J `->` f)).
+elim: J => [| a J' IH].
+- move=> _ _ /=.
+  rewrite big_nil.
+  have -> : (mem [] `->` f) = setT by rewrite /(`->`).
+  have -> : (fun (g : 'a -> xreal) => big predT g []) = (fun g => 0%xr).
+  - by rewrite fun_ext => g /=; rewrite big_nil.
+  by rewrite image_const //= xlub_set1.  
+- move=> [aU J'u] hnE.
+  rewrite big_cons /predT //=.
+  have * : forall (a0 : 'a), a0 \in J' => exists (a1 : xreal), f a0 a1 by smt(). 
+  have * : nonempty (f a) by smt().
+  rewrite IH //=.
+  have * :  nonempty ((fun (g : 'a -> xreal) => big predT<:'a> g J') `$` (mem J' `->` f)).
+    + exists (big predT (fun a' => choiceb (f a') witness) J').
+      apply/imageP; exists (fun a' => choiceb (f a') witness); split; [| done].
+      by rewrite /(`->`) => a' ha'; apply (choicebP (f a') witness); smt().
+  rewrite xlub_add //=.
+  congr; rewrite fun_ext => z /=; rewrite /(`$`) eq_iff //= .  
+  split.
+  - move=> [p]; rewrite /(`*`); move => [[fap1 [g [gg ->]]]] ->.
+    exists (fun a' => if a' = a then p.`1 else g a'); rewrite /(`->`).
+    split. 
+    + move=> a' ha'. case: (a' = a) => [-> //= |]; by smt().
+    + rewrite big_cons /=.
+      congr; apply eq_big_seq => a' ha' /=. by smt().
+  - move=> [g [hg ->]].
+    exists (g a, big predT g J'); rewrite /(`*`) //=.
+    split; [split; [smt() | exists g => //=; smt()] | by rewrite big_cons].
+qed.    
+
+lemma xlub_mull (c : realp) (P : xreal -> bool) :
+  0%rp < c =>
+  c%xr * xlub P = xlub ((fun x => c%xr * x) `$` P) .
+proof.
+  move=> c_nneg.
+  have hmul1 : (inv c)%xr * c%xr = 1%xr by smt(of_realdK to_realP).
+  have invc_nneg: 0%rp < inv c. smt(@Rp).
+  apply xle_antisym.
+  - apply (xler_pmul2l _ invc_nneg); rewrite mulmA hmul1 //=.
+    apply xlub_le => x hPx.
+    apply (xle_trans ((inv c)%xr * (c%xr * x))).
+    * by rewrite mulmA hmul1. 
+    apply xler_mull; apply xlub_ub.
+    by apply imageP; exists x.
+  - apply xlub_le => z /imageP [x [hPx ->]] //=.
+    apply (xler_pmul2l _ c_nneg). exact xlub_ub.
+qed.
+
+lemma xlub_mulr (c : realp) (P : xreal -> bool) :
+  0%rp < c =>
+  xlub P * c%xr = xlub ((fun x => x * c%xr) `$` P) .
+proof.
+  move=> c_nneg.
+  rewrite mulmC xlub_mull //.
+  by congr; smt(mulmC).
+qed.    
+
+lemma xlub_scale_mdl (c :realp) (P : xreal -> bool) :
+  c ** xlub P = xlub (( ** ) c `$` P). 
+proof.
+  case ( (c = 0%rp) ) => [-> //= | hc].
+  * case (empty P) => [ /empty_set0 -> | /negb_forall //= [x px]]; first by rewrite image_set0 xlub_set0.
+    rewrite /(`$`) //= (xlub_eq (set1 0%xr)).
+    + by move => r //=; apply eq_iff; split; [  | move => <-; exists x]. 
+    by rewrite xlub_set1.
+  + have : (0%rp < c) by smt(@Rp).
+    by rewrite /( ** ) hc //=; exact xlub_mull.
+qed.  
+
+(* xsum *)
+
+
+op xsum  (s : 'a -> xreal) : xreal = xlub (big predT s `$` uniq).
+
+
+
+lemma xsum_eq (g f : 'a -> xreal) :
+  (forall a, f a = g a) => xsum f = xsum g.
+proof.
+  move=> hfg; apply xlub_eq => r /=.
+  by apply/eq_iff; split=> [/imageP [J [huJ ->]] | /imageP [J [huJ ->]]] //=;
+     apply/imageP; exists J; split=> //; apply eq_big_seq => a _ /=; rewrite hfg.
+qed.
+
+lemma xsum_le (f g : 'a -> xreal) :
+  (forall a, f a <= g a) => xsum f <= xsum g.
+proof.
+  move=> hfg; apply xlub_mono_dom => r /imageP [J [huJ ->]].
+  exists (big predT g J); split.
+  - apply/imageP; exists J; split=> //.
+  - by apply big_le.
+qed.
+
+lemma xsum_inj_le (s : 'a -> xreal) (h : 'b -> 'a) :
+  injective h => xsum (s \o h) <= xsum s.
+proof.
+  move=> hinj; apply xlub_le => z /imageP [Jb [huniqJb ->]].
+  apply xlub_ub; apply/imageP; exists (map h Jb); rewrite big_map //=.
+  rewrite map_inj_in_uniq //=.
+  - move => x y hx hy; exact hinj. 
+qed.
+
+lemma xsum_reindex (s : 'a -> xreal) (h : 'b -> 'a) (h' : 'a -> 'b) :
+  injective h => cancel h' h => xsum s = xsum (s \o h).
+proof.
+  move=> hinj hK.
+  apply xle_antisym.
+  - have h'inj : injective h' by move=> x y heq; rewrite -(hK x) -(hK y) heq.
+    have {1}<- : (s \o h) \o h' = s by rewrite fun_ext /(\o) => y //=; rewrite hK.
+    apply (xsum_inj_le); exact h'inj.
+  - exact (xsum_inj_le s h hinj).
+qed.
+
+lemma xsum_oo (f : 'a -> xreal) (a : 'a) : f a = oo => xsum f = oo.
+proof.
+  move => ha.
+  apply xle_antisym => //=.
+  apply xlub_ub; apply/imageP.
+  by exists [a]; rewrite big_cons /predT big_nil  ha. 
+qed.
+
+lemma xsum_0 (f : 'a -> xreal) : (forall (a : 'a), f a = 0%xr) => (xsum f = 0%xr).
+proof.
+  + move => hf. apply xle_antisym.
+    * by apply xlub_le => x /imageP [L [uL ->]]; rewrite big1 //.
+    * by apply xlub_ub; exists [].
+qed.
+
+lemma xsum_0P (f : 'a -> xreal) : (xsum f = 0%xr) <=> (forall (a : 'a), f a = 0%xr).
+  split.  
+  + move => hf a; apply xle_antisym. 
+    * by rewrite -hf; apply xlub_ub; exists [a]; rewrite big_cons big_nil /predT. 
+    * done.
+  exact xsum_0.
+qed.
+
+(*
+lemma xsum_ne0 (f : 'a -> xreal) : (exists (a : 'a), f a <> 0%xr) => (xsum f <> 0%xr).
+    smt(xsum_0P).
+qed.
+
+lemma xsum_ne0P (f : 'a -> xreal) : (xsum f <> 0%xr) <=> (exists (a : 'a), f a <> 0%xr).
+proof. smt(xsum_0P). qed.
+    *)
+
+(* -------------------------------------------------------------------- *)
+lemma xsum_fin J f : 
+  uniq J => 
+  (forall (a : 'a), f a <> 0%xr => a \in J) =>
+  xsum f = big predT f J.
+proof.
+  move => uJ fJ.  
+  apply xle_antisym.
+  * apply xlub_le => x /imageP [L [uL ->]].
+    rewrite (bigID _ _ (fun a => a \in J)).
+    rewrite (big1_seq (fun (x0 : 'a) => ! (x0 \in J))) //=.
+    + by move=>a; apply absurd; move => h; rewrite (fJ _ h).
+    rewrite -big_filter.
+    apply big_sub_le; first by exact: filter_uniq.
+    by move => a /mem_filter.
+  by apply xlub_ub; exists J.
+qed.
+  
+    (* todo *)
+lemma to_real_is_real (x : xreal) : is_real x => (to_real x)%xr = x.
+proof. case x; smt(of_realdK to_realP). qed.
+  
+
+lemma to_real_is_realF (f : 'a -> xreal) (a : 'a) : is_real f => (to_real f a )%xr = f a.
+proof. smt(to_real_is_real). qed.
+(*end*)
+
+lemma xsum_neq_oo (f : 'a -> xreal) :
+    xsum f <> oo <=> (is_real f /\ summable (to_real f)).
+proof.
+  split.
+  - move=> fin.
+    have ir_f: is_real f by move: fin; apply contraR => [/is_realPn [a ha]]; exact (xsum_oo _ _ ha).
+    rewrite ir_f //=.
+    have [M [ubM M_ge0]] : exists (M : real), xsum f = M%xr /\ 0%r <= M. 
+      case (xsum f) fin; [move => rp *; by exists (to_real rp) | done].
+    exists M => J uJ.
+    have //= : (BRA.big predT<:'a> (fun (i : 'a) => `|to_real f i|) J)%xr <= M%xr.
+    + rewrite -ubM -bigXR; first by move => * /=; exact normr_ge0.
+      apply (xle_xlub _ (BXA.big predT f J)).
+      - apply/imageP; exists J => //.
+        apply big_le => a _ //=; rewrite ger0_norm //=; first by exact to_realP.
+        by rewrite to_real_is_realF //.
+    by rewrite (to_pos_pos M) //; smt(). 
+  - move => [irf [M hM]].
+    have //= : xsum f <= M%xr.
+    + apply xlub_le => x /imageP [J [uJ ->]].
+      apply (xle_trans (BRA.big predT<:'a> (fun (i : 'a) => `|to_real f i|) J)%xr).
+      + rewrite -bigXR; first by move => * /=; exact normr_ge0.
+        by apply big_le => a _ //=; rewrite ger0_norm ?to_realP //= to_real_is_realF //.
+      simplify; apply le_pos; exact (hM J uJ). 
+    by case (xsum f).     
+qed.
+
+    
+lemma xsum_fin_sum (f : 'a -> xreal) :
+  is_real f => summable (to_real f) => xsum f = (sum (to_real f))%xr.
+  move => ir sf; rewrite /sum sf //=.
+  have ->: neg (to_real f) = fun _ => 0%r.
+  have f_nneg: forall a, 0%r <= to_real f a by smt(to_realP).
+    + apply fun_ext => a; by smt().
+    have -> /=: psum (fun (_ :'a) => 0%r) = 0%r by apply psum_eq0P; [exact summable0 | done].
+  case (xsum f = oo); first by smt(xsum_neq_oo).
+  move => xsum_fin.  
+  have [M [ubM M_ge0]] : exists (M : real), xsum f = M%xr /\ 0%r <= M by case (xsum f) xsum_fin; [move => rp *; by exists (to_real rp) | done].
+  apply xle_antisym.
+  - apply xlub_le => x /imageP [J [uJ ->]].
+    have -> : pos (to_real f) = to_real f by apply fun_ext => a /=; smt(to_realP).
+    have -> : big predT f J = big predT (fun a => (`|to_real f a|)%xr) J.
+    by apply eq_big_seq => a _ //=; rewrite ger0_norm ?to_realP to_real_is_realF //.
+    rewrite bigXR //=; first by move => * /=; exact normr_ge0.
+    apply le_pos; exact (ler_big_psum (to_real f) J sf uJ). 
+  - rewrite ubM //=; apply le_pos.
+    apply ler_psum_lub => J uJ.
+    rewrite (BRA.eq_big_seq _ (to_real f)); first by smt(ger0_norm to_realP).
+    have : big predT (fun x => (to_real f x)%xr) J <= M%xr.
+    + rewrite -ubM; apply xlub_ub.
+      exists J; rewrite uJ //=.
+      apply eq_big_seq => a _ //=;  exact to_real_is_realF. 
+    rewrite bigXR //=; first by move => * //=; exact to_realP.
+    by smt().
+qed.
+
+lemma xsumD (f g : 'a -> xreal) : xsum (f + g) = xsum f + xsum g.
+proof.    
+  rewrite xlub_add; [by exists 0%xr; exists [] | by exists 0%xr; exists [] | ].
+  rewrite /xsum; apply xle_antisym.
+  + apply xlub_mono_dom => x //=.
+    move => [J [uJ xs]].
+    exists x => //=; rewrite imageP.
+    exists (big predT f J, big predT g J); rewrite prodP //= -big_split xs //=.
+    by split; exists J => //=.
+  + apply xlub_mono_dom => x //=.
+    move=> /imageP [[a b] [/prodP [/imageP [I [uI ->]] /imageP [J [uJ ->]]] ->]].
+    pose U := undup (I ++ J).
+    exists (big predT (f + g) U).
+    split.
+    + exists U; split; [exact (undup_uniq _) | done].
+    + apply (xle_trans (big predT f U + big predT g U)); last by rewrite big_split.
+      apply xler_add; apply big_sub_le => //=; move => *; rewrite mem_undup mem_cat;
+      [by left | by right].  
+qed.
+
+  
+
+(* todo *)
+lemma undup_nseq (n : int) (a : 'a) : undup (nseq n a) = if n <= 0 then [] else [a].
+proof.
+  move: n; apply natind => n nleq0 //=.
+  - rewrite nseq0_le //= /#.
+  - by move => IH; rewrite nseqS // //= IH mem_nseq; smt(). 
+qed.
+
+lemma undup_cat (s t : 'a list) :
+  (forall x, x \in s => ! x \in t) =>
+    undup (s ++ t) = undup s ++ undup t.
+proof.
+  elim s; first by auto.  
+  move => x l IH h //=.
+  case (x \in l) => hxl. rewrite mem_cat hxl //=.
+  apply IH. by smt().
+  rewrite mem_cat hxl.
+  have hxt : ! (x \in t) by smt().
+  rewrite hxt IH; first by smt() .
+  by [].
+qed.
+
+op concatmap (f : 'a -> 'b list) (l : 'a list) : 'b list = flatten (map f l).
+
+lemma concatmap_nil ['a, 'b] (f : 'a -> 'b list) : concatmap f [] = [].
+proof. by rewrite /concatmap. qed.
+
+lemma concatmap_cons ['a, 'b] (f : 'a -> 'b list) (x : 'a) (s : 'a list) :
+  concatmap f (x :: s) = f x ++ concatmap f s.
+proof. by rewrite /concatmap /= flatten_cons. qed.
+
+lemma unzip1_cat (s t : ('a * 'b) list) :
+  unzip1 (s ++ t) = unzip1 s ++ unzip1 t.
+    proof. by elim s => //= x s ih. qed.
+
+lemma inj_pswap : injective pswap<:'a, 'b>.
+proof. by move => x y heq; rewrite -(pswapK x) -(pswapK y) heq. qed.
+
+
+
+(* end todo*)
+
+op grid (I : 'a -> 'b list) (J : 'a list) = concatmap (fun a => map (fun b => (a,b)) (I a)) J.
+
+lemma grid_uniq (I : 'a -> 'b list) (J : 'a list) :
+  uniq J => (forall a, mem J a => uniq (I a)) =>
+  uniq (grid I J).
+proof.
+elim: J => [| a J' IH].
+- by move=> _ _ /=. 
+- move=> /= [aneJ uJ] uI.
+  rewrite /grid /concatmap /= flatten_cons cat_uniq.
+  split.
+  + apply (map_inj_in_uniq (fun b => (a,b))).
+    + move=> b1 b2 b1' b2' /=. done.
+   by apply (uI a).
+  split. 
+  + rewrite hasPn => p.
+    move=> /flatten_mapP [a' [ha' /mapP [b' [hb' hpeq]]]].
+    apply/negP => /mapP [b [hb /=]].
+    by smt().
+  by rewrite IH; smt().
+qed.
+
+lemma grid_cons (a : 'a) (I : 'a -> 'b list) (J : 'a list):
+  grid I (a :: J) = map (fun b => (a,b)) (I a) ++ grid I J.
+proof. by rewrite /grid /concatmap_cons. qed.    
+
+lemma grid_filter_nil (a : 'a) (I : 'a -> 'b list) (J : 'a list) : 
+    ! mem J a => filter (fun (xy : 'a * 'b) => xy.`1 = a) (grid I J) = [].
+proof.
+  elim J; first by done.    
+  move=> x J' IH /= /negb_or [anex aniJ'].
+  rewrite grid_cons filter_cat filter_map /preim //=.
+  have ->: (fun (_ : 'b) => x = a) = pred0 by smt().
+  rewrite filter_pred0 //=. exact (IH aniJ').
+qed.
+
+lemma filter_grid (a : 'a) (I : 'a -> 'b list) (J : 'a list) :
+  uniq J =>
+  mem J a =>
+  filter (fun xy : 'a * 'b => xy.`1 = a) (grid I J) = map (fun b => (a,b)) (I a). 
+proof.
+  elim J; first by done.    
+  move => x J' IH /= [aneJ uJ'] aJ.
+  rewrite grid_cons filter_cat filter_map /preim.
+  move:  aJ aneJ IH. case (a = x) => [<- //= | //=].
+  - by move => aneJ' _; rewrite grid_filter_nil // cats0 filter_predT.
+  - move => anex ainJ' xneJ' IH.
+    rewrite IH // //.
+    have ->:  (fun (_ : 'b) => x = a) = pred0 by smt().
+  by rewrite filter_pred0 //=.
+qed.
+
+
+lemma grid_filter_nonempty (I : 'a -> 'b list) (J : 'a list) :
+  grid I J = grid I (filter (fun a => I a <> []) J).
+proof.
+  elim: J => [| a J' IH] //=.
+  rewrite grid_cons IH; case: (I a = []) => hIa /=; [ by rewrite hIa | by rewrite grid_cons ]. 
+qed.
+
+lemma undup_unzip1_grid (I : 'a -> 'b list) (J : 'a list) :
+  uniq J =>
+  (forall a, mem J a => I a <> []) =>
+  undup (unzip1 (grid I J)) = J.
+proof.
+  elim J; first by done.
+  move => a J' IH /= [aneJ uJ'] aJ.
+  rewrite grid_cons unzip1_cat.
+  have ->: forall l, unzip1 (map (fun (b : 'b) => (a, b)) l) = nseq (size l) a.
+  + move => l; elim l => //=; first by rewrite nseq0.
+    move => l ->; rewrite -nseqS; first by exact size_ge0.
+    congr; smt(). 
+  rewrite undup_cat.
+  + move => b.
+    rewrite mem_nseq -mem_undup.
+    move => [sz <-].
+    have aJ': forall (a0 : 'a), a0 \in J' => I a0 <> [] by move => c; have :=aJ c; case (c=a) => //=.
+    by rewrite (IH uJ' aJ').  
+  rewrite undup_nseq IH //.
+  + move => b. have:=aJ b; case (b = a) => //=.
+  have -> //= : !(size (I a) <= 0) by have //= := aJ a; case (I a) => //=; smt(size_ge0).
+qed.
+
+lemma xsum_pair (s : 'a * 'b -> xreal): xsum s = xsum (fun a => xsum (fun b => s (a, b))).
+proof.
+  apply xle_antisym.
+  - apply xlub_le => z /imageP [J [uJ ->]].
+    pose Ja := undup (map fst J).
+    pose Jb a := map snd (filter (fun (p : 'a * 'b) => p.`1 = a) J).
+    have uJa : forall a, uniq (Jb a).
+    - move => a; rewrite /Jb map_inj_in_uniq.
+      + move=> p1 p2 hp1 hp2 //= heq.
+        have hp1a : p1.`1 = a by move: hp1; rewrite mem_filter => -[]. 
+        have hp2a : p2.`1 = a by move: hp2; rewrite mem_filter => -[].
+        by rewrite (pairS p1) (pairS p2) hp1a hp2a heq.
+      + by apply filter_uniq.
+    have -> : big predT s J = big predT (fun a => big predT (fun b => s (a,b)) (Jb a)) Ja.
+    * rewrite (partition_big fst predT predT s J Ja (undup_uniq _)).
+      + move => p Jp _ => //=; split => //=; 
+        by rewrite mem_undup; apply mem_map_fst; exists p.`2; smt().
+      + apply eq_big_seq => a Jaa //=.
+        rewrite -big_filter /Jb.
+        have -> : (fun (y : 'a * 'b) => predT y /\ y.`1 = a) = (fun (y : 'a * 'b) => y.`1 = a) by smt().
+        rewrite (eq_big_seq _ (fun (y : 'a * 'b) => s (a, y.`2))).
+        by move => y hy; rewrite mem_filter in hy; smt().
+        by rewrite big_map //=.
+    apply (xle_trans (big predT (fun (a : 'a) => xsum (fun (b : 'b) => s (a, b))) Ja)).
+    * apply big_le => a _ //=. apply xlub_ub; rewrite /(`$`). exists (Jb a) => //=; by apply uJa.
+    * apply xlub_ub; rewrite /(`$`). by exists Ja; split; first by apply undup_uniq. 
+  - apply xlub_le => zz /imageP [J [uJ ->]].
+    rewrite xlub_bigsum // => //=.
+    - by move => a Ja; exists (big predT (fun b => s(a,b)) []); rewrite /(`$`); exists [].  
+    apply xlub_le => z /imageP [g [/funsetP gSpec ->]].
+    pose I a := choiceb (fun l => uniq l /\ g a = big predT (fun b => s (a,b)) l) [].
+    have ISpec : forall a, mem J a => uniq (I a) /\
+                               g a = big predT<:'b> (fun (b : 'b) => s (a, b)) (I a).
+    - move=> a haJa.
+      apply (choicebP (fun l => uniq l /\ g a = big predT (fun b => s (a,b)) l)). 
+      by rewrite /P; have:= gSpec a haJa; rewrite /(`$`) //=.
+    have I_uniq: forall a, a \in J => uniq (I a) by smt().
+    have I_ix_g: forall a, a \in J => g a = big predT<:'b> (fun (b : 'b) => s (a, b)) (I a). by smt().
+    (* have gSpecrid_uniq : uniq (grid I J). apply (grid_uniq _ _ uJ). gsmt(). *)
+
+     
+    have //= ->: big predT g J = big (fun a => a \in J /\ I a <> []) g J.
+    + rewrite big_seq (bigID (mem J) _ (fun a => I a <> []) _) /predI /predC.
+      have //= -> : big (fun a => (a \in J) /\ ! (I a <> [])) g J = 0%xr.
+      - apply big1 => a [haJ hIa].
+        have hIa0 : I a = [] by smt().
+       by have [_ ->] := ISpec a haJ; rewrite hIa0 big_nil.
+    by smt().
+    rewrite -big_filter.
+    have -> : filter (fun a => (a \in J) /\ I a <> []) J = filter (fun a => I a <> []) J
+    by apply eq_in_filter => a haJ /=; smt().
+    have //= -> : big predT g (filter (fun (a : 'a) => I a <> []) J) = big predT s (grid I J).
+    + rewrite (big_pair s) //=; first by rewrite grid_uniq // //.
+      rewrite grid_filter_nonempty.
+      rewrite undup_unzip1_grid; first by apply filter_uniq.    
+      - by move => a /mem_filter //=.
+      apply eq_big_seq => a haJa /=.
+      rewrite filter_grid //; first by apply filter_uniq.
+      rewrite big_map I_ix_g //.
+      by move: haJa; rewrite mem_filter => -[_ ->].
+    apply xlub_ub; apply/imageP.
+    by exists (grid I J); rewrite grid_uniq.
+qed.
+
+lemma xsum_exchange (s : 'a -> 'b -> xreal) :
+  xsum (fun a => xsum (fun b => s a b)) = xsum (fun b => xsum (fun a => s a b)).
+proof.
+  pose t (p : 'a * 'b) := s p.`1 p.`2.
+  rewrite -(xsum_pair t).
+  rewrite (xsum_reindex t pswap pswap) /t /(\o) /pswap //=; [exact inj_pswap | exact pswapK |  ].
+  by rewrite xsum_pair.
+qed.
+
+lemma xsum_scale_mdl (c : realp) (f : 'a -> xreal):
+   c ** xsum f = xsum (fun a => c ** f a) .
+proof.     
+  rewrite xlub_scale_mdl.
+  rewrite /xsum image_comp.
+  by congr; apply image_eq_in => L _ //=; exact mulr_sumr. 
+qed.
+
+lemma xsum_mull (c : realp) (f : 'a -> xreal):
+   0%rp < c => c%xr * xsum f = xsum (fun a => c%xr * f a) .
+proof.     
+  move => hc. have md: forall a, c%xr * a = c ** a by smt().
+  rewrite md (xsum_eq (fun a => c ** f a) (fun a => c%xr * f a)).
+    by move => a //=; exact md.
+  exact xsum_scale_mdl. 
+qed.
+
+lemma xsum_mulr (c : realp) (f : 'a -> xreal):
+   0%rp < c => xsum f * c%xr = xsum (fun a => f a * c%xr) .
+proof.
+  move => hc.
+  rewrite mulmC.
+  have ->: (fun a => f a * c%xr) = (fun a => c%xr * f a)
+    by apply fun_ext; move => a //=; exact mulmC.
+  exact xsum_mull.
+qed.
+
+
+
+
+op Ep (d : 'a distr) (f : 'a -> xreal) : xreal =
+  xsum (fun a => (mu1 d a) ** f a).
 
 lemma eq_Ep ['a] (d : 'a distr) (f g : 'a -> xreal) :
   (forall (x : 'a), x \in d => f x = g x) => 
@@ -756,72 +1399,70 @@ lemma le_Ep ['a] (d: 'a distr) (f g : 'a -> xreal) :
    (forall (x : 'a), x \in d => f x <= g x) => 
   Ep d f <= Ep d g.
 proof.
-  rewrite /Ep /= => h; case: (is_real (d ** g)) => //.
-  move=> h1; rewrite (is_real_le_md _ _ _ h h1) /=.
-  apply le_psuminf => //= x; apply/xler_md/h.
+  by rewrite /Ep /= => h; apply xsum_le => a //=; apply/xler_md/h.
 qed.
 
 lemma EpC ['a] (d : 'a distr) (c : xreal):
    Ep d (fun (_ : 'a) => c) = (weight d) ** c.
 proof.
-  case: c => [c | ].
-  + rewrite /Ep /= is_real_rp /=. 
-    rewrite /psuminf /= to_real_rp /=.
-    have -> : (fun (x : 'a) => mu1 d x * to_real c) = (fun (x : 'a) => to_real c * mu1 d x ).
-    + by apply fun_ext => x; apply RField.mulrC.
-    have /summableZ /= -> /= := summable_mu1 d.
+  have to_real_mdfun': forall (f : 'a -> xreal), to_real (d ** f) = fun (x : 'a) => to_real (f x) * mu1 d x. 
+    by move => f; rewrite to_real_mdfun; apply fun_ext => a; apply RField.mulrC.    
+  rewrite /Ep; case: c => [c | ].
+  + rewrite xsum_fin_sum //.
+    + rewrite to_real_mdfun' //=.
+      exact (summableZ _ _ (summable_mu1 d)).
+    rewrite to_real_mdfun' //=.
     by rewrite mulmC sumZ /= of_realM // 1: ge0_sum //= weightE; do 3! congr.
-  rewrite /Ep /=; case: (weight d = 0%r) => hw.
-  + have hx : forall x, mu1 d x = 0%r.
-    + move=> x; have := mu_le_weight d (pred1 x); smt(mu_bounded).
-    have -> : (fun (x : 'a) => mu1 d x ** oo) = (fun (x:'a) => 0%xr). 
-    + by apply fun_ext => x; rewrite hx.
-    by rewrite is_real_rp /= /psuminf /= to_real_rp /= summable0 /= sum0 hw.
-  rewrite /( **) /=. 
-  have -> : !is_real (fun (x : 'a) => if (mu1 d x)%rp = 0%rp then 0%xr else oo).
-  + apply/negP => his.
-    move/neq0_mu : hw => -[x [hx _]].
-    by have := his x; smt(of_realdK to_realP ge0_weight).
-  by have -> : (weight d)%rp <> 0%rp by smt(of_realdK to_realP ge0_weight).
+  case (exists a, 0%r < mu1 d a) => [[a ha] | /negb_exists //= ha].
+  + rewrite (xsum_oo _ a); first by smt(@Rp).
+    rewrite eq_sym; apply md_eqinfP => //=.
+    by smt(weight_eq0 ge0_weight).
+  have mu1_0: forall a, mu1 d a = 0%r by smt(ge0_mu1).
+  have -> //= : weight d = 0%r. rewrite weightE; rewrite sump_eq0P // ?summable_mu1.
+  apply xsum_0.
+  by move => a //=; rewrite mu1_0.
+qed.
+
+lemma EpsZ ['a] (d: 'a distr) (c:realp) (f: 'a -> xreal) :
+  Ep d (fun x => c ** f x) = c ** Ep d f.
+proof.
+  rewrite /Ep xsum_scale_mdl.
+  by apply xsum_eq => a //=; rewrite /( ** ); smt(@Rp). 
 qed.
 
 lemma EpZ ['a] (d: 'a distr) (c:realp) (f: 'a -> xreal) :
   c <> of_reald 0.0 => 
   Ep d (fun x => rp c * f x) = rp c * Ep d f.
-proof. 
-  move=> hc; rewrite /Ep /= (is_realMd f); 1: by move=> x _ /=; rewrite is_realM. 
-  case: (is_real (d ** f)) => // hr; rewrite /psuminf.
-  rewrite mdCA /= to_realM /=.
-  rewrite -summableZ_iff 1:#smt:(@Rp); rewrite /to_real.
-  case: (summable (fun (x : 'a) => to_real (of_reald (mu1 d x) ** f x))) => // ?.
-  rewrite sumZ /= of_realM // ge0_sum => /= ?; apply to_realP.
+proof.
+  move=> hc. rewrite /Ep xsum_mull; first by smt(@Rp).
+  apply xsum_eq => a //=. rewrite /( ** ). smt(@Rp).
 qed.
 
-lemma EpsZ ['a] (d: 'a distr) (c:realp) (f: 'a -> xreal) :
-  Ep d (fun x => c ** f x) = c ** Ep d f.
-proof. 
-  rewrite /( ** ); case: (c = of_reald 0%r) => ?; last by apply EpZ.
-  by rewrite EpC.
-qed.
 
 lemma EpD ['a] (d : 'a distr) (f1 f2 : 'a -> xreal) : 
   Ep d (f1 + f2) = Ep d f1 + Ep d f2.
 proof.
-  rewrite /Ep /= mdDr.
-  have /= := is_realD (d ** f1) (d ** f2).
-  case: (is_real (fun x => of_reald (mu1 d x) ** f1 x + of_reald (mu1 d x) ** f2 x)) => h />.
-  + by move=> h1 h2; rewrite -psumifD.
-  by case: (is_real (d ** f1)) => />.
+  rewrite /Ep -xsumD.
+  by apply xsum_eq => a //=; exact smulmDr. 
+qed.
+
+
+lemma summable_to_pos (f : 'a -> real) : summable f => summable (fun x => (f x)%pos).
+proof.
+ have -> : (fun x => (f x)%pos) = (fun x => pos f x).
+ by apply fun_ext => a; smt().
+  exact : summable_pos.
 qed.
 
 lemma Ep_mu (d:'a distr) (p:'a -> bool): 
   Ep d (fun a => (p a)%xr) = (mu d p)%xr.
 proof.
-  rewrite /Ep /=.
+  rewrite /Ep.
   rewrite (: (fun (x : 'a) => ((mu1 d x)%rp * (b2r (p x))%rp)%xr) = (d ** (fun x => (p x)%xr))) 1://.
-  have -> /= : is_real (d ** fun (x : 'a) => (p x)%xr) by apply is_real_sM.
-  rewrite /psuminf /to_real /= summable_mu1_wght /= 1:/# muE.
-  by congr; apply eq_sum => x /=; case: (p x).
+  have ir : is_real (d ** fun (x : 'a) => (p x)%xr) by apply is_real_sM.
+  rewrite xsum_fin_sum // /to_real //=.
+  + apply summable_mu1_wght => a //=; smt().
+  by congr; rewrite muE; apply eq_sum => x /=; case: (p x). 
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -830,15 +1471,9 @@ lemma Ep_fin ['a] J (d : 'a distr) f :
   (forall (x : 'a), mu1 d x <> 0%r => x \in J) =>
   Ep d f = big predT (d ** f) J.
 proof.
-  move=> hu hJ; rewrite /Ep /=.
-  case: (is_real (d ** f)) => his.
-  + have hJ' : forall (x : 'a), to_real (d ** f) x <> 0%r => x \in J.
-    + by rewrite /to_real /( ** )=> x; case: (of_real (mu1 d x) = of_real 0.0) => //; smt(@Rp).
-    by rewrite  /psuminf (summable_fin _ J hJ') /= (sumE_fin _ J hu hJ') is_real_bigRX.
-  rewrite big_oo //.
-  move/negb_forall: his => /> x hx; exists x.
-  move: hx; case _: (mu1 d x ** f x) => //=.
-  rewrite /( ** ); case: (of_real (mu1 d x) = of_real 0.0) => //=; smt(@Rp).
+  move=> uJ hJ; rewrite /Ep /=.
+  apply (xsum_fin _ _ uJ). 
+  by move=> a //=; case (mu1 d a = 0%r) => [-> | /hJ].
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -858,93 +1493,59 @@ lemma EP_E ['a] (d : 'a distr) (f : 'a -> xreal) :
   => summable (to_real (d ** f))
   => Ep d f = (E d (to_real f))%xr.
 proof.
-move=> rl_f smb_f; rewrite /Ep /= rl_f /= /psuminf smb_f /=; congr.
-by apply: eq_sum => x /=; rewrite to_real_mdfun /= RField.mulrC.
+  move => rl_f smb_f. rewrite /Ep xsum_fin_sum // //=. congr.
+  by apply: eq_sum => x /=; rewrite to_real_mdfun /= RField.mulrC.
 qed.
 
+
+
+op ( *** ) ( c x : xreal) : xreal =
+  if c = 0%xr then 0%xr else x * c.
+
+
+lemma xsum_scale_mdr (f : 'a -> realp) (c : xreal) :
+    xsum (fun (x : 'a) => (f x)%xr) <> oo => xsum (fun (x : 'a) => f x ** c) = xsum (fun (x : 'a) => (f x)%xr) *** c.
+proof.
+  move => summ.    
+  case: (xsum (fun (x : 'a) => (f x)%xr) = '0) => hf. 
+  - rewrite hf.
+    have hall0:= iffLR _ _ (xsum_0P _) hf.
+    by rewrite xsum_0; first by move => a //=; smt().
+  rewrite /( *** ) hf //=.
+  case (c = 0%xr) => [-> | ].
+  + rewrite xsum_0; first by move => a //=.
+    smt(@Rp).
+  case c => [cr //= hc| hc].
+  + rewrite xsum_mull; first by smt(@Rp).
+    by apply xsum_eq => a //=; smt(@Rp).
+  have [a ha] : (exists a, (f a)%xr <> 0%xr). by move: hf; by smt(xsum_0P @Rp).
+  apply xle_antisym => //=.
+  apply xlub_ub; rewrite imageP. by exists [a]; rewrite big_cons big_nil //=; smt().
+qed.  
+  
 (* -------------------------------------------------------------------- *)
 lemma Ep_dlet (d : 'a distr) (F : 'a -> 'b distr) f : 
   Ep (dlet d F) f = Ep d (fun x => Ep (F x) f).
 proof.
-pose D := dlet d F; case: (is_real (D ** f)); last first.
-- move=> @{1}/Ep /= ^ + -> /= - /is_realPn [y] /=.
-  case/md_eqinfP => [nz_Dy eqinf_fy].
-  rewrite {1}/Ep /=; pose g x := mu1 d x ** Ep (F x) f.
-  suff -> // : !is_real g; apply/is_realPn.
-  case/supp_dlet: nz_Dy => x [x_d y_Fx]; exists x.
-  apply/md_eqinfP; rewrite -/(_ \in _)%Distr x_d /=.
-  rewrite /Ep /=; suff -> // : !is_real (F x ** f).
-  by apply/is_realPn; exists y => /=; apply/md_eqinfP.
-move=> isrl; have is_real_Fx_f: forall x, x \in d => is_real (F x ** f).
-- move=> x x_d y /=; move/(_ y): isrl; case/md_realP; last first.
-  - by move=> real_fy; apply/md_realP; right.
-  rewrite ler_eqVlt ltrNge ge0_mu /= /D dlet1E sump_eq0P /=.
-  - by move=> x'; apply: mulr_ge0.
-  - by apply: summable_mu1_wght.
-  by move/(_ x); rewrite RField.mulf_eq0 -supportPn x_d /= => ->.
-pose fa (x : 'a) := mu1 d x.
-pose fb (y : 'b) := to_real f y.
-pose G x y := mu1 (F x) y.
-have eqf: to_real (D ** f) = (fun y => sum (fun x => fa x * G x y) * fb y).
-- by apply/fun_ext=> y; rewrite to_real_mdfun /= dlet1E.
-have smb_Fx_f:
-  (forall x, fa x <> 0%r => summable (fun y => G x y * fb y))
-  => forall x, x \in d => summable (to_real (F x ** f)).
-- move=> subsmb x x_d; have ->: to_real (F x ** f) = (fun y => G x y * fb y).
-  - by apply/fun_ext=> y; rewrite to_real_mdfun /=.
-  by apply/subsmb/gtr_eqF/x_d.
-have eqE1:
-  (forall x, fa x <> 0%r => summable (fun y => G x y * fb y))
-  => forall x, x \in d => to_real (Ep (F x) f) = E (F x) (to_real f).
-- move=> subsmb x x_d; rewrite EP_E /=.
-  - by apply/is_real_Fx_f.
-  - by apply/smb_Fx_f.
-  - by rewrite to_pos_pos // &(exp_ge0) => y _; apply: to_realP.
-case: (summable (to_real (D ** f))); last first.
-- move=> smbN; rewrite {1}/Ep /= isrl /= /psuminf smbN /=.
-  rewrite {1}/Ep /=; case _: (Lift.is_real _) => //=.
-  move=> is_real_d_E_Fx_f @/psuminf. 
-  case _: (summable _) => //=; apply/negP=> smb2N.
-  apply: smbN; rewrite eqf; have := summable_swapR fa fb G _ _ _ _ _ => //.
-  - by move=> y; apply/to_realP.
-  - apply: eq_summable (smb2N) => /= x; rewrite to_real_mdfun /=.
-    rewrite -/(fa x); case: (fa x = 0%r) => [-> //|nz_fa].
-    congr => @/Ep /=; rewrite is_real_Fx_f /=; first by apply/supportP.
-    rewrite /psuminf to_real_mdfun; case _: (summable _) => /=.
-    - move=> _; rewrite to_pos_pos //= ge0_sum => y /=.
-      by apply/mulr_ge0/to_realP/ge0_mu1.
-    - by move/sum_Nsbl.
-  - move=> x nz_fax; apply: contraLR is_real_d_E_Fx_f.
-    move=> smb3N; apply/is_realPn => /=; exists x.
-    apply/md_eqinfP; split; first by apply/supportP.
-    rewrite /Ep /=; case: (Lift.is_real _) => //=.
-    by rewrite /psuminf to_real_mdfun /= smb3N.
-move=> ^smb0; rewrite eqf => smb.
-have subsmb: forall y, fb y <> 0%r => summable (fun x => fa x * G x y).
-- move=> y _; apply: summable_mu1_wght => x /=; split.
-  - by apply: ge0_mu1.
-  - by move=> _; apply: le1_mu1.
-have [smb2 subsmb2] := summable_swap _ _ _ _ _ _ smb subsmb.
-- by move=> x; apply: ge0_mu1.
-- by move=> y; apply: to_realP.
-- by move=> x y; apply ge0_mu1.
-have {eqE1}eqE1 := eqE1 subsmb2.
-have {smb_Fx_f}smb_Fx_f := smb_Fx_f subsmb2.
-rewrite EP_E // /D; rewrite exp_dlet.
-- by apply: eq_summable smb0 => x /=; rewrite RField.mulrC to_real_mdfun.
-have is_real_d_E_Fx_f : is_real (d ** (fun x => Ep (F x) f)).
-- move=> x /=; apply/md_realP; rewrite ler_eqVlt ltrNge ge0_mu1 /=.
-  case: (x \in d) => [x_d | /supportPn -> //]; right.
-  by rewrite /Ep /= is_real_Fx_f //= /psuminf smb_Fx_f.
-apply: (eq_trans _ (E d (fun x => to_real (Ep (F x) f)))%xr).
-- by do 2! congr; apply: eq_exp => x x_d /=; rewrite eqE1.
-rewrite EP_E //=.
-suff ->: to_real (fun x => mu1 d x ** Ep (F x) f) =
-  (fun x => fa x * sum (fun y => G x y * fb y)) by apply/smb2.
-apply/fun_ext => x /=; rewrite to_real_mdfun /=.
-case: (x \in d); last by move/supportPn => @/fa ->.
-move=> x_d; congr => //; rewrite eqE1 // /E.
-by apply: eq_sum => /= y; rewrite RField.mulrC.
+  rewrite /Ep /mlet //=.
+  have mconv: forall (a :realp) (b : xreal), a ** b = a%xr *** b by rewrite /( **) /( ***) //=; smt().
+  rewrite (xsum_eq (fun (y : 'b) => xsum (fun (x : 'a) => (mu1 d x * mu1 (F x) y) ** f y))).
+  + move => b //=; rewrite dlet1E.
+    rewrite mconv.
+    pose w a := (mu1 d a * mu1 (F a) b)%xr.
+    have ->: (fun (a : 'a) => mu1 d a * mu1 (F a) b) = to_real w.
+      by rewrite /w /to_real; apply fun_ext => a //=; smt(ge0_mu1).
+    have sum_mus : summable (to_real w).
+      by rewrite /w /to_real //=; apply summable_to_pos; apply summable_mu1_wght; move => a //=.
+    have ir_mus : is_real w.
+      by rewrite /is_real => a //=.
+    rewrite -xsum_fin_sum // //.
+    by rewrite xsum_scale_mdr; first by smt(xsum_neq_oo).
+  rewrite xsum_exchange //=.
+  apply xsum_eq => a //=.
+  rewrite xsum_scale_mdl.
+  apply xsum_eq => b //=.
+  rewrite -msmulmAC /xmul //= /( *) //=.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1037,16 +1638,14 @@ lemma Ep_cxr (d:'a distr) (b:'a -> bool) (f:'a -> xreal) :
   Ep d (fun x => b x `|` f x) = 
   (forall x, x \in d => b x) `|` Ep d f. 
 proof.
-  rewrite /Ep /(`|`) /=. 
-  case: (forall (x : 'a), x \in d => b x) => hb; last first. 
-  + have /> x xin xb: exists x, x \in d /\ !b x by smt().
-    have -> // : !is_real (fun (x0 : 'a) => mu1 d x0 ** if b x0 then f x0 else oo). 
-    rewrite /is_real; apply /negP => h.
-    by have := h x; rewrite xb /= /( ** ) /= Rp_to_real_eq /= /#.
-  rewrite (eq_is_real_md _ _ f).
-  + by move=> x /hb /= ->.
-  case: (is_real (d ** f)) => // _; congr; apply fun_ext => x.
-  rewrite /( **) Rp_to_real_eq /=; smt(ge0_mu1).
+  rewrite /Ep /(`|`) /=.
+  case: (forall (x : 'a), x \in d => b x) => [hall | /negb_forall [x //= /negb_imply [/supportP mux nbx]]].
+  + apply xsum_eq. move => a //=.
+    case (a \in d); first by move => ha; rewrite (hall _ ha) //=.
+    move => /supportPn -> //=.
+  apply (xsum_oo _ x) => //=.
+  rewrite nbx /( **) //=.
+  by smt(@Rp). 
 qed.
 
 lemma if_cxr (b b1 b2:bool) (f1 f2: xreal) : 
@@ -1194,3 +1793,4 @@ hint solve 2 concave_incr : concave_incr_cxr concave_incr_if.
 (* -------------------------------------------------------------------- *)
 lemma trans_help P Q f : (P => Q) => (P `|` f) = oo \/ Q.
 proof. case P => />. qed.
+
