@@ -34,7 +34,8 @@ val t_equiv_seq : equiv_seq_rule -> backward
         R := pre<1> /\ forall (mod c2)<1>, post<1> => Q
       giving  (a) equiv [c1 ~ c' : P ==> R]          — left open,
               (b) equiv [c2 ~ skip : R ==> Q];
-   2. on (b), the framed consequence (currently [EcPhlConseq.t_equivS_conseq_nm])
+   2. on (b), the framed consequence [EcPhlConseq.t_equivS_conseq_nm] (the
+      frame rule [EcEquivFrame.t_equivS_frame], then the consequence rule)
       to [equiv [c2 ~ skip : pre<1> ==> post<1>]]; its side conditions
       [R => pre<1>] and [R => forall (mod c2)<1>, post<1> => Q] are closed
       by [t_trivial];
