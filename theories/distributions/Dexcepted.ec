@@ -154,7 +154,10 @@ qed.
 phoare phoare_indirect x' X' P:
   [ S.indirect: x = x' /\ X = X' ==> P res ]
   = (weight (dt x) * mu (dt x \ X x) P).
-proof. bypr=> &m; smt(pr_indirect ge0_mu). qed.
+proof.
+bypr=> &m; rewrite mulr_ge0 1:ge0_weight 1:ge0_mu /= => [#] -> ->.
+exact/(@pr_indirect &m x' X' P).
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma ll_pr_indirect &m x' X' P:
@@ -166,7 +169,9 @@ phoare ll_phoare_indirect x' X' P:
   [ S.indirect: x = x' /\ X = X' /\ is_lossless (dt x') ==> P res ]
   = (mu (dt x \ X x) P).
 proof.
-by bypr=> &m; smt(ll_pr_indirect ge0_mu). qed.
+bypr=> &m; rewrite ge0_mu /= => [#] -> -> dt_ll.
+exact/(@ll_pr_indirect &m x' X' P dt_ll).
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma indirect_direct &m x X P:
