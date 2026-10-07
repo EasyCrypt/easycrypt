@@ -34,9 +34,21 @@ let t_kill_r side cpos olen tc =
           List.takedrop len zpr.Zpr.z_tail
     in
 
-    (* FIXME [BG]: check the usage of po_rd *)
+    (* [ks] is replaced by [skip]. This is sound if [ks] is lossless
+       (side goal below) and if the variables it writes ([ks_wr]) are
+       read neither by the postcondition nor by any code that may run
+       after [ks]: then both programs end in states that agree outside
+       of [ks_wr]. The code that may run after [ks] is, for each
+       enclosing block, the code that follows the block's cursor, and,
+       for each enclosing while loop, the loop guard and the whole loop
+       body (with [ks] removed): the next iterations run them again,
+       including the part of the body before [ks]. This is what
+       [EcPV.zpr_pv `Read `After] computes. *)
     let ks_wr = is_write env ks in
     let po_rd = PV.fv env (fst me) po in
+    let af_rd =
+      EcPV.zpr_pv `Read `After env PV.empty
+        ((zpr.Zpr.z_head, tl), zpr.Zpr.z_path) in
 
     let pp_of_name =
       let ppe = EcPrinting.PPEnv.ofenv env in
@@ -46,23 +58,14 @@ let t_kill_r side cpos olen tc =
           | `PV     p -> EcPrinting.pp_pv     ppe fmt p
     in
 
-    List.iteri
-      (fun i is ->
-         let is_rd = is_read env is in
-         let indp  = PV.interdep env ks_wr is_rd in
-           match PV.pick indp with
-           | None   -> ()
-           | Some x ->
-               match i with
-               | 0 ->
-                   tc_error !!tc
-                     "code writes variables (%a) used by the current block"
-                     pp_of_name x
-               | _ ->
-                   tc_error !!tc
-                     "code writes variables (%a) used by the %dth parent block"
-                     pp_of_name x i)
-      (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
+    begin
+      match PV.pick (PV.interdep env ks_wr af_rd) with
+      | None   -> ()
+      | Some x ->
+          tc_error !!tc
+            "code writes variables (%a) used by the code that may run after it"
+            pp_of_name x
+    end;
 
     begin
       match PV.pick (PV.interdep env ks_wr po_rd) with
