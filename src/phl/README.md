@@ -80,19 +80,59 @@ The kernel ([`ecCoreGoal`](../ecCoreGoal.mli)) provides:
 
 Run the test suite with `EC_RECHECK=1` to exercise every migrated checker.
 
+## Program transformations
+
+Tactics that replace the program by an equivalent one and keep the judgement
+(rndsem, and later rcond, inline, swap, …) go through **one** trusted
+transformation rule per logic, `t_<logic>_transform` (`Ec<Logic>Transform`;
+equiv: one side at a time), parameterized by an entry of a catalogue:
+
+```
+   J [c' : P ==> Q]        O_1 … O_n      (c', [O_1 … O_n]) = t(c)
+ ------------------------------------------------------------------
+                          J [c : P ==> Q]
+```
+
+- The catalogue ([`EcPlTransform`](rules/ecPlTransform.mli)) is an open type
+  `transform` plus a registry; each entry (`rules/transforms/EcTr<Name>`)
+  carries resolved parameters and is a pure, deterministic, statement-level
+  function, which may extend the memory with fresh program variables.
+- The obligations are abstract (a small closed set: so far, "every
+  terminating run of the prefix `hd` from the precondition satisfies
+  `cond`"); each logic's rule states them as its own premises (see its
+  `.mli`).
+- The node records the transformation and its parameters; the checker
+  ("<logic>-transform") re-runs it on the goal's program and compares the
+  subgoals up to conversion (programs up to alpha-equivalence).
+
+Current catalogue: `rndsem` (`EcTrRndSem`). Further entries come with the
+tactics that use them. The framed form of `match C k` changes the
+precondition: it stays a separate trusted rule. See `REFACTORING.md` §7f.
+
 ## Directory layout
 
 `(include_subdirs unqualified)` in `src/dune` slurps everything under `src/`
 into one flat-namespace library, so subdirectories are purely organizational —
-**module names must stay globally unique** (keep the `Ec<Logic><Tactic>` prefix;
+**module names must stay globally unique** (keep the `Ec<Logic><Rule>` prefix;
 directories are for humans).
 
 ```
 src/phl/
-  rules/        genuine logic rules (different subgoals per logic)
+  rules/
     hoare/  ehoare/  bdhoare/  equiv/  eager/
-  codetx/       logic-uniform program transforms (wp, sp, inline, swap, rcond, …)
-  bridge/       probabilistic / cross-logic bridges (deno, pr, byequiv, fel, upto)
-  multi/        multi-logic tactics with shared machinery (conseq, trans, sym)
-  ecPhl<Tactic>.ml   legacy, thin dispatchers, not-yet-migrated tactics
+                Ec<Logic><Rule>: one module per (logic, rule)
+    transforms/ EcTr<Name>: catalogue entries of the program transformations
+    ecPl*.ml    computations shared by the rules of every logic: EcPlFrame,
+                EcPlSp, EcPlWp, EcPlRndSem, EcPlTransform
+  ecPlRecheck.ml     checker scaffolding
+  ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
+                     tactics
 ```
+
+- `wp` and `sp` are logic rules on an explicit suffix / prefix, in
+  `rules/<logic>/` (the shared computation in `EcPlWp` / `EcPlSp`).
+- `sym` and `trans` are equiv-only rules, in `rules/equiv/`.
+- A rule relating two logics (e.g. the `pr` bridges) lives with the logic of
+  its conclusion.
+- Program transformations use the transformation rule of each logic; only
+  their catalogue entries live in `rules/transforms/`.

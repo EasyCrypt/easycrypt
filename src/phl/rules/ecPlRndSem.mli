@@ -3,8 +3,8 @@ open EcAst
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
-(* Semantic sampling of a straight-line statement, shared by the [rndsem]
-   rules of every logic.
+(* Semantic sampling of a straight-line statement, used by the [rndsem]
+   program transformation ([EcTrRndSem]).
 
    [semrnd env me used s] — [s] must consist of assignments and samplings
    only, and write no global. Returns the single sampling
