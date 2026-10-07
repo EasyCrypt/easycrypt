@@ -66,7 +66,7 @@ module LowInternal = struct
     let hyps = FApi.tc1_hyps tc in
     let env  = LDecl.toenv hyps in
 
-    let inline1 me lv p args =
+    let inline1 ~inloop me lv p args =
       let p = EcEnv.NormMp.norm_xfun env p in
       let f = EcEnv.Fun.by_xpath p env in
       let fdef =
@@ -80,6 +80,28 @@ module LowInternal = struct
                   (EcPrinting.pp_funname ppe) p)
         end
       in
+
+      (* The callee's parameters and locals become fresh variables of the
+       * caller. Outside of a loop, these variables are never written
+       * before the inlined body, and hence hold, as the callee's locals,
+       * an unconstrained initial value. Inside a loop body, they are
+       * shared by all iterations and start with the value left by the
+       * previous one, whereas a call starts with fresh locals. Inlining
+       * is then only sound if the callee never reads a local before
+       * writing it (parameters are written by the prelude): the inlined
+       * code does not depend on the initial value of these variables. *)
+      if inloop then begin
+        let uninit = get_uninit_read_of_fun f in
+        if not (EcSymbols.Ssym.is_empty uninit) then
+          tc_error_lazy !!tc (fun fmt ->
+            let ppe = EcPrinting.PPEnv.ofenv env in
+              Format.fprintf fmt
+                "function `%a' cannot be inlined inside a loop: \
+                 it may use the uninitialized local variable(s): %a"
+                (EcPrinting.pp_funname ppe) p
+                (EcPrinting.pp_list ", " EcSymbols.pp_symbol)
+                (EcSymbols.Ssym.elements uninit))
+      end;
       let _params =
         let named_arg ov =
           match ov.ov_name with
@@ -134,37 +156,37 @@ module LowInternal = struct
 
       me, prelude @ body.s_node @ resasgn in
 
-    let rec inline_i me ip i =
+    let rec inline_i ~inloop me ip i =
       match ip, i.i_node with
       | IPpat, Scall (lv, p, args) ->
-          inline1 me lv p args
+          inline1 ~inloop me lv p args
       | IPif (sp1, sp2), Sif (e, s1, s2) ->
-          let me, s1 = inline_s me sp1 s1.s_node in
-          let me, s2 = inline_s me sp2 s2.s_node in
+          let me, s1 = inline_s ~inloop me sp1 s1.s_node in
+          let me, s2 = inline_s ~inloop me sp2 s2.s_node in
           me, [i_if (e, stmt s1, stmt s2)]
       | IPwhile sp, Swhile (e, s) ->
-          let me, s = inline_s me sp s.s_node in
+          let me, s = inline_s ~inloop:true me sp s.s_node in
           me, [i_while (e, stmt s)]
       | IPmatch sps, Smatch (e, bs) ->
           let me, bs = List.fold_left_map (fun me (sp, (xs, s)) ->
-              let me, s = inline_s me sp s.s_node in (me, (xs, stmt s)))
+              let me, s = inline_s ~inloop me sp s.s_node in (me, (xs, stmt s)))
             me (List.combine sps bs)
           in me, [i_match (e, bs)]
 
       | _, _ -> assert false (* FIXME error message *)
 
-    and inline_s me sp s =
+    and inline_s ~inloop me sp s =
       match sp with
       | [] -> me, s
       | (toskip, ip)::sp ->
         let r, i, s = List.pivot_at toskip s in
-        let me, si = inline_i me ip i in
-        let me, s  = inline_s me sp s in
+        let me, si = inline_i ~inloop me ip i in
+        let me, s  = inline_s ~inloop me sp s in
         (me, List.rev_append r (si @ s))
 
     in
 
-    snd_map stmt (inline_s me sp s.s_node)
+    snd_map stmt (inline_s ~inloop:false me sp s.s_node)
 end
 
 (* -------------------------------------------------------------------- *)
