@@ -127,33 +127,3 @@ let t_prbounded_r conseq tc =
   FApi.xmutate1 tc `PrBounded cond
 
 let t_prbounded = FApi.t_low1 "pr-bounded" t_prbounded_r
-
-(* -------------------------------------------------------------------- *)
-let t_prfalse tc =
-  let (env, _, concl) = FApi.tc1_eflat tc in
-
-  let (f, ev, bd) =
-    match concl.f_node with
-    | Fapp ({f_node = Fop (op, _)}, [f; bd]) when is_pr f &&
-          EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
-          || EcPath.p_equal op EcCoreLib.CI_Bool.p_eq->
-        let pr = destr_pr f in (pr.pr_fun,pr.pr_event,bd)
-
-      | Fapp ({f_node = Fop(op,_)}, [bd;f]) when is_pr f &&
-          EcPath.p_equal op EcCoreLib.CI_Bool.p_eq->
-        let pr = destr_pr f in (pr.pr_fun,pr.pr_event,bd)
-
-      | _ -> tc_error !!tc "expecting a conclusion of the form Pr[...]"
-  in
-
-  (* the bound is zero *)
-  let is_zero = f_real_le bd f_r0 in
-
-  (* the event is false *)
-  let smem  = Fsubst.f_bind_mem Fsubst.f_subst_id ev.m ev.m in
-  let ev'    = Fsubst.f_subst smem ev.inv in
-  let fun_  = EcEnv.Fun.by_xpath f env in
-  let me    = EcEnv.Fun.actmem_post ev.m fun_ in
-  let concl_po = f_forall_mems [me] (f_imp f_false ev') in
-
-  FApi.xmutate1 tc `PrFalse [is_zero; concl_po]
