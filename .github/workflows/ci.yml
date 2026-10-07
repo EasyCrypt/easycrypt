@@ -9,16 +9,42 @@ on:
     tags:
       - 'r[0-9]+.[0-9]+'
   pull_request:
+    # `unlabeled`: removing the `stacked` label (see `gate`) starts the CI.
+    types: [opened, synchronize, reopened, unlabeled]
   merge_group:
 
 env:
   IMAGE_TAG: ci-${{ github.run_id }}
 
 jobs:
+  # ── Phase 0: Decide whether to run ──
+  #
+  # A pull request labelled `stacked` (an intermediate PR of a stack, whose
+  # changes are checked by the CI of the PR at the top of the stack) skips
+  # the CI, unless it targets the default branch. Skipped jobs count as
+  # passing for branch protection, so a PR that can be merged into the
+  # default branch always runs the CI, whatever its labels.
+
+  gate:
+    name: Decide whether to run the CI
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+    - id: decide
+      env:
+        RUN: >-
+          ${{ github.event_name != 'pull_request'
+              || github.base_ref == github.event.repository.default_branch
+              || !contains(github.event.pull_request.labels.*.name, 'stacked') }}
+      run: echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
   # ── Phase 1: Build Docker images and share via artifact ──
 
   docker:
     name: Build Docker images
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
     permissions:
       packages: read
@@ -88,6 +114,8 @@ jobs:
 
   compile-nix:
     name: EasyCrypt compilation (nix)
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     env:
       HOME: /home/runner
     runs-on: ubuntu-24.04
@@ -150,6 +178,8 @@ jobs:
 
   fetch-external-matrix:
     name: Fetch EasyCrypt External Projects Matrix
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -233,8 +263,8 @@ jobs:
 
   external-status:
     name: Check EasyCrypt External Projects (set-status)
-    if: always()
-    needs: [external]
+    if: always() && needs.gate.outputs.run == 'true'
+    needs: [gate, external]
     runs-on: ubuntu-24.04
     steps:
     - uses: re-actors/alls-green@release/v1
