@@ -109,8 +109,10 @@ Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`),
 `rmatch` (`EcTrRMatch`), `if-push` (`EcTrIfPush`), `match-push`
 (`EcTrMatchPush`), `swap` (`EcTrSwap`), `inline` (`EcTrInline`), `kill`
 (`EcTrKill`), `alias` (`EcTrAlias`), `set` (`EcTrSet`), `set-match`
-(`EcTrSetMatch`), `cfold` (`EcTrCFold`), `asgn-case` (`EcTrAsgnCase`) and
-`simplify-if` (`EcTrSimplifyIf`). `if-push` / `match-push` push
+(`EcTrSetMatch`), `cfold` (`EcTrCFold`), `asgn-case` (`EcTrAsgnCase`),
+`simplify-if` (`EcTrSimplifyIf`), and the loop transformations `fission`
+(`EcTrFission`), `fusion` (`EcTrFusion`), `unroll` (`EcTrUnroll`) and
+`splitwhile` (`EcTrSplitWhile`). `if-push` / `match-push` push
 the continuation of a leading conditional / `match` into its branches: the
 `if` and `match` tactics are push + rule on the conditional alone
 (`Ec<Logic>If`, `Ec<Logic>Match`).

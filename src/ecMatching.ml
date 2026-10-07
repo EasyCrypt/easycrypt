@@ -389,6 +389,15 @@ module Position = struct
     let (env, s), npath = normalize_cpos_path env cpath s in
     (env, s), (npath, normalize_cpos1 env cp1 s)
 
+  (* The code position denoting a normalized one, with absolute positions
+     only: resolving it again in the same statement needs no lookup and
+     yields the same position. *)
+  let cpos_of_nm_cpos ((cpath, cp1) : nm_codepos) : codepos =
+    let brsel : nm_codepos_brsel -> codepos_brsel = function
+      | `Cond b   -> `Cond b
+      | `Match ix -> `MatchByPos ix in
+    (List.map (fun (i, br) -> (cpos1 i, brsel br)) cpath, cpos1 cp1)
+
   let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 = 
     match off with
     | `Absolute off -> normalize_cpos1 env off s 
