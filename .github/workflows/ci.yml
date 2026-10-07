@@ -31,6 +31,19 @@ jobs:
     outputs:
       run: ${{ steps.decide.outputs.run }}
     steps:
+    - name: Debug (temporary)
+      env:
+        ACTION: ${{ github.event.action }}
+        BASE: ${{ github.base_ref }}
+        DEFAULT: ${{ github.event.repository.default_branch }}
+        LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        C1: ${{ github.event_name != 'pull_request' }}
+        C2: ${{ github.base_ref == github.event.repository.default_branch }}
+        C3: ${{ !contains(github.event.pull_request.labels.*.name, 'stacked') }}
+      run: |
+        echo "action=$ACTION base=$BASE default=$DEFAULT"
+        echo "labels=$LABELS"
+        echo "C1=$C1 C2=$C2 C3=$C3"
     - id: decide
       env:
         RUN: >-
