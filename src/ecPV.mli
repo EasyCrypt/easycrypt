@@ -153,6 +153,13 @@ val s_read     : stmt       pvaccess0
 val f_read     : xpath      pvaccess0
 
 (* -------------------------------------------------------------------- *)
+(* [zpr_pv kind span env pvs ((hd, tl), path)] adds to [pvs] the program
+ * variables read / written ([kind]) by the code that may run before /
+ * after ([span]) the cursor of the zipper, the cursor sitting between
+ * [hd] (reversed) and [tl]: at each level, the instructions of the block
+ * that are before / after the cursor, and, for each enclosing while loop,
+ * the whole loop (guard and body, with [hd] and [tl] as the only code of
+ * the innermost block), as the other iterations run all of it. *)
 val zpr_pv :
      [ `Read | `Write ]
   -> [ `Before | `After ]

@@ -274,14 +274,6 @@ module Zipper : sig
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt
 
-  (* [after ~strict zpr] returns all the statements that come after the
-   * zipper cursor. They are returned as a list of statements, where the head
-   * is the list of instructions coming directly after the cursor at the
-   * same level, the next element is the ones coming after the cursor
-   * parent block, and so forth. The cursor is included iff [strict] is [true].
-   *)
-  val after : strict:bool -> zipper -> instr list list
-
   type ('a, 'state) folder = env -> 'a -> 'state -> instr -> 'state * instr list
   type ('a, 'state) folder_l = env -> 'a -> 'state -> instr list -> 'state * instr list
 
