@@ -24,6 +24,30 @@ type unroll_t     = oside * pcodepos * [`While | `For of bool]
 type splitwhile_t = pexpr * oside * pcodepos
 
 (* -------------------------------------------------------------------- *)
+(* Side conditions of loop fission / fusion, which state:
+
+     init; while b { c1; c2; c3 }
+       ==  init; while b { c1; c3 }; init; while b { c2; c3 }
+
+   (1) [init] (prelude) and [c3] (epilog) are deterministic, loop-,
+       call- and exception-free ([check_dslc]), and [c1] / [c2] do not
+       raise exceptions ([check_noraise]);
+   (2) [b] and [c3] read nothing written by [c1] or [c2];
+   (3) [c1] and [c2] commute: neither reads what the other writes, and
+       they write disjoint sets of variables;
+   (4) [c3] only writes variables that [init] writes;
+   (5) [init] reads nothing written by [init], [c1] or [c3], and writes
+       nothing written by [c1].
+
+   Soundness: by (1) and (2), the number of iterations and the values
+   taken by the variables written by [c3] are a function of the state
+   after [init]. Then, by (2) and (3), in the fused loop, the [c1] part
+   (on [wr c1]) and the [c2; c3] part (on the other variables) evolve
+   without any information flow between them: the fused loop has the
+   same distribution as the product of the two split loops. By (1),
+   (4) and (5), the second [init] restores the state after the first
+   one on all variables but [wr c1], which it leaves untouched. Since
+   this is an equivalence, the same conditions apply to fusion. *)
 let check_independence (pf, hyps) b init c1 c2 c3 =
   let env = LDecl.toenv hyps in
 
@@ -45,16 +69,19 @@ let check_independence (pf, hyps) b init c1 c2 c3 =
 
   check_disjoint rd_c1 wr_c2;
   check_disjoint rd_c2 wr_c1;
+  check_disjoint wr_c1 wr_c2;
   List.iter (check_disjoint fv_b) [wr_c1; wr_c2];
-  check_disjoint fv_b (PV.diff wr_c3 wr_init);
+  if not (PV.subset wr_c3 wr_init) then
+    tc_error pf "epilog must only write variables written by the prelude";
   List.iter (check_disjoint rd_init) [wr_init; wr_c1; wr_c3];
+  check_disjoint wr_init wr_c1;
   List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
 
 (* -------------------------------------------------------------------- *)
-let check_dslc pf =
+let check_dslc pf name =
   let error () =
     tc_error pf
-      "epilog must be deterministic and loop/procedure-call free" in
+      "%s must be deterministic and loop/procedure-call free" name in
 
   let rec doit_i c =
     match c.i_node with
@@ -72,6 +99,16 @@ let check_dslc pf =
 
   and doit_s c =
     List.iter doit_i c.s_node
+
+  in fun c -> List.iter doit_i c
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: as for [swap], a procedure call that raises is not detected *)
+let check_noraise pf =
+  let rec doit_i c =
+    match c.i_node with
+    | Sraise _ -> tc_error pf "loop body must not raise exceptions"
+    | _ -> EcModules.i_iter doit_i c
 
   in fun c -> List.iter doit_i c
 
@@ -103,7 +140,9 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   in
 
   check_independence (pf, hyps) b init s1 s2 s3;
-  check_dslc pf s3;
+  check_dslc pf "prelude" init;
+  check_dslc pf "epilog" s3;
+  List.iter (check_noraise pf) [s1; s2];
 
   let wl1 = i_while (b, stmt (s1 @ s3)) in
   let wl2 = i_while (b, stmt (s2 @ s3)) in
@@ -160,7 +199,9 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
     tc_error pf "in loop-fusion, while conditions do not match";
 
   check_independence (pf, hyps) b1 init1 sw1 sw2 fini1;
-  check_dslc pf fini1;
+  check_dslc pf "prelude" init1;
+  check_dslc pf "epilog" fini1;
+  List.iter (check_noraise pf) [sw1; sw2];
 
   let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
   let fus = List.rev_append init1 [wl] in
