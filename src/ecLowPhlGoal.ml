@@ -804,8 +804,10 @@ let t_code_transform (side : oside) cpos tr tx tc =
       match concl.f_node with
       | FhoareS hs ->
           let pr, po = hs_pr hs, hs_po hs in
-          (* FIXME: This is very suspicious why only main is provided ? *)
-          let po = po.hsi_inv.main in
+          (* The transformations only use the postcondition for the
+             program variables it reads: give them the conjunction of the
+             main and exceptional postconditions, so that none is missed. *)
+          let po = f_ands (POE.fold (fun fs f -> fs @ [f]) [] po.hsi_inv) in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po) (hs.hs_m, hs.hs_s) in
           let concl =
