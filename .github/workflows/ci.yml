@@ -24,20 +24,41 @@ jobs:
   # the CI, unless it targets the default branch. Skipped jobs count as
   # passing for branch protection, so a PR that can be merged into the
   # default branch always runs the CI, whatever its labels.
+  #
+  # The labels and base are read from the PR itself, not from the event:
+  # when a stack is pushed, its events can carry a stale snapshot of the
+  # PR. If they cannot be read, the CI runs.
 
   gate:
     name: Decide whether to run the CI
     runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
     outputs:
       run: ${{ steps.decide.outputs.run }}
     steps:
     - id: decide
       env:
-        RUN: >-
-          ${{ github.event_name != 'pull_request'
-              || github.base_ref == github.event.repository.default_branch
-              || !contains(github.event.pull_request.labels.*.name, 'stacked') }}
-      run: echo "run=$RUN" >> "$GITHUB_OUTPUT"
+        GH_TOKEN: ${{ github.token }}
+        EVENT: ${{ github.event_name }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        DEFAULT: ${{ github.event.repository.default_branch }}
+      run: |
+        run=true
+        if [ "$EVENT" = pull_request ]; then
+          state=$(gh api "repos/$REPO/pulls/$PR" \
+                    --jq '[.base.ref, any(.labels[]; .name == "stacked")] | @tsv') \
+            || state=
+          base=$(printf '%s' "$state" | cut -f1)
+          stacked=$(printf '%s' "$state" | cut -f2)
+          echo "base=${base:-?} stacked=${stacked:-?}"
+          if [ -n "$base" ] && [ "$base" != "$DEFAULT" ] && [ "$stacked" = true ]; then
+            run=false
+          fi
+        fi
+        echo "run=$run"
+        echo "run=$run" >> "$GITHUB_OUTPUT"
 
   # ── Phase 1: Build Docker images and share via artifact ──
 
