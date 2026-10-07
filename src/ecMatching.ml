@@ -650,6 +650,33 @@ module Zipper = struct
   let zipper_of_cpos (env : EcEnv.env) (cp : codepos) (s : stmt) =
     fst (zipper_of_cpos_r env cp s)
 
+  let zipper_of_nm_cpos ((cpath, cp1) : nm_codepos) (s : stmt) =
+    let step (zpr, s) ((k, br) : nm_codepos_step) =
+      let (s1, i, s2) = find_by_nmcpos1 k s in
+      match i.i_node, br with
+      | Swhile (e, sw), `Cond true ->
+          (ZWhile (e, ((s1, s2), zpr)), sw)
+
+      | Sif (e, ifs1, ifs2), `Cond true ->
+          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1)
+
+      | Sif (e, ifs1, ifs2), `Cond false ->
+          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2)
+
+      | Smatch (e, bs), `Match ix ->
+          let prebr, (locals, body), postbr =
+            try  List.pivot_at ix bs
+            with Invalid_argument _ | Not_found -> raise InvalidCPos in
+          (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body)
+
+      | _ -> raise InvalidCPos
+    in
+
+    let zpr, s = List.fold_left step (ZTop, s) cpath in
+    check_nm_cgap1 cp1 s;
+    let s1, s2 = split_at_nmcgap1 cp1 s in
+    zipper (List.rev s1) s2 zpr
+
   let zipper_of_cgap (env : EcEnv.env) (cp : codegap) (s : stmt) =
     fst (zipper_of_cgap_r env cp s)
 

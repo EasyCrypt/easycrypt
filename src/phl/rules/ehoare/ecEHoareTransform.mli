@@ -21,7 +21,9 @@ type ehoare_transform = {
    obligation becomes a premise (first, in order):
    - [OPrefixPost (hd, cond)]:  hoare [hd : P_bool ==> cond]
      where [P] is [P_bool `|` f] (otherwise fails with "the pre should
-     have the form \"_ `|` _\"").
+     have the form \"_ `|` _\"");
+   - [OLossless ks]:  phoare [ks : true ==> true] = 1
+     (in the memory of [c]).
    Side condition: [t] applies to [c] (otherwise fails with its message).
 
    Node: [REHoareTransform { ehtr_tr = t }]. Checker: "ehoare-transform"
