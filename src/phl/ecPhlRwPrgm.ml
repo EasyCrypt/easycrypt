@@ -55,24 +55,48 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
 
   let zp = Zpr.zipper_of_cpos env cpos hs.hs_s in
 
-  let rec pvtail (pvs : EcPV.PV.t) (zp : Zpr.ipath) =
-    let parent =
-      match zp with
-      | Zpr.ZTop -> None
-      | Zpr.ZWhile (_, p) -> Some p
-      | Zpr.ZIfThen (_, p, _) -> Some p
-      | Zpr.ZIfElse (_, _, p) -> Some p
-      | Zpr.ZMatch (_, p, _) -> Some p in
-    match parent with
-    | None -> pvs
-    | Some ((_, tl), p) -> pvtail (EcPV.PV.union pvs (EcPV.is_read env tl)) p
-  in
-
   let zp =
     let target, tl = List.split_at i zp.z_tail in
 
-    let keep = pvtail (EcPV.is_read env tl) zp.z_path in
+    (* [keep] is the set of variables on which [target] and [s] must
+       agree. Let [R] be the variables read by both [target] and [s].
+       We take for [keep]:
+       - the variables read by the code that may run after the fragment
+         (for each enclosing [while], its guard and its whole body),
+         and by the postcondition;
+       - if the fragment is inside a loop, [R].
+       Soundness: the original and the new programs are related by
+       "the states agree on [keep]" (they are equal before the first
+       run of the fragment). The code that may run after the fragment
+       only reads [keep], so preserves this relation. When reaching the
+       fragment in states [m1] (original) and [m2] (new), let [m] be
+       [m2] updated with the values of [m1] on [read(target) \ R].
+       Then [m] agrees with [m1] on [read(target)] and on [keep] (as
+       [R] is included in [keep]), and with [m2] on [read(s)] and on
+       [keep]. As [target] and [s] are deterministic, we get
+       [target(m1) =keep target(m) =keep s(m) =keep s(m2)], the middle
+       equality being the one established by the circuit checker.
+       Outside a loop, the fragment is run once, from [m1 = m2], and
+       [R] does not need to be kept. *)
+    let keep =
+      let zpr = ((zp.z_head, tl), zp.z_path) in
+      EcPV.zpr_pv `Read `After env EcPV.PV.empty zpr in
+    let keep =
+      if Zpr.in_loop zp.z_path then
+        EcPV.PV.union keep
+          (EcPV.PV.inter
+             (EcPV.is_read env target)
+             (EcPV.is_read env s.s_node))
+      else keep in
     let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) (POE.lower (EcAst.hs_po hs)).inv) in
+    (* The variables that are neither read nor written by [target] and
+       [s] are left unchanged by both and need not be compared. This
+       drops the global variables, which [target] and [s] cannot access
+       (this is checked by the circuit checker). *)
+    let keep =
+      let ts = target @ s.s_node in
+      EcPV.PV.inter keep
+        (EcPV.PV.union (EcPV.is_read env ts) (EcPV.is_write env ts)) in
     let st = EcLowCircuits.create_state (EcEnv.gstate env) in
 
     let equiv =
