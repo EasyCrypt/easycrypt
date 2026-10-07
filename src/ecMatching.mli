@@ -274,6 +274,12 @@ module Zipper : sig
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt
 
+  (* [in_loop ip] holds iff the path [ip] goes through the body of a
+   * [while] loop, i.e. iff the code at the cursor may be executed more
+   * than once.
+   *)
+  val in_loop : ipath -> bool
+
   type ('a, 'state) folder = env -> 'a -> 'state -> instr -> 'state * instr list
   type ('a, 'state) folder_l = env -> 'a -> 'state -> instr list -> 'state * instr list
 

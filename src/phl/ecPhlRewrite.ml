@@ -323,12 +323,20 @@ let t_change_stmt
       tc_error !!tc "invalid code position"
   in
 
-  (* Collect the variables that may be modified by the surrounding context,
-     excluding the fragment being replaced. *)
+  (* Inside a loop, the fragment may run several times. Its later runs
+     start after the surrounding code of the loop, but also after the
+     previous runs of the fragment itself, and from states where the two
+     programs only agree on the observable variables (see [obs] below). *)
+  let inloop = EcMatching.Zipper.in_loop zpr.z_path in
+
+  (* Collect the variables that may be modified before (a run of) the
+     fragment: by the surrounding context and, inside a loop, by the
+     previous runs of the original fragment. *)
   let modi =
     let zpr = { zpr with z_tail = epilog } in
     let zpr = (zpr.z_head, zpr.z_tail), zpr.z_path in
-    EcPV.zpr_pv `Write `Before env EcPV.PV.empty zpr in
+    let modi = EcPV.zpr_pv `Write `Before env EcPV.PV.empty zpr in
+    if inloop then EcPV.is_write_r env modi stmt else modi in
 
   (* Keep only the top-level conjuncts of the current precondition that talk
      about the active memory and are independent from the surrounding writes. *)
@@ -349,10 +357,30 @@ let t_change_stmt
   let written = EcPV.is_write_r env written stmt in
   let written = EcPV.is_write_r env written s.s_node in
 
+  (* The observable variables: those read by the code that may run after
+     the fragment (for an enclosing loop, its guard and its whole body)
+     and by the postcondition. Inside a loop, we add the variables read
+     by both fragments, i.e. the ones assumed equal by the local
+     equivalence below.
+     Soundness: the original and new programs are related by "the states
+     agree on [obs]" (they are equal before the first run of the
+     fragment). The code after the fragment only reads [obs], so it
+     preserves this relation. When reaching the fragment, the relation
+     implies the equalities of the precondition of the local
+     equivalence (their variables are in [obs] when in a loop), the
+     frame holds on the original side as no code run so far writes its
+     variables (see [modi]), and the local equivalence then
+     re-establishes the relation: the observable variables that are
+     written are equal, and the other ones are unchanged. *)
   let obs =
     let zpr = { zpr with z_tail = epilog } in
     let zpr = (zpr.z_head, zpr.z_tail), zpr.z_path in
     let obs = EcPV.zpr_pv `Read `After env EcPV.PV.empty zpr in
+    let obs =
+      if inloop then
+        EcPV.PV.union obs
+          (EcPV.PV.inter (EcPV.is_read env stmt) (EcPV.is_read env s.s_node))
+      else obs in
 
     let goal =
       let pvs =

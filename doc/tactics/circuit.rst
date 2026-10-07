@@ -390,7 +390,11 @@ through the same machinery as the ``circuit`` tactic.
 The equivalence check considers only those variables that are
 **live** at the end of the rewritten region — i.e., read by the rest
 of the procedure body or by the postcondition. Variables written by
-the replacement block but never read again may freely differ.
+the replacement block but never read again may freely differ. When
+the region is inside a ``while`` loop, the rest of the procedure body
+includes the loop guard and the whole loop body, which run again on
+the next iterations; the variables read by both fragments are then
+live too, as the fragment itself runs again.
 
 .. ecproof::
    :title: Replacing a fragment with an equivalent one

@@ -659,6 +659,14 @@ module Zipper = struct
 
   let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
 
+  let rec in_loop (ip : ipath) =
+    match ip with
+    | ZTop                          -> false
+    | ZWhile  _                     -> true
+    | ZIfThen (_, (_, ip), _)       -> in_loop ip
+    | ZIfElse (_, _, (_, ip))       -> in_loop ip
+    | ZMatch  (_, (_, ip), _)       -> in_loop ip
+
   let fold_range (env: env) cenv (cpr: codegap_range) f state (s: stmt) =
     let zpr, (_pre, s, tl), _nmcpr = zipper_and_split_of_cgap_range env cpr s in
     let env = odfl env zpr.z_env in
