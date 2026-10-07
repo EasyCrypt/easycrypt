@@ -83,7 +83,7 @@ Run the test suite with `EC_RECHECK=1` to exercise every migrated checker.
 ## Program transformations
 
 Tactics that replace the program by an equivalent one and keep the judgement
-(rndsem, rcond, and later inline, swap, …) go through **one** trusted
+(rndsem, rcond, swap, and later inline, …) go through **one** trusted
 transformation rule per logic, `t_<logic>_transform` (`Ec<Logic>Transform`;
 equiv: one side at a time), parameterized by an entry of a catalogue:
 
@@ -106,10 +106,11 @@ equiv: one side at a time), parameterized by an entry of a catalogue:
   subgoals up to conversion (programs up to alpha-equivalence).
 
 Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`),
-`rmatch` (`EcTrRMatch`), `if-push` (`EcTrIfPush`) and `match-push`
-(`EcTrMatchPush`), the last two pushing the continuation of a leading
-conditional / `match` into its branches. The `if` and `match` tactics are
-push + rule on the conditional alone (`Ec<Logic>If`, `Ec<Logic>Match`).
+`rmatch` (`EcTrRMatch`), `if-push` (`EcTrIfPush`), `match-push`
+(`EcTrMatchPush`) and `swap` (`EcTrSwap`). `if-push` / `match-push` push
+the continuation of a leading conditional / `match` into its branches: the
+`if` and `match` tactics are push + rule on the conditional alone
+(`Ec<Logic>If`, `Ec<Logic>Match`).
 Further entries come with the tactics that use them. The framed form of
 `match C k` changes the precondition: it stays a separate trusted rule of
 each logic, `t_<logic>_rmatch_framed` (`Ec<Logic>RMatch`). See

@@ -583,6 +583,35 @@ module Zipper = struct
 
   let zipper ?env hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; z_env = env; }
 
+  (* Step into the block selected by a normalized step: nothing is
+     resolved. *)
+  let zipper_step_into_nm_block
+    (env        : EcEnv.env)
+    ((cp1, sub) : nm_codepos_step)
+    (s          : stmt)
+    (zpr        : ipath)
+  : (ipath * stmt) * env
+  =
+    let (s1, i, s2) = find_by_nmcpos1 cp1 s in
+    match i.i_node, sub with
+    | Swhile (e, sw), `Cond true ->
+        (ZWhile (e, ((s1, s2), zpr)), sw), env
+
+    | Sif (e, ifs1, ifs2), `Cond true ->
+        (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1), env
+
+    | Sif (e, ifs1, ifs2), `Cond false ->
+        (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2), env
+
+    | Smatch (e, bs), `Match ix ->
+        let prebr, (locals, body), postbr =
+          try  List.pivot_at ix bs
+          with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
+        let env = EcEnv.Var.bind_locals locals env in
+        (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), env
+
+    | _ -> raise InvalidCPos
+
   let zipper_step_into_block
     (env        : EcEnv.env)
     ((cp1, sub) : codepos_step)
@@ -590,26 +619,15 @@ module Zipper = struct
     (zpr        : ipath)
   : (ipath * stmt) * nm_codepos_step * env
   =
-    let (s1, i, s2) = find_by_cpos1 env cp1 s in
-    let zpr, step, env =
+    let (_, i, _), cp1 = find_and_normalize_cpos1 env cp1 s in
+    let sub =
       match i.i_node, sub with
-      | Swhile (e, sw), `Cond true ->
-          (ZWhile (e, ((s1, s2), zpr)), sw), `Cond true, env
-
-      | Sif (e, ifs1, ifs2), `Cond true ->
-          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1), `Cond true, env
-
-      | Sif (e, ifs1, ifs2), `Cond false ->
-          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2), `Cond false, env
-
-      | Smatch (e, bs), _ ->
-          let ix = select_match_arm (fun () -> raise InvalidCPos) env e sub in
-          let prebr, (locals, body), postbr = List.pivot_at ix bs in
-          let env = EcEnv.Var.bind_locals locals env in
-          (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), `Match ix, env
-
-      | _ -> raise InvalidCPos
-    in zpr, ((List.length s1), step), env
+      | Smatch (e, _), _ ->
+          `Match (select_match_arm (fun () -> raise InvalidCPos) env e sub)
+      | _, `Cond b -> `Cond b
+      | _ -> raise InvalidCPos in
+    let zs, env = zipper_step_into_nm_block env (cp1, sub) s zpr in
+    zs, (cp1, sub), env
 
   let pre_zipper_of_codepos_path (env : EcEnv.env) (cpath: codepos_path) (s: stmt) =
     List.fold_left_map
@@ -634,6 +652,17 @@ module Zipper = struct
 
   let zipper_of_cgap (env : EcEnv.env) (cp : codegap) (s : stmt) =
     fst (zipper_of_cgap_r env cp s)
+
+  (* Normalized counterpart of [zipper_of_cgap]: nothing is resolved. *)
+  let zipper_of_nm_cgap (env : EcEnv.env) ((cpath, nm) : nm_codegap) (s : stmt) =
+    let (zpr, s), env =
+      List.fold_left
+        (fun ((zpr, s), env) step -> zipper_step_into_nm_block env step s zpr)
+        ((ZTop, s), env) cpath in
+    check_nm_cgap1 nm s;
+    let s1, s2 = split_at_nmcgap1 nm s in
+    zipper ~env (List.rev s1) s2 zpr
+
   (* 
    * Returns:
    *  - A zipper pointing to the start of the range

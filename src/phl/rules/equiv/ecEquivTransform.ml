@@ -40,6 +40,7 @@ let equiv_transform_subgoals
     trc_env  = env;
     trc_me   = me;
     trc_post = lazy (EcPV.PV.fv env m (es_po es).inv);
+    trc_exn  = false;
   } in
   let r = apply ctxt n.etr_tr s in
   let ts_inv_lower_side2 =
