@@ -180,6 +180,11 @@ uniform across logics or relate several judgements:
 - a rule concluding a statement on probabilities from a judgement
   (`byphoare`, `byehoare`, `byequiv`) lives with the logic of that
   judgement (`EcBdHoareDeno`, `EcEHoareDeno`, `EcEquivDeno`);
+- the failure-event lemma (`fel`, `EcBdHoareFel`), whose conclusion is a
+  probability bound and whose oracle premises are phoare bounds, lives in
+  `rules/bdhoare/`; it is stated on the whole procedure body (an implicit
+  seq at the end of the initialization, there being no seq rule on
+  probabilities);
 - program transformations go through the transformation rule of each logic
   (`Ec<Logic>Transform`); only their catalogue entries live in
   `rules/transforms/`.

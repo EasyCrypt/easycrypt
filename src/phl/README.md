@@ -160,5 +160,7 @@ src/phl/
 - A rule concluding a probability statement from a judgement (`byphoare`,
   `byehoare`, `byequiv`: `Ec<Logic>Deno`) lives with the logic of that
   judgement.
+- The failure-event lemma (`fel`, `EcBdHoareFel`) concludes a probability
+  bound from phoare premises; it lives in `rules/bdhoare/`.
 - Program transformations use the transformation rule of each logic; only
   their catalogue entries live in `rules/transforms/`.
