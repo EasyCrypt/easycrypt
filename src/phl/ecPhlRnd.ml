@@ -270,6 +270,16 @@ module Core = struct
           let concl = f_forall_simpl binders concl in
           FApi.xmutate1 tc `Rnd [concl]
       | PMultRndParams ((phi,d1,d2,d3,d4),event), _ ->
+        (* [d2] and [d4] are interpreted after [s] in [sgoal2] and [sgoal4],
+           and in the initial memory in [bd_sgoal]: the two coincide only if
+           [s] does not write them. *)
+        List.iter (fun (d : ss_inv) ->
+          if not (PV.indep env (s_write env s) (PV.fv env d.m d.inv)) then
+            tc_error !!tc
+              "The bounds on the probability of the sampling (third and \
+               fifth arguments) cannot depend on variables written by the \
+               statements preceding the sampling")
+          [d2; d4];
         let event = match event ty_distr with
           | None -> {m;inv=mk_event ~simpl:false ty_distr} | Some event -> event
         in

@@ -311,6 +311,23 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let bhs_po = ss_inv_rebind (bhs_po bhs) m in
   let bhs_pr = ss_inv_rebind (bhs_pr bhs) m in
 
+  (* The bound of the specification of the called procedure (the bound of
+     the conclusion, or [opt_bd]) is interpreted in the memory the procedure
+     starts from: after [s], and with the local variables of the callee.
+     The bound of the conclusion is interpreted in the initial memory, with
+     the local variables of the caller. The two coincide only if this bound
+     depends neither on local variables nor on variables written by [s]. *)
+  let callee_bd = odfl bhs_bd opt_bd in
+  let fv_bd = PV.fv env callee_bd.m callee_bd.inv in
+
+  if List.exists (fun (pv, _) -> is_loc pv) (fst (PV.elements fv_bd)) then
+    tc_error !!tc "The bound cannot depend on local variables";
+
+  if not (PV.indep env (s_write env s) fv_bd) then
+    tc_error !!tc
+      "The bound cannot depend on variables written by the \
+       statements preceding the call";
+
   (* The function satisfies the specification *)
   let f_concl =
     bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp bhs_bd opt_bd in
