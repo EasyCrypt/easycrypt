@@ -11,6 +11,16 @@ module L  = EcLocation
 module PT = EcProofTerm
 
 (* -------------------------------------------------------------------- *)
+(* The match-arm locals in scope at the end of [path], outermost first. *)
+let rec locals_of_path (path : EcMatching.Zipper.ipath) =
+  match path with
+  | ZTop -> []
+  | ZWhile  (_, (_, path))
+  | ZIfThen (_, (_, path), _)
+  | ZIfElse (_, _, (_, path)) -> locals_of_path path
+  | ZMatch  (_, (_, path), ctxt) -> locals_of_path path @ ctxt.locals
+
+(* -------------------------------------------------------------------- *)
 (* [t_change_range side range expr tc] applies [expr] to every expression
    of the instructions selected by [range] (the whole statement when
    [range] is [None]), recursing into the bodies of [if]/[while]/[match].
@@ -75,15 +85,6 @@ let t_change_range
             goal in
         let goal = EcSubst.f_forall_mems_ss_inv m goal in
         ((data, mid :: ids), goal) :: acc, rename fresh locals e'
-  in
-
-  let rec locals_of_path (path : EcMatching.Zipper.ipath) =
-    match path with
-    | ZTop -> []
-    | ZWhile  (_, (_, path))
-    | ZIfThen (_, (_, path), _)
-    | ZIfElse (_, _, (_, path)) -> locals_of_path path
-    | ZMatch  (_, (_, path), ctxt) -> locals_of_path path @ ctxt.locals
   in
 
   let acc, s =
@@ -436,13 +437,17 @@ let t_change_stmt
      observable behavior required by the outer proof. The left program is the
      original fragment, which only mentions the pre-existing locals
      ([metc]); the right program is the replacement, which may use the
-     freshly bound locals ([mt]). *)
+     freshly bound locals ([mt]). Inside the arm of a [match], the original
+     fragment may mention the locals bound by the arm: the subgoal is
+     quantified over them, as the fragment runs for any of their values. *)
   let goal1 =
-    f_equivS
-      metc mt
-      { ml; mr; inv = ofold f_and (f_ands pr_eq) frame; }
-      (EcAst.stmt stmt) s
-      { ml; mr; inv = f_ands po_eq; }
+    f_forall
+      (List.map (fun (x, ty) -> (x, GTty ty)) (locals_of_path zpr.z_path))
+      (f_equivS
+         metc mt
+         { ml; mr; inv = ofold f_and (f_ands pr_eq) frame; }
+         (EcAst.stmt stmt) s
+         { ml; mr; inv = f_ands po_eq; })
   in
 
   let stmt = EcMatching.Zipper.zip { zpr with z_tail = s.s_node @ epilog } in
