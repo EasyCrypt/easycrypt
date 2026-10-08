@@ -339,7 +339,9 @@ let t_change_stmt
     if inloop then EcPV.is_write_r env modi stmt else modi in
 
   (* Keep only the top-level conjuncts of the current precondition that talk
-     about the active memory and are independent from the surrounding writes. *)
+     about the active memory and are independent from the surrounding writes.
+     The precondition of an ehoare goal is real-valued: only its boolean
+     part [P], when it has the form [P `|` f], can be framed. *)
   let frame =
     let filter (f : form) =
       let pvs = EcPV.form_read env EcPV.PMVS.empty f in
@@ -349,9 +351,17 @@ let t_change_stmt
          EcIdent.Mid.is_empty pvs
       && (EcPV.PV.indep env modi pvs_me) in
 
-    EcFol.filter_topand_form
-      filter
-      (inv_of_inv (EcLowPhlGoal.tc1_get_pre tc)) in
+    let pre =
+      let pre = inv_of_inv (EcLowPhlGoal.tc1_get_pre tc) in
+      match (FApi.tc1_goal tc).f_node with
+      | FeHoareS _ -> begin
+          match destr_app pre with
+          | o, [p; _] when f_equal o fop_interp_ehoare_form -> Some p
+          | _ -> None
+        end
+      | _ -> Some pre in
+
+    obind (EcFol.filter_topand_form filter) pre in
 
   let written = EcPV.PV.empty in
   let written = EcPV.is_write_r env written stmt in
