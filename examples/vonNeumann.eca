@@ -121,5 +121,6 @@ seq 1: b p (1%r - p) (1%r - p) p=> //.
 + by rnd; skip=> />; rewrite dbiasedE.
 + by rnd; skip=> />; rewrite dbiasedE.
 + by rnd; skip=> /> &hr _; rewrite dbiasedE.
-smt(in01_p).
++ smt(in01_p).
+by move=> &hr; smt(mu_bounded).
 qed.

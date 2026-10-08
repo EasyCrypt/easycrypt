@@ -283,6 +283,13 @@ let t_bdhoare_while_rev_geq_r inv vrnt (k: ss_inv) (eps: ss_inv) tc =
       EcSubst.f_forall_mems_ss_inv mem term_post
   in
 
+  (* 2'. Pre-bound: the bound is at most 1 in every memory satisfying the
+     pre-condition. *)
+  let pre_bound_le1_concl =
+    EcSubst.f_forall_mems_ss_inv mem
+      (map_ss_inv2 f_imp b_pre (map_ss_inv2 f_real_le bound {m;inv=f_r1}))
+  in
+
   (* 3. Term-invariant *)
   let inv_term_concl =
     let concl = map_ss_inv2 f_imp (map_ss_inv2 f_int_le vrnt {m;inv=f_i0}) (map_ss_inv1 f_not lp_guard) in
@@ -331,13 +338,16 @@ let t_bdhoare_while_rev_geq_r inv vrnt (k: ss_inv) (eps: ss_inv) tc =
     f_imp while_jgmt unfolded_while_jgmt
   in
 
-  FApi.xmutate1_hyps tc `While
-    [(hyps , pre_inv_concl  );
-     (hyps , pre_bound_concl);
-     (hyps , inv_term_concl );
-     (hyps', body_concl     );
-     (hyps , inv_concl      );
-     (hyps , vrnt_concl     )]
+  (* sub-goal 2' is closed here when trivial *)
+  FApi.t_lasts (FApi.t_try t_trivial) 1
+    (FApi.xmutate1_hyps tc `While
+       [(hyps , pre_inv_concl      );
+        (hyps , pre_bound_concl    );
+        (hyps , inv_term_concl     );
+        (hyps', body_concl         );
+        (hyps , inv_concl          );
+        (hyps , vrnt_concl         );
+        (hyps , pre_bound_le1_concl)])
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_while_disj_r side vrnt inv tc =
