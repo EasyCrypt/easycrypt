@@ -28,6 +28,7 @@ let hoare_transform_subgoals (hyps : LDecl.hyps) (hs : sHoareS) (n : hoare_trans
   let m   = fst hs.hs_m in
   let po  = hs_po hs in
   let ctxt = {
+    trc_hyps = hyps;
     trc_env  = env;
     trc_me   = hs.hs_m;
     trc_post = lazy (POE.fold
@@ -42,7 +43,11 @@ let hoare_transform_subgoals (hyps : LDecl.hyps) (hs : sHoareS) (n : hoare_trans
         f_hoareS (snd hs.hs_m) (hs_pr hs) hd (update_hs_ss cond po)
     | OLossless ks ->
         f_bdHoareS (snd hs.hs_m)
-          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 } in
+          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 }
+    | OExprEq o ->
+        f_expr_eq r.trr_me o
+    | OLocalEquiv o ->
+        f_local_equiv env hs.hs_m (snd r.trr_me) (Some (hs_pr hs).inv) o in
   List.map obligation r.trr_obl
   @ [f_hoareS (snd r.trr_me) (hs_pr hs) r.trr_s po]
 

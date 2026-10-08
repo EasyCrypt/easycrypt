@@ -37,6 +37,7 @@ let equiv_transform_subgoals
     | `Right -> es.es_mr, es.es_ml, es.es_sr in
   let m = fst me in
   let ctxt = {
+    trc_hyps = hyps;
     trc_env  = env;
     trc_me   = me;
     trc_post = lazy (EcPV.PV.fv env m (es_po es).inv);
@@ -59,7 +60,11 @@ let equiv_transform_subgoals
              f_hoareS (snd me) pr hd (POE.lift po)) (es_pr es) cond)
     | OLossless ks ->
         f_bdHoareS (snd me)
-          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 } in
+          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 }
+    | OExprEq o ->
+        f_expr_eq r.trr_me o
+    | OLocalEquiv o ->
+        f_local_equiv env me (snd r.trr_me) (Some (es_pr es).inv) o in
   let concl =
     match side with
     | `Left  ->

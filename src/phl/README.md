@@ -83,7 +83,7 @@ Run the test suite with `EC_RECHECK=1` to exercise every migrated checker.
 ## Program transformations
 
 Tactics that replace the program by an equivalent one and keep the judgement
-(rndsem, rcond, swap, inline, …) go through **one** trusted
+(rndsem, rcond, swap, inline, proc rewrite / change, …) go through **one** trusted
 transformation rule per logic, `t_<logic>_transform` (`Ec<Logic>Transform`;
 equiv: one side at a time), parameterized by an entry of a catalogue:
 
@@ -99,8 +99,11 @@ equiv: one side at a time), parameterized by an entry of a catalogue:
   function, which may extend the memory with fresh program variables.
 - The obligations are abstract (a small closed set: so far, "every
   terminating run of the prefix `hd` from the precondition satisfies
-  `cond`" and "the statement `ks` is lossless"); each logic's rule states
-  them as its own premises (see its `.mli`).
+  `cond`", "the statement `ks` is lossless", "the expressions `e` and
+  `e'` are equal in every memory" and "the fragments `s` and `s'` are
+  locally equivalent", the latter's frame being computed by each rule
+  from its own precondition); each logic's rule states them as its own
+  premises (see its `.mli`).
 - The node records the transformation and its parameters; the checker
   ("<logic>-transform") re-runs it on the goal's program and compares the
   subgoals up to conversion (programs up to alpha-equivalence).
@@ -112,7 +115,11 @@ Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`),
 (`EcTrSetMatch`), `cfold` (`EcTrCFold`), `asgn-case` (`EcTrAsgnCase`),
 `simplify-if` (`EcTrSimplifyIf`), and the loop transformations `fission`
 (`EcTrFission`), `fusion` (`EcTrFusion`), `unroll` (`EcTrUnroll`) and
-`splitwhile` (`EcTrSplitWhile`). `if-push` / `match-push` push
+`splitwhile` (`EcTrSplitWhile`), and the program rewritings
+`expr-change` (`EcTrExprChange`, `proc rewrite`), `stmt-change`
+(`EcTrStmtChange`, `proc change`), `circuit-change`
+(`EcTrCircuitChange`, `proc change circuit`) and `idassign`
+(`EcTrIdAssign`). `if-push` / `match-push` push
 the continuation of a leading conditional / `match` into its branches: the
 `if` and `match` tactics are push + rule on the conditional alone
 (`Ec<Logic>If`, `Ec<Logic>Match`).
