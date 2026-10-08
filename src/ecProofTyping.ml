@@ -298,13 +298,12 @@ let merge2_poe_list (poe1 : form Mop.t) (poe2 : form Mop.t) =
     | None   -> poe, None
     | Some x -> Mop.remove None poe, Some x
   in
+  (* [poe1] is the target, [poe2] the source: the conditions state that
+     every exceptional postcondition of [poe2] implies the corresponding
+     one of [poe1]. An exception that is neither named nor covered by a
+     default branch is unconstrained (as if [_ => true]). *)
   let poe1, d1 = remove_default poe1 in
   let poe2, d2 = remove_default poe2 in
-  let get_default d =
-    match d with
-    | Some d -> d
-    | None ->  failwith "no default exception"
-  in
   let aux _ a b =
     match a,b with
     | Some a, Some b ->
@@ -314,17 +313,16 @@ let merge2_poe_list (poe1 : form Mop.t) (poe2 : form Mop.t) =
 
     | Some a, None ->
       let bd, body = decompose_lambda a in
-      Some (f_forall bd (f_imp (get_default d2) body))
+      Some (f_forall bd (ofold f_imp body d2))
 
     | None, Some b ->
       let bd, body = decompose_lambda b in
-      Some (f_forall bd (f_imp body (get_default d1)))
+      omap (fun d1 -> f_forall bd (f_imp body d1)) d1
 
     | None, None -> assert false
   in
   let epost = Mop.merge aux poe1 poe2 in
   let poe = List.map snd (Mop.bindings epost) in
-  match d2, d1 with
-  | None, _ -> poe
-  | Some d2, Some d1 -> f_imp d2 d1 :: poe
-  | _, _ -> failwith "no default exception"
+  match d1 with
+  | None -> poe
+  | Some d1 -> ofold f_imp d1 d2 :: poe
