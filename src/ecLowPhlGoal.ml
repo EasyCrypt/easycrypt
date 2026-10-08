@@ -343,6 +343,43 @@ let push_memenvs_pre (hyps : LDecl.hyps) (f : form) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
+(* Exceptions. A hoare postcondition maps the exceptions it names (and,
+   for the default branch [_ => Q], [None]) to the condition they must
+   satisfy; an exception neither named nor covered by a default branch is
+   unconstrained (as if [_ => true]).
+
+   [s_may_raise env s] holds when running [s] may raise an exception: [s]
+   contains a [raise], an abstract instruction, or a call to a procedure
+   that may raise (whose body may raise; abstract procedures are assumed
+   to possibly raise). *)
+let rec s_may_raise (env : env) (s : stmt) =
+  List.exists (i_may_raise env) s.s_node
+
+and i_may_raise (env : env) (i : instr) =
+  match i.i_node with
+  | Sraise _ | Sabstract _ -> true
+  | Sasgn _ | Srnd _ -> false
+  | Scall (_, f, _) -> f_may_raise env f
+  | Sif (_, s1, s2) -> s_may_raise env s1 || s_may_raise env s2
+  | Swhile (_, s) -> s_may_raise env s
+  | Smatch (_, bs) -> List.exists (fun (_, s) -> s_may_raise env s) bs
+
+and f_may_raise (env : env) (f : EcPath.xpath) =
+  let f = NormMp.norm_xfun env f in
+  match (Fun.by_xpath f env).f_def with
+  | FBdef fd  -> s_may_raise env fd.f_body
+  | FBalias f -> f_may_raise env f
+  | FBabs _   -> true
+
+(* [hs_observes_exn po] holds when the hoare postcondition [po] constrains
+   some exception, i.e. has a branch other than [_ => true] / [e _ =>
+   true]. Otherwise, raising an exception is as good as not terminating. *)
+let hs_observes_exn (po : hs_inv) =
+  EcPath.Mop.exists
+    (fun _ f -> not (f_equal (snd (decompose_lambda f)) f_true))
+    po.hsi_inv.exnmap
+
+(* -------------------------------------------------------------------- *)
 type logicS = [
   | `Hoare   of sHoareS
   | `BdHoare of bdHoareS

@@ -103,17 +103,33 @@ let check_dslc pf name =
   in fun c -> List.iter doit_i c
 
 (* -------------------------------------------------------------------- *)
-(* FIXME: as for [swap], a procedure call that raises is not detected *)
-let check_noraise pf =
+(* [c1] / [c2] must not raise: if one raises at some iteration, the
+   executions of the other one that precede it in the original loop are
+   lost (or added). A [raise] is always rejected; when the goal observes
+   exceptions ([exn], see [swap]), so is a call to a procedure that may
+   raise ([EcLowPhlGoal.s_may_raise]). Otherwise, raising is as good as
+   not terminating, which fission / fusion preserve. *)
+let check_noraise pf ~(exn : bool) env =
   let rec doit_i c =
     match c.i_node with
     | Sraise _ -> tc_error pf "loop body must not raise exceptions"
     | _ -> EcModules.i_iter doit_i c
 
-  in fun c -> List.iter doit_i c
+  in fun c ->
+    List.iter doit_i c;
+    if exn && EcLowPhlGoal.s_may_raise env (stmt c) then
+      tc_error pf
+        "loop body must not call procedures that may raise exceptions \
+         when the postcondition constrains exceptions"
+
+(* Whether the goal observes exceptions (see [swap]). *)
+let observes_exn (tc : tcenv1) =
+  match (FApi.tc1_goal tc).f_node with
+  | FhoareS hs -> hs_observes_exn (hs_po hs)
+  | _ -> false
 
 (* -------------------------------------------------------------------- *)
-let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
+let fission_stmt ~exn (il, (d1, d2)) (pf, hyps) me zpr =
   if d2 < d1 then
     tc_error pf "%s, %s"
       "in loop-fission"
@@ -142,7 +158,7 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   check_independence (pf, hyps) b init s1 s2 s3;
   check_dslc pf "prelude" init;
   check_dslc pf "epilog" s3;
-  List.iter (check_noraise pf) [s1; s2];
+  List.iter (check_noraise pf ~exn (LDecl.toenv hyps)) [s1; s2];
 
   let wl1 = i_while (b, stmt (s1 @ s3)) in
   let wl2 = i_while (b, stmt (s2 @ s3)) in
@@ -153,13 +169,14 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
 
 let t_fission_r side cpos infos g =
   let tr = fun side -> `LoopFission (side, cpos, infos) in
-  let cb = fun cenv _ me zpr -> fission_stmt infos cenv me zpr in
+  let exn = observes_exn g in
+  let cb = fun cenv _ me zpr -> fission_stmt ~exn infos cenv me zpr in
   t_code_transform side cpos tr (t_zip cb) g
 
 let t_fission = FApi.t_low3 "loop-fission" t_fission_r
 
 (* -------------------------------------------------------------------- *)
-let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
+let fusion_stmt ~exn (il, (d1, d2)) (pf, hyps) me zpr =
   let env = LDecl.toenv hyps in
 
   let (hd, init1, b1, sw1, tl) =
@@ -201,7 +218,7 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   check_independence (pf, hyps) b1 init1 sw1 sw2 fini1;
   check_dslc pf "prelude" init1;
   check_dslc pf "epilog" fini1;
-  List.iter (check_noraise pf) [sw1; sw2];
+  List.iter (check_noraise pf ~exn (LDecl.toenv hyps)) [sw1; sw2];
 
   let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
   let fus = List.rev_append init1 [wl] in
@@ -210,7 +227,8 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
 
 let t_fusion_r side cpos infos g =
   let tr = fun side -> `LoopFusion (side, cpos, infos) in
-  let cb = fun cenv _ me zpr -> fusion_stmt infos cenv me zpr in
+  let exn = observes_exn g in
+  let cb = fun cenv _ me zpr -> fusion_stmt ~exn infos cenv me zpr in
   t_code_transform side cpos tr (t_zip cb) g
 
 let t_fusion = FApi.t_low3 "loop-fusion" t_fusion_r

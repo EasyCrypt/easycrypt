@@ -22,19 +22,13 @@ module LowInternal = struct
 
     assert (List.is_empty tyargs);
 
-    let default_exn () =
-      match Mop.find_opt None epost with
-      | Some body -> body
-      | None ->
-        tacuerror
-          "missing postcondition for exception %a"
-          EcPrinting.pp_path ex in
-
-    let body =
-      Mop.find_opt (Some ex) epost
-      |> ofdfl (fun () -> default_exn ()) in
-
-    f_app_simpl body args EcTypes.tbool
+    (* The postcondition of [ex]: its branch, applied to the arguments,
+       or the default branch [_ => Q] (which binds nothing), or [true]
+       when there is none (an exception covered by no branch is
+       unconstrained). *)
+    match Mop.find_opt (Some ex) epost with
+    | Some body -> f_app_simpl body args EcTypes.tbool
+    | None -> odfl f_true (Mop.find_opt None epost)
 
   let wp_asgn_aux c_pre memenv lv e (lets, f) =
     let m = EcMemory.memory memenv in

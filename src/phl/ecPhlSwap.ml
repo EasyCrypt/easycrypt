@@ -18,7 +18,20 @@ type swap_kind = {
 
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
-  let check_swap (pf : proofenv) (env : EcEnv.env) (s1 : stmt) (s2 : stmt) =
+  (* [exn] holds when the goal observes exceptions (a hoare goal whose
+     postcondition constrains some exception, see
+     [EcLowPhlGoal.hs_observes_exn]). Swapping two independent blocks
+     preserves the final state of the runs that terminate normally, but
+     not the state in which an exception is raised: if one of the blocks
+     raises, the other one has run (or not) before. Hence:
+     - blocks that contain a [raise] are never swapped;
+     - when the goal observes exceptions, blocks that may raise (through
+       a procedure call, see [EcLowPhlGoal.s_may_raise]) are not swapped
+       either. Otherwise, raising is as good as not terminating, which
+       the swap preserves. *)
+  let check_swap
+      (pf : proofenv) ~(exn : bool) (env : EcEnv.env) (s1 : stmt) (s2 : stmt)
+  =
     let is_contains_raise =
       let exception HasRaise in
 
@@ -35,6 +48,12 @@ module LowInternal = struct
 
     if List.exists is_contains_raise [s1; s2] then
       tc_error pf "cannot swap blocks that contain exceptions";
+
+    if exn && List.exists (EcLowPhlGoal.s_may_raise env) [s1; s2] then
+      tc_error pf
+        "cannot swap blocks that may raise an exception \
+         (through a procedure call) when the postcondition \
+         constrains exceptions";
 
     let m1,m2 = s_write env s1, s_write env s2 in
     let r1,r2 = s_read  env s1, s_read  env s2 in
@@ -65,6 +84,7 @@ module LowInternal = struct
 
   let swap_stmt
     (pf   : proofenv   )
+   ~(exn  : bool       )
     (env  : EcEnv.env  )
     (info : swap_kind  )
     (s    : stmt       )
@@ -93,7 +113,7 @@ module LowInternal = struct
       else [start; fin; target]
       ) s
     with 
-    | [hd; s1; s2; tl] -> check_swap pf env (stmt s1) (stmt s2);
+    | [hd; s1; s2; tl] -> check_swap pf ~exn env (stmt s1) (stmt s2);
       EcMatching.Zipper.zip
         { zpr with z_head = []; z_tail = List.flatten [hd; s2; s1; tl] }
     | _ -> assert false
@@ -103,7 +123,11 @@ end
 let t_swap_r (side : oside) (info : swap_kind) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
-  let stmt = LowInternal.swap_stmt !!tc env info stmt in
+  let exn =
+    match (FApi.tc1_goal tc).f_node with
+    | FhoareS hs -> EcLowPhlGoal.hs_observes_exn (hs_po hs)
+    | _ -> false in
+  let stmt = LowInternal.swap_stmt !!tc ~exn env info stmt in
   FApi.xmutate1 tc `Swap [EcLowPhlGoal.hl_set_stmt side (FApi.tc1_goal tc) stmt]
 
 (* -------------------------------------------------------------------- *)
