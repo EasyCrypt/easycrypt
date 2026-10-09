@@ -1,0 +1,11 @@
+# exit: 0
+# -noproof admits every lemma before the target on its statement alone
+# and replays only the proof the position lands inside. Line 32 is the
+# second `split.' of `target_and', so the goals here are exactly the
+# ones `load-goals'-style plain LOAD reports at that line -- run the
+# same LOAD without the flag to see it. The reply tag carries
+# [noproof], and `print first_and' shows a skipped lemma is bound and
+# usable like any other.
+LOAD "fixtures/noproof.ec" 32 -noproof
+TREE
+print first_and.

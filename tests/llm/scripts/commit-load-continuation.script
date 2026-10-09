@@ -1,0 +1,9 @@
+# exit: 0
+# LOAD a file that ends mid-proof, continue it at the REPL, COMMIT.
+LOAD "fixtures/midproof.ec"
+QUIET ON
+trivial.
+trivial.
+QUIET OFF
+GOALS
+COMMIT

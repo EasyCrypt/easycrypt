@@ -1,0 +1,292 @@
+#! /usr/bin/env python3
+
+# --------------------------------------------------------------------
+# Check of the session multiplexer, `easycrypt mcp -sessions'.
+#
+#   mcp-sessions [--bin PATH] [-v]
+#
+# The multiplexer serves requests concurrently and answers them in
+# whatever order the children finish, so its output is not a byte
+# stream the golden harness could freeze. This checker drives it as a
+# client would -- one reader thread, replies matched by id -- and
+# asserts the contract of doc/llm/CLAUDE.md, "Multi-agent sessions":
+#
+#   * `initialize' names the same server as the single engine;
+#   * `tools/list' is the engine's table with `session' required on
+#     every tool, plus ec_sessions and ec_close;
+#   * two sessions load different files at the same time and neither
+#     sees the other's state;
+#   * a call without `session', or with a name that is not one, is a
+#     tool-level error, not a protocol error;
+#   * the engine's own protocol errors come back as such;
+#   * ec_sessions lists the live children; ec_close kills one and
+#     leaves the other; a session whose engine exited is reported dead
+#     and restarted by the next call;
+#   * on end of input the multiplexer exits 0 and no child survives;
+#   * on SIGTERM, the same.
+#
+# The single-engine server is exercised by mcp-golden; nothing here
+# depends on the content of a reply beyond what the multiplexer adds.
+# --------------------------------------------------------------------
+
+import json
+import os
+import signal
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+
+
+# --------------------------------------------------------------------
+class Client:
+    """One multiplexer process, driven over stdio."""
+
+    def __init__(self, binary, cwd, logdir):
+        self.proc = subprocess.Popen(
+            [binary, "mcp", "-sessions", "-logdir", logdir],
+            cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, bufsize=0)
+        self.replies = {}
+        self.next_id = 0
+        self.lock = threading.Lock()
+        threading.Thread(target=self._reader, daemon=True).start()
+
+    def _reader(self):
+        for raw in self.proc.stdout:
+            msg = json.loads(raw)
+            with self.lock:
+                self.replies[msg.get("id")] = msg
+
+    def send(self, method, params=None):
+        self.next_id += 1
+        msg = {"jsonrpc": "2.0", "id": self.next_id, "method": method}
+        if params is not None:
+            msg["params"] = params
+        self.proc.stdin.write((json.dumps(msg) + "\n").encode())
+        self.proc.stdin.flush()
+        return self.next_id
+
+    def wait(self, i, timeout=120):
+        deadline = time.time() + timeout
+        while True:
+            with self.lock:
+                if i in self.replies:
+                    return self.replies[i]
+            if time.time() > deadline:
+                raise SystemExit(f"mcp-sessions: timeout waiting for reply {i}")
+            time.sleep(0.02)
+
+    def call(self, tool, args):
+        return self.send("tools/call", {"name": tool, "arguments": args})
+
+    def ask(self, tool, args):
+        return self.wait(self.call(tool, args))
+
+    def close_stdin(self):
+        self.proc.stdin.close()
+
+
+def text_of(reply):
+    return reply["result"]["content"][0]["text"]
+
+
+def pids_of(listing):
+    return [int(line.split()[2]) for line in listing.splitlines()
+            if line.split()[:1] and line.split()[1] == "pid"]
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def gone(pids, timeout=5.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not any(alive(p) for p in pids):
+            return True
+        time.sleep(0.05)
+    return False
+
+
+# --------------------------------------------------------------------
+def main():
+    root = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    binary = os.path.join(root, "_build", "default", "src", "ec.exe")
+    verbose = False
+
+    args = sys.argv[1:]
+    while args:
+        if args[0] == "--bin":
+            binary, args = args[1], args[2:]
+        elif args[0].startswith("--bin="):
+            binary, args = args[0][len("--bin="):], args[1:]
+        elif args[0] in ("-v", "--verbose"):
+            verbose, args = True, args[1:]
+        elif args[0] in ("-h", "--help"):
+            print("usage: mcp-sessions [--bin PATH] [-v]")
+            return 0
+        else:
+            print(f"mcp-sessions: unknown option: {args[0]}", file=sys.stderr)
+            return 2
+
+    binary = os.path.abspath(binary)
+    if not os.access(binary, os.X_OK):
+        print(f"mcp-sessions: no such executable: {binary}", file=sys.stderr)
+        return 2
+
+    cwd = os.path.join(root, "tests", "llm")
+    nfail = 0
+
+    def check(label, ok, detail=""):
+        nonlocal nfail
+        if ok:
+            print(f"PASS {label}" + (f" ({detail})" if verbose and detail else ""))
+        else:
+            print(f"FAIL {label}" + (f" ({detail})" if detail else ""))
+            nfail += 1
+
+    with tempfile.TemporaryDirectory(prefix="mcp-sessions.") as logdir:
+        c = Client(binary, cwd, logdir)
+
+        # -- handshake
+        r = c.wait(c.send("initialize", {
+            "protocolVersion": "2025-06-18", "capabilities": {},
+            "clientInfo": {"name": "mcp-sessions", "version": "0"}}))
+        info = r["result"]["serverInfo"]
+        check("initialize", info["name"] == "easycrypt"
+              and r["result"]["protocolVersion"] == "2025-06-18",
+              json.dumps(r["result"]))
+        c.send("notifications/initialized")
+
+        # -- the tool table
+        tools = {t["name"]: t for t in c.wait(c.send("tools/list"))["result"]["tools"]}
+        engine_tools = [n for n in tools if n not in ("ec_sessions", "ec_close")]
+        check("tools/list: multiplexer tools present",
+              "ec_sessions" in tools and "ec_close" in tools, ", ".join(tools))
+        check("tools/list: session required everywhere",
+              all("session" in tools[n]["inputSchema"]["properties"]
+                  and tools[n]["inputSchema"]["required"][-1] == "session"
+                  and tools[n]["description"].endswith("sessions are independent.]")
+                  for n in engine_tools),
+              f"{len(engine_tools)} engine tools")
+        check("tools/list: ec_close takes session",
+              tools["ec_close"]["inputSchema"]["required"] == ["session"])
+
+        # -- two sessions at once, on different files
+        t0 = time.time()
+        a = c.call("ec_load", {"session": "A", "file": "fixtures/simple.ec", "line": 6})
+        b = c.call("ec_load", {"session": "B", "file": "fixtures/midproof.ec"})
+        ra, rb = c.wait(a), c.wait(b)
+        check("parallel ec_load: both succeed",
+              not ra["result"]["isError"] and not rb["result"]["isError"],
+              f"{time.time() - t0:.1f}s")
+        check("parallel ec_load: independent states",
+              text_of(ra) != text_of(rb)
+              and "remaining: 2" in text_of(rb) and "remaining" not in text_of(ra))
+
+        # -- a step in one does not move the other
+        ua = c.ask("ec_step", {"session": "A", "phrase": "split."})["result"]["structuredContent"]
+        ub = c.ask("ec_goals", {"session": "B"})["result"]["structuredContent"]
+        check("ec_step in A leaves B alone",
+              ua["changed"] and not ub["changed"]
+              and "remaining: 2" in ub["text"] and "1 = 1" in ua["text"])
+
+        # -- errors of the multiplexer's own: tool-level
+        r = c.ask("ec_step", {"phrase": "split."})
+        check("missing session is a tool error",
+              r["result"].get("isError") is True
+              and text_of(r).startswith("missing `session'"), text_of(r))
+        r = c.ask("ec_step", {"session": "../x", "phrase": "split."})
+        check("bad session name is a tool error",
+              r["result"].get("isError") is True
+              and text_of(r).startswith("invalid session name"), text_of(r))
+
+        # -- errors of the engine: protocol-level, under our id
+        r = c.ask("ec_nope", {"session": "A"})
+        check("unknown tool is -32602 from the engine",
+              r.get("error", {}).get("code") == -32602, json.dumps(r))
+        r = c.ask("ec_step", {"session": "A"})
+        check("missing argument is -32602 from the engine",
+              r.get("error", {}).get("code") == -32602
+              and "phrase" in r["error"]["message"], json.dumps(r))
+
+        # -- ec_sessions / ec_close
+        listing = text_of(c.ask("ec_sessions", {}))
+        pids = pids_of(listing)
+        names = [line.split()[0] for line in listing.splitlines()]
+        check("ec_sessions lists A and B", names == ["A", "B"] and len(pids) == 2
+              and all(alive(p) for p in pids), listing.replace("\n", " | "))
+
+        check("ec_close B", text_of(c.ask("ec_close", {"session": "B"})) == "closed B")
+        check("ec_close B again",
+              text_of(c.ask("ec_close", {"session": "B"})) == "no session `B'")
+        listing = text_of(c.ask("ec_sessions", {}))
+        check("ec_close leaves A",
+              [l.split()[0] for l in listing.splitlines()] == ["A"]
+              and alive(pids[0]) and gone([pids[1]]),
+              listing)
+        r = c.ask("ec_goals", {"session": "A"})
+        check("A still answers after closing B",
+              not r["result"]["isError"] and "1 = 1" in text_of(r))
+
+        # -- an engine that exits on its own
+        r = c.ask("ec_step", {"session": "A", "phrase": "exit."})
+        check("exit. reaches the engine", text_of(r) == "session terminated")
+        # The engine exits right after answering; give it a moment. It
+        # stays a zombie until the multiplexer's next look at it, which
+        # is what ec_sessions does, so poll that rather than the pid.
+        deadline = time.time() + 5
+        while True:
+            listing = text_of(c.ask("ec_sessions", {}))
+            if listing.endswith("(dead)") or time.time() > deadline:
+                break
+            time.sleep(0.1)
+        check("exited engine is reported dead", listing.endswith("(dead)"), listing)
+        r = c.ask("ec_goals", {"session": "A"})
+        check("next call restarts the engine",
+              not r["result"]["isError"] and text_of(r).startswith("No active proof"),
+              text_of(r).strip())
+        pids += pids_of(text_of(c.ask("ec_sessions", {})))
+
+        # -- ping, and shutdown on EOF
+        check("ping", c.wait(c.send("ping"))["result"] == {})
+        c.close_stdin()
+        try:
+            code = c.proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            code = None
+        check("EOF: multiplexer exits 0", code == 0, f"exit {code}")
+        check("EOF: no child survives", gone(pids), str([p for p in pids if alive(p)]))
+
+        # -- shutdown on SIGTERM
+        c = Client(binary, cwd, logdir)
+        c.ask("ec_load", {"session": "T1", "file": "fixtures/simple.ec", "line": 6})
+        c.ask("ec_load", {"session": "T2", "file": "fixtures/simple.ec", "line": 6})
+        pids = pids_of(text_of(c.ask("ec_sessions", {})))
+        c.proc.send_signal(signal.SIGTERM)
+        try:
+            code = c.proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            code = None
+        check("SIGTERM: multiplexer exits", code is not None, f"exit {code}")
+        check("SIGTERM: no child survives", gone(pids), str([p for p in pids if alive(p)]))
+
+        logs = sorted(os.listdir(logdir))
+        check("one log per session",
+              logs == ["ec-mcp-A.log", "ec-mcp-B.log", "ec-mcp-T1.log", "ec-mcp-T2.log"],
+              ", ".join(logs))
+
+    print("----")
+    print(f"{'all' if nfail == 0 else nfail} {'passed' if nfail == 0 else 'failed'}")
+    return 1 if nfail else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

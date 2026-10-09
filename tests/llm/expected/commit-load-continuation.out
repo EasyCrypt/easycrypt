@@ -1,0 +1,25 @@
+READY [uuid:0]
+<END>
+OK [uuid:4] [loaded:fixtures/midproof.ec:8] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:4]
+<END>
+OK [uuid:5]
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:6]
+No more goals
+<END>
+OK [uuid:6]
+- trivial.
+- trivial.
+<END>
