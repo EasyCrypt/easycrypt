@@ -48,13 +48,15 @@ Concretely:
   `process_*` function.
 - **Goal classification** lives in `ecCoreFol` (`is_hoareS`/`destr_hoareS`/…) and
   `ecLowPhlGoal` (`tc1_as_hoareS`/`pf_as_hoareS`/…).
-- **Three tactic families** (this drives the directory layout, §5):
+- **Three tactic families**:
   - *logic rules* — genuinely different subgoals per logic: seq, while, call,
-    cond, rnd, conseq, fun, exists.
-  - *code transforms* — transform the program statement and re-wrap in the
-    **same** judgement; logic enters only as "grab the stmt+memory", so the core
-    is shared across logics: wp, sp, inline, swap, rcond, fission/fusion/unroll/
-    splitwhile, kill/alias/cfold, outline, rwequiv.
+    cond, rnd, wp, sp, conseq, fun, exists.
+  - *program transformations* — replace the program by an equivalent one and
+    keep the **same** judgement; logic enters only as "grab the stmt+memory",
+    so the core is shared across logics: rndsem, inline, swap, rcond,
+    fission/fusion/unroll/splitwhile, kill/alias/cfold, outline, rwequiv.
+    They are expressed as one transformation rule per logic plus a catalogue
+    of transformations (§7f).
   - *bridges / multi-logic* — deno, pr, byequiv, fel, upto, eager; and the
     special multi-logic tactics conseq/trans/sym that operate across judgements.
 
@@ -131,38 +133,55 @@ the trusted non-`VRule` kernel rules. It is a per-node soundness net for TCB
 tactics, not yet a standalone independent proof-checker — that comes once enough
 rules carry their params.
 
-## 5. Directory layout — by family, then logic
+## 5. Directory layout — by logic, plus the shared computations
 
 `(include_subdirs unqualified)` in [src/dune](../dune) slurps everything under
 `src/` into one flat-namespace library, so subdirectories are **purely
 organizational** — module names must stay globally unique (keep the
-`Ec<Logic><Tactic>` prefix; directories are for humans, no dune changes needed).
+`Ec<Logic><Rule>` prefix; directories are for humans, no dune changes needed).
 
 ```
 src/phl/
-  rules/        genuine logic rules (different subgoals per logic)
+  rules/
     hoare/  ehoare/  bdhoare/  equiv/  eager/
-  codetx/       logic-uniform program transforms (wp, sp, inline, swap, rcond, …)
-  bridge/       probabilistic / cross-logic bridges (deno, pr, byequiv, fel, upto)
-  multi/        multi-logic tactics with shared machinery (conseq, trans, sym)
-  ecPhl<Tactic>.ml   legacy, thin dispatchers, not-yet-migrated tactics
+                Ec<Logic><Rule>: one module per (logic, rule) — its records,
+                node, pure builder, checker, derived forms, elaboration
+    transforms/ EcTr<Name>: the catalogue entries of the program
+                transformations (§7f)
+    ecPl*.ml    logic-agnostic computations shared by the rules of every
+                logic: EcPlFrame (framing conditions), EcPlSp (strongest
+                postcondition), EcPlWp (weakest precondition), EcPlRndSem
+                (semantic sampling), EcPlTransform (the transformation
+                catalogue and its obligations)
+  ecPlRecheck.ml     checker scaffolding
+  ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
+                     tactics
 ```
 
-Rationale: dir-per-logic is right for *logic rules* but would **scatter** the
-logic-uniform code transforms and has no home for the multi-logic tactics —
-hence the family split first. Within `rules/`, file-per-(logic,tactic) because
-that is the unit that pairs 1:1 with a proof-node kind + checker, and
-one-file-per-logic would yield 2–3k-line modules.
+Every rule lives in the directory of its logic, including the ones that are
+uniform across logics or relate several judgements:
+
+- `wp` and `sp` are logic rules on an explicit suffix / prefix
+  (`EcHoareWp`, `EcEquivSp`, …), the shared computation being in
+  `EcPlWp` / `EcPlSp`;
+- `sym` and `trans` are equiv-only rules, in `rules/equiv/`;
+- a rule relating judgements of two logics (the `pr` bridges, `hoare` from
+  `phoare`, …) lives with the logic of its conclusion;
+- program transformations go through the transformation rule of each logic
+  (`Ec<Logic>Transform`); only their catalogue entries live in
+  `rules/transforms/`.
+
+Within `rules/`, file-per-(logic,rule) because that is the unit that pairs 1:1
+with a proof-node kind + checker, and one-file-per-logic would yield 2–3k-line
+modules.
 
 ## 6. Special / multi-logic tactics
 
 `conseq` is the hard case: `t_conseq` matches goal-form × invariant-token
 (`Inv_ss`/`Inv_ts`) and routes to 11 variants; `process_conseq` is ~2.5k lines.
-These (and `trans`, `sym`, the deno/pr bridges) get their own `multi/` area: keep
-the dispatcher generic, but still split each *logic's* rule into its own
-builder+checker so the node model stays uniform. Do not force them into
-`rules/<logic>/`. Migrate them **last**, once the pattern is proven on the
-regular rules.
+Keep its dispatcher generic, but still split each *logic's* rule into its own
+builder+checker (in `rules/<logic>/`) so the node model stays uniform. Migrate
+it **last**, once the pattern is proven on the regular rules.
 
 ## 7. Phased plan
 
@@ -172,7 +191,7 @@ regular rules.
 - **Then one PR per tactic class**, all of its logics at once, roughly by
   increasing difficulty: seq (the reference, proving the whole spine
   end-to-end with real rules + checkers) → frame (the frame rule of §7d,
-  which every other rule relies on) → skip → wp/sp (codetx pilot) → cond
+  which every other rule relies on) → skip → wp/sp → cond
   → rnd → while → call → fun → exists → … → the rest of conseq / trans / sym
   last.
 
@@ -292,6 +311,70 @@ The `.mli` of a rule module has three sections, in this order:
 
 So what is trusted, which rule is applied, and what is derived is readable
 from the interface alone.
+
+## 7f. Program transformations: one rule per logic, a catalogue of transformations
+
+A program transformation replaces the program of a judgement by an equivalent
+one and keeps the judgement. Instead of one trusted rule per (logic,
+transformation), each logic has **one** trusted transformation rule,
+parameterized by an entry of a **catalogue** of transformations:
+
+```
+   J [c' : P ==> Q]        O_1 … O_n      (c', [O_1 … O_n]) = t(c)
+ ------------------------------------------------------------------
+                          J [c : P ==> Q]
+```
+
+- **The catalogue** ([`rules/ecPlTransform.ml`](rules/ecPlTransform.mli)): an
+  open type `transform`, each entry adding a constructor that carries its
+  **resolved** parameters (§7c) and registering the function computing it
+  (`EcPlTransform.register`, a registry of partial handlers like the rule
+  checkers). An entry is a pure, deterministic function of a context and of
+  the statement `c`; it acts at the statement level only and may extend the
+  memory with fresh program variables. Its context holds the environment, the
+  memory of `c` and what it needs from the judgement — so far the program
+  variables read by the postcondition — computed by each logic's rule from its
+  own judgement, so that the checker recomputes it from the goal (a recorded
+  set is never trusted). `EcPlTransform.apply` runs an entry, raising
+  `InvalidTransform` with a user-facing message when it does not apply.
+  Entries live in `rules/transforms/`, one module `EcTr<Name>` each.
+- **The obligations** are **abstract** and form a small closed set; each
+  logic's rule states them as premises of its own (first, in order, then the
+  transformed judgement — same pre/post, possibly extended memory). The only
+  kind so far is `OPrefixPost (hd, cond)`: every terminating run of the prefix
+  `hd` from the precondition ends in a state satisfying `cond`. Per logic:
+  - hoare: `hoare [hd : P ==> cond | E]` (the goal's exceptional
+    postconditions kept);
+  - ehoare: `hoare [hd : P_bool ==> cond]`, the precondition having the form
+    ``P_bool `|` f``;
+  - bdhoare: `hoare [hd : P ==> cond]`;
+  - equiv (transformation of side `i`): `forall &j, hoare [hd : P ==> cond]`,
+    the relation read on side `i` with the other memory quantified.
+
+  These are the premises the `rcond` rules build today.
+- **The rules** `t_<logic>_transform` (`rules/<logic>/Ec<Logic>Transform`;
+  equiv: one side at a time, the other program and memory unchanged) record
+  `(transformation, resolved parameters)` (and the side) in their node. The
+  checker ("<logic>-transform") re-runs the transformation on the goal's own
+  program and compares the rebuilt subgoals with the recorded ones through
+  `EcPlRecheck.checker_of`: programs are thus compared up to alpha-equivalence
+  (the fresh binders an entry introduces may differ from run to run).
+- **The tactics** using a transformation are derived: they resolve their
+  arguments, check what they always checked (to keep their error messages),
+  and apply the transformation rule.
+
+Current catalogue: `rndsem` (`EcTrRndSem`, semantic sampling of a
+straight-line suffix, computed by `EcPlRndSem`; no obligation), used by the
+`rndsem` tactic in hoare, bdhoare and equiv (no ehoare `rndsem`, so the
+ehoare rule is not used yet). Further entries come with the tactics that use
+them: rcond, rmatch, if/match-push, then swap, inline, kill/alias/cfold/set
+and proc rewrite.
+
+Exception: the framed form of `match C k` (used when the variables of the
+discriminant `e` are neither read nor written by the prefix) adds `e = C ys`
+to the precondition instead of assigning `ys` in the program. It changes the precondition, so it is not a program
+transformation in this sense and stays a separate trusted rule (to be
+rediscussed).
 
 ## 8. Per-tactic migration recipe
 
