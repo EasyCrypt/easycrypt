@@ -170,6 +170,14 @@ let t_bdhoare_while_rev_r inv tc =
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
   let lp_guard = ss_inv_of_expr (EcMemory.memory mem) lp_guard_exp in
 
+  (* The bound of the conclusion is interpreted in the initial memory, while
+     sub-goal 1 interprets it in the memory the loop starts from: the two
+     coincide only if the prefix [rem_s] does not write the bound. *)
+  if not (PV.indep env (s_write env rem_s) (PV.fv env (EcMemory.memory mem) bound.inv)) then
+    tc_error !!tc
+      "The bound cannot depend on variables written by the \
+       statements preceding the loop";
+
   let w_u   = while_info env lp_guard_exp lp_body in
   let w     = EcEnv.LDecl.fresh_id hyps "w" in
   let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in
