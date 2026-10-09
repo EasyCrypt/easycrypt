@@ -1,350 +1,77 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
-open EcSymbols
 open EcAst
-open EcTypes
-open EcDecl
-open EcModules
-open EcFol
-open EcParsetree
-open EcSubst
 
 open EcCoreGoal
-open EcLowPhlGoal
+
+(* -------------------------------------------------------------------- *)
+(* The [rcond] and [match C k] tactics are derived, one module per logic in
+   [rules/<logic>/] (EcHoareRCond, EcHoareRMatch, ...): they apply the
+   [rcond] / [rmatch] program transformations ([EcTrRCond], [EcTrRMatch])
+   through the transformation rule of the logic, or the framed [rmatch]
+   rule of the logic. This module only keeps the legacy positional entry
+   points (adapters onto those tactics, so external callers and this
+   module's interface are unchanged) and the logic-agnostic dispatchers. *)
 
 (* -------------------------------------------------------------------- *)
 module Low = struct
-  (* ------------------------------------------------------------------ *)
-  let gen_rcond (pf, env) b m at_pos s =
-    let head, i, tail = s_split_i env at_pos s in
-    let e, s =
-      match i.i_node with
-      | Sif(e,s1,s2) -> e, if b then s1.s_node else s2.s_node
-      | Swhile(e,s1) -> e, if b then s1.s_node@[i] else []
-      | _ ->
-          tc_error_lazy pf (fun fmt ->
-            Format.fprintf fmt
-              "the targetted instruction is not a conditionnal")
-    in
-    let f_e = ss_inv_of_expr m e in
-    let f_e = if b then f_e else map_ss_inv1 f_not f_e in
+  let t_hoare_rcond b at_pos =
+    EcHoareRCond.(t_hoare_rcond { hrcr_at = at_pos; hrcr_branch = b })
 
-    (stmt head, e, f_e, stmt (head @ s @ tail))
+  let t_ehoare_rcond b at_pos =
+    EcEHoareRCond.(t_ehoare_rcond { ehrcr_at = at_pos; ehrcr_branch = b })
 
-  (* ------------------------------------------------------------------ *)
-  let t_hoare_rcond_r b at_pos tc =
-    let env = FApi.tc1_env tc in
-    let hs = tc1_as_hoareS tc in
-    let m  = EcMemory.memory hs.hs_m in
-    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.hs_s in
-    let e = update_hs_ss e (hs_po hs) in
-    let concl1  = f_hoareS (snd hs.hs_m) (hs_pr hs) hd e in
-    let concl2  = f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs) in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
+  let t_bdhoare_rcond b at_pos =
+    EcBdHoareRCond.(t_bdhoare_rcond { brcr_at = at_pos; brcr_branch = b })
 
-  (* ------------------------------------------------------------------ *)
-  let t_ehoare_rcond_r b at_pos tc =
-    let env = FApi.tc1_env tc in
-    let hs = tc1_as_ehoareS tc in
-    let m  = EcMemory.memory hs.ehs_m in
-    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.ehs_s in
-    let pre pr =
-      match destr_app pr with
-      | o, pre :: _ when f_equal o fop_interp_ehoare_form -> pre
-      | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
-    let pre = map_ss_inv1 pre (ehs_pr hs) in
-    let e = POE.lift e in
-
-    let concl1  = f_hoareS (snd hs.ehs_m) pre hd e in
-    let concl2  = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs) in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_bdhoare_rcond_r b at_pos tc =
-    let env = FApi.tc1_env tc in
-    let bhs = tc1_as_bdhoareS tc in
-    let m  = EcMemory.memory bhs.bhs_m in
-    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos bhs.bhs_s in
-    let e = POE.lift e in
-
-    let concl1  = f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd e in
-    let concl2  = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_equiv_rcond_r side b at_pos tc =
-    let env = FApi.tc1_env tc in
-    let es = tc1_as_equivS tc in
-    let m,mo,s =
-      match side with
-      | `Left  -> es.es_ml,es.es_mr, es.es_sl
-      | `Right -> es.es_mr,es.es_ml, es.es_sr in
-    let ts_inv_lower_side2 = sideif side ts_inv_lower_left2 ts_inv_lower_right2 in
-    let ss_inv_generalize_other = sideif side ss_inv_generalize_right ss_inv_generalize_left in
-    let hd,_,e,s = gen_rcond (!!tc, env) b (fst m) at_pos s in
-    let e = ss_inv_generalize_other e (fst mo) in
-    let concl1 =
-      EcSubst.f_forall_mems_ss_inv (EcIdent.create "&m", snd mo)
-        (ts_inv_lower_side2 (fun pr po ->
-          let mhs = EcIdent.create "&hr" in
-          let pr = ss_inv_rebind pr mhs in
-          let po = ss_inv_rebind po mhs in
-          let po = POE.lift po in
-          f_hoareS (snd m) pr hd po) (es_pr es) e) in
-    let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in
-    let concl2 = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr (es_po es) in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_hoare_rcond   = FApi.t_low2 "hoare-rcond"   t_hoare_rcond_r
-  let t_ehoare_rcond  = FApi.t_low2 "ehoare-rcond"  t_ehoare_rcond_r
-  let t_bdhoare_rcond = FApi.t_low2 "bdhoare-rcond" t_bdhoare_rcond_r
-  let t_equiv_rcond   = FApi.t_low3 "equiv-rcond"   t_equiv_rcond_r
+  let t_equiv_rcond side b at_pos =
+    EcEquivRCond.(t_equiv_rcond
+      { ercr_side = side; ercr_at = at_pos; ercr_branch = b })
 end
 
 (* -------------------------------------------------------------------- *)
+(* Dispatch on the goal kind only. Without a side, a goal that is neither a
+   [bdHoareS] nor a [hoareS] goes to the ehoare tactic, which reports it. *)
 let t_rcond side b at_pos tc =
-  let concl = FApi.tc1_goal tc in
-
-  match side with
-  | None when is_bdHoareS concl ->
-    Low.t_bdhoare_rcond b at_pos tc
-  | None when is_hoareS concl ->
-    Low.t_hoare_rcond b at_pos tc
-  | None ->
-    Low.t_ehoare_rcond b at_pos tc
-  | Some side ->
-    Low.t_equiv_rcond side b at_pos tc
+  match side, (FApi.tc1_goal tc).f_node with
+  | None, FbdHoareS _ -> Low.t_bdhoare_rcond b at_pos tc
+  | None, FhoareS   _ -> Low.t_hoare_rcond b at_pos tc
+  | None, _           -> Low.t_ehoare_rcond b at_pos tc
+  | Some side, _      -> Low.t_equiv_rcond side b at_pos tc
 
 let process_rcond side b at_pos tc =
-  let at_pos = EcLowPhlGoal.tc1_process_codepos1 tc (side, at_pos) in
-  t_rcond side b at_pos tc
+  match side, (FApi.tc1_goal tc).f_node with
+  | None, FbdHoareS _ -> EcBdHoareRCond.process_bdhoare_rcond b at_pos tc
+  | None, FhoareS   _ -> EcHoareRCond.process_hoare_rcond b at_pos tc
+  | None, _           -> EcEHoareRCond.process_ehoare_rcond b at_pos tc
+  | Some side, _      -> EcEquivRCond.process_equiv_rcond side b at_pos tc
 
 (* -------------------------------------------------------------------- *)
 module LowMatch = struct
-  (* ------------------------------------------------------------------ *)
-  let gen_rcond (pf, env) c m at_pos s =
-    let head, i, tail = s_split_i env at_pos s in
-    let e, infos, (cvars, subs) =
-      match i.i_node with
-      | Smatch (e, bs) -> begin
-          let typ, tydc, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
-          let tyd = oget (EcDecl.tydecl_as_datatype tydc) in
-          let ctor =
-            let test (_i : int) = sym_equal c -| fst in
-            List.Exceptionless.findi test tyd.tydt_ctors in
+  let t_hoare_rcond_match c at_pos =
+    EcHoareRMatch.(t_hoare_rmatch { hrmr_at = at_pos; hrmr_ctor = c })
 
-          match ctor with
-          | None ->
-              tc_error_lazy pf (fun fmt ->
-                  Format.fprintf fmt
-                    "cannot find the constructor %s" c)
+  let t_bdhoare_rcond_match c at_pos =
+    EcBdHoareRMatch.(t_bdhoare_rmatch { brmr_at = at_pos; brmr_ctor = c })
 
-          | Some (i, (cname, _cty)) ->
-              let b = oget (List.nth_opt bs i) in
-              let cname = EcPath.pqoname (EcPath.prefix typ) cname in
-              let tyinst = List.combine tydc.tyd_params tyinst in
-              (e, ((typ, tyd, tyinst), cname), b)
-        end
-
-      | _ ->
-          tc_error_lazy pf (fun fmt ->
-            Format.fprintf fmt
-              "the targetted instruction is not a match")
-    in
-
-    let f = ss_inv_of_expr m e in
-
-    ((stmt head, subs, tail), (e, f), infos, cvars)
-
-  (* [can_frame]: whether the judgement may use the framed form when the
-     prefix [hd] is not empty. The framed form adds [e = C ys] to the
-     precondition, which is only valid in the initial memories where [hd]
-     terminates: harmless for hoare, ehoare and phoare-[<=] judgements
-     (diverging runs carry no obligation, or contribute 0 to an upper
-     bound), unsound for phoare-[=]/[>=] and equiv ones. With an empty
-     prefix it is always sound. *)
-  let gen_rcond_full ~(can_frame : bool) (pf, env) c me0 at_pos s =
-    let m  = EcMemory.memory me0 in
-    let (hd, s, tl), (e, f), ((typ, _tyd, tyinst), cname), cvars =
-      gen_rcond (pf,env) c m at_pos s in
-
-    let po1 =
-      let names = List.map (
-        fun (x, xty) ->
-          let x =
-            if   EcIdent.name x = "_"
-            then EcIdent.create (symbol_of_ty xty)
-            else EcIdent.fresh x
-          in (x, xty)) cvars in
-      let vars = List.map (curry f_local) names in
-      let cty = toarrow (List.snd names) f.inv.f_ty in
-      let po = f_op cname (List.snd tyinst) cty in
-      let po = f_app po vars f.inv.f_ty in
-      map_ss_inv1 (f_exists (List.map (snd_map gtty) names)) (map_ss_inv2 f_eq f {m;inv=po}) in
-
-    let me, pvs =
-      let cvars =
-        List.map
-          (fun (x, xty) -> { ov_name = Some (EcIdent.name x); ov_type = xty; })
-          cvars in
-      EcMemory.bindall_fresh cvars me0 in
-
-    let subst, pvs =
-      let s = Fsubst.f_subst_id in
-      let s, pvs =
-        List.fold_left_map (fun s ((x, xty), name) ->
-            let pv = pv_loc (oget name.ov_name) in
-            let s  = bind_elocal s x (e_var pv xty) in
-            (s, (pv, xty)))
-          s (List.combine cvars pvs) in
-      (s, pvs) in
-
-    let frame =
-         (can_frame || List.is_empty hd.s_node)
-      && EcPV.PV.indep env
-           (EcPV.e_read env e)
-           (EcPV.PV.union (EcPV.s_read env hd) (EcPV.s_write env hd)) in
-
-    let epr, asgn =
-    if frame then begin
-      let vars = List.map (fun (pv, ty) -> f_pvar pv ty (fst me)) pvs in
-      let epr = f_op cname (List.snd tyinst) f.inv.f_ty in
-      let epr = map_ss_inv ~m:f.m (fun vars -> f_app epr vars f.inv.f_ty) vars in
-      Some (map_ss_inv2 f_eq f epr), []
-    end else begin
-      let asgn =
-        EcModules.lv_of_list pvs |> omap (fun lv ->
-          (* FIXME: factorize out *)
-          let rty  = ttuple (List.snd cvars) in
-          let proj = EcInductive.datatype_proj_path typ (EcPath.basename cname) in
-          let proj = e_op proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
-          let proj = e_app proj [e] (toption rty) in
-          let proj = e_oget proj rty in
-          i_asgn (lv, proj)) in
-      None, otolist asgn
-    end in
-
-    (epr, hd, po1), (me, stmt (hd.s_node @ asgn @ (s_subst subst s).s_node @ tl))
-
-  (* ------------------------------------------------------------------ *)
-  let t_hoare_rcond_match_r c at_pos tc =
-    let hs = tc1_as_hoareS tc in
-    let (epr, hd, po1), (me, full) =
-      gen_rcond_full ~can_frame:true (!!tc, FApi.tc1_env tc) c hs.hs_m at_pos hs.hs_s in
-
-    let pr = ofold (map_ss_inv2 f_and) (hs_pr hs) epr in
-    let po1 = update_hs_ss po1 (hs_po hs) in
-
-    let concl1  = f_hoareS (snd hs.hs_m) (hs_pr hs) hd po1 in
-    let concl2  = f_hoareS (snd me) pr full (hs_po hs) in
-
-    FApi.xmutate1 tc `RCondMatch [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_ehoare_rcond_match_r c at_pos tc =
-    let hs = tc1_as_ehoareS tc in
-    let (epr, hd, po1), (me, full) =
-      gen_rcond_full ~can_frame:true (!!tc, FApi.tc1_env tc) c hs.ehs_m at_pos hs.ehs_s in
-
-    (* The precondition has the form [P `|` f], with [P] boolean: as for
-       [rcond], the prefix obligation is a hoare judgement on [P], and the
-       framed condition is added to [P]. *)
-    let p, f =
-      match destr_app (ehs_pr hs).inv with
-      | o, [p; f] when f_equal o fop_interp_ehoare_form -> p, f
-      | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
-    let p = { m = (ehs_pr hs).m; inv = p; } in
-    let pr =
-      map_ss_inv1 (fun p -> f_interp_ehoare_form p f)
-        (ofold (map_ss_inv2 f_and) p epr) in
-
-    let concl1  = f_hoareS (snd hs.ehs_m) p hd (POE.lift po1) in
-    let concl2  = f_eHoareS (snd me) pr full (ehs_po hs) in
-
-    FApi.xmutate1 tc `RCondMatch [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_bdhoare_rcond_match_r c at_pos tc =
-    let bhs = tc1_as_bdhoareS tc in
-    let (epr, hd, po1), (me, full) =
-      gen_rcond_full ~can_frame:(bhs.bhs_cmp = FHle)
-        (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in
-
-    let pr = ofold (map_ss_inv2 f_and) (bhs_pr bhs) epr in
-    let po1 = POE.lift po1 in
-
-    let concl1 = f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd po1 in
-    let concl2 = f_bdHoareS (snd me) pr full (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
-
-    FApi.xmutate1 tc `RCondMatch [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_equiv_rcond_match_r side c at_pos tc =
-    let es = tc1_as_equivS tc in
-    let ml, mr = fst es.es_ml, fst es.es_mr in
-
-    let m, mo, s =
-      match side with
-      | `Left  -> es.es_ml, es.es_mr, es.es_sl
-      | `Right -> es.es_mr, es.es_ml, es.es_sr in
-
-    let (epr, hd, po1), (me, full) =
-      gen_rcond_full ~can_frame:false (!!tc, FApi.tc1_env tc) c m at_pos s in
-
-    let ss_inv_generalize_other inv = sideif side
-      (ss_inv_generalize_right inv mr) (ss_inv_generalize_left inv ml) in
-
-    let epr  = omap (fun epr ->
-      ss_inv_generalize_other (ss_inv_rebind epr (fst m))) epr in
-
-    let ts_inv_lower_side1 =
-      sideif side ts_inv_lower_left1 ts_inv_lower_right1 in
-
-    let po1 = POE.lift po1 in
-    let concl1 =
-      f_forall_mems_ss_inv mo
-        (ts_inv_lower_side1 (fun pr -> f_hoareS (snd m) pr hd po1) (es_pr es)) in
-
-    let (ml, mr), (sl, sr) =
-      match side with
-      | `Left ->
-          ((fst es.es_ml, snd me), es.es_mr),
-          (full, es.es_sr)
-
-      | `Right ->
-          (es.es_ml, (fst es.es_mr, snd me)),
-          (es.es_sl, full) in
-
-    let concl2 =
-      f_equivS (snd ml) (snd mr) (ofold (map_ts_inv2 f_and) (es_pr es) epr) sl sr (es_po es) in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_hoare_rcond_match =
-    FApi.t_low2 "hoare-rcond-match" t_hoare_rcond_match_r
-
-  let t_ehoare_rcond_match =
-    FApi.t_low2 "hoare-rcond-match" t_ehoare_rcond_match_r
-
-  let t_bdhoare_rcond_match =
-    FApi.t_low2 "hoare-rcond-match" t_bdhoare_rcond_match_r
-
-  let t_equiv_rcond_match =
-    FApi.t_low3 "hoare-rcond-match" t_equiv_rcond_match_r
+  let t_equiv_rcond_match side c at_pos =
+    EcEquivRMatch.(t_equiv_rmatch
+      { ermr_side = side; ermr_at = at_pos; ermr_ctor = c })
 end
 
 (* -------------------------------------------------------------------- *)
+(* Dispatch on the goal kind only. Without a side, a goal that is neither a
+   [bdHoareS] nor an [eHoareS] goes to the hoare tactic, which reports it. *)
 let t_rcond_match side c at_pos tc =
-  let concl = FApi.tc1_goal tc in
+  match side, (FApi.tc1_goal tc).f_node with
+  | None, FbdHoareS _ -> LowMatch.t_bdhoare_rcond_match c at_pos tc
+  | None, FeHoareS  _ ->
+      EcEHoareRMatch.(t_ehoare_rmatch { ehrmr_at = at_pos; ehrmr_ctor = c }) tc
+  | None, _           -> LowMatch.t_hoare_rcond_match c at_pos tc
+  | Some side, _      -> LowMatch.t_equiv_rcond_match side c at_pos tc
 
-  match side with
-  | None when is_bdHoareS concl -> LowMatch.t_bdhoare_rcond_match c at_pos tc
-  | None when is_eHoareS concl -> LowMatch.t_ehoare_rcond_match c at_pos tc
-  | None -> LowMatch.t_hoare_rcond_match c at_pos tc
-  | Some side -> LowMatch.t_equiv_rcond_match side c at_pos tc
-
-(* -------------------------------------------------------------------- *)
 let process_rcond_match side c at_pos tc =
-  let at_pos = EcLowPhlGoal.tc1_process_codepos1 tc (side, at_pos) in
-  t_rcond_match side c at_pos tc
+  match side, (FApi.tc1_goal tc).f_node with
+  | None, FbdHoareS _ -> EcBdHoareRMatch.process_bdhoare_rmatch c at_pos tc
+  | None, FeHoareS  _ -> EcEHoareRMatch.process_ehoare_rmatch c at_pos tc
+  | None, _           -> EcHoareRMatch.process_hoare_rmatch c at_pos tc
+  | Some side, _      -> EcEquivRMatch.process_equiv_rmatch side c at_pos tc

@@ -151,8 +151,9 @@ src/phl/
     ecPl*.ml    logic-agnostic computations shared by the rules of every
                 logic: EcPlFrame (framing conditions), EcPlSp (strongest
                 postcondition), EcPlWp (weakest precondition), EcPlRndSem
-                (semantic sampling), EcPlTransform (the transformation
-                catalogue and its obligations)
+                (semantic sampling), EcPlRCond (deciding a conditional or
+                a match), EcPlTransform (the transformation catalogue and
+                its obligations)
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -351,7 +352,7 @@ parameterized by an entry of a **catalogue** of transformations:
   - equiv (transformation of side `i`): `forall &j, hoare [hd : P ==> cond]`,
     the relation read on side `i` with the other memory quantified.
 
-  These are the premises the `rcond` rules build today.
+  These are the premises `rcondt` / `rcondf` have always stated.
 - **The rules** `t_<logic>_transform` (`rules/<logic>/Ec<Logic>Transform`;
   equiv: one side at a time, the other program and memory unchanged) record
   `(transformation, resolved parameters)` (and the side) in their node. The
@@ -363,18 +364,33 @@ parameterized by an entry of a **catalogue** of transformations:
   arguments, check what they always checked (to keep their error messages),
   and apply the transformation rule.
 
-Current catalogue: `rndsem` (`EcTrRndSem`, semantic sampling of a
-straight-line suffix, computed by `EcPlRndSem`; no obligation), used by the
-`rndsem` tactic in hoare, bdhoare and equiv (no ehoare `rndsem`, so the
-ehoare rule is not used yet). Further entries come with the tactics that use
-them: rcond, rmatch, if/match-push, then swap, inline, kill/alias/cfold/set
-and proc rewrite.
+Current catalogue:
+- `rndsem` (`EcTrRndSem`, semantic sampling of a straight-line suffix,
+  computed by `EcPlRndSem`; no obligation), used by the `rndsem` tactic in
+  hoare, bdhoare and equiv;
+- `rcond` (`EcTrRCond`, deciding the `if` / `while` at a position; obligation
+  `OPrefixPost (hd, b)` or `OPrefixPost (hd, !b)`), used by `rcondt` /
+  `rcondf` in every logic;
+- `rmatch` (`EcTrRMatch`, deciding the `match` at a position, the arguments
+  of the constructor being assigned to fresh program variables; obligation
+  `OPrefixPost (hd, exists xs, e = C xs)`), used by `match C k` in every
+  logic (its unframed form, see below).
+
+The decisions of a conditional or a match are computed by `EcPlRCond`.
+Further entries come with the tactics that use them: if/match-push, then
+swap, inline, kill/alias/cfold/set and proc rewrite.
 
 Exception: the framed form of `match C k` (used when the variables of the
-discriminant `e` are neither read nor written by the prefix) adds `e = C ys`
-to the precondition instead of assigning `ys` in the program. It changes the precondition, so it is not a program
-transformation in this sense and stays a separate trusted rule (to be
-rediscussed).
+discriminant `e` are neither read nor written by the prefix, and the
+judgement ignores the initial memories in which the prefix does not
+terminate: hoare, ehoare, phoare `<=`, or an empty prefix) adds `e = C ys`
+to the precondition instead of assigning `ys` in the program. It changes
+the precondition, so it is not a program transformation in this sense and
+stays a separate trusted rule of each logic, `t_<logic>_rmatch_framed`
+(`Ec<Logic>RMatch`, checker "<logic>-rmatch-framed"), stated on the whole
+statement (to be rediscussed). The `match C k` tactic of each logic is
+derived: it applies that rule when the framing condition holds, the
+`rmatch` transformation otherwise.
 
 ## 8. Per-tactic migration recipe
 
