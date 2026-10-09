@@ -143,7 +143,7 @@ src/phl/
     transforms/ EcTr<Name>: catalogue entries of the program transformations
     ecPl*.ml    computations shared by the rules of every logic: EcPlFrame,
                 EcPlSp, EcPlWp, EcPlRndSem, EcPlRCond, EcPlTransform,
-                EcPlMatch
+                EcPlMatch, EcPlFun
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -152,6 +152,9 @@ src/phl/
 - `wp` and `sp` are logic rules on an explicit suffix / prefix, in
   `rules/<logic>/` (the shared computation in `EcPlWp` / `EcPlSp`).
 - `sym` and `trans` are equiv-only rules, in `rules/equiv/`.
+- The `proc` rules (`Ec<Logic>FunDef`, `Ec<Logic>FunAbs`,
+  `EcEquivFunAbsUpto`, `Ec<Logic>FunToCode`, `EcEagerFunToCode`) are
+  logic rules in `rules/<logic>/`; `proc I` is derived (consequence + rule).
 - A rule relating two logics (e.g. the `pr` bridges) lives with the logic of
   its conclusion.
 - Program transformations use the transformation rule of each logic; only
