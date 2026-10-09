@@ -143,7 +143,7 @@ src/phl/
     transforms/ EcTr<Name>: catalogue entries of the program transformations
     ecPl*.ml    computations shared by the rules of every logic: EcPlFrame,
                 EcPlSp, EcPlWp, EcPlRndSem, EcPlRCond, EcPlTransform,
-                EcPlMatch, EcPlFun, EcPlCall
+                EcPlMatch, EcPlFun, EcPlCall, EcPlWeakMem
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -158,6 +158,10 @@ src/phl/
 - The `call` rules (`Ec<Logic>Call`) are logic rules on the call alone;
   `call` is derived (`seq` + rule), except in bdhoare, whose rule keeps its
   composite statement on `c; x <@ f(a)`.
+- The `weakmem` rules (`Ec<Logic>WeakMem`) weaken the memory of a statement
+  judgement by fresh locals it does not mention; the `weakmem` tactic is
+  derived (cut of the weakened hypothesis, closed by the rule and the
+  hypothesis).
 - A rule relating two logics (e.g. the `pr` bridges) lives with the logic of
   its conclusion.
 - A rule concluding a probability statement from a judgement (`byphoare`,
