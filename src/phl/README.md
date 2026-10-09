@@ -143,7 +143,7 @@ src/phl/
     transforms/ EcTr<Name>: catalogue entries of the program transformations
     ecPl*.ml    computations shared by the rules of every logic: EcPlFrame,
                 EcPlSp, EcPlWp, EcPlRndSem, EcPlRCond, EcPlTransform,
-                EcPlMatch, EcPlFun
+                EcPlMatch, EcPlFun, EcPlCall
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -155,6 +155,9 @@ src/phl/
 - The `proc` rules (`Ec<Logic>FunDef`, `Ec<Logic>FunAbs`,
   `EcEquivFunAbsUpto`, `Ec<Logic>FunToCode`, `EcEagerFunToCode`) are
   logic rules in `rules/<logic>/`; `proc I` is derived (consequence + rule).
+- The `call` rules (`Ec<Logic>Call`) are logic rules on the call alone;
+  `call` is derived (`seq` + rule), except in bdhoare, whose rule keeps its
+  composite statement on `c; x <@ f(a)`.
 - A rule relating two logics (e.g. the `pr` bridges) lives with the logic of
   its conclusion.
 - A rule concluding a probability statement from a judgement (`byphoare`,
