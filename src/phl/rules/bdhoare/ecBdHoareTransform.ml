@@ -38,7 +38,10 @@ let bdhoare_transform_subgoals
   let obligation = function
     | OPrefixPost { opp_prefix = hd; opp_cond = cond } ->
         let cond = { (ss_inv_rebind cond m) with m } in
-        f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd (POE.lift cond) in
+        f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd (POE.lift cond)
+    | OLossless ks ->
+        f_bdHoareS (snd bhs.bhs_m)
+          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 } in
   List.map obligation r.trr_obl
   @ [f_bdHoareS (snd r.trr_me)
        (bhs_pr bhs) r.trr_s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs)]
