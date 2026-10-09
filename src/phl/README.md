@@ -83,7 +83,7 @@ Run the test suite with `EC_RECHECK=1` to exercise every migrated checker.
 ## Program transformations
 
 Tactics that replace the program by an equivalent one and keep the judgement
-(rndsem, rcond, swap, and later inline, …) go through **one** trusted
+(rndsem, rcond, swap, inline, …) go through **one** trusted
 transformation rule per logic, `t_<logic>_transform` (`Ec<Logic>Transform`;
 equiv: one side at a time), parameterized by an entry of a catalogue:
 
@@ -107,7 +107,7 @@ equiv: one side at a time), parameterized by an entry of a catalogue:
 
 Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`),
 `rmatch` (`EcTrRMatch`), `if-push` (`EcTrIfPush`), `match-push`
-(`EcTrMatchPush`) and `swap` (`EcTrSwap`). `if-push` / `match-push` push
+(`EcTrMatchPush`), `swap` (`EcTrSwap`) and `inline` (`EcTrInline`). `if-push` / `match-push` push
 the continuation of a leading conditional / `match` into its branches: the
 `if` and `match` tactics are push + rule on the conditional alone
 (`Ec<Logic>If`, `Ec<Logic>Match`).
