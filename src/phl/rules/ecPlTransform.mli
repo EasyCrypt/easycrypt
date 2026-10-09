@@ -36,7 +36,10 @@ open EcEnv
    on the conditional alone), [EcTrSwap] (moving a block of a possibly
    nested block), [EcTrInline] (inlining procedure calls), [EcTrKill],
    [EcTrAlias], [EcTrSet], [EcTrSetMatch], [EcTrCFold], [EcTrAsgnCase]
-   and [EcTrSimplifyIf] (the code transformations). Entries live
+   and [EcTrSimplifyIf] (the code transformations), [EcTrFission] /
+   [EcTrFusion] (splitting / merging loops), [EcTrUnroll] (unrolling the
+   first iteration of a loop) and [EcTrSplitWhile] (splitting a loop on an
+   extra condition). Entries live
    in [rules/transforms/], as [EcTr<Name>]. The framed form of [match C k]
    changes the precondition: it is not a transformation, but a separate
    rule of each logic ([Ec<Logic>RMatch]). *)
