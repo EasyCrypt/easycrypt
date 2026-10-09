@@ -20,7 +20,7 @@ theory DHIES.
     type range    <- K,
     op   q_ror    <- q_lor.
 
-  clone GP.ZModE.ZModpField as ZPF.
+  clone GP.ZModE.ZModpFieldBd as ZPF.
 
   type group   = ODH.G.group.
   type exp     = ODH.GP.exp.
@@ -546,7 +546,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
       move: (assoc_some _ _ _ H20) => /mapP [v [? /= [[H22 H23] H24]]].
       rewrite H24 H23 -H22.
       move: (H4 _ _ H18) => ->; congr.
-      by rewrite -!GP.expM ZPF.mulrC.
+      by rewrite -!GP.expM ZPF.R.mulrC.
   by wp; skip; rewrite /inv /=; clear inv => />; smt().
 + proc; inline*.
   sp 1 1 ; if; first by rewrite /inv.

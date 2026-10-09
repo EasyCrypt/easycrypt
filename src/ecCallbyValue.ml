@@ -323,6 +323,12 @@ and try_reduce_fixdef
     if not (st.st_ri.iota && is_fix_def st p) then
       raise Bailout;
 
+    (match st.st_ri.delta_p p with
+     | `Force -> ()
+     | _ ->
+       if EcReduction.reduction_opaque st.st_ri st.st_env p then
+         raise Bailout);
+
     let Args.{ resty = ty; stack = args; } = args in
     let op  = oget (oper st p) in
     let fix = EcDecl.operator_as_fix op in
@@ -424,7 +430,7 @@ and reduce_user_delta st f1 p tys args =
   match reduce_user_with_exn st f2 with
   | f -> f
   | exception NotReducible ->
-    let mode = st.st_ri.delta_p p in
+    let mode = EcReduction.opacity_mode st.st_ri p (st.st_ri.delta_p p) in
     let nargs = List.length args.stack in
     match mode with
     | #Op.redmode as mode -> begin
