@@ -1,0 +1,3 @@
+# exit: 0
+# LOAD -trace on a file ending mid-proof: BEFORE/TACTIC/AFTER/SUMMARY.
+LOAD "fixtures/midproof.ec" -trace

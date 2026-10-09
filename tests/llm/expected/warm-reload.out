@@ -1,0 +1,44 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/sub/reload.ec:7]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+neighbour = 3
+<END>
+OK [uuid:3]
+* In [operators, predicates or exceptions]:
+
+(* Neighbour.neighbour (shorten name: neighbour) *)
+op neighbour : int = 3.
+
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+neighbour = 3
+<END>
+OK [uuid:3] [loaded:fixtures/sub/reload.ec:7]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+neighbour = 3
+<END>
+OK [uuid:3]
+* In [operators, predicates or exceptions]:
+
+(* Neighbour.neighbour (shorten name: neighbour) *)
+op neighbour : int = 3.
+
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+neighbour = 3
+<END>

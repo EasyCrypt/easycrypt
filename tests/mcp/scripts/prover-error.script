@@ -1,0 +1,11 @@
+# exit: 0
+# An EasyCrypt-level failure is data, not a protocol error: a
+# successful response carrying isError, the prover's message and the
+# goal state at the point of failure. ec_undo then reports there is
+# nothing left to undo, which is the same kind of failure.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","line":6}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"apply nosuchlemma."}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ec_focus","arguments":{"path":"7"}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ec_revert","arguments":{"target":"0"}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"ec_undo","arguments":{}}}

@@ -1,0 +1,5 @@
+# exit: 1
+# SEARCH with a pattern, then SEARCH with no argument (error).
+LOAD "fixtures/simple.ec" 6
+SEARCH (b2i _)
+SEARCH

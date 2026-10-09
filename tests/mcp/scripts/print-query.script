@@ -1,0 +1,13 @@
+# exit: 0
+# `print' reaches the agent. Its output used to go to the process's
+# stdout, which this server points at stderr, so an ec_step of
+# `print b2i.' came back with an empty body. `locate', which already
+# went through the notice buffer, is pinned next to it. Neither is
+# recorded for ec_commit.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/midproof.ec"}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"print b2i."}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"locate b2i."}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"trivial. trivial."}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"ec_commit","arguments":{}}}
