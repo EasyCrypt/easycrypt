@@ -1009,12 +1009,16 @@ let circ_simplify_form_bitstring_equality
   let env = toenv hyps in
   let st = Option.default (create_state (EcEnv.gstate env)) st in
 
+  (* An equality that the circuits prove valid (under [pres]) is replaced
+     by [true]. Any other one is kept: it may still hold in some states,
+     and replacing it by [false] would be unsound under a negation (or on
+     the left of an implication). *)
   let rec check (f : form) =
     match EcFol.sform_of_form f with
     | SFeq (f1, f2)
       when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty)
            || (Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty) ->
-      f_bool (circuit_simplify_equality ~st ~hyps ~pres f1 f2)
+      if circuit_simplify_equality ~st ~hyps ~pres f1 f2 then f_true else f
     | _ -> f_map (fun ty -> ty) check f
   in
   check f

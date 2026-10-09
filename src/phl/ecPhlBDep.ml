@@ -357,6 +357,14 @@ let t_extens (v : string option) (tt : backward) (tc : tcenv1) =
         | `Bitstring {ofint} :: _ -> ofint
         | _ -> tc_error (tc1_penv tc) "Only finite size bitstring supported"
       in
+      (* Each instance replaces [v] by a constant in the program, the
+         precondition and the postcondition. The postcondition reads [v]
+         in the final memory: this is only sound if the program does not
+         write [v]. *)
+      if EcPV.PV.mem_pv (tc1_env tc) (pv_loc v.v_name)
+           (EcPV.s_write (tc1_env tc) hs.hs_s) then
+        tc_error (tc1_penv tc)
+          "extens: the program writes the variable %s" v.v_name;
       let ngoals = 1 lsl size in
       List.init ngoals (fun i ->
           let subst =
