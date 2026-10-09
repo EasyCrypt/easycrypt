@@ -105,11 +105,15 @@ equiv: one side at a time), parameterized by an entry of a catalogue:
   ("<logic>-transform") re-runs it on the goal's program and compares the
   subgoals up to conversion (programs up to alpha-equivalence).
 
-Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`) and
-`rmatch` (`EcTrRMatch`). Further entries come with the tactics that use
-them. The framed form of `match C k` changes the precondition: it stays a
-separate trusted rule of each logic, `t_<logic>_rmatch_framed`
-(`Ec<Logic>RMatch`). See `REFACTORING.md` §7f.
+Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`),
+`rmatch` (`EcTrRMatch`), `if-push` (`EcTrIfPush`) and `match-push`
+(`EcTrMatchPush`), the last two pushing the continuation of a leading
+conditional / `match` into its branches. The `if` and `match` tactics are
+push + rule on the conditional alone (`Ec<Logic>If`, `Ec<Logic>Match`).
+Further entries come with the tactics that use them. The framed form of
+`match C k` changes the precondition: it stays a separate trusted rule of
+each logic, `t_<logic>_rmatch_framed` (`Ec<Logic>RMatch`). See
+`REFACTORING.md` §7f.
 
 ## Directory layout
 
@@ -125,7 +129,8 @@ src/phl/
                 Ec<Logic><Rule>: one module per (logic, rule)
     transforms/ EcTr<Name>: catalogue entries of the program transformations
     ecPl*.ml    computations shared by the rules of every logic: EcPlFrame,
-                EcPlSp, EcPlWp, EcPlRndSem, EcPlRCond, EcPlTransform
+                EcPlSp, EcPlWp, EcPlRndSem, EcPlRCond, EcPlTransform,
+                EcPlMatch
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
