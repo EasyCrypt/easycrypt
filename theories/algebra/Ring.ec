@@ -858,6 +858,123 @@ abstract theory Field.
 
 end Field.
 
+(* -------------------------------------------------------------------- *)
+(* Refinements as delta-only mixins: the parent ComRing is a named      *)
+(* parameter, referenced -- not copied.  One library per level.         *)
+abstract theory IDomainMixin.
+  type t.
+
+  clone import ComRing as R with type t <= t.
+
+  axiom mulf_eq0:
+    forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
+
+  lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
+  proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0 /#. qed.
+
+  lemma expf_eq0 x n : (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
+  proof.
+  elim/intwlog: n => [n| |n ge0_n ih].
+  + by rewrite exprN invr_eq0 /#.
+  + by rewrite expr0 oner_neq0.
+  by rewrite exprS // mulf_eq0 ih addz1_neq0 ?andKb.
+  qed.
+
+  lemma mulfI (x : t): x <> zeror => injective (( * ) x).
+  proof.
+    move=> ne0_x y y'; rewrite -(opprK (x * y')) -mulrN -addr_eq0.
+    by rewrite -mulrDr mulf_eq0 ne0_x /= addr_eq0 opprK.
+  qed.
+
+  lemma mulIf x: x <> zeror => injective (fun y => y * x).
+  proof. by move=> nz_x y z; rewrite -!(@mulrC x); exact: mulfI. qed.
+
+  lemma sqrf_eq1 x : (exp x 2 = oner) <=> (x = oner \/ x = -oner).
+  proof. by rewrite -subr_eq0 subr_sqr_1 mulf_eq0 subr_eq0 addr_eq0. qed.
+
+  lemma lregP x : lreg x <=> x <> zeror.
+  proof. by split=> [/lreg_neq0//|/mulfI]. qed.
+
+  lemma eqr_div (x1 y1 x2 y2 : t) : unit y1 => unit y2 =>
+    (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
+  proof.
+  move=> Nut1 Nut2; rewrite -{1}(@mulrK y2 _ x1) //.
+  rewrite  -{1}(@mulrK y1 _ x2) // -!mulrA (@mulrC (invr y1)) !mulrA.
+  split=> [|->] //;
+    (have nz_Vy1: unit (invr y1) by rewrite unitrV);
+    (have nz_Vy2: unit (invr y2) by rewrite unitrV).
+  by move/(mulIr _ nz_Vy1)/(mulIr _ nz_Vy2).
+  qed.
+end IDomainMixin.
+
+(* -------------------------------------------------------------------- *)
+abstract theory FieldMixin.
+  type t.
+
+  clone import ComRing as R with type t <= t.
+
+  axiom unitfP : forall (x : t), unit x <=> x <> zeror.
+
+  lemma mulf_eq0 (x y : t) : x * y = zeror <=> x = zeror \/ y = zeror.
+  proof.
+  split=> [hxy|]; last by case=> ->; rewrite ?(mul0r, mulr0).
+  case: (x = zeror) => //= nz_x.
+  have ux : unit x by rewrite unitfP.
+  by rewrite -(mul1r y) -(mulVr _ ux) -mulrA hxy mulr0.
+  qed.
+
+  clone IDomainMixin as Dom with
+    type t <= t, theory R <= R
+    proof mulf_eq0 by exact mulf_eq0.
+
+  lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
+  proof. by move=> nz_x; apply/mulrV; rewrite unitfP. qed.
+
+  lemma mulVf (x : t): x <> zeror => (invr x) * x = oner.
+  proof. by move=> nz_x; apply/mulVr; rewrite unitfP. qed.
+
+  lemma divff (x : t): x <> zeror => x / x = oner.
+  proof. by move=> nz_x; apply/divrr; rewrite unitfP. qed.
+
+  lemma invfM (x y : t) : invr (x * y) = invr x * invr y.
+  proof.
+  case: (x = zeror) => [->|nz_x]; first by rewrite !(mul0r, invr0).
+  case: (y = zeror) => [->|nz_y]; first by rewrite !(mulr0, invr0).
+  by rewrite invrM ?unitfP // mulrC.
+  qed.
+
+  lemma invf_div x y : invr (x / y) = y / x.
+  proof. by rewrite invfM invrK mulrC. qed.
+
+  lemma eqf_div (x1 y1 x2 y2 : t) : y1 <> zeror => y2 <> zeror =>
+    (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
+  proof. by move=> nz_1 nz_2; apply: Dom.eqr_div; rewrite unitfP. qed.
+
+  lemma expfM x y n : exp (x * y) n = exp x n * exp y n.
+  proof.
+  elim/intwlog: n => [n h | | n ge0_n ih].
+  + by rewrite -(@oppzK n) !(@exprN _ (-n)) h invfM.
+  + by rewrite !expr0 mulr1.
+  + by rewrite !exprS // mulrCA -!mulrA -ih mulrCA.
+  qed.
+end FieldMixin.
+
+(* -------------------------------------------------------------------- *)
+(* Bundles: references only, one slot per level, no library of their    *)
+(* own.  Consumers declare ONE bundle parameter; instances substitute   *)
+(* ONE theory.                                                          *)
+abstract theory IDomainBundle.
+  type t.
+  clone import ComRing      as R   with type t <= t.
+  clone import IDomainMixin as Dom with type t <= t, theory R <= R.
+end IDomainBundle.
+
+abstract theory FieldBundle.
+  type t.
+  clone import ComRing    as R with type t <= t.
+  clone import FieldMixin as F with type t <= t, theory R <= R.
+end FieldBundle.
+
 (* --------------------------------------------------------------------- *)
 abstract theory Additive.
 

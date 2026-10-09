@@ -326,7 +326,7 @@ module Theory : sig
     -> EcTheory.thmode
     -> env -> compiled_theory option
 
-  val alias : ?import:bool -> symbol -> path -> env -> env
+  val alias : ?import:bool -> symbol -> path list -> env -> env
   val aliases : env -> path Mp.t
 end
 
