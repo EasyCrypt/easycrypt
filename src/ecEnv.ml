@@ -313,6 +313,29 @@ let empty_mc params = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* Merge the members of [mc2] into [mc1].  Entries keep their original
+ * paths; bindings of [mc2] shadow same-named bindings of [mc1] (the
+ * most recently merged component wins, as with imports). *)
+let mc_merge (mc1 : mc) (mc2 : mc) =
+  let merge m1 m2 =
+    MMsym.fold
+      (fun x vs acc -> List.fold_right (fun v acc -> MMsym.add x v acc) vs acc)
+      m2 m1 in
+
+  { mc_parameters = mc1.mc_parameters;
+    mc_modules    = merge mc1.mc_modules     mc2.mc_modules;
+    mc_modsigs    = merge mc1.mc_modsigs     mc2.mc_modsigs;
+    mc_tydecls    = merge mc1.mc_tydecls     mc2.mc_tydecls;
+    mc_operators  = merge mc1.mc_operators   mc2.mc_operators;
+    mc_axioms     = merge mc1.mc_axioms      mc2.mc_axioms;
+    mc_theories   = merge mc1.mc_theories    mc2.mc_theories;
+    mc_variables  = merge mc1.mc_variables   mc2.mc_variables;
+    mc_functions  = merge mc1.mc_functions   mc2.mc_functions;
+    mc_typeclasses= merge mc1.mc_typeclasses mc2.mc_typeclasses;
+    mc_rwbase     = merge mc1.mc_rwbase      mc2.mc_rwbase;
+    mc_components = merge mc1.mc_components  mc2.mc_components; }
+
+(* -------------------------------------------------------------------- *)
 let empty_norm_cache =
   { norm_mp   = Mm.empty;
     norm_xpv  = Mx.empty;
@@ -627,8 +650,9 @@ module MC = struct
 
     | x :: qn ->
         let x = if x = EcCoreLib.i_self then EcCoreLib.i_top else x in
+        let top = MMsym.last x env.env_current.mc_components in
         let p =
-          (MMsym.last x env.env_current.mc_components) |>
+          top |>
             obind
               (fun p ->
                 match p, qn with
@@ -636,7 +660,27 @@ module MC = struct
                 | IPIdent _, _  -> None
                 | IPPath  p, _  -> Some (IPPath (path_of_qn p qn)))
         in
-          p |> obind (fun p -> Mip.find_opt p env.env_comps)
+
+        match p |> obind (fun p -> Mip.find_opt p env.env_comps) with
+        | Some _ as mc -> mc
+        | None ->
+          (* A theory alias is only a component of its enclosing
+           * theory, that names the components of its target: follow
+           * the components of [qn] one by one. *)
+          let rec follow (mc : mc) (qn : symbol list) =
+            match qn with
+            | [] -> Some mc
+            | x :: qn ->
+                match MMsym.last x mc.mc_components with
+                | Some (IPPath _ as p) ->
+                    Mip.find_opt p env.env_comps
+                      |> obind (fun mc -> follow mc qn)
+                | _ -> None in
+
+          match top, qn with
+          | Some (IPPath _ as p), _ :: _ ->
+              Mip.find_opt p env.env_comps |> obind (fun mc -> follow mc qn)
+          | _ -> None
 
   (* ------------------------------------------------------------------ *)
   let lookup ?(unique = false) proj (qn, x) env =
@@ -1019,7 +1063,29 @@ module MC = struct
     { mc with mc_theories = MMsym.add x obj mc.mc_theories }
 
   let lookup_theory qnx env =
-    match lookup (fun mc -> mc.mc_theories) qnx env with
+    (* A theory alias [x = T] is a component [x] of its enclosing
+     * theory, that names [T]. *)
+    let by_alias ((qn, x) : qsymbol) =
+      match lookup_mc qn env |> obind (fun mc -> MMsym.last x mc.mc_components) with
+      | Some (IPPath p) -> begin
+          match p.EcPath.p_node with
+          | EcPath.Pqname (q, y) ->
+              Mip.find_opt (IPPath q) env.env_comps
+                |> obind (fun mc -> MMsym.last y mc.mc_theories)
+                |> obind (fun (q, th) ->
+                     match q with
+                     | IPPath q when EcPath.p_equal p q -> Some (IPPath q, ([], th))
+                     | _ -> None)
+          | _ -> None
+        end
+      | _ -> None in
+
+    let th =
+      match lookup (fun mc -> mc.mc_theories) qnx env with
+      | None -> by_alias qnx
+      | th -> th in
+
+    match th with
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_th env p args, obj)
 
@@ -1153,9 +1219,37 @@ module MC = struct
       | Th_baserw (x, _) ->
           (add2mc _up_rwbase x (expath x) mc, None)
 
-      | Th_alias _ ->
-          (* FIXME:ALIAS *)
-          (mc, None)
+      | Th_alias (name, targets) -> begin
+          (* Alias entries resolve to their targets.  A single-target
+           * alias is a pure component redirection; a packed alias
+           * (several targets) gets a merged component built from the
+           * sibling targets (enforced in [EcScope.Theory.alias]),
+           * whose entries keep the targets' paths. *)
+          match targets with
+          | [target] ->
+              (_up_mc ~name false mc (IPPath target), None)
+
+          | targets ->
+              let mc_of_target (target : path) =
+                let tname = EcPath.basename target in
+                let tcth  =
+                  List.find_map_opt
+                    (fun item ->
+                      match item.ti_item with
+                      | Th_theory (x, tcth) when x = tname -> Some tcth
+                      | _ -> None)
+                    cth.cth_items in
+                (* enforced by [EcScope.Theory.alias] *)
+                let tcth = oget tcth in
+                let ((_, tmc), _) = mc_of_theory_r subscope (tname, tcth) in
+                tmc in
+
+              let merged =
+                List.fold_left mc_merge (empty_mc None)
+                  (List.map mc_of_target targets) in
+              let mc = _up_mc false mc (IPPath (expath name)) in
+              (mc, Some ((name, merged), []))
+        end
       | Th_export    _
       | Th_addrw     _
       | Th_instance  _
@@ -3498,18 +3592,39 @@ module Theory = struct
       Option.get (Mp.find_opt p env.env_thenvs)
 
 (* ------------------------------------------------------------------ *)
-  let rebind_alias (name : symbol) (path : path) (env : env) =
-    let th = by_path path env in
-    let src = EcPath.pqname (root env) name in
-    let env = MC.import_theory ~name path th env in
-    let env = MC.import_mc ~name (IPPath path) env in
-    let env = { env with env_albase = Mp.add path src env.env_albase } in
-    env
+  let rebind_alias (name : symbol) (paths : path list) (env : env) =
+    match paths with
+    | [path] ->
+        let th = by_path path env in
+        let src = EcPath.pqname (root env) name in
+        let env = MC.import_theory ~name path th env in
+        let env = MC.import_mc ~name (IPPath path) env in
+        let env = { env with env_albase = Mp.add path src env.env_albase } in
+        env
+
+    | paths ->
+        (* Packed alias: merge the targets' components under the alias
+         * name.  Entries keep their original paths, so resolution
+         * always yields the aliased objects -- no copies.  Contrary to
+         * [MC.bind_mc], rebinding must be idempotent: the alias is
+         * rebound on every import of the enclosing theory. *)
+        let mc_of (p : path) =
+          oget (Mip.find_opt (IPPath p) env.env_comps) in
+        let merged =
+          List.fold_left mc_merge (empty_mc None) (List.map mc_of paths) in
+        let apath = IPPath (EcPath.pqname (root env) name) in
+        { env with
+            env_current = MC._up_mc true env.env_current apath;
+            env_comps =
+              Mip.change
+                (fun mc -> Some (MC._up_mc true (oget mc) apath))
+                (IPPath (root env))
+                (Mip.add apath merged env.env_comps); }
 
   (* ------------------------------------------------------------------ *)
-  let alias ?(import = true) (name : symbol) (path : path) (env : env) =
-    let env = if import then rebind_alias name path env else env in
-    { env with env_item = mkitem ~import (Th_alias (name, path)) :: env.env_item }
+  let alias ?(import = true) (name : symbol) (paths : path list) (env : env) =
+    let env = if import then rebind_alias name paths env else env in
+    { env with env_item = mkitem ~import (Th_alias (name, paths)) :: env.env_item }
 
   (* ------------------------------------------------------------------ *)
   let aliases (env : env) =
@@ -3782,7 +3897,9 @@ module Theory = struct
       in (cleared, omap (fun item_r -> { item with ti_item = item_r; }) item_r)
 
   (* ------------------------------------------------------------------ *)
-  type clear_mode = [`Full | `ClearOnly | `No]
+  (* [`Alias] is [`Full], but also drops a theory whose items are all
+   * aliases. *)
+  type clear_mode = [`Full | `Alias | `ClearOnly | `No]
 
   let close
     ?(clears : path list = [])
@@ -3798,8 +3915,12 @@ module Theory = struct
       else snd (filter_th clears (root env) Sp.empty items) in
 
     let items =
+      let is_alias (item : theory_item) =
+        match item.ti_item with Th_alias _ -> true | _ -> false in
+
       match items, pempty with
       | None, (`No | `ClearOnly) -> Some []
+      | Some items, `Alias when List.for_all is_alias items -> None
       | _, _ -> items
     in
 

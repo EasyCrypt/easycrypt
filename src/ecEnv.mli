@@ -321,12 +321,12 @@ module Theory : sig
 
   val close :
        ?clears:(path list)
-    -> ?pempty:[`Full | `ClearOnly | `No]
+    -> ?pempty:[`Full | `Alias | `ClearOnly | `No]
     -> EcTypes.is_local
     -> EcTheory.thmode
     -> env -> compiled_theory option
 
-  val alias : ?import:bool -> symbol -> path -> env -> env
+  val alias : ?import:bool -> symbol -> path list -> env -> env
   val aliases : env -> path Mp.t
 end
 
