@@ -1,0 +1,9 @@
+# exit: 1
+# A SEARCH pattern is a pattern, not EasyCrypt input: a sentence-ending
+# '.' inside it must not start a new command. The `split. admit' below
+# is rejected outright -- the uuid must not move and COMMIT must stay
+# empty. A qualified name (dots and all) is still a legal pattern.
+LOAD "fixtures/simple.ec" 6
+SEARCH (_ /\ _). split. admit
+COMMIT
+SEARCH (RField.ofint _)

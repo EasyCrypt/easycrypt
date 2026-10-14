@@ -1,0 +1,11 @@
+# exit: 0
+# -noproof gives up rather than guess. Deciding which proof to replay
+# is a parse-only pass over the prefix, and an `undo' in it moves the
+# engine in a way that pass cannot follow without running the file. So
+# a prefix holding one is loaded with checking on throughout: slower,
+# never wrong. The tell is the reply tag, which carries no [noproof]
+# here -- `fixtures/undoafter.ec' has an `undo 3.' on line 9, and
+# stopping at line 10 puts it inside the prefix. `load-upto-undo' pins
+# the same file stopping short of the `undo'.
+LOAD "fixtures/undoafter.ec" 10 -noproof
+GOALS
