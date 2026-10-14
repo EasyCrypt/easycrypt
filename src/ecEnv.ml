@@ -3947,7 +3947,9 @@ module Theory = struct
       in (cleared, omap (fun item_r -> { item with ti_item = item_r; }) item_r)
 
   (* ------------------------------------------------------------------ *)
-  type clear_mode = [`Full | `ClearOnly | `No]
+  (* [`Alias] is [`Full], but also drops a theory whose items are all
+   * aliases. *)
+  type clear_mode = [`Full | `Alias | `ClearOnly | `No]
 
   let close
     ?(clears : path list = [])
@@ -3963,8 +3965,12 @@ module Theory = struct
       else snd (filter_th clears (root env) Sp.empty items) in
 
     let items =
+      let is_alias (item : theory_item) =
+        match item.ti_item with Th_alias _ -> true | _ -> false in
+
       match items, pempty with
       | None, (`No | `ClearOnly) -> Some []
+      | Some items, `Alias when List.for_all is_alias items -> None
       | _, _ -> items
     in
 
