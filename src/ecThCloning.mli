@@ -69,6 +69,8 @@ type evclone = {
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : (evclone * bool) Msym.t;
+  evc_target   : EcPath.path option;
+    (* the target of the theory override of this (sub-)theory, if any *)
 }
 
 and evlemma = {
