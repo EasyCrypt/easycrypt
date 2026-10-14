@@ -650,8 +650,9 @@ module MC = struct
 
     | x :: qn ->
         let x = if x = EcCoreLib.i_self then EcCoreLib.i_top else x in
+        let top = MMsym.last x env.env_current.mc_components in
         let p =
-          (MMsym.last x env.env_current.mc_components) |>
+          top |>
             obind
               (fun p ->
                 match p, qn with
@@ -659,7 +660,27 @@ module MC = struct
                 | IPIdent _, _  -> None
                 | IPPath  p, _  -> Some (IPPath (path_of_qn p qn)))
         in
-          p |> obind (fun p -> Mip.find_opt p env.env_comps)
+
+        match p |> obind (fun p -> Mip.find_opt p env.env_comps) with
+        | Some _ as mc -> mc
+        | None ->
+          (* A theory alias is only a component of its enclosing
+           * theory, that names the components of its target: follow
+           * the components of [qn] one by one. *)
+          let rec follow (mc : mc) (qn : symbol list) =
+            match qn with
+            | [] -> Some mc
+            | x :: qn ->
+                match MMsym.last x mc.mc_components with
+                | Some (IPPath _ as p) ->
+                    Mip.find_opt p env.env_comps
+                      |> obind (fun mc -> follow mc qn)
+                | _ -> None in
+
+          match top, qn with
+          | Some (IPPath _ as p), _ :: _ ->
+              Mip.find_opt p env.env_comps |> obind (fun mc -> follow mc qn)
+          | _ -> None
 
   (* ------------------------------------------------------------------ *)
   let lookup ?(unique = false) proj (qn, x) env =
@@ -1042,7 +1063,29 @@ module MC = struct
     { mc with mc_theories = MMsym.add x obj mc.mc_theories }
 
   let lookup_theory qnx env =
-    match lookup (fun mc -> mc.mc_theories) qnx env with
+    (* A theory alias [x = T] is a component [x] of its enclosing
+     * theory, that names [T]. *)
+    let by_alias ((qn, x) : qsymbol) =
+      match lookup_mc qn env |> obind (fun mc -> MMsym.last x mc.mc_components) with
+      | Some (IPPath p) -> begin
+          match p.EcPath.p_node with
+          | EcPath.Pqname (q, y) ->
+              Mip.find_opt (IPPath q) env.env_comps
+                |> obind (fun mc -> MMsym.last y mc.mc_theories)
+                |> obind (fun (q, th) ->
+                     match q with
+                     | IPPath q when EcPath.p_equal p q -> Some (IPPath q, ([], th))
+                     | _ -> None)
+          | _ -> None
+        end
+      | _ -> None in
+
+    let th =
+      match lookup (fun mc -> mc.mc_theories) qnx env with
+      | None -> by_alias qnx
+      | th -> th in
+
+    match th with
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_th env p args, obj)
 
