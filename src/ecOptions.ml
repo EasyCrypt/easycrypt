@@ -375,7 +375,7 @@ let specs = {
       `Group "loader";
       `Group "provers";
       `Spec  ("gcstats", `Flag  , "Display GC statistics");
-      `Spec  ("tstats" , `String, "Save timing statistics to <file>");
+      `Spec  ("tstats" , `String, "Save timing and memory statistics to <file>");
       `Spec  ("script" , `Flag  , "Computer-friendly output");
       `Spec  ("no-eco" , `Flag  , "Do not cache verification results");
       `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");

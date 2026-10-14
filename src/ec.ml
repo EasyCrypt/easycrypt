@@ -714,15 +714,36 @@ let main () =
     | None -> ()
   in
 
-  let tstats : EcLocation.t -> float option -> unit =
+  (* [-tstats]: one line per command, with its location and its time,
+   * then its CPU time, the memory it allocated (in MB), the size and
+   * the peak size of the major heap after it (in MB), and the number of
+   * major collections during it. [tstats ()] starts the measure of a
+   * command, the function it returns records it. *)
+  let tstats : unit -> EcLocation.t -> float option -> unit =
     match options.o_command with
     | `Compile { cmpo_tstats = Some out } ->
         let channel = Format.formatter_of_out_channel (open_out out) in
-        let fmt loc tdelta =
-          Format.fprintf channel "%s %f\n%!"
-            (EcLocation.tostring_raw ~with_fname:false loc) tdelta in
-        fun loc tdelta -> oiter (fmt loc) tdelta
-    | _ -> fun _ _ -> () in
+        let sample () = (Sys.time (), Gc.quick_stat ()) in
+        let mb (words : float) =
+          words *. float_of_int (Sys.word_size / 8) /. (1024. *. 1024.) in
+        let alloc (gc : Gc.stat) =
+          gc.Gc.minor_words +. gc.Gc.major_words -. gc.Gc.promoted_words in
+
+        fun () ->
+          let (cpu0, gc0) = sample () in
+          fun loc tdelta ->
+            let (cpu1, gc1) = sample () in
+            tdelta |> oiter (fun tdelta ->
+              Format.fprintf channel
+                "%s %f cpu=%f alloc=%.3f heap=%.1f top=%.1f gc=%d\n%!"
+                (EcLocation.tostring_raw ~with_fname:false loc) tdelta
+                (cpu1 -. cpu0)
+                (mb (alloc gc1 -. alloc gc0))
+                (mb (float_of_int gc1.Gc.heap_words))
+                (mb (float_of_int gc1.Gc.top_heap_words))
+                (gc1.Gc.major_collections - gc0.Gc.major_collections))
+
+    | _ -> fun () _ _ -> () in
 
   (* Instantiate terminal *)
   let lazy terminal = state.terminal in
@@ -834,6 +855,7 @@ let main () =
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
                    let ignore_fail = ref false in
+                   let tstats = tstats () in
 
                      state.trace <- state.trace |> Option.map (fun trace ->
                       { State.Trace.trace0 with position = loc.loc_echar } :: trace
