@@ -1324,7 +1324,7 @@ and replay_alias
   if is_none (EcEnv.Theory.by_path_opt p env) then
     (subst, ops, proofs, scope)
   else
-    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_alias (name, target)) in
+    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_alias (name, p)) in
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)

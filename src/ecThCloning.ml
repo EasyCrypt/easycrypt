@@ -87,6 +87,7 @@ type evclone = {
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : (evclone * bool) Msym.t;
+  evc_target   : EcPath.path option;
 }
 
 
@@ -108,7 +109,8 @@ let evc_empty =
       evc_modexprs = Msym.empty;
       evc_modtypes = Msym.empty;
       evc_lemmas   = evl;
-      evc_ths      = Msym.empty; }
+      evc_ths      = Msym.empty;
+      evc_target   = None; }
 
 let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone) =
   match nm with
@@ -519,12 +521,48 @@ end = struct
         List.find_map (fun rnm -> rename rnm (kind, name)) prerenames
       with Not_found -> name in
 
-    assert (not (Msym.mem x evc.evc_ths));
+    let evc =
+      evc_update
+        (fun evc ->
+          let ths =
+            Msym.change (fun sub ->
+              let sub, clear = odfl (evc_empty, false) sub in
+              if is_some sub.evc_target then
+                clone_error oc.oc_env (CE_DupOverride (OVK_Theory, name));
+              let sub = { sub with evc_target = Some sp } in
+              Some (sub, clear || (mode <> `Alias)))
+            x evc.evc_ths
+          in { evc with evc_ths = ths })
+        nm evc in
 
-    let evc = { evc with
-      evc_ths = Msym.change (fun sub ->
-        let sub, clear = odfl (evc_empty, false) sub in
-        Some (sub, clear || (mode <> `Alias))) x evc.evc_ths } in
+    (* A more specific override takes precedence over the one implied
+     * by the theory override. *)
+    let overridden (prefix : symbol list) (dth : theory_item_r) =
+      let sub = odfl evc_empty (evc_get (xdth @ prefix) evc) in
+
+      match dth with
+      | Th_type (x, _) ->
+         Msym.mem x sub.evc_types
+      | Th_operator (x, { op_kind = OB_oper _ }) ->
+         Msym.mem x sub.evc_ops
+      | Th_operator (x, { op_kind = OB_pred _ }) ->
+         Msym.mem x sub.evc_preds
+      | Th_operator (x, { op_kind = OB_nott _ }) ->
+         Msym.mem x sub.evc_abbrevs
+      | Th_module me ->
+         Msym.mem me.tme_expr.me_name sub.evc_modexprs
+      | Th_modtype (x, _) ->
+         Msym.mem x sub.evc_modtypes
+      | Th_theory (x, _) ->
+         Msym.find_opt x sub.evc_ths
+           |> obind (fun (sub, _) -> sub.evc_target)
+           |> is_some
+      | Th_axiom (x, _) ->
+         List.exists (fun prf ->
+           match prf.pthp_mode with
+           | `Named (y, _) -> unloc y = (xdth @ prefix, x)
+           | `All _ -> false) proofs
+      | _ -> false in
 
     let rec doit_r (prefix, tgprefix) (proofs, evc) dth =
       let dtpath (x : symbol) =
@@ -533,6 +571,8 @@ end = struct
       let tgpath ?kind (x : symbol) =
         let x = Option.fold ~none:x ~some:(fun k -> rename (k, x)) kind in
         EcPath.fromqsymbol (thd @ tgprefix, x) in
+
+      if overridden prefix dth then (proofs, evc) else
 
       match dth with
       | Th_type (x, _) ->
@@ -677,10 +717,19 @@ let clone (scenv : EcSection.scenv) (thcl : theory_cloning) =
   let name = odfl (EcPath.basename opath) (thcl.pthc_name |> omap unloc) in
   let oc   = { oc_env = env; oc_oth = oth; } in
 
+  (* Theory overrides are processed last, the most specific first: a
+   * theory override does not override the items that already have an
+   * override, so that the more specific override wins. *)
+  let ovrds =
+    let isth = function (_, PTHO_Theory _) -> true | _ -> false in
+    let ths, others = List.partition isth thcl.pthc_ext in
+    let depth (name, _) = List.length (fst (unloc name)) in
+    others @ List.stable_sort (fun o1 o2 -> compare (depth o2) (depth o1)) ths in
+
   let (genproofs, ovrds) =
     List.fold_left
       (fun st -> curry (OVRD.ovrd oc st))
-      ([], evc_empty) thcl.pthc_ext
+      ([], evc_empty) ovrds
   in
 
   let ovrds = List.fold_left (Proofs.proof ~intheory:true oc) ovrds genproofs in
