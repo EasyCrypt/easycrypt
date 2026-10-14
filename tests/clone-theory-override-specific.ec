@@ -57,3 +57,38 @@ expect "
 lemma leaflm: forall (x : int Arr.t), Arr.get x 0 = Arr.get x 0.
 " by print lemma L3.leaflm.
 
+(* The theory override leaves an alias to its target in place of the
+   theory it clears, unless a more specific override departs from it. *)
+clone Base as B1 with theory A <- Arr.
+
+(* `B1.A` was cleared and replaced with an alias to `Arr`: agrees. *)
+clone Leaf as L4 with theory B <- B1, theory B.A <- Arr.
+
+expect "
+theory L4.
+  (* no import *) theory B = B1.
+  
+  (* import *) lemma leaflm:
+                 forall (x : int Arr.t), Arr.get x B1.k = Arr.get x B1.k.
+end L4.
+" by print theory L4.
+
+(* `B0.A` is not `Arr2`: departs. *)
+expect "
+theory L1.
+  (* no import *) theory B.
+                    (* no import *) theory A = Arr2.
+                  end B.
+  
+  (* import *) lemma leaflm:
+                 forall (x : int Arr2.t), Arr2.get x B0.k = Arr2.get x B0.k.
+end L1.
+" by print theory L1.
+
+(* `B0.k` is not `0`: departs. *)
+expect "
+theory L3.
+  (* import *) lemma leaflm:
+                 forall (x : int Arr.t), Arr.get x 0 = Arr.get x 0.
+end L3.
+" by print theory L3.
