@@ -36,6 +36,10 @@ clone Leaf as L1 with theory B.A <- Arr.
 
 expect "
 theory L1.
+  (* import *) theory B.
+                 (* no import *) theory A = Arr.
+               end B.
+  
   (* import *) theory A.
                  (* import *) type u.
                end A.
@@ -51,6 +55,10 @@ expect "
 (* L2.h *)
 op h : Arr2.u -> int Arr.t.
 " by print op L2.h.
+
+(* The cleared theories are replaced with aliases to their targets. *)
+op w1 : L2.A.u -> Arr2.u = fun x => x.
+op w2 : int L2.B.A.t -> int Arr.t = fun x => x.
 
 (* Overriding the same theory twice is an error. *)
 expect fail "the theory `B.A' is instantiate twice"

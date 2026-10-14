@@ -36,7 +36,7 @@ and 'a ovrhooks = {
   henv      : 'a -> EcSection.scenv;
   hadd_item : 'a -> import:bool -> EcTheory.theory_item_r -> 'a;
   hthenter  : 'a -> thmode -> symbol -> is_local -> 'a;
-  hthexit   : 'a -> import:bool -> [`Full | `ClearOnly | `No] -> 'a;
+  hthexit   : 'a -> import:bool -> [`Full | `Alias | `ClearOnly | `No] -> 'a;
   herr      : 'b . ?loc:EcLocation.t -> string -> 'b;
 }
 
@@ -1407,6 +1407,13 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
           else subovrds.evc_lemmas.ev_global; }
       in
 
+      (* The theory [T] this one is to be replaced with, once cleared,
+       * by [theory ox <- T] *)
+      let target =
+        match subovrds.evc_target with
+        | Some (p, true) -> Some (EcSubst.subst_path subst p)
+        | _ -> None in
+
       let (subst, ops, proofs, subscope) =
         let new_local = odfl cth.cth_loca ove.ovre_local in
         let subscope = ove.ovre_hooks.hthenter scope thmode x new_local in
@@ -1414,8 +1421,27 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
           List.fold_left
             (fun state item -> replay1 subove state (hidden, item))
             (subst, ops, proofs, subscope) cth.cth_items in
-        let scope = ove.ovre_hooks.hthexit ~import:(not hidden) subscope `Full in
+        let pempty = if is_some target then `Alias else `Full in
+        let scope = ove.ovre_hooks.hthexit ~import:(not hidden) subscope pempty in
         (subst, ops, proofs, scope)
+
+      in
+
+      (* If the overridden theory has been cleared, leave an alias to
+       * its target, so that a later theory override whose target is
+       * the theory being built can find what [ox] has been replaced
+       * with. *)
+      let subscope =
+        match target with
+        | None ->
+           subscope
+        | Some target ->
+           let env = EcSection.env (ove.ovre_hooks.henv subscope) in
+           let xpath = EcPath.pqname (EcEnv.root env) x in
+           if is_some (EcEnv.Theory.by_path_opt ~mode:`All xpath env) then
+             subscope
+           else
+             ove.ovre_hooks.hadd_item subscope ~import:false (Th_alias (x, [target]))
 
       in (subst, ops, proofs, subscope)
   end

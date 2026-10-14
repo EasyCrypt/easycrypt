@@ -69,9 +69,12 @@ type evclone = {
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : (evclone * bool) Msym.t;
-  evc_target   : EcPath.path option;
-    (* the target of the theory override of this (sub-)theory, if any *)
+  evc_target   : (EcPath.path * bool) option;
 }
+(* [evc_target] is the target [T] of the theory override of this
+ * (sub-)theory, if any, and whether, once cleared, the theory is to be
+ * replaced by an alias to [T]: when the override is [theory X <- T]
+ * and no more specific override departs from it. *)
 
 and evlemma = {
   ev_global  : (ptactic_core option * evtags option) list;
