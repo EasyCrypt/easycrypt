@@ -535,6 +535,16 @@ end = struct
           in { evc with evc_ths = ths })
         nm evc in
 
+    (* The lemmas that already have a proof *)
+    let proved : (qsymbol, unit) Hashtbl.t =
+      let proved = Hashtbl.create 0 in
+      List.iter (fun prf ->
+          match prf.pthp_mode with
+          | `Named (y, _) -> Hashtbl.replace proved (unloc y) ()
+          | `All _ -> ())
+        proofs;
+      proved in
+
     (* A more specific override takes precedence over the one implied
      * by the theory override. *)
     let overridden (prefix : symbol list) (dth : theory_item_r) =
@@ -558,10 +568,7 @@ end = struct
            |> obind (fun (sub, _) -> sub.evc_target)
            |> is_some
       | Th_axiom (x, _) ->
-         List.exists (fun prf ->
-           match prf.pthp_mode with
-           | `Named (y, _) -> unloc y = (xdth @ prefix, x)
-           | `All _ -> false) proofs
+         Hashtbl.mem proved (xdth @ prefix, x)
       | _ -> false in
 
     let rec doit_r (prefix, tgprefix) (proofs, evc) dth =
