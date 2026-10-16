@@ -42,8 +42,9 @@ val t_equiv_upto : backward
    first apply a lemma of the real theory ([eq_upto], [upto_le],
    [upto_abs], [upto_maxr]), whose instance of the rule is closed by
    [t_equiv_upto], and whose facts on probabilities are closed by
-   [rewrite Pr mu_split bad] (resp. [mu_sub], [mu_ge0]) then [trivial]
-   (what [trivial] leaves remains visible). Here [E'] is [E /\ !bad].
+   [rewrite Pr mu_split bad] (resp. [mu_sub], [mu_ge0];
+   [EcBdHoarePrFact.t_pr_rewrite]) then [trivial] (what [trivial] leaves
+   remains visible). Here [E'] is [E /\ !bad].
    - [Pr[f1 : E'] = Pr[f2 : E']]: [t_equiv_upto];
    - [Pr[f1 : E] - Pr[f2 : E] = Pr[f1 : E /\ bad] - Pr[f2 : E /\ bad]]:
      [eq_upto], splitting both probabilities on [bad];
