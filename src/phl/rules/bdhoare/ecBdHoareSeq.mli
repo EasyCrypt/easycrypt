@@ -46,8 +46,9 @@ val t_bdhoare_seq : bdhoare_seq_rule -> backward
 (* Derived tactics                                                      *)
 
 (* [t_bdhoare_seq_full r] — [t_bdhoare_seq r], then a best-effort discharge
-   of (N): introduce [r1 r2], apply the framed consequence (currently
-   [EcPhlConseq.t_hoareS_conseq_nm]) down to [hoare [c1 : _ ==> true]], and
+   of (N): introduce [r1 r2], apply the framed consequence
+   [EcPhlConseq.t_hoareS_conseq_nm] (the frame rule
+   [EcHoareFrame.t_hoareS_frame], then the consequence rule) down to [hoare [c1 : _ ==> true]], and
    close everything with [EcPhlAuto.t_pl_trivial] — which succeeds when [c1]
    does not write the variables of [f2] / [g2]. Otherwise (N) is left open
    unchanged. Emits no node of its own. *)
