@@ -4,7 +4,7 @@ open EcCoreGoal.FApi
 open EcMatching.Position
 
 (* ==================================================================== *)
-(* Rules (trusted)                                                      *)
+(* Derived tactics                                                      *)
 
 type equiv_rndsem_rule = {
   ersr_side   : side;       (* rewritten side *)
@@ -13,25 +13,18 @@ type equiv_rndsem_rule = {
 }
 
 (* [t_equiv_rndsem { ersr_side = `Left; ersr_at = k; ersr_reduce = red }]
-   — semantic sampling of a straight-line suffix of one side:
+   — semantic sampling of the straight-line suffix [c2] of the left program
+   of [equiv [c1; c2 ~ c' : P ==> Q]], with [c1 = c[0..k)] (symmetrically
+   for [`Right]). Resolves [k] to an index, then applies
 
-       equiv [c1; wr <$ D(c2) ~ c' : P ==> Q]
-     ------------------------------------------  c = c1; c2   (c1 = c[0..k))
-               equiv [c ~ c' : P ==> Q]
+     [EcEquivTransform.t_equiv_transform] on that side with
+       [EcTrRndSem.TrRndSem { trrs_at = k (resolved); trrs_reduce = red }]
 
-   (symmetrically for [`Right]), where [c2] consists of assignments and
-   samplings only and writes no global, [wr] are the variables written by
-   [c2] — only those occurring in [Q] (on that side) when [red] — and
-   [D(c2)] is the distribution of their final values (see
-   [EcPlRndSem.semrnd]). When [wr] is empty, a fresh [unit] variable is
-   added to the memory of that side and sampled instead.
+   (no obligation), giving  equiv [c1; wr <$ D(c2) ~ c' : P ==> Q]
+   (failing with "semrnd" when [c2] is not straight-line or writes a
+   global).
 
-   As for hoare, the suffix is rewritten in place, keeping the prefix
-   [c1]: a program transformation, not expressible through [seq].
-
-   Node: [REquivRndSem { ersn_side; ersn_at = k (resolved index);
-                         ersn_reduce = red }].
-   Checker: "equiv-rndsem". *)
+   Visible goal: the transformed judgement. Emits no node of its own. *)
 val t_equiv_rndsem : equiv_rndsem_rule -> backward
 
 (* ==================================================================== *)
