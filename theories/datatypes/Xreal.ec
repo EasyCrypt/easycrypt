@@ -217,6 +217,9 @@ hint simplify to_pos_pos @10.
 lemma le_pos (x y : real) : x <= y => x%pos <= y%pos
 by smt().
 
+lemma pos_le (x y : real) : 0%r <= y => x%pos <= y%pos => x <= y
+by smt().
+    
 lemma inv_pos x : inv x%pos = (inv x)%pos
 by smt(divr0).
 
@@ -376,10 +379,24 @@ lemma msmulmAC (x y :realp) (z : xreal) : x * y ** z = x ** (y ** z).
   case (x = 0%rp) => [-> | hx ] //=.
   case (y = 0%rp) => [-> | hy ] //=.
   case z => [ r | ] //=; first by rewrite mulmA.
-  rewrite /( **) hx hy //=. print of_reald_pinj.
-  have -> : (x * y <> 0%rp). rewrite /( *). by smt(@Rp). (* ??? *)
+  rewrite /( **) hx hy //=.
+  have hygt : 0%r < y%r by smt(@Rp).
+  have hxgt : 0%r < x%r by smt(@Rp).
+  have hgtrp : (0%rp < x * y) by smt().
+  have ->: (x * y <> 0%rp) by smt().
   done.  
 qed.  
+
+lemma xmulzA (x y z : xreal): x * y * z = x * (y * z).
+proof.
+  case x; last by trivial.
+  case y; last by trivial.
+  case z; last by trivial.
+  move => z y x.
+  have ->: x%xr * y%xr * z%xr = (x * y) ** z%xr by trivial.
+  have ->: x%xr * (y%xr * z%xr) = x ** (y ** z%xr) by trivial.
+  apply msmulmAC.
+qed.
 
 (* -------------------------------------------------------------- *)
 
@@ -422,16 +439,22 @@ lemma xle_tot (x y : xreal) : x <= y \/ y <= x.
 proof. case: x => // x; case: y => // y; smt(@Rp). qed.
 
 lemma xle_antisym (x y : xreal) : x <= y => y <= x <=> x = y.
-proof. case: x => //; case: y => //; smt(@Rp). qed.
+proof. case: x => //; case: y => //; move => *; split; by smt(@Rp). qed.
 
 lemma xle_le  (a b : realp) : a%xr <= b%xr <=> to_real a <= to_real b.
 proof. by []. qed.    
 
 lemma nxlt_xle (x y : xreal) : !(y < x) <=> x <= y.
-proof. by move=> *; case: (xle_tot x y) => //; smt(@Rp). qed.
+proof.
+  case: x => //; case y => //; move => x y.
+  case: (xle_tot x%xr y%xr) => //;  by smt().
+qed.
 
 lemma xle_nxlt (x y : xreal) : x <= y => !(y < x).
-proof. by move=> *; case: (xle_tot x y) => //; smt(@Rp). qed.
+proof.
+  case: x => //; case y => //; move => x y.
+  by move=> *; case: (xle_tot x%xr y%xr) => //; smt().
+qed.
 
 lemma xle_eps (x y : xreal) :
   (forall eps, 0%r < eps => x <= y + eps%xr) => x <= y.
@@ -669,7 +692,10 @@ theory Lift.
 
   lemma is_real_sM ['a] (d : 'a  distr) f : 
     is_real (d ** f) <=> forall x, x \in d => is_real (f x).
-  proof. split => h x; have := h x; smt (mu_bounded @Rp). qed.
+  proof.
+    split => h x; have := h x; last by smt(mu_bounded).
+    move => hr hd; move : hr; rewrite /( **); have -> /=: !(mu1 d x)%rp = 0%rp; by smt(is_realM @Rp).
+  qed.
 
   lemma to_real_rp ['a] (f:'a -> realp) : to_real (fun x => rp (f x)) = fun x => to_real (f x).
   proof. by apply fun_ext. qed.
@@ -762,7 +788,7 @@ elim: I U => [| i I' IH] U.
   rewrite (eq_big_perm _ _ _ _ hp) !big_cons /predT //=.
   apply xler_addl; apply IH => //=.
   + move=> j hjI'. have := hsub j _. right. done.
-    by smt( perm_eq_mem).
+  rewrite (perm_eq_mem U (i :: rem i U)) //; by smt().
 qed.
 
 lemma big_le (f,g : 'a -> xreal) (P : 'a -> bool) (I : 'a list) :
@@ -874,10 +900,13 @@ move=> [p0 hp0].
         by case: L hlt => [x | ] *; [exists x | smt()].
         move: hlt; rewrite Ex Efin => hlt.
         have *: ra%xr <= x%xr by rewrite -Ex; apply (xle_trans (ra%xr + p0)); [apply xle_add_r | apply xlub_ub; exists p0; auto ].
-        have below : (x%r - ra%r)%xr < xlub P. smt(@Rp).
+        have below : (x%r - ra%r)%xr < xlub P.
+        rewrite Efin /=; move : hlt; simplify; move => hlt; smt().
         have [p [hPp hpz]] := (xlub_adherent _ _ below).
-        have * : ra%xr + p <= x%xr by rewrite -Ex; apply xlub_ub; exists p.
-        smt(@Rp).
+        have hpr : ra%xr + p <= x%xr by rewrite -Ex; apply xlub_ub; exists p.
+        move : hpz hPp hpr => /=. 
+        case p => r /=; last by trivial.
+        move => hpr hPp; smt(@Rp).
     + by apply xlub_ub; exists p0.
   - by apply xlub_le => z [p [hPp ->]] //=; apply xler_addl; apply xlub_ub.
 qed.
@@ -902,7 +931,10 @@ proof.
                 + congr; apply fun_ext => q; apply eq_iff; apply exists_eq => x //=.
                  by rewrite -xlub_addr; first by exists a.
   rewrite xlub_xlub prod_eq_bigcup bigcup_image.
-  by congr; apply bigcup_eq => r //= Br; apply fun_ext => s; rewrite !imageP; smt().
+  congr; apply bigcup_eq => r //= Br; apply fun_ext => s; rewrite !imageP.
+  rewrite /(`$`) /=.
+  apply eq_iff_imp; split; first by elim => k hk; exists (k , r); by smt().
+  smt().
 qed.
 
 lemma xlub_bigsum (f : 'a -> xreal set) (J : 'a list) :
@@ -945,7 +977,9 @@ lemma xlub_mull (c : realp) (P : xreal -> bool) :
 proof.
   move=> c_nneg.
   have hmul1 : (inv c)%xr * c%xr = 1%xr by smt(of_realdK to_realP).
-  have invc_nneg: 0%rp < inv c. smt(@Rp).
+  have invc_nneg: 0%rp < inv c.
+  rewrite /inv /= to_pos_pos; first by apply invr_ge0; by smt().
+  apply invr_gt0; by smt(@Rp).
   apply xle_antisym.
   - apply (xler_pmul2l _ invc_nneg); rewrite mulmA hmul1 //=.
     apply xlub_le => x hPx.
@@ -1096,8 +1130,8 @@ proof.
       apply (xle_xlub _ (BXA.big predT f J)).
       - apply/imageP; exists J => //.
         apply big_le => a _ //=; rewrite ger0_norm //=; first by exact to_realP.
-        by rewrite to_real_is_realF //.
-    by rewrite (to_pos_pos M) //; smt(). 
+        by rewrite to_real_is_realF //. 
+      apply pos_le; by trivial.
   - move => [irf [M hM]].
     have //= : xsum f <= M%xr.
     + apply xlub_le => x /imageP [J [uJ ->]].
@@ -1174,10 +1208,14 @@ proof.
   elim s; first by auto.  
   move => x l IH h //=.
   case (x \in l) => hxl. rewrite mem_cat hxl //=.
-  apply IH. by smt().
+  apply IH.
+    move => y; case (y = x) => hyx; first by rewrite hyx h //.
+    move => hy; by rewrite h /= //; by rewrite hy /= //.
   rewrite mem_cat hxl.
-  have hxt : ! (x \in t) by smt().
-  rewrite hxt IH; first by smt() .
+  have hxt : ! (x \in t); first by rewrite h // /=.
+  rewrite hxt IH.
+    move => y; case (y = x) => hyx; first by rewrite hyx h //.
+    move => hy; by rewrite h /= //; by rewrite hy /= //.
   by [].
 qed.
 
@@ -1321,9 +1359,9 @@ proof.
       apply (choicebP (fun l => uniq l /\ g a = big predT (fun b => s (a,b)) l)). 
       by rewrite /P; have:= gSpec a haJa; rewrite /(`$`) //=.
     have I_uniq: forall a, a \in J => uniq (I a) by smt().
-    have I_ix_g: forall a, a \in J => g a = big predT<:'b> (fun (b : 'b) => s (a, b)) (I a). by smt().
+    have I_ix_g: forall a, a \in J => g a = big predT<:'b> (fun (b : 'b) => s (a, b)) (I a)
+      by move => a ha; by rewrite ISpec //.
     (* have gSpecrid_uniq : uniq (grid I J). apply (grid_uniq _ _ uJ). gsmt(). *)
-
      
     have //= ->: big predT g J = big (fun a => a \in J /\ I a <> []) g J.
     + rewrite big_seq (bigID (mem J) _ (fun a => I a <> []) _) /predI /predC.
@@ -1414,7 +1452,8 @@ proof.
     rewrite to_real_mdfun' //=.
     by rewrite mulmC sumZ /= of_realM // 1: ge0_sum //= weightE; do 3! congr.
   case (exists a, 0%r < mu1 d a) => [[a ha] | /negb_exists //= ha].
-  + rewrite (xsum_oo _ a); first by smt(@Rp).
+  + rewrite (xsum_oo _ a) /=.
+      rewrite /( **); have /= -> //: mu1 d a <> 0%r => (mu1 d a)%rp <> 0%rp by smt(@Rp). smt().
     rewrite eq_sym; apply md_eqinfP => //=.
     by smt(weight_eq0 ge0_weight).
   have mu1_0: forall a, mu1 d a = 0%r by smt(ge0_mu1).
@@ -1422,12 +1461,15 @@ proof.
   apply xsum_0.
   by move => a //=; rewrite mu1_0.
 qed.
-
+    
 lemma EpsZ ['a] (d: 'a distr) (c:realp) (f: 'a -> xreal) :
   Ep d (fun x => c ** f x) = c ** Ep d f.
 proof.
   rewrite /Ep xsum_scale_mdl.
-  by apply xsum_eq => a //=; rewrite /( ** ); smt(@Rp). 
+  apply xsum_eq => a //=; rewrite /( ** ).
+  case ((mu1 d a)%rp = 0%rp) => hm; first by smt().
+  case (c = 0%rp) => hc; first by smt().
+  rewrite -!xmulzA; by smt().
 qed.
 
 lemma EpZ ['a] (d: 'a distr) (c:realp) (f: 'a -> xreal) :
@@ -1435,9 +1477,10 @@ lemma EpZ ['a] (d: 'a distr) (c:realp) (f: 'a -> xreal) :
   Ep d (fun x => rp c * f x) = rp c * Ep d f.
 proof.
   move=> hc. rewrite /Ep xsum_mull; first by smt(@Rp).
-  apply xsum_eq => a //=. rewrite /( ** ). smt(@Rp).
+  apply xsum_eq => a //=. rewrite /( ** ).
+  case ((mu1 d a)%rp = 0%rp) => hm; first by smt().
+  rewrite -!xmulzA; by smt().
 qed.
-
 
 lemma EpD ['a] (d : 'a distr) (f1 f2 : 'a -> xreal) : 
   Ep d (f1 + f2) = Ep d f1 + Ep d f2.
@@ -1445,7 +1488,6 @@ proof.
   rewrite /Ep -xsumD.
   by apply xsum_eq => a //=; exact smulmDr. 
 qed.
-
 
 lemma summable_to_pos (f : 'a -> real) : summable f => summable (fun x => (f x)%pos).
 proof.
@@ -1514,7 +1556,7 @@ proof.
   rewrite /( *** ) hf //=.
   case (c = 0%xr) => [-> | ].
   + rewrite xsum_0; first by move => a //=.
-    smt(@Rp).
+    rewrite -(to_real_is_real (xsum _)); by smt().
   case c => [cr //= hc| hc].
   + rewrite xsum_mull; first by smt(@Rp).
     by apply xsum_eq => a //=; smt(@Rp).
@@ -1540,7 +1582,7 @@ proof.
     have ir_mus : is_real w.
       by rewrite /is_real => a //=.
     rewrite -xsum_fin_sum // //.
-    by rewrite xsum_scale_mdr; first by smt(xsum_neq_oo).
+    rewrite xsum_scale_mdr //; first by rewrite xsum_neq_oo is_real_rp /= sum_mus //.
   rewrite xsum_exchange //=.
   apply xsum_eq => a //=.
   rewrite xsum_scale_mdl.
