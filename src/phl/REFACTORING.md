@@ -420,7 +420,21 @@ Current catalogue:
 - `asgn-case` (`EcTrAsgnCase`): splits a tuple assignment into one
   assignment per variable (`case <-`); no obligation;
 - `simplify-if` (`EcTrSimplifyIf`): turns a conditional whose branches are
-  assignments into a single assignment (`simplify if`); no obligation.
+  assignments into a single assignment (`simplify if`); no obligation;
+- `fission` (`EcTrFission`, splitting the loop at a — possibly nested —
+  position in two loops at two offsets of its body, its prelude of `n`
+  instructions duplicated; read / write independence, determinism and
+  `raise`-freedom side conditions; no obligation), used by `fission` in
+  every logic;
+- `fusion` (`EcTrFusion`, the inverse: merging two consecutive loops with
+  equal preludes, conditions and epilogs, under the side conditions of
+  `fission`; no obligation), used by `fusion` in every logic;
+- `unroll` (`EcTrUnroll`): `while e do c` becomes
+  `if e then c; while e do c`; no obligation; used by `unroll` (`unroll
+  for` stays derived: rcond, wp, seq, conseq, cfold);
+- `splitwhile` (`EcTrSplitWhile`): `while e do c` becomes
+  `while (e /\ b) do c; while e do c`; no obligation; used by
+  `splitwhile`.
 
 The decisions of a conditional or a match are computed by `EcPlRCond`.
 The `if` and `match` tactics are push + rule on the conditional alone: they
@@ -428,7 +442,7 @@ push the continuation into the branches (when there is one) through the
 transformation rule (on each side, for the two-sided equiv forms), then
 apply the `if` / `match` rule of their logic (`Ec<Logic>If`,
 `Ec<Logic>Match`), stated on the conditional alone. Further entries come
-with the tactics that use them: the loop transformations and proc rewrite.
+with the tactics that use them: proc rewrite / change.
 
 Exception: the framed form of `match C k` (used when the variables of the
 discriminant `e` are neither read nor written by the prefix, and the
