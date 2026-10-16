@@ -39,7 +39,10 @@ let hoare_transform_subgoals (hyps : LDecl.hyps) (hs : sHoareS) (n : hoare_trans
   let obligation = function
     | OPrefixPost { opp_prefix = hd; opp_cond = cond } ->
         let cond = { (ss_inv_rebind cond m) with m } in
-        f_hoareS (snd hs.hs_m) (hs_pr hs) hd (update_hs_ss cond po) in
+        f_hoareS (snd hs.hs_m) (hs_pr hs) hd (update_hs_ss cond po)
+    | OLossless ks ->
+        f_bdHoareS (snd hs.hs_m)
+          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 } in
   List.map obligation r.trr_obl
   @ [f_hoareS (snd r.trr_me) (hs_pr hs) r.trr_s po]
 

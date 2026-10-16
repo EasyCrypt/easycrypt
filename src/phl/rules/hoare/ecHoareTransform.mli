@@ -20,7 +20,9 @@ type hoare_transform = {
    and the entry is given the program variables read by [Q | E]. Each
    obligation becomes a premise (first, in order):
    - [OPrefixPost (hd, cond)]:  hoare [hd : P ==> cond | E]
-     (the exceptional postconditions [E] of the goal are kept).
+     (the exceptional postconditions [E] of the goal are kept);
+   - [OLossless ks]:  phoare [ks : true ==> true] = 1
+     (in the memory of [c]).
    Side condition: [t] applies to [c] (otherwise fails with its message).
 
    Node: [RHoareTransform { htr_tr = t }]. Checker: "hoare-transform" (it

@@ -99,15 +99,18 @@ equiv: one side at a time), parameterized by an entry of a catalogue:
   function, which may extend the memory with fresh program variables.
 - The obligations are abstract (a small closed set: so far, "every
   terminating run of the prefix `hd` from the precondition satisfies
-  `cond`"); each logic's rule states them as its own premises (see its
-  `.mli`).
+  `cond`" and "the statement `ks` is lossless"); each logic's rule states
+  them as its own premises (see its `.mli`).
 - The node records the transformation and its parameters; the checker
   ("<logic>-transform") re-runs it on the goal's program and compares the
   subgoals up to conversion (programs up to alpha-equivalence).
 
 Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`),
 `rmatch` (`EcTrRMatch`), `if-push` (`EcTrIfPush`), `match-push`
-(`EcTrMatchPush`), `swap` (`EcTrSwap`) and `inline` (`EcTrInline`). `if-push` / `match-push` push
+(`EcTrMatchPush`), `swap` (`EcTrSwap`), `inline` (`EcTrInline`), `kill`
+(`EcTrKill`), `alias` (`EcTrAlias`), `set` (`EcTrSet`), `set-match`
+(`EcTrSetMatch`), `cfold` (`EcTrCFold`), `asgn-case` (`EcTrAsgnCase`) and
+`simplify-if` (`EcTrSimplifyIf`). `if-push` / `match-push` push
 the continuation of a leading conditional / `match` into its branches: the
 `if` and `match` tactics are push + rule on the conditional alone
 (`Ec<Logic>If`, `Ec<Logic>Match`).

@@ -56,7 +56,10 @@ let equiv_transform_subgoals
              let mhs = EcIdent.create "&hr" in
              let pr  = ss_inv_rebind pr mhs in
              let po  = ss_inv_rebind po mhs in
-             f_hoareS (snd me) pr hd (POE.lift po)) (es_pr es) cond) in
+             f_hoareS (snd me) pr hd (POE.lift po)) (es_pr es) cond)
+    | OLossless ks ->
+        f_bdHoareS (snd me)
+          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 } in
   let concl =
     match side with
     | `Left  ->
