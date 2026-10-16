@@ -148,6 +148,8 @@ src/phl/
                 node, pure builder, checker, derived forms, elaboration
     transforms/ EcTr<Name>: the catalogue entries of the program
                 transformations (§7f)
+    fol/        EcFol<Rule>: rules of program-logic tactics whose
+                conclusion is a plain formula (EcFolCircuit, EcFolExtens)
     ecPl*.ml    logic-agnostic computations shared by the rules of every
                 logic: EcPlFrame (framing conditions), EcPlSp (strongest
                 postcondition), EcPlWp (weakest precondition), EcPlRndSem
@@ -162,7 +164,9 @@ src/phl/
                 variables), EcPlExists (pulling the existentials of a
                 precondition to the front, quantifying a precondition
                 over values), EcPlECall (the elaboration of `ecall`:
-                typing the contract, abstracting its program variables)
+                typing the contract, abstracting its program variables),
+                EcPlCircuit (translation of a precondition to circuits
+                and decision of a postcondition)
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -203,6 +207,17 @@ uniform across logics or relate several judgements:
   the contract abstracted by the existential rules, `seq`, then the
   `call` rule of the logic; the forward hoare form frames the
   precondition with the split and frame rules);
+- the `circuit` rules — `EcHoareCircuit`, `EcEquivCircuit` (the judgement
+  decided by the circuit backend, no premise), `EcHoareCircuitSimplify`
+  (`circuit simplify`: the postcondition simplified by circuits) and
+  `EcHoareExtens` (`extens [x]`: one premise per value of a program
+  variable of a type bound to a bitstring) — live in `rules/<logic>/`;
+  their forms on plain formulas (`EcFolCircuit`; `EcFolExtens`:
+  `all p (iota_ s n)` from its `n` instances) live in `rules/fol/`. The
+  nodes record nothing but the resolved variable of `extens`; the
+  checkers re-run the circuit decision on the goal (deterministic, but
+  expensive: it only runs under `EC_RECHECK`). `extens` is derived: the
+  rule, then the given tactic on each premise, which must close it;
 - a rule relating judgements of two logics (the `pr` bridges, `hoare` from
   `phoare`, …) lives with the logic of its conclusion;
 - a rule concluding a statement on probabilities from a judgement
