@@ -157,7 +157,9 @@ src/phl/
                 fresh program variables), EcPlFun (unfolding a procedure,
                 the oracle conditions of the abstract-procedure rules,
                 the single-call statement of `proc*`), EcPlCall (the
-                result assignment and argument substitution of a call)
+                result assignment and argument substitution of a call),
+                EcPlWeakMem (restricting a memory weakened by fresh local
+                variables)
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -183,6 +185,11 @@ uniform across logics or relate several judgements:
   `call` is derived (`seq`, then the rule); the bdhoare rule keeps its
   statement on `c; lv <@ f(a)` (implicit seq and framing: the bdhoare
   `seq` rule has extra premises);
+- the `weakmem` rules (`Ec<Logic>WeakMem`; equiv: one side at a time)
+  weaken the memory of a judgement on a statement by fresh local
+  variables it does not mention (the shared computation in
+  `EcPlWeakMem`); the `weakmem` tactic is derived: a cut of the weakened
+  hypothesis, closed by the rule and the hypothesis;
 - a rule relating judgements of two logics (the `pr` bridges, `hoare` from
   `phoare`, …) lives with the logic of its conclusion;
 - a rule concluding a statement on probabilities from a judgement
