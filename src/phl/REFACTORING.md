@@ -197,6 +197,14 @@ uniform across logics or relate several judgements:
   equality of probabilities of two procedures, is relational and lives in
   `rules/equiv/`; the forms of `byupto` other than `Pr[_] = Pr[_]` are
   derived (a lemma of the real theory, the rule and `rewrite Pr`);
+- the facts on probabilities of `rewrite Pr` (`EcBdHoarePrFact`, an
+  axiom schema without premise: `mu_eq`, `mu_sub`, `mu_split`, `muE`,
+  …; the node records the schema and its resolved parameters, binders
+  included, and the checker regenerates the fact and compares it with
+  the goal) are statements on the probability of an event of one
+  procedure, the object of the phoare logic: they live in
+  `rules/bdhoare/`; `rewrite Pr` is derived (a rewriting with the cut
+  fact, closed by the rule), and `byupto` / `byequiv` use it;
 - program transformations go through the transformation rule of each logic
   (`Ec<Logic>Transform`); only their catalogue entries live in
   `rules/transforms/`.

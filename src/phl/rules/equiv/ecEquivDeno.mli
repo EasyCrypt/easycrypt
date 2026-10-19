@@ -45,9 +45,10 @@ val t_equiv_deno : equiv_deno -> backward
       [Pr[f2(args2) @ &n2 : (E2 /\ !B) \/ B]];
    2. on the first side, [t_equiv_deno { eqd_pre = P; eqd_post = Q }],
       whose third premise is closed with [upto_bad_or];
-   3. on the second side, [mu_disjoint], [ler_add], [mu_sub] and the
-      lemmas [upto_bad_false], [upto_bad_sub], closed on the spot (by
-      [EcLowGoal.t_trivial] for the inclusion of the events).
+   3. on the second side, [mu_disjoint], [ler_add], [mu_sub]
+      ([EcBdHoarePrFact.t_pr_rewrite]) and the lemmas [upto_bad_false],
+      [upto_bad_sub], closed on the spot (by [EcLowGoal.t_trivial] for
+      the inclusion of the events).
    Visible goals: the first two premises of [t_equiv_deno], in this
    order. Emits no node of its own. *)
 val t_equiv_deno_bad : ts_inv -> backward
