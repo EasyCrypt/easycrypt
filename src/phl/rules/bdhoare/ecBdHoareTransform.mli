@@ -20,7 +20,9 @@ type bdhoare_transform = {
    where [c'] may live in an extended memory (fresh program variables),
    and the entry is given the program variables read by [Q]. Each
    obligation becomes a premise (first, in order):
-   - [OPrefixPost (hd, cond)]:  hoare [hd : P ==> cond].
+   - [OPrefixPost (hd, cond)]:  hoare [hd : P ==> cond];
+   - [OLossless ks]:  phoare [ks : true ==> true] = 1
+     (in the memory of [c]).
    Side condition: [t] applies to [c] (otherwise fails with its message).
 
    Node: [RBdHoareTransform { btr_tr = t }]. Checker: "bdhoare-transform"

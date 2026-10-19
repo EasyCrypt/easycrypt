@@ -26,7 +26,9 @@ type equiv_transform = {
    - [OPrefixPost (hd, cond)]:
        forall &2, hoare [hd : P ==> cond]
      ([P] read as an assertion on [&1], the other memory [&2] being
-     universally quantified).
+     universally quantified);
+   - [OLossless ks]:  phoare [ks : true ==> true] = 1
+     (in the memory [&1] of [c], the other memory not involved).
    Side condition: [t] applies to [c] (otherwise fails with its message).
 
    Node: [REquivTransform { etr_side; etr_tr = t }]. Checker:
