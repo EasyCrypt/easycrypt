@@ -9,11 +9,11 @@ import itertools as it
 keywords = dict(
     bytac     = ['exact', 'assumption', 'smt', 'coq', 'check', 'edit', 'fix', 'by', 'reflexivity', 'done', 'solve'],
     dangerous = ['admit', 'admitted'],
-    global_   = ['axiom', 'axiomatized', 'lemma', 'realize', 'proof', 'qed', 'abort', 'goal', 'end', 'from', 'import', 'export', 'include', 'local', 'global', 'declare', 'hint', 'module', 'of', 'const', 'op', 'pred', 'inductive', 'notation', 'abbrev', 'require', 'theory', 'abstract', 'section', 'subtype', 'type', 'class', 'instance', 'print', 'search', 'locate', 'as', 'Pr', 'clone', 'with', 'rename', 'prover', 'timeout', 'why3', 'dump', 'remove', 'exit', 'Top', 'Self'],
+    global_   = ['array', 'bind', 'circuit', 'bitstring', 'axiom', 'axiomatized', 'lemma', 'realize', 'proof', 'qed', 'abort', 'goal', 'end', 'from', 'import', 'export', 'include', 'local', 'global', 'declare', 'hint', 'module', 'of', 'const', 'op', 'exception', 'pred', 'inductive', 'notation', 'abbrev', 'require', 'theory', 'abstract', 'section', 'subtype', 'type', 'instance', 'print', 'search', 'locate', 'as', 'Pr', 'clone', 'with', 'rename', 'prover', 'timeout', 'why3', 'dump', 'remove', 'exit', 'Top', 'Self'],
     internal  = ['fail', 'time', 'undo', 'debug', 'pragma'],
-    prog      = ['forall', 'exists', 'fun', 'glob', 'let', 'in', 'for', 'var', 'proc', 'if', 'is', 'match', 'then', 'else', 'elif', 'match', 'for', 'while', 'assert', 'return', 'res', 'equiv', 'hoare', 'ehoare', 'phoare', 'islossless', 'async'],
+    prog      = ['forall', 'exists', 'fun', 'glob', 'let', 'in', 'for', 'var', 'proc', 'if', 'is', 'match', 'then', 'else', 'elif', 'match', 'for', 'while', 'raise', 'return', 'res', 'equiv', 'hoare', 'ehoare', 'phoare', 'islossless', 'async'],
     tactic    = ['beta', 'iota', 'zeta', 'eta', 'logic', 'delta', 'simplify', 'cbv', 'congr', 'change', 'split', 'left', 'right', 'case', 'pose', 'gen', 'have', 'suff', 'elim', 'exlim', 'ecall', 'clear', 'wlog', 'idassign', 'apply', 'rewrite', 'rwnormal', 'subst', 'progress', 'trivial', 'auto', 'idtac', 'move', 'modpath', 'field', 'fieldeq', 'ring', 'ringeq', 'algebra', 'replace', 'transitivity', 'symmetry', 'seq', 'wp', 'sp', 'sim', 'skip', 'call', 'rcondt', 'rcondf', 'swap', 'cfold', 'rnd', 'rndsem', 'pr_bounded', 'bypr', 'byphoare', 'byehoare', 'byequiv', 'byupto', 'fel', 'conseq', 'exfalso', 'inline', 'outline', 'interleave', 'alias', 'weakmem', 'fission', 'fusion', 'unroll', 'splitwhile', 'kill', 'eager'],
-    tactical  = ['try', 'first', 'last', 'do', 'expect'],
+    tactical  = ['try', 'first', 'last', 'do', 'expect', 'extens'],
 )
 
 # ------------------------------------------------------------------------
@@ -38,6 +38,11 @@ class EasyCryptLexer(pylex.RegexLexer):
       # Whitespace
       (r"[ \t]+", pytok.Whitespace),
       (r"\n+", pytok.Whitespace),
+
+      # Operator sections such as (*) or ( * ), and "(*" binop "*)",
+      # which src/ecLexer.mll matches before a comment opener
+      (r"\(\*(?:[=<>+\-*/\\%&^|:#$]+|\\[\w']+)\*\)", pytok.Comment.Multiline),
+      (r"\(\s*(?:[=<>+\-*/\\%&^|:#$]+|`[=<>+\-*/\\%&^|:#$]+`|\\[\w']+|'\d+|%[a-z_][\w']*)\s*\)", pytok.Operator),
 
       # Comments
       (r"\(\*", pytok.Comment.Multiline, "comment"),
