@@ -1,0 +1,23 @@
+# exit: 1
+# Strict mode. Off, a session is a file still being written: a failure
+# is reported and the next phrase runs against wherever it left the
+# engine. That is the trap a client sending one phrase per call falls
+# into, so STRICT ON stops the session at the failure instead.
+#
+# `apply etrivial.' fails after `split.' has opened two goals, so the
+# session is left somewhere the caller did not intend. The `trivial.'
+# that follows is refused, and the refusal names the phrase that
+# stopped it. GOALS answers all the same -- being stopped is not being
+# locked out -- and RESUME releases it. The COMMIT at the end shows the
+# body carries no trace of any of it: a failed phrase was never
+# recorded, and a refused one never ran.
+STRICT ON
+LOAD "fixtures/simple.ec" 5
+split.
+apply etrivial.
+trivial.
+GOALS
+RESUME
+trivial.
+trivial.
+COMMIT
