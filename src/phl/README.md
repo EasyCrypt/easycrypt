@@ -162,5 +162,8 @@ src/phl/
   judgement.
 - The failure-event lemma (`fel`, `EcBdHoareFel`) concludes a probability
   bound from phoare premises; it lives in `rules/bdhoare/`.
+- The upto rule of `byupto` (`EcEquivUpto`, a premise-free rule concluding
+  `Pr[f1 : E /\ !bad] = Pr[f2 : E /\ !bad]` for procedures equal up to
+  `bad`) is relational: it lives in `rules/equiv/`.
 - Program transformations use the transformation rule of each logic; only
   their catalogue entries live in `rules/transforms/`.
