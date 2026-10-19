@@ -1,0 +1,19 @@
+(* -------------------------------------------------------------------- *)
+open EcCoreGoal.FApi
+
+(* ==================================================================== *)
+(* Rules (trusted)                                                      *)
+
+(* [t_equivF_fun_to_code] — two procedures, as single calls ([proc*]):
+
+     equiv [r1 <@ f1(as1) ~ r2 <@ f2(as2) :
+              P[arg<1> := as1, arg<2> := as2] ==> Q[res<1> := r1, res<2> := r2]]
+     ---------------------------------------------------------------------------
+                            equiv [f1 ~ f2 : P ==> Q]
+
+   where [asi] is [(a1, ..., an)], [a1 ... an] and [ri] being fresh local
+   variables of the memory of side [i] (the parameters of [fi], unnamed
+   ones named [arg<j>], and its result).
+
+   Node: [REquivFunToCode]. Checker: "equivF-fun-to-code". *)
+val t_equivF_fun_to_code : backward
