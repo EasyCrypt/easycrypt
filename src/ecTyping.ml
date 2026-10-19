@@ -2323,7 +2323,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
             | None ->
               tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond)
             | Some (p, b) -> begin
-              (* TODO: Factorize. This is mostly just a copy/paste from EcPhlRCond.gen_rcond_full. *)
+              (* TODO: Factorize. This is mostly just a copy/paste from EcPlRCond.rmatch_select. *)
               let cvars = List.map (fun (x, xty) -> { ov_name = Some (EcIdent.name x); ov_type = xty; }) p in
               let me, cvars = EcMemory.bindall_fresh cvars !memenv in
 
