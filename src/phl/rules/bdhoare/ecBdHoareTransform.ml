@@ -32,6 +32,7 @@ let bdhoare_transform_subgoals
     trc_env  = env;
     trc_me   = bhs.bhs_m;
     trc_post = lazy (EcPV.PV.fv env m (bhs_po bhs).inv);
+    trc_exn  = false;
   } in
   let r = apply ctxt n.btr_tr bhs.bhs_s in
   let obligation = function
