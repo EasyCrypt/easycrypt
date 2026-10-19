@@ -177,7 +177,7 @@ module Theory : sig
    * its name. Raises [TopScope] if [scope] has not super scope. *)
   val exit :
        ?import:bool
-    -> ?pempty:[`ClearOnly | `Full | `No]
+    -> ?pempty:[`ClearOnly | `Full | `Alias | `No]
     -> ?clears:(pqsymbol option) list
     -> scope -> symbol * scope
 
@@ -219,7 +219,7 @@ module Theory : sig
 
   (* [alias scope (name, thname)] create a theory alias [name] to
    * [thname] *)
-  val alias : scope -> psymbol * pqsymbol -> scope
+  val alias : scope -> psymbol * pqsymbol list -> scope
 end
 
 (* -------------------------------------------------------------------- *)
