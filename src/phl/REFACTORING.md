@@ -156,7 +156,8 @@ src/phl/
                 its obligations), EcPlMatch (branches of a `match` on
                 fresh program variables), EcPlFun (unfolding a procedure,
                 the oracle conditions of the abstract-procedure rules,
-                the single-call statement of `proc*`)
+                the single-call statement of `proc*`), EcPlCall (the
+                result assignment and argument substitution of a call)
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -175,6 +176,13 @@ uniform across logics or relate several judgements:
   the consequence rule then the rule), `EcEquivFunAbsUpto` (the abstract
   upto rule) and `Ec<Logic>FunToCode` (`proc*`, also `EcEagerFunToCode`
   in `rules/eager/`);
+- the `call` rules are logic rules in `rules/<logic>/` (`Ec<Logic>Call`),
+  stated on the call alone (`lv <@ f(a)`; `lv <@ f(a) ~ skip` for the
+  one-sided equiv rule), with the specification of the procedure as
+  premise and the weakest precondition of the call as precondition;
+  `call` is derived (`seq`, then the rule); the bdhoare rule keeps its
+  statement on `c; lv <@ f(a)` (implicit seq and framing: the bdhoare
+  `seq` rule has extra premises);
 - a rule relating judgements of two logics (the `pr` bridges, `hoare` from
   `phoare`, …) lives with the logic of its conclusion;
 - a rule concluding a statement on probabilities from a judgement
