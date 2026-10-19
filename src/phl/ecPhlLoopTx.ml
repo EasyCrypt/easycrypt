@@ -14,6 +14,7 @@ open EcLowPhlGoal
 open EcPhlRCond
 open EcLowGoal
 
+module Pos = EcMatching.Position
 module Zpr = EcMatching.Zipper
 module TTC = EcProofTyping
 
@@ -24,243 +25,79 @@ type unroll_t     = oside * pcodepos * [`While | `For of bool]
 type splitwhile_t = pexpr * oside * pcodepos
 
 (* -------------------------------------------------------------------- *)
-(* Side conditions of loop fission / fusion, which state:
+(* Derived tactics. The loop transformations are entries of the
+   transformation catalogue, applied through the transformation rule of
+   the goal's logic ([t_<logic>_transform]; equiv: on the given side):
 
-     init; while b { c1; c2; c3 }
-       ==  init; while b { c1; c3 }; init; while b { c2; c3 }
+     t_fission side p (n, (d1, d2))   [EcTrFission.TrFission]
+     t_fusion  side p (n, (d1, d2))   [EcTrFusion.TrFusion]
+     t_unroll  side p                 [EcTrUnroll.TrUnroll]
+     t_splitwhile b side p            [EcTrSplitWhile.TrSplitWhile]
 
-   (1) [init] (prelude) and [c3] (epilog) are deterministic, loop-,
-       call- and exception-free ([check_dslc]), and [c1] / [c2] do not
-       raise exceptions ([check_noraise]);
-   (2) [b] and [c3] read nothing written by [c1] or [c2];
-   (3) [c1] and [c2] commute: neither reads what the other writes, and
-       they write disjoint sets of variables;
-   (4) [c3] only writes variables that [init] writes;
-   (5) [init] reads nothing written by [init], [c1] or [c3], and writes
-       nothing written by [c1].
+   Each one resolves the code position [p] in the transformed statement
+   (failing with "invalid code position"), then applies the rule, which
+   runs the entry and reports its failures. No obligation: the only
+   visible goal is the transformed judgement, same pre / postconditions.
+   They are uniform across logics, hence a single dispatcher here rather
+   than one module per logic that would only hold a one-line call. The
+   [process_*] entries type the position (and the condition of
+   [splitwhile]) in the memory of the transformed statement.
 
-   Soundness: by (1) and (2), the number of iterations and the values
-   taken by the variables written by [c3] are a function of the state
-   after [init]. Then, by (2) and (3), in the fused loop, the [c1] part
-   (on [wr c1]) and the [c2; c3] part (on the other variables) evolve
-   without any information flow between them: the fused loop has the
-   same distribution as the product of the two split loops. By (1),
-   (4) and (5), the second [init] restores the state after the first
-   one on all variables but [wr c1], which it leaves untouched. Since
-   this is an equivalence, the same conditions apply to fusion. *)
-let check_independence (pf, hyps) b init c1 c2 c3 =
-  let env = LDecl.toenv hyps in
-
-  (* TODO improve error message, see swap *)
-  let check_disjoint s1 s2 =
-    if not (PV.indep env s1 s2) then
-      tc_error pf "independence check failed"
-  in
-
-  let fv_b    = e_read   env b    in
-  let rd_init = is_read  env init in
-  let wr_init = is_write env init in
-  let rd_c1   = is_read  env c1   in
-  let rd_c2   = is_read  env c2   in
-  let rd_c3   = is_read  env c3   in
-  let wr_c1   = is_write env c1   in
-  let wr_c2   = is_write env c2   in
-  let wr_c3   = is_write env c3   in
-
-  check_disjoint rd_c1 wr_c2;
-  check_disjoint rd_c2 wr_c1;
-  check_disjoint wr_c1 wr_c2;
-  List.iter (check_disjoint fv_b) [wr_c1; wr_c2];
-  if not (PV.subset wr_c3 wr_init) then
-    tc_error pf "epilog must only write variables written by the prelude";
-  List.iter (check_disjoint rd_init) [wr_init; wr_c1; wr_c3];
-  check_disjoint wr_init wr_c1;
-  List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
+   [unroll for] ([process_unroll_for]) stays derived: rcond, wp, seq,
+   conseq and cfold. *)
 
 (* -------------------------------------------------------------------- *)
-let check_dslc pf name =
-  let error () =
-    tc_error pf
-      "%s must be deterministic and loop/procedure-call free" name in
+(* Resolve [cpos] in [s] to a normalized (possibly nested) position. *)
+let resolve_cpos (tc : tcenv1) (cpos : Pos.codepos) (s : stmt) =
+  try  fst (snd (Zpr.zipper_of_cpos_r (FApi.tc1_env tc) cpos s))
+  with Pos.InvalidCPos -> tc_error !!tc "invalid code position"
 
-  let rec doit_i c =
-    match c.i_node with
-    | Sasgn _ ->
-       ()
+(* Apply the transformation [tr at], [at] being [cpos] resolved in the
+   transformed statement, through the transformation rule of the goal's
+   logic (equiv: of [side]). *)
+let t_loop_transform
+    side cpos (tr : Pos.nm_codepos -> EcPlTransform.transform) tc
+=
+  match side, (FApi.tc1_goal tc).f_node with
+  | None, FhoareS hs ->
+      EcHoareTransform.t_hoare_transform
+        { htr_tr = tr (resolve_cpos tc cpos hs.hs_s) } tc
 
-    | Sif (_, c1, c2) ->
-       List.iter doit_s [c1; c2]
+  | None, FeHoareS hs ->
+      EcEHoareTransform.t_ehoare_transform
+        { ehtr_tr = tr (resolve_cpos tc cpos hs.ehs_s) } tc
 
-    | Smatch (_, bs) ->
-       List.iter (doit_s -| snd) bs
+  | None, FbdHoareS hs ->
+      EcBdHoareTransform.t_bdhoare_transform
+        { btr_tr = tr (resolve_cpos tc cpos hs.bhs_s) } tc
 
-    | Srnd _ | Scall _ | Swhile _ | Sraise _  | Sabstract _ ->
-       error ()
+  | None, _ ->
+      tc_error_noXhl ~kinds:[`PHoare `Stmt; `Hoare `Stmt; `EHoare `Stmt] !!tc
 
-  and doit_s c =
-    List.iter doit_i c.s_node
-
-  in fun c -> List.iter doit_i c
-
-(* -------------------------------------------------------------------- *)
-(* [c1] / [c2] must not raise: if one raises at some iteration, the
-   executions of the other one that precede it in the original loop are
-   lost (or added). A [raise] is always rejected; when the goal observes
-   exceptions ([exn], see [swap]), so is a call to a procedure that may
-   raise ([EcLowPhlGoal.s_may_raise]). Otherwise, raising is as good as
-   not terminating, which fission / fusion preserve. *)
-let check_noraise pf ~(exn : bool) env =
-  let rec doit_i c =
-    match c.i_node with
-    | Sraise _ -> tc_error pf "loop body must not raise exceptions"
-    | _ -> EcModules.i_iter doit_i c
-
-  in fun c ->
-    List.iter doit_i c;
-    if exn && EcLowPhlGoal.s_may_raise env (stmt c) then
-      tc_error pf
-        "loop body must not call procedures that may raise exceptions \
-         when the postcondition constrains exceptions"
-
-(* Whether the goal observes exceptions (see [swap]). *)
-let observes_exn (tc : tcenv1) =
-  match (FApi.tc1_goal tc).f_node with
-  | FhoareS hs -> hs_observes_exn (hs_po hs)
-  | _ -> false
+  | Some side, _ ->
+      let es = tc1_as_equivS tc in
+      let s  = sideif side es.es_sl es.es_sr in
+      EcEquivTransform.t_equiv_transform
+        { etr_side = side; etr_tr = tr (resolve_cpos tc cpos s) } tc
 
 (* -------------------------------------------------------------------- *)
-let fission_stmt ~exn (il, (d1, d2)) (pf, hyps) me zpr =
-  if d2 < d1 then
-    tc_error pf "%s, %s"
-      "in loop-fission"
-      "second break offset must not be lower than the first one";
+let t_fission side cpos (il, (d1, d2)) =
+  t_loop_transform side cpos (fun at ->
+    EcTrFission.TrFission
+      { trfi_at = at; trfi_init = il; trfi_d1 = d1; trfi_d2 = d2; })
 
-  let (hd, init, b, sw, tl) =
-    match zpr.Zpr.z_tail with
-    | { i_node = Swhile (b, sw) } :: tl -> begin
-        if List.length zpr.Zpr.z_head < il then
-          tc_error pf "while-loop is not headed by %d intructions" il;
-      let (init, hd) = List.takedrop il zpr.Zpr.z_head in
-        (hd, init, b, sw, tl)
-      end
-    | _ -> tc_error pf "code position does not lead to a while-loop"
-  in
+let t_fusion side cpos (il, (d1, d2)) =
+  t_loop_transform side cpos (fun at ->
+    EcTrFusion.TrFusion
+      { trfu_at = at; trfu_init = il; trfu_d1 = d1; trfu_d2 = d2; })
 
-  if d2 > List.length sw.s_node then
-    tc_error pf "in loop fission, invalid offsets range";
+let t_unroll side cpos =
+  t_loop_transform side cpos (fun at ->
+    EcTrUnroll.TrUnroll { trun_at = at; })
 
-  let (s1, s2, s3) =
-    let (s1, s2) = List.takedrop (d1   ) sw.s_node in
-    let (s2, s3) = List.takedrop (d2-d1) s2 in
-      (s1, s2, s3)
-  in
-
-  check_independence (pf, hyps) b init s1 s2 s3;
-  check_dslc pf "prelude" init;
-  check_dslc pf "epilog" s3;
-  List.iter (check_noraise pf ~exn (LDecl.toenv hyps)) [s1; s2];
-
-  let wl1 = i_while (b, stmt (s1 @ s3)) in
-  let wl2 = i_while (b, stmt (s2 @ s3)) in
-  let fis =   (List.rev_append init [wl1])
-            @ (List.rev_append init [wl2]) in
-
-    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl }, [])
-
-let t_fission_r side cpos infos g =
-  let tr = fun side -> `LoopFission (side, cpos, infos) in
-  let exn = observes_exn g in
-  let cb = fun cenv _ me zpr -> fission_stmt ~exn infos cenv me zpr in
-  t_code_transform side cpos tr (t_zip cb) g
-
-let t_fission = FApi.t_low3 "loop-fission" t_fission_r
-
-(* -------------------------------------------------------------------- *)
-let fusion_stmt ~exn (il, (d1, d2)) (pf, hyps) me zpr =
-  let env = LDecl.toenv hyps in
-
-  let (hd, init1, b1, sw1, tl) =
-    match zpr.Zpr.z_tail with
-    | { i_node = Swhile (b, sw) } :: tl -> begin
-        if List.length zpr.Zpr.z_head < il then
-          tc_error pf "1st while-loop is not headed by %d intruction(s)" il;
-      let (init, hd) = List.takedrop il zpr.Zpr.z_head in
-        (hd, init, b, sw, tl)
-      end
-    | _ -> tc_error pf "code position does not lead to a while-loop"
-  in
-
-  let (init2, b2, sw2, tl) =
-    if List.length tl < il then
-      tc_error pf "1st first-loop is not followed by %d instruction(s)" il;
-    let (init2, tl) = List.takedrop il tl in
-      match tl with
-      | { i_node = Swhile (b2, sw2) } :: tl -> (List.rev init2, b2, sw2, tl)
-      | _ -> tc_error pf "cannot find the 2nd while-loop"
-  in
-
-  if d1 > List.length sw1.s_node then
-    tc_error pf "in loop-fusion, body is less than %d instruction(s)" d1;
-  if d2 > List.length sw2.s_node then
-    tc_error pf "in loop-fusion, body is less than %d instruction(s)" d2;
-
-  let (sw1, fini1) = List.takedrop d1 sw1.s_node in
-  let (sw2, fini2) = List.takedrop d2 sw2.s_node in
-
-  (* FIXME: costly *)
-  if not (EcReduction.EqTest.for_stmt env (stmt init1) (stmt init2)) then
-    tc_error pf "in loop-fusion, preludes do not match";
-  if not (EcReduction.EqTest.for_stmt env (stmt fini1) (stmt fini2)) then
-    tc_error pf "in loop-fusion, epilogs do not match";
-  if not (EcReduction.EqTest.for_expr env b1 b2) then
-    tc_error pf "in loop-fusion, while conditions do not match";
-
-  check_independence (pf, hyps) b1 init1 sw1 sw2 fini1;
-  check_dslc pf "prelude" init1;
-  check_dslc pf "epilog" fini1;
-  List.iter (check_noraise pf ~exn (LDecl.toenv hyps)) [sw1; sw2];
-
-  let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
-  let fus = List.rev_append init1 [wl] in
-
-    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; }, [])
-
-let t_fusion_r side cpos infos g =
-  let tr = fun side -> `LoopFusion (side, cpos, infos) in
-  let exn = observes_exn g in
-  let cb = fun cenv _ me zpr -> fusion_stmt ~exn infos cenv me zpr in
-  t_code_transform side cpos tr (t_zip cb) g
-
-let t_fusion = FApi.t_low3 "loop-fusion" t_fusion_r
-
-(* -------------------------------------------------------------------- *)
-let unroll_stmt (pf, _) me i =
-  match i.i_node with
-  | Swhile (e, sw) -> (me, [i_if (e, sw, stmt []); i])
-  | _ -> tc_error pf "cannot find a while loop at given position"
-
-let t_unroll_r side cpos g =
-  let tr = fun side -> `LoopUnraoll (side, cpos) in
-  t_code_transform side cpos tr (t_fold unroll_stmt) g
-
-let t_unroll = FApi.t_low2 "loop-unroll" t_unroll_r
-
-(* -------------------------------------------------------------------- *)
-let splitwhile_stmt b (pf, _) me i =
-  match i.i_node with
-  | Swhile (e, sw) ->
-      let op_ty  = toarrow [tbool; tbool] tbool in
-      let op_and = e_op EcCoreLib.CI_Bool.p_and [] op_ty in
-      let e = e_app op_and [e; b] tbool in
-        (me, [i_while (e, sw); i])
-
-  | _ -> tc_error pf "cannot find a while loop at given position"
-
-let t_splitwhile_r b side cpos g =
-  let tr = fun side -> `SplitWhile (b, side, cpos) in
-  t_code_transform side cpos tr (t_fold (splitwhile_stmt b)) g
-
-let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
+let t_splitwhile b side cpos =
+  t_loop_transform side cpos (fun at ->
+    EcTrSplitWhile.TrSplitWhile { trsw_at = at; trsw_cond = b; })
 
 (* -------------------------------------------------------------------- *)
 let process_fission (side, cpos, infos) tc =
