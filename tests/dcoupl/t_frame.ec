@@ -14,7 +14,7 @@ proof.
 proc. delay.
 dcoupl frame (M.b{1} = M.b{2}).
 (* Goal's pre is now (={M.a, M.b}) /\ (={M.b}). *)
-dcoupl wp. dcoupl skip. smt().
+dcoupl asgn {1}. dcoupl asgn {2}. dcoupl skip. smt().
 qed.
 
 (* Negative case: theta touches a, which the body writes. Must fail. *)

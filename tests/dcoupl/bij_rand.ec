@@ -10,7 +10,6 @@ module M = {
 lemma bij_rand : equiv[ M.f ~ M.g : true ==> ={res} ].
 proof.
 proc. delay.
-dcoupl wp.
 dcoupl rnd (fun b => !b) (fun b => !b).
-move=> &1 &2 _. smt(dbool_ll supp_dbool mu1_uni).
+move=> &1 &2 _. smt(supp_dbool dbool1E).
 qed.

@@ -16,30 +16,50 @@ fail dcoupl skip.   (* body = N.b <- 1 on both sides, skip requires empty *)
 admit.
 qed.
 
-(* pop with N exceeding body length. *)
-lemma pop_too_many :
+(* push with N exceeding body length. *)
+lemma push_too_many :
   equiv[ N.h ~ N.k : true ==> true ].
 proof.
 proc. delay.
-fail dcoupl pop 5.
+fail dcoupl push 5.
 admit.
 qed.
 
-(* unpop when R is empty. *)
-lemma unpop_empty_R :
+(* pop when R is empty. *)
+lemma pop_empty_R :
   equiv[ N.h ~ N.k : true ==> true ].
 proof.
 proc. delay.
-fail dcoupl unpop 1.
+fail dcoupl pop 1.
 admit.
 qed.
 
-(* undelay on dcoupl with non-empty R fails. *)
+(* undelay on dcoupl with non-empty R succeeds: R is prepended to the body. *)
 lemma undelay_nonempty_R :
   equiv[ N.h ~ N.k : true ==> true ].
 proof.
 proc. delay.
-dcoupl pop 1.
+dcoupl push 1.
+undelay. auto.
+qed.
+
+(* undelay on dcoupl with non-empty S fails. *)
+lemma undelay_nonempty_S :
+  equiv[ N.h ~ N.k : true ==> true ].
+proof.
+proc. delay.
+dcoupl seq 1 1 (true) with (N.b <- 1; ~ N.b <- 1;).
+(* First goal has S_i = N.b <- 1. *)
 fail undelay.
+admit. admit.
+qed.
+
+(* asgn fails when the chosen-side body does not end in an assignment. *)
+lemma asgn_fails_empty_body :
+  equiv[ N.h ~ N.k : true ==> true ].
+proof.
+proc. delay.
+dcoupl push 1.
+fail dcoupl asgn {1}.
 admit.
 qed.

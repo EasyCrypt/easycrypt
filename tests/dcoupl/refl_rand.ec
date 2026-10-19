@@ -9,6 +9,6 @@ module M = {
 lemma refl_rand : equiv[ M.f ~ M.f : true ==> ={res} ].
 proof.
 proc. delay.
-dcoupl wp. dcoupl rnd.
+dcoupl rnd.
 move=> &1 &2 _. smt(dbool_ll supp_dbool).
 qed.

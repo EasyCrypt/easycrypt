@@ -37,6 +37,23 @@ let t_dc_skip_r tc =
 let t_dc_skip = FApi.t_low0 "dc-skip" t_dc_skip_r
 
 (* -------------------------------------------------------------------- *)
+(* Delay / continuation stacks of an F-level judgement, and the stacks
+   handed over to a procedure call, must only mention global program
+   variables: a callee cannot observe the caller's locals.              *)
+let check_global_stack ?(who = "dcoupl") tc (s : stmt) =
+  let env = FApi.tc1_env tc in
+  let pvs = EcPV.PV.union (EcPV.s_read env s) (EcPV.s_write env s) in
+  let (pvs, _) = EcPV.PV.elements pvs in
+  match List.find_opt (fun (pv, _) -> EcTypes.is_loc pv) pvs with
+  | None -> ()
+  | Some (pv, _) ->
+      tc_error_lazy !!tc ~who (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        Format.fprintf fmt
+          "delay stacks must only mention global variables (found `%a')"
+          (EcPrinting.pp_pv ppe) pv)
+
+(* -------------------------------------------------------------------- *)
 (* Helpers for body splitting.                                          *)
 let split_at ~who tc n s =
   let nodes = s.EcAst.s_node in
@@ -895,6 +912,8 @@ let t_dc_fun_def_r tc =
   let fr = EcEnv.NormMp.norm_xfun env ef.dcef_fr in
   EcPhlFun.check_concrete !!tc env fl;
   EcPhlFun.check_concrete !!tc env fr;
+  List.iter (check_global_stack ~who:"proc" tc)
+    [ef.dcef_rl; ef.dcef_sl; ef.dcef_rr; ef.dcef_sr];
   let (menvl, eqsl, menvr, eqsr, env) =
     EcEnv.Fun.equivS ml mr fl fr env in
   let (fsigl, fdefl) = eqsl in

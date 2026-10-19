@@ -286,6 +286,11 @@ and process_dc_while side inv invr1 invr2 tc =
   | Some `Right ->
     EcPhlDCCore.t_dc_while_side ~side:`Right tc
 
+and process_fun_abs_dispatch f tc =
+  match (EcCoreGoal.FApi.tc1_goal tc).f_node with
+  | EcAst.FdcEquivF _ -> EcPhlDCCall.process_dc_fun_abs f tc
+  | _ -> EcPhlFun.process_fun_abs f tc
+
 and process_fun_def_dispatch tc =
   match (EcCoreGoal.FApi.tc1_goal tc).f_node with
   | EcAst.FdcEquivF _ -> EcPhlDCCore.t_dc_fun_def tc
@@ -318,7 +323,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
     match unloc t with
     | Pfun `Def                 -> process_fun_def_dispatch
-    | Pfun (`Abs f)             -> EcPhlFun.process_fun_abs f
+    | Pfun (`Abs f)             -> process_fun_abs_dispatch f
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
@@ -411,6 +416,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
         let side' = Option.value side ~default:`Left in
         EcPhlDCCore.t_dc_prod_intro ~side:side'
     | Pdc_unroll side           -> process_dc_unroll side
+    | Pdc_call (side, info, ts) -> EcPhlDCCall.process_dc_call side info ts
     | Pdc_split (side, e)       -> process_dc_split side e
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv

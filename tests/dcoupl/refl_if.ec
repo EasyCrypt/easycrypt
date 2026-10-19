@@ -14,6 +14,6 @@ proof.
 proc. delay.
 dcoupl if.
 - smt().
-- dcoupl wp. dcoupl skip. smt().
-- dcoupl wp. dcoupl skip. smt().
+- dcoupl asgn {1}. dcoupl asgn {2}. dcoupl skip. smt().
+- dcoupl asgn {1}. dcoupl asgn {2}. dcoupl skip. smt().
 qed.

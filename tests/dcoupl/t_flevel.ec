@@ -13,7 +13,7 @@ lemma dcoupl_surface_empty_ctx :
   dcoupl[ , M.f , ~ , M.g , : ={M.a} ==> ={M.a} ].
 proof.
 proc.
-dcoupl wp.
+dcoupl asgn {1}. dcoupl asgn {2}.
 dcoupl skip.
 smt().
 qed.
@@ -23,7 +23,7 @@ lemma dcoupl_surface_true :
   dcoupl[ , M.f , ~ , M.g , : true ==> true ].
 proof.
 proc.
-dcoupl wp.
+dcoupl asgn {1}. dcoupl asgn {2}.
 dcoupl skip.
 smt().
 qed.

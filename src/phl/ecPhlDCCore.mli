@@ -4,6 +4,10 @@ open EcCoreGoal
 (* -------------------------------------------------------------------- *)
 (* Two-sided rules for the delayed-coupling logic (paper §4.1).         *)
 
+(* Fails unless the statement only mentions global program variables.
+   Used for the stacks of F-level judgements and of procedure calls.   *)
+val check_global_stack : ?who:string -> tcenv1 -> EcAst.stmt -> unit
+
 (* Skip: closes a dcoupl goal whose bodies are empty and whose
    continuations match their delay contexts; produces one subgoal
    [forall m1 m2, phi m1 m2 => psi m1 m2].                             *)

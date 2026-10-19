@@ -16,7 +16,7 @@ lemma prod_split_fires :
   equiv[ N.sample_tuple ~ N.noop : true ==> true ].
 proof.
 proc. delay.
-dcoupl pop {1} 1.
+dcoupl push {1} 1.
 (* R_l: (N.x, N.y) <$ {0,1} `*` {0,1} *)
 dcoupl prod {1}.
 (* R_l becomes: N.x <$ {0,1}; N.y <$ {0,1} *)
@@ -28,7 +28,7 @@ lemma prod_split_intro_roundtrip :
   equiv[ N.sample_tuple ~ N.noop : true ==> true ].
 proof.
 proc. delay.
-dcoupl pop {1} 1.
+dcoupl push {1} 1.
 dcoupl prod {1}.
 dcoupl prod intro {1}.
 admit.

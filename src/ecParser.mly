@@ -2549,6 +2549,16 @@ conseq_xt:
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
     { (None, None, None), Some (CQI_bd (cmp, bd)) }
 
+dc_call_info:
+| f1=form LONGARROW f2=form
+    { DCI_spec (f1, f2) }
+| f=form
+    { DCI_inv f }
+
+dc_call_stacks:
+| WITH LPAREN tl=stmt TILD tr=stmt RPAREN
+    { (tl, tr) }
+
 call_info:
 | f1=form LONGARROW f2=form poe=hoare_epost(none)
     { CI_spec (f1, { pnormal = f2; pexcept = poe}) }
@@ -3018,6 +3028,9 @@ dcoupl_tac:
 
 | UNROLL s=option(side)
     { Pdc_unroll s }
+
+| CALL s=side? info=gpterm(dc_call_info) ts=option(dc_call_stacks)
+    { Pdc_call (s, info, ts) }
 
 | SPLIT s=option(side) e=sexpr
     { Pdc_split (s, e) }

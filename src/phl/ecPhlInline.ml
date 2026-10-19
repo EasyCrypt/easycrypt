@@ -214,8 +214,33 @@ let t_inline_ehoare  ~use_tuple =
   FApi.t_low1 "hoare-inline"   (t_inline_ehoare_r ~use_tuple)
 let t_inline_bdhoare ~use_tuple =
   FApi.t_low1 "bdhoare-inline" (t_inline_bdhoare_r ~use_tuple)
+(* -------------------------------------------------------------------- *)
+(* Inlining in a delayed-coupling goal only touches the body [C_i] of
+   the chosen side; the delay/continuation stacks are left untouched. *)
+let t_inline_dc_r ~use_tuple side sp tc =
+  let es = tc1_as_dcEquivS tc in
+  let concl =
+    match side with
+    | `Left  ->
+        let ((_,mt), stmt) =
+          LowInternal.inline ~use_tuple tc es.dces_ml sp es.dces_cl in
+        f_dcEquivS mt (snd es.dces_mr) (dces_pr es)
+          es.dces_rl es.dces_rr stmt es.dces_cr
+          (dces_po es) es.dces_sl es.dces_sr
+    | `Right ->
+        let ((_,mt), stmt) =
+          LowInternal.inline ~use_tuple tc es.dces_mr sp es.dces_cr in
+        f_dcEquivS (snd es.dces_ml) mt (dces_pr es)
+          es.dces_rl es.dces_rr es.dces_cl stmt
+          (dces_po es) es.dces_sl es.dces_sr
+  in
+
+  FApi.xmutate1 tc `Inline [concl]
+
 let t_inline_equiv ~use_tuple =
   FApi.t_low2 "equiv-inline"   (t_inline_equiv_r ~use_tuple)
+let t_inline_dc ~use_tuple =
+  FApi.t_low2 "dc-inline"      (t_inline_dc_r ~use_tuple)
 
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
@@ -352,6 +377,22 @@ let rec process_inline_all ~use_tuple side cond tc =
                 tc
   end
 
+  | FdcEquivS _, None ->
+      FApi.t_seq
+        (process_inline_all ~use_tuple (Some `Left ) cond)
+        (process_inline_all ~use_tuple (Some `Right) cond)
+        tc
+
+  | FdcEquivS es, Some b -> begin
+      let st = sideif b es.dces_cl es.dces_cr in
+      match HiInternal.pat_all cond st with
+      | [] -> t_id tc
+      | sp -> FApi.t_seq
+                (t_inline_dc ~use_tuple b sp)
+                (process_inline_all ~use_tuple  side cond)
+                tc
+  end
+
   | FhoareS hs, None -> begin
       match HiInternal.pat_all cond hs.hs_s with
       | [] -> t_id tc
@@ -393,6 +434,11 @@ let process_inline_occs ~use_tuple side cond occs tc =
       let sp = HiInternal.pat_of_occs cond occs st in
         t_inline_equiv ~use_tuple b sp tc
 
+  | FdcEquivS es, Some b ->
+      let st = sideif b es.dces_cl es.dces_cr in
+      let sp = HiInternal.pat_of_occs cond occs st in
+        t_inline_dc ~use_tuple b sp tc
+
   | FhoareS hs, None ->
       let sp = HiInternal.pat_of_occs cond occs hs.hs_s in
         t_inline_hoare ~use_tuple sp tc
@@ -415,6 +461,11 @@ let process_inline_codepos ~use_tuple side pos tc =
         let st = sideif b es.es_sl es.es_sr in
         let sp = HiInternal.pat_of_codepos env pos st in
         t_inline_equiv ~use_tuple b sp tc
+
+    | FdcEquivS es, Some b ->
+        let st = sideif b es.dces_cl es.dces_cr in
+        let sp = HiInternal.pat_of_codepos env pos st in
+        t_inline_dc ~use_tuple b sp tc
 
     | FhoareS hs, None ->
         let sp = HiInternal.pat_of_codepos env pos hs.hs_s in

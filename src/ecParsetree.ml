@@ -595,6 +595,10 @@ type call_info =
   | CI_inv of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
+type dc_call_info =
+  | DCI_spec of pformula * pformula
+  | DCI_inv  of pformula
+
 type p_seq_xt_info =
   | PSeqNone
   | PSeqSingle of pformula
@@ -871,6 +875,7 @@ type phltactic =
   | Pdc_prod       of oside
   | Pdc_prod_intro of oside
   | Pdc_unroll of oside
+  | Pdc_call   of oside * dc_call_info gppterm * (pstmt * pstmt) option
   | Pdc_split  of oside * pexpr
 
     (* Relation between logic *)
