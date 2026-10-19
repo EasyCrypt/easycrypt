@@ -1,87 +1,42 @@
 (* --------------------------------------------------------------------- *)
-open EcFol
-open EcCoreGoal
-open EcLowPhlGoal
 open EcAst
 
-(* --------------------------------------------------------------------- *)
-let t_hoare_case_r ?(simplify = true) f tc =
-  let fand = if simplify then f_and_simpl else f_and in
-  let hs = tc1_as_hoareS tc in
-  let mt = snd hs.hs_m in
-  let concl1 =
-    f_hoareS mt (map_ss_inv2 fand (hs_pr hs) f) hs.hs_s (hs_po hs)
-  in
-  let concl2 =
-    f_hoareS
-      mt
-      (map_ss_inv2 fand (hs_pr hs) (map_ss_inv1 f_not f))
-      hs.hs_s
-      (hs_po hs)
-  in
-  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
+open EcCoreGoal
+open EcLowPhlGoal
 
 (* --------------------------------------------------------------------- *)
-let t_ehoare_case_r ?(simplify = true) f tc =
-  let _ = simplify in
-  let hs = tc1_as_ehoareS tc in
-  let mt = snd hs.ehs_m in
-  let concl1 = f_eHoareS mt (map_ss_inv2 f_interp_ehoare_form f (ehs_pr hs)) hs.ehs_s (ehs_po hs) in
-  let concl2 = f_eHoareS mt (map_ss_inv2 f_interp_ehoare_form (map_ss_inv1 f_not f) (ehs_pr hs)) hs.ehs_s (ehs_po hs) in
-  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
+(* The [case] rules live, one module per logic, in [rules/<logic>/]. This
+   module only keeps the legacy positional entry points (adapters onto
+   those rules, so that external callers and this module's interface are
+   unchanged) and the logic-agnostic dispatcher. *)
 
 (* --------------------------------------------------------------------- *)
-let t_bdhoare_case_r ?(simplify = true) f tc =
-  let fand = if simplify then f_and_simpl else f_and in
-  let bhs = tc1_as_bdhoareS tc in
-  let mt = snd bhs.bhs_m in
-  let concl1 = f_bdHoareS mt (map_ss_inv2 fand (bhs_pr bhs) f) bhs.bhs_s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
-  let concl2 = f_bdHoareS mt
-    (map_ss_inv2 fand (bhs_pr bhs) (map_ss_inv1 f_not f)) bhs.bhs_s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
-  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
+let t_hoare_case ?(simplify = true) f =
+  EcHoareCase.(t_hoare_case { hca_cond = f; hca_simplify = simplify })
+
+let t_bdhoare_case ?(simplify = true) f =
+  EcBdHoareCase.(t_bdhoare_case { bca_cond = f; bca_simplify = simplify })
+
+let t_equiv_case ?(simplify = true) f =
+  EcEquivCase.(t_equiv_case { eca_cond = f; eca_simplify = simplify })
 
 (* --------------------------------------------------------------------- *)
-let t_equiv_case_r ?(simplify = true) f tc =
-  let fand = if simplify then f_and_simpl else f_and in
-  let es = tc1_as_equivS tc in
-  let mtl, mtr = snd es.es_ml, snd es.es_mr in
-  let concl1 = f_equivS mtl mtr (map_ts_inv2 fand (es_pr es) f) es.es_sl es.es_sr (es_po es) in
-  let concl2 = f_equivS mtl mtr (map_ts_inv2 fand (es_pr es) (map_ts_inv1 f_not f)) es.es_sl es.es_sr (es_po es) in
-  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
+(* Dispatch on the formula kind and the goal kind. The ehoare rule has no
+   [simplify] option: its precondition is not a conjunction. *)
+let t_hl_case ?simplify f tc =
+  match f, (FApi.tc1_goal tc).f_node with
+  | Inv_hs _, _ -> assert false
 
-(* --------------------------------------------------------------------- *)
-let t_hoare_case ?simplify =
-  FApi.t_low1 "hoare-case" (t_hoare_case_r ?simplify)
+  | Inv_ss f, FhoareS   _ -> t_hoare_case   ?simplify f tc
+  | Inv_ss f, FeHoareS  _ -> EcEHoareCase.(t_ehoare_case { ehca_cond = f }) tc
+  | Inv_ss f, FbdHoareS _ -> t_bdhoare_case ?simplify f tc
+  | Inv_ss _, FequivS   _ -> tc_error !!tc "expecting a two sided formula"
 
-let t_ehoare_case ?simplify =
-  FApi.t_low1 "ehoare-case" (t_ehoare_case_r ?simplify)
+  | Inv_ts f, FequivS _ -> t_equiv_case ?simplify f tc
+  | Inv_ts _, (FhoareS _ | FeHoareS _ | FbdHoareS _) ->
+      tc_error !!tc "expecting a one sided formula"
 
-let t_bdhoare_case ?simplify =
-  FApi.t_low1 "bdhoare-case" (t_bdhoare_case_r ?simplify)
-
-let t_equiv_case ?simplify =
-  FApi.t_low1 "equiv-case" (t_equiv_case_r ?simplify)
-
-(* --------------------------------------------------------------------- *)
-let t_hl_case_r ?simplify f tc =
-  match f with
-  | Inv_ss f ->
-    t_hS_or_bhS_or_eS
-      ~th:(t_hoare_case ?simplify f)
-      ~teh:(t_ehoare_case ?simplify f)
-      ~tbh:(t_bdhoare_case ?simplify f)
-      ~te:(fun _ -> tc_error !!tc "expecting a two sided formula")
-      tc
-  | Inv_ts f ->
-    let err _ =
-      tc_error !!tc "expecting a one sided formula" in
-    t_hS_or_bhS_or_eS
-      ~th:err
-      ~teh:err
-      ~tbh:err
-      ~te:(t_equiv_case ?simplify f)
-      tc
-  | _ -> assert false
-
-(* -------------------------------------------------------------------- *)
-let t_hl_case ?simplify = FApi.t_low1 "hl-case" (t_hl_case_r ?simplify)
+  | _, _ ->
+      tc_error_noXhl
+        ~kinds:[`Hoare `Stmt; `EHoare `Stmt; `PHoare `Stmt; `Equiv `Stmt]
+        !!tc
