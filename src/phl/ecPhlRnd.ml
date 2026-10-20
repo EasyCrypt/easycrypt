@@ -34,14 +34,11 @@ module Core = struct
     let x_id = EcIdent.create (symbol_of_lv lv) in
     let x = {m; inv=f_local x_id ty_distr} in
     let distr = EcFol.ss_inv_of_expr m distr in
-    if (not (POE.is_empty (hs_po hs).hsi_inv)) then
-      tc_error !!tc "exceptions are not supported";
-    let post = (hs_po hs).hsi_inv.main  in
-    let post = { m = (hs_po hs).hsi_m; inv = post} in
+    let post = POE.lower (hs_po hs) in
     let post = subst_form_lv env lv x post in
     let post = map_ss_inv2 f_imp (map_ss_inv2 f_in_supp x distr) post in
     let post = map_ss_inv1 (f_forall_simpl [(x_id,GTty ty_distr)]) post in
-    let post = POE.lift post in
+    let post = update_hs_ss post (hs_po hs) in
     let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
     FApi.xmutate1 tc `Rnd [concl]
 
