@@ -1435,8 +1435,17 @@ type phint = {
 type puseroption =
   [`Delta | `EqTrue]
 
+(* [hint simplify]: [PURAdd (db, opts, rules)] adds the rules compiled
+   from lemmas to database [db] (the default one when [None]), as a
+   theory item exported to the files requiring this one; [PURSwitch
+   (mode, db, lemmas)] disables / re-enables the rules of [lemmas] in
+   [db] for the rest of the enclosing theory / section of the current
+   file -- never exported. *)
+type puserswitch = [`Disable | `Enable]
+
 type puserred =
-  symbol option * puseroption list * (pqsymbol list * int option) list
+  | PURAdd    of symbol option * puseroption list * (pqsymbol list * int option) list
+  | PURSwitch of puserswitch * symbol option * pqsymbol list
 
 type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option

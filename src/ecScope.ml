@@ -2091,6 +2091,35 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction = struct
+  (* [hint simplify disable / enable]: switch off / back on, for the rest
+     of the enclosing theory / section of the current file, the rules
+     compiled from the given lemmas. Deliberately not a theory item: a
+     file must never switch off rules in the files requiring it. *)
+  let switch_reduction scope (mode : puserswitch) (base, lemmas) =
+    check_state `InTop "hint simplify" scope;
+
+    let dbname =
+      match base with
+      | None   -> "the default database"
+      | Some b -> Printf.sprintf "database `%s'" b in
+
+    let for1 (name : pqsymbol) =
+      let path = EcEnv.Ax.lookup_path (unloc name) (env scope) in
+      if not (EcEnv.Reduction.has_rules ?base path (env scope)) then
+        hierror ~loc:name.pl_loc "`%s' has no simplify rule in %s"
+          (EcSymbols.string_of_qsymbol (unloc name)) dbname;
+      if mode = `Enable && not (EcEnv.Reduction.is_disabled ?base path (env scope)) then
+        hierror ~loc:name.pl_loc "the simplify rules of `%s' are not disabled in %s"
+          (EcSymbols.string_of_qsymbol (unloc name)) dbname;
+      path in
+
+    let lemmas = List.map for1 lemmas in
+    let sc_env =
+      match mode with
+      | `Disable -> EcSection.disable_reduction ?base lemmas scope.sc_env
+      | `Enable  -> EcSection.enable_reduction  ?base lemmas scope.sc_env in
+    { scope with sc_env }
+
   (* FIXME: section -> allow "local" flag *)
   let add_reduction scope (base, opts, reds) =
     check_state `InTop "hint simplify" scope;
@@ -2118,6 +2147,11 @@ module Reduction = struct
         (EcTheory.Th_reduction { red_base = base; red_rules = rules })
     in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
+
+  let add_reduction scope (red : puserred) =
+    match red with
+    | PURAdd    (base, opts, reds) -> add_reduction scope (base, opts, reds)
+    | PURSwitch (mode, base, lemmas) -> switch_reduction scope mode (base, lemmas)
 end
 
 (* -------------------------------------------------------------------- *)
