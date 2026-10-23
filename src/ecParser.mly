@@ -4052,11 +4052,37 @@ hint:
 
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
+(* The option list is not written [bracket(...)?]: its empty reduction
+   before the first lemma would conflict with the [disable]/[enable]
+   forms below, which also start with an identifier. *)
 reduction:
-| HINT SIMPLIFY IN db=lident COLON opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
-    { (Some (unloc db), odfl [] opt, xs) }
-| HINT SIMPLIFY opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
-    { (None, odfl [] opt, xs) }
+| HINT SIMPLIFY IN db=lident COLON opt=bracket(user_red_option*) xs=plist1(user_red_info, COMMA)
+    { PURAdd (Some (unloc db), opt, xs) }
+| HINT SIMPLIFY IN db=lident COLON xs=plist1(user_red_info, COMMA)
+    { PURAdd (Some (unloc db), [], xs) }
+| HINT SIMPLIFY opt=bracket(user_red_option*) xs=plist1(user_red_info, COMMA)
+    { PURAdd (None, opt, xs) }
+| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
+    { PURAdd (None, [], xs) }
+
+(* [hint simplify disable L1, L2] / [hint simplify enable L1, L2]: switch
+   the rules of these lemmas off / back on in the (default / named)
+   database, for the rest of the enclosing theory / section of the
+   current file. *)
+| HINT SIMPLIFY IN db=lident COLON sw=user_red_switch xs=plist1(qident, COMMA)
+    { PURSwitch (sw, Some (unloc db), xs) }
+| HINT SIMPLIFY sw=user_red_switch xs=plist1(qident, COMMA)
+    { PURSwitch (sw, None, xs) }
+
+user_red_switch:
+| x=lident {
+    match unloc x with
+    | "disable" -> `Disable
+    | "enable"  -> `Enable
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("expecting `disable' or `enable', not: " ^ (unloc x)))
+  }
 
 user_red_info:
 | x=qident i=prefix(AT, word)?

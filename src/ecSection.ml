@@ -1650,6 +1650,13 @@ let generalize_lc_items scenv  =
 let import p scenv =
   { scenv with sc_env = EcEnv.Theory.import p scenv.sc_env }
 
+(* [hint simplify disable / enable]: no theory item, never exported *)
+let disable_reduction ?base (lemmas : EcPath.path list) scenv =
+  { scenv with sc_env = EcEnv.Reduction.disable ?base lemmas scenv.sc_env }
+
+let enable_reduction ?base (lemmas : EcPath.path list) scenv =
+  { scenv with sc_env = EcEnv.Reduction.enable ?base lemmas scenv.sc_env }
+
 let import_vars m scenv =
   { scenv with
     sc_env = EcEnv.Mod.import_vars scenv.sc_env m }
