@@ -1,0 +1,11 @@
+# exit: 1
+# The include path is process-global and grows with every LOAD, so a
+# previously loaded file's directory used to stay searchable for later,
+# unrelated LOADs. Here `Neighbour' lives next to fixtures/sub/entry.ec
+# and nowhere else: it must resolve while that file is the session, and
+# stop resolving once fixtures/simple.ec is (loaded up to its own
+# `require', so that the second attempt is outside any proof).
+LOAD "fixtures/sub/entry.ec"
+require import Neighbour.
+LOAD "fixtures/simple.ec" 3
+require import Neighbour.

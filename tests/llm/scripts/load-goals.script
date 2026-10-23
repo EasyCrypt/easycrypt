@@ -1,0 +1,7 @@
+# exit: 0
+# LOAD a file up to a proof point, then inspect with GOALS / GOALS ALL.
+LOAD "fixtures/simple.ec" 6
+GOALS
+split.
+GOALS
+GOALS ALL
