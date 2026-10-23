@@ -421,7 +421,9 @@ let rec t_lazy_match ?(reduce = `Full) ?(texn = fun _ -> raise InvalidGoalShape)
     let strategy =
       match reduce with
       | `None    -> raise InvalidGoalShape
-      | `Full    -> EcReduction.full_red
+      | `Full    ->
+          { EcReduction.full_red with
+              user_local = FApi.tc1_simplify_context tc }
       | `NoDelta -> EcReduction.nodelta in
     FApi.t_seq (FApi.t_or (t_hred_with_info strategy) texn) (t_lazy_match ~reduce tx) tc
 
@@ -567,7 +569,8 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         intro1 ((hyps, concl), Fsubst.f_subst_id) id
 
     | _ ->
-        match h_red_opt full_red hyps concl with
+        let ri = { full_red with user_local = FApi.tc1_simplify_context tc } in
+        match h_red_opt ri hyps concl with
         | None       -> LowIntro.tc_no_product !!tc ?loc:(tg_tag id) ()
         | Some concl -> intro1 ((hyps, concl), sbt) id
   in
@@ -1187,7 +1190,9 @@ let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
           let strategy =
             match reduce with
             | `None    -> raise InvalidGoalShape
-            | `Full    -> EcReduction.full_red
+            | `Full    ->
+                { EcReduction.full_red with
+                    user_local = FApi.tc1_simplify_context tc }
             | `NoDelta -> EcReduction.nodelta in
 
             match h_red_opt strategy (FApi.tc1_hyps tc) f1 with

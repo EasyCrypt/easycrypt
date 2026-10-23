@@ -769,7 +769,17 @@ let reduce_user_gen simplify ri env hyps f =
     | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
 
-  begin match ri.user_hd, p with
+  (* An explicit use-site head filter wins; otherwise the proof-local
+   * default one (set by [hint +[..]] / [hint -[..]]) applies. Resolving
+   * the default here, and not only in the [simplify]/[cbv] front-ends,
+   * makes every reduction path that threads [user_local] honour it:
+   * [/=], [done], [progress], rewriting, conversion checks, ... *)
+  let user_hd =
+    match ri.user_hd with
+    | Some _ as hd -> hd
+    | None -> EcEnv.SimplifyContext.default_hd ri.user_local in
+
+  begin match user_hd, p with
   | Some (`Include hs), `Path p when not (EcPath.Sp.mem p hs) -> raise nohead
   | Some (`Exclude hs), `Path p when EcPath.Sp.mem p hs -> raise nohead
   | _ -> ()

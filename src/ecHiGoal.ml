@@ -434,8 +434,11 @@ module LowRewrite = struct
             then Some (ptc, `Bool, (ax, f_true))
             else None
           else None
-        and pt3 = omap base
-          (EcReduction.h_red_opt EcReduction.full_red hyps ax)
+        and pt3 =
+          let ri =
+            { EcReduction.full_red with
+                EcReduction.user_local = pt.PT.ptev_env.PT.pte_lc } in
+          omap base (EcReduction.h_red_opt ri hyps ax)
         in pt1 @ (otolist pt2) @ (odfl [] pt3)) in
 
         let rec doit reduce =
@@ -862,7 +865,8 @@ let process_delta ?(rigid = false) ?target ((s :rwside), o, p) tc =
   in
 
   let ri = { EcReduction.full_red with
-               delta_p = (fun p -> if Some p = dp then `Force else `IfTransparent)} in
+               delta_p = (fun p -> if Some p = dp then `Force else `IfTransparent);
+               user_local = FApi.tc1_simplify_context tc; } in
   let na = List.length args in
 
   match s with
