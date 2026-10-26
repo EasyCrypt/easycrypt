@@ -120,22 +120,6 @@ Variant: Probabilistic Hoare logic with (<=) bound
 
    `while {formula}`
 
-Here `{formula}` is a loop invariant.
-
-This variant essentially proceeds by coinduction on the number of iterations.
-A non-trivial application of this variant relies on the probability bound
-depending on variables being modified by the loop. This can be achieved
-by using `conseq` to change the bound.
-
-The generated goals are as follows:
-
-- An induction step, where you need to show that adding one more iteration 
-  before a statement preserving the invariant with the bound also preserves 
-  the invariant with the bound.
-
-- A case where you show that the invariant holds to start with,
-  and that the bound becomes `1%r` when the loop condition becomes false.
-
 .. ecproof::
    :title: Probabilistic Hoare logic example (shape)
 
@@ -187,19 +171,6 @@ Variant: Probabilistic Hoare logic with strict variant
 .. admonition:: Syntax
 
    `while {formula} {expr}`
-
-Here `{formula}` is an invariant and `{expr}` is an integer termination
-variant.
-
-At a high level, this variant generates obligations analogous to the
-designated relational case, but for a single program:
-
-- a probabilistic goal for the loop body showing preservation of the
-  invariant and strict progress of the variant, and
-
-- a remaining goal for the code before the loop, whose postcondition is
-  strengthened with the invariant plus pure logical conditions that connect
-  loop exit to the desired postcondition.
 
 .. ecproof::
    require import AllCore DBool.
