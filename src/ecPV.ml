@@ -502,12 +502,19 @@ let lp_write_r env w lp =
   | LvTuple pvs ->
       List.fold_left add w pvs
 
-let rec f_write_r ?(except=Sx.empty) env w f =
-  let f    = NormMp.norm_xfun env f in
+(* The variables written by a function are those of its body and of the
+   functions it calls, transitively. The call graph is walked once, the
+   functions already visited (the set [seen]) being skipped: a walk of the
+   graph as a tree is exponential in the depth of the sharing. *)
+let rec f_write_v ?(except=Sx.empty) env (seen, w) f =
+  let f = NormMp.norm_xfun env f in
+  if Sx.mem f seen then (seen, w) else
+
+  let seen = Sx.add f seen in
   let func = Fun.by_xpath f env in
 
-  let folder w o =
-    if Sx.mem o except then w else f_write_r ~except env w o in
+  let folder sw o =
+    if Sx.mem o except then sw else f_write_v ~except env sw o in
 
   match func.f_def with
   | FBalias _ ->
@@ -516,51 +523,60 @@ let rec f_write_r ?(except=Sx.empty) env w f =
 
   | FBabs oi ->
     let mp = get_abs_functor f in
-    List.fold_left folder (PV.add_glob env mp w) (OI.allowed oi)
+    List.fold_left folder (seen, PV.add_glob env mp w) (OI.allowed oi)
 
   | FBdef fdef ->
       let add x w =
         let ty = Var.by_xpath x env in
         PV.add env (pv_glob x) ty w in
       List.fold_left folder
-        (EcPath.Sx.fold add fdef.f_uses.us_writes w )
+        (seen, EcPath.Sx.fold add fdef.f_uses.us_writes w)
         fdef.f_uses.us_calls
 
-and is_write_r ?(except=Sx.empty) env w s =
-  List.fold_left (i_write_r ~except env) w s
+and is_write_v ?(except=Sx.empty) env sw s =
+  List.fold_left (i_write_v ~except env) sw s
 
-and s_write_r ?(except=Sx.empty) env w s =
-  is_write_r ~except env w s.s_node
+and s_write_v ?(except=Sx.empty) env sw s =
+  is_write_v ~except env sw s.s_node
 
-and i_write_r ?(except=Sx.empty) env w i =
+and i_write_v ?(except=Sx.empty) env ((seen, w) as sw) i =
   match i.i_node with
-  | Sasgn  (lp, _) -> lp_write_r env w lp
-  | Srnd   (lp, _) -> lp_write_r env w lp
-  | Sraise _      -> w
+  | Sasgn  (lp, _) -> (seen, lp_write_r env w lp)
+  | Srnd   (lp, _) -> (seen, lp_write_r env w lp)
+  | Sraise _      -> sw
 
   | Scall(lp,f,_) ->
-    if Sx.mem f except then w else
+    if Sx.mem f except then sw else
       let w  = match lp with None -> w | Some lp -> lp_write_r env w lp in
-      f_write_r ~except env w f
+      f_write_v ~except env (seen, w) f
 
   | Sif (_, s1, s2) ->
-      List.fold_left (s_write_r ~except env) w [s1; s2]
+      List.fold_left (s_write_v ~except env) sw [s1; s2]
 
   | Swhile (_, s) ->
-      s_write_r ~except env w s
+      s_write_v ~except env sw s
 
   | Smatch (_, b) ->
-      List.fold_left (fun w (_, b) -> s_write_r ~except env w b) w b
+      List.fold_left (fun sw (_, b) -> s_write_v ~except env sw b) sw b
 
   | Sabstract id ->
       let us = AbsStmt.byid id env in
       let add_pv w (pv,ty) = PV.add env pv ty w in
       let w = List.fold_left add_pv w us.EcModules.aus_writes in
-      List.fold_left (f_write_r ~except env) w us.EcModules.aus_calls
+      List.fold_left (f_write_v ~except env) (seen, w) us.EcModules.aus_calls
+
+let f_write_r  ?except env w f = snd (f_write_v  ?except env (Sx.empty, w) f)
+let i_write_r  ?except env w i = snd (i_write_v  ?except env (Sx.empty, w) i)
+let is_write_r ?except env w s = snd (is_write_v ?except env (Sx.empty, w) s)
+let s_write_r  ?except env w s = snd (s_write_v  ?except env (Sx.empty, w) s)
 
 (* -------------------------------------------------------------------- *)
-let rec f_read_r env r f =
-  let f    = NormMp.norm_xfun env f in
+(* The variables read, with the same walk of the call graph *)
+let rec f_read_v env (seen, r) f =
+  let f = NormMp.norm_xfun env f in
+  if Sx.mem f seen then (seen, r) else
+
+  let seen = Sx.add f seen in
   let func = Fun.by_xpath f env in
 
   match func.f_def with
@@ -570,14 +586,14 @@ let rec f_read_r env r f =
 
   | FBabs oi ->
       let mp = get_abs_functor f in
-      List.fold_left (f_read_r env) (PV.add_glob env mp r) (OI.allowed oi)
+      List.fold_left (f_read_v env) (seen, PV.add_glob env mp r) (OI.allowed oi)
 
   | FBdef fdef ->
       let add x r =
         let ty = Var.by_xpath x env in
         PV.add env (pv_glob x) ty r in
       let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
-      List.fold_left (f_read_r env) r fdef.f_uses.us_calls
+      List.fold_left (f_read_v env) (seen, r) fdef.f_uses.us_calls
 
 let rec e_read_r env r e =
   match e.e_node with
@@ -589,38 +605,43 @@ let rec form_read_r env r f =
   | Fpvar (pv, _) -> PV.add env pv f.f_ty r
   | _ -> f_fold (form_read_r env) r f
 
-let rec is_read_r env w s =
-  List.fold_left (i_read_r env) w s
+let rec is_read_v env sr s =
+  List.fold_left (i_read_v env) sr s
 
-and s_read_r env w s =
-  is_read_r env w s.s_node
+and s_read_v env sr s =
+  is_read_v env sr s.s_node
 
-and i_read_r env r i =
+and i_read_v env (seen, r) i =
   match i.i_node with
-  | Sasgn   (_lp, e) -> e_read_r env r e
-  | Srnd    (_lp, e) -> e_read_r env r e
-  | Sraise  e        -> e_read_r env r e
+  | Sasgn   (_lp, e) -> (seen, e_read_r env r e)
+  | Srnd    (_lp, e) -> (seen, e_read_r env r e)
+  | Sraise  e        -> (seen, e_read_r env r e)
 
   | Scall (_lp, f, es) ->
       let r = List.fold_left (e_read_r env) r es in
-      f_read_r env r f
+      f_read_v env (seen, r) f
 
   | Sif (e, s1, s2) ->
-      List.fold_left (s_read_r env) (e_read_r env r e) [s1; s2]
+      List.fold_left (s_read_v env) (seen, e_read_r env r e) [s1; s2]
 
   | Swhile (e, s) ->
-      s_read_r env (e_read_r env r e) s
+      s_read_v env (seen, e_read_r env r e) s
 
   | Smatch (e, b) ->
       List.fold_left
-        (fun r (_, b) -> s_read_r env r b)
-        (e_read_r env r e) b
+        (fun sr (_, b) -> s_read_v env sr b)
+        (seen, e_read_r env r e) b
 
   | Sabstract id ->
       let us = AbsStmt.byid id env in
       let add_pv r (pv,ty) = PV.add env pv ty r in
       let r = List.fold_left add_pv r us.EcModules.aus_reads in
-      List.fold_left (f_read_r env) r us.EcModules.aus_calls
+      List.fold_left (f_read_v env) (seen, r) us.EcModules.aus_calls
+
+let f_read_r  env r f = snd (f_read_v  env (Sx.empty, r) f)
+let i_read_r  env r i = snd (i_read_v  env (Sx.empty, r) i)
+let is_read_r env r s = snd (is_read_v env (Sx.empty, r) s)
+let s_read_r  env r s = snd (s_read_v  env (Sx.empty, r) s)
 
 (* -------------------------------------------------------------------- *)
 type 'a pvaccess0 = env -> 'a -> PV.t
