@@ -705,10 +705,13 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   | Flocal _ -> trans_app env fp []
   | Fop    _ -> trans_app env fp []
 
-    (* Special case for `%r` *)
+    (* Special case for `%r`. An integer literal is never negative
+       ([f_int] builds the opposite of a non-negative literal), and
+       why3 real constants carry their sign apart from the mantissa. *)
   | Fapp({ f_node = Fop (p, [])},  [{f_node = Fint n}])
       when p_equal p CI_Real.p_real_of_int ->
-    WTerm.t_real_const (BI.to_why3 n)
+    assert (0 <= BI.sign n);
+    WTerm.t_real_const ~is_neg:false (BI.to_why3 n)
 
   | Fapp (f,args) -> trans_app env f (List.map (trans_form env) args)
 
