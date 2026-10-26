@@ -1,12 +1,17 @@
 {
   inputs = {
     opam-nix.url = "github:tweag/opam-nix";
+    opam-nix.inputs.opam-repository.follows = "opam-repository";
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    stable.url = "github:nixos/nixpkgs/24.05";
+    stable.url = "github:nixos/nixpkgs/26.05";
     nixpkgs.follows = "opam-nix/nixpkgs";
 
+    opam-repository = {
+      url = "github:ocaml/opam-repository/d84cf31c7dc731a040a072ad455a629ac0909e30";
+      flake = false;
+    };
   };
 
   outputs = { self, flake-utils, opam-nix, nixpkgs, ... }@inputs:
