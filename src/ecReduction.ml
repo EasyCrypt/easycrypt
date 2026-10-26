@@ -1006,11 +1006,14 @@ let reduce_head simplify ri env hyps f =
 
     (* ζ-reduction *)
   | Flet (LSymbol(x,_), e1, e2) when ri.zeta ->
+      if not (Mid.mem x e2.f_fv) then e2 else
       let s = Fsubst.f_bind_local Fsubst.f_subst_id x e1 in
       Fsubst.f_subst s e2
 
-    (* ι-reduction (let-tuple) *)
+    (* ι-reduction (let-tuple): a binding whose variables do not occur in
+       the body is dropped without reducing its value *)
   | Flet (LTuple ids, e1, e2) when ri.iota ->
+    if List.for_all (fun (x, _) -> not (Mid.mem x e2.f_fv)) ids then e2 else
     if is_tuple e1 then
       let es = destr_tuple e1 in
       let s =
@@ -1023,6 +1026,9 @@ let reduce_head simplify ri env hyps f =
 
     (* ι-reduction (let-records) *)
   | Flet (LRecord (_, ids), f1, f2) when ri.iota ->
+    if List.for_all (fun (x, _) ->
+         match x with None -> true | Some x -> not (Mid.mem x f2.f_fv)) ids
+    then f2 else
     if is_record env f1 then
       let args  = snd (EcFol.destr_app f1) in
       let subst =
