@@ -23,7 +23,7 @@ val enter_theory : EcSymbols.symbol -> EcTypes.is_local -> thmode -> scenv -> sc
 
 val exit_theory  :
   ?clears:EcPath.path list ->
-  ?pempty:[ `ClearOnly | `Full | `No ] ->
+  ?pempty:[ `ClearOnly | `Full | `Alias | `No ] ->
   scenv -> EcSymbols.symbol * EcEnv.Theory.compiled_theory option * scenv
 
 val import : EcPath.path -> scenv -> scenv

@@ -87,7 +87,7 @@ type evclone = {
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : (evclone * bool) Msym.t;
-  evc_target   : EcPath.path option;
+  evc_target   : (EcPath.path * bool) option;
 }
 
 
@@ -513,7 +513,6 @@ end = struct
       | Some (sp, _) -> sp
     in
 
-    let thd  = let thd = EcPath.toqsymbol sp in (fst thd @ [snd thd]) in
     let xdth = nm @ [x] in
 
     let rename (kind, name) =
@@ -529,11 +528,28 @@ end = struct
               let sub, clear = odfl (evc_empty, false) sub in
               if is_some sub.evc_target then
                 clone_error oc.oc_env (CE_DupOverride (OVK_Theory, name));
-              let sub = { sub with evc_target = Some sp } in
+              let sub = { sub with evc_target = Some (sp, false) } in
               Some (sub, clear || (mode <> `Alias)))
             x evc.evc_ths
           in { evc with evc_ths = ths })
         nm evc in
+
+    (* The target of the sub-theory [x] of the target theory [p].  A
+     * sub-theory that was cleared by a theory override when [p] was
+     * cloned is replaced by an alias to the theory it was overridden
+     * with: follow it. *)
+    let subtarget (p : EcPath.path) (x : symbol) =
+      let q = EcPath.pqname p x in
+      if is_some (EcEnv.Theory.by_path_opt ~mode:`All q oc.oc_env) then q else
+
+      let alias (item : theory_item) =
+        match item.ti_item with
+        | Th_alias (y, [q]) when y = x -> Some q
+        | _ -> None in
+
+      EcEnv.Theory.by_path_opt ~mode:`All p oc.oc_env
+        |> obind (fun cth -> List.opick alias cth.cth_items)
+        |> odfl q in
 
     (* The lemmas that already have a proof *)
     let proved : (qsymbol, unit) Hashtbl.t =
@@ -546,40 +562,59 @@ end = struct
       proved in
 
     (* A more specific override takes precedence over the one implied
-     * by the theory override. *)
-    let overridden (prefix : symbol list) (dth : theory_item_r) =
+     * by the theory override. Unless it overrides a sub-theory with
+     * its target and leaves an alias, it departs from the theory
+     * override, which then does not leave an alias. *)
+    let departs = ref false in
+
+    let overridden (prefix : symbol list) (tgp : EcPath.path) (dth : theory_item_r) =
       let sub = odfl evc_empty (evc_get (xdth @ prefix) evc) in
 
-      match dth with
-      | Th_type (x, _) ->
-         Msym.mem x sub.evc_types
-      | Th_operator (x, { op_kind = OB_oper _ }) ->
-         Msym.mem x sub.evc_ops
-      | Th_operator (x, { op_kind = OB_pred _ }) ->
-         Msym.mem x sub.evc_preds
-      | Th_operator (x, { op_kind = OB_nott _ }) ->
-         Msym.mem x sub.evc_abbrevs
-      | Th_module me ->
-         Msym.mem me.tme_expr.me_name sub.evc_modexprs
-      | Th_modtype (x, _) ->
-         Msym.mem x sub.evc_modtypes
-      | Th_theory (x, _) ->
-         Msym.find_opt x sub.evc_ths
-           |> obind (fun (sub, _) -> sub.evc_target)
-           |> is_some
-      | Th_axiom (x, _) ->
-         Hashtbl.mem proved (xdth @ prefix, x)
-      | _ -> false in
+      let thtarget (x : symbol) =
+        Msym.find_opt x sub.evc_ths |> obind (fun (sub, _) -> sub.evc_target) in
 
-    let rec doit_r (prefix, tgprefix) (proofs, evc) dth =
+      let overridden =
+        match dth with
+        | Th_type (x, _) ->
+           Msym.mem x sub.evc_types
+        | Th_operator (x, { op_kind = OB_oper _ }) ->
+           Msym.mem x sub.evc_ops
+        | Th_operator (x, { op_kind = OB_pred _ }) ->
+           Msym.mem x sub.evc_preds
+        | Th_operator (x, { op_kind = OB_nott _ }) ->
+           Msym.mem x sub.evc_abbrevs
+        | Th_module me ->
+           Msym.mem me.tme_expr.me_name sub.evc_modexprs
+        | Th_modtype (x, _) ->
+           Msym.mem x sub.evc_modtypes
+        | Th_theory (x, _) ->
+           is_some (thtarget x)
+        | Th_axiom (x, _) ->
+           Hashtbl.mem proved (xdth @ prefix, x)
+        | _ -> false in
+
+      let agrees =
+        match dth with
+        | Th_theory (x, _) -> begin
+           match thtarget x with
+           | Some (p, true) ->
+              EcPath.p_equal p (subtarget tgp (rename (`Theory, x)))
+           | _ -> false
+          end
+        | _ -> false in
+
+      if overridden && not agrees then departs := true;
+      overridden in
+
+    let rec doit_r (prefix, tgp) (proofs, evc) dth =
       let dtpath (x : symbol) =
         loced (xdth @ prefix, x) in
 
       let tgpath ?kind (x : symbol) =
         let x = Option.fold ~none:x ~some:(fun k -> rename (k, x)) kind in
-        EcPath.fromqsymbol (thd @ tgprefix, x) in
+        EcPath.pqname tgp x in
 
-      if overridden prefix dth then (proofs, evc) else
+      if overridden prefix tgp dth then (proofs, evc) else
 
       match dth with
       | Th_type (x, _) ->
@@ -603,9 +638,9 @@ end = struct
         ax_ovrd oc (proofs, evc) (dtpath x) (axd, mode)
 
       | Th_theory (x, dth) when dth.cth_mode = `Concrete ->
-        let tgx = rename (`Theory, x) in
+        let tgp = subtarget tgp (rename (`Theory, x)) in
          List.fold_left
-          (doit (prefix @ [x], tgprefix @ [tgx]))
+          (doit (prefix @ [x], tgp))
           (proofs, evc)
           dth.cth_items
 
@@ -636,7 +671,24 @@ end = struct
     and doit prefix (proofs, evc) dth =
       doit_r prefix (proofs, evc) dth.ti_item
 
-    in List.fold_left (doit ([], [])) (proofs, evc) dth.cth_items
+    in
+
+    let (proofs, evc) =
+      List.fold_left (doit ([], sp)) (proofs, evc) dth.cth_items in
+
+    let evc =
+      if mode <> `Inline `Clear || !departs then evc else
+        evc_update
+          (fun evc ->
+            let ths =
+              Msym.change
+                (omap (fun (sub, clear) ->
+                  ({ sub with evc_target = Some (sp, true) }, clear)))
+                x evc.evc_ths
+            in { evc with evc_ths = ths })
+          nm evc
+
+    in (proofs, evc)
 
   (* ------------------------------------------------------------------ *)
   let ovrd oc state name (ovrd : theory_override) =
