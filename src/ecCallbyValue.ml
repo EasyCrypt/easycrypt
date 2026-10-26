@@ -241,6 +241,26 @@ let norm_me   s me = Subst.subst_me s me
 let norm_e    s e  = Subst.subst_e s e
 
 (* -------------------------------------------------------------------- *)
+(* Let bindings whose variables are dead: `let p = e in b` is `b` when no
+   variable of `p` occurs in `b`, and the value `e` need not be looked at. *)
+let dead_binding (p : lpattern) (body : form) : bool =
+  let bound =
+    match p with
+    | LSymbol (x, _) -> [x]
+    | LTuple ids -> List.map fst ids
+    | LRecord (_, ids) -> List.filter_map fst ids in
+  List.for_all (fun x -> not (Mid.mem x body.f_fv)) bound
+
+(* Drop the dead bindings of a formula, bodies first, so that a chain of
+   bindings only used by a dead one disappears as well. *)
+let rec drop_dead_lets (f : form) : form =
+  match f.f_node with
+  | Flet (p, e1, e2) ->
+    let e2 = drop_dead_lets e2 in
+    if dead_binding p e2 then e2 else f_let p (drop_dead_lets e1) e2
+  | _ -> f_map (fun ty -> ty) drop_dead_lets f
+
+(* -------------------------------------------------------------------- *)
 let rec norm st s f =
 (* FIXME : I think substitution in type is wrong *)
  let f = cbv st s f (Args.empty (Subst.subst_ty s f.f_ty)) in
@@ -529,6 +549,11 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
         let bs = List.map (norm st s) bs in
         app_red st (f_match (norm st s cf) bs ty) args
 
+  (* a binding whose variables do not occur in the body is dropped
+     without evaluating its value *)
+  | Flet (p, _, f2) when st.st_ri.zeta && dead_binding p f2 ->
+    cbv st s f2 args
+
   | Flet (p, f1, f2) ->
     let f1 = cbv_init st s f1 in
     begin match p, f1.f_node with
@@ -715,4 +740,4 @@ let norm_cbv (ri : reduction_info) hyps f =
       Subst.subst_id
       (List.rev (LDecl.tohyps hyps).h_local)
 
-  in norm st s f
+  in norm st s (if ri.zeta then drop_dead_lets f else f)
