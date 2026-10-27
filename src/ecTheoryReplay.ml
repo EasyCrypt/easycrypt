@@ -36,7 +36,7 @@ and 'a ovrhooks = {
   henv      : 'a -> EcSection.scenv;
   hadd_item : 'a -> import:bool -> EcTheory.theory_item_r -> 'a;
   hthenter  : 'a -> thmode -> symbol -> is_local -> 'a;
-  hthexit   : 'a -> import:bool -> [`Full | `Alias | `ClearOnly | `No] -> 'a;
+  hthexit   : 'a -> import:bool -> ?source:EcPath.path -> [`Full | `Alias | `ClearOnly | `No] -> 'a;
   herr      : 'b . ?loc:EcLocation.t -> string -> 'b;
 }
 
@@ -1414,7 +1414,27 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
         | Some (p, true) -> Some (EcSubst.subst_path subst p)
         | _ -> None in
 
+      (* The override replaces a pristine copy of a theory by another
+         pristine copy of the same theory: the two are indiscernible, so
+         the items are not replayed and compared one by one, every path
+         of the source copy is redirected to the target instead. *)
+      let pristine =
+        match target, cth.cth_source with
+        | Some tp, Some { ths_base } when List.is_empty ove.ovre_rnms -> begin
+            let env = EcSection.env (ove.ovre_hooks.henv scope) in
+            match EcEnv.Theory.by_path_opt ~mode:`All tp env with
+            | Some { cth_source = Some { ths_base = tb }; cth_mode } ->
+                EcPath.p_equal ths_base tb && cth_mode = thmode
+            | _ -> false
+          end
+        | _ -> false in
+
       let (subst, ops, proofs, subscope) =
+        if pristine then
+          let subst =
+            EcSubst.add_path subst ~src:(xpath ove ox) ~dst:(oget target) in
+          (subst, ops, proofs, scope)
+        else
         let new_local = odfl cth.cth_loca ove.ovre_local in
         let subscope = ove.ovre_hooks.hthenter scope thmode x new_local in
         let (subst, ops, proofs, subscope) =
@@ -1449,7 +1469,7 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
 (* -------------------------------------------------------------------- *)
 let replay (hooks : 'a ovrhooks)
   ~abstract ~override_locality ~incl ~clears ~renames
-  ~opath ~npath ovrds (scope : 'a) (name, hidden, items, base_local)
+  ~opath ~npath ?source ovrds (scope : 'a) (name, hidden, items, base_local)
 =
   let subst = EcSubst.add_path EcSubst.empty ~src:opath ~dst:npath in
   let ove   = {
@@ -1473,7 +1493,8 @@ let replay (hooks : 'a ovrhooks)
       List.fold_left
         (fun state item -> replay1 ove state (hidden, item))
         (subst, Mp.empty, [], scope) items in
-     let scope = if incl then scope else hooks.hthexit scope ~import:true `No in
+     let scope =
+       if incl then scope else hooks.hthexit scope ~import:true ?source `No in
     (List.rev proofs, scope)
 
   with EcEnv.DuplicatedBinding x ->

@@ -27,7 +27,7 @@ and 'a ovrhooks = {
   henv      : 'a -> EcSection.scenv;
   hadd_item : 'a -> import:bool -> EcTheory.theory_item_r -> 'a;
   hthenter  : 'a -> thmode -> symbol -> EcTypes.is_local -> 'a;
-  hthexit   : 'a -> import:bool -> [`Full | `Alias | `ClearOnly | `No] -> 'a;
+  hthexit   : 'a -> import:bool -> ?source:path -> [`Full | `Alias | `ClearOnly | `No] -> 'a;
   herr      : 'b . ?loc:EcLocation.t -> string -> 'b;
 }
 
@@ -40,6 +40,7 @@ val replay : 'a ovrhooks
   -> renames:(renaming list)
   -> opath:path
   -> npath:path
+  -> ?source:path
   -> evclone
   -> 'a -> symbol * bool * theory_item list * EcTypes.is_local
   ->  axclone list * 'a

@@ -3954,6 +3954,7 @@ module Theory = struct
   let close
     ?(clears : path list = [])
     ?(pempty : clear_mode = `No)
+    ?(source : path option)
      (loca   : is_local)
      (mode   : thmode)
      (env    : env)
@@ -3977,7 +3978,7 @@ module Theory = struct
     items |> omap (fun items ->
       let ctheory =
         { cth_items  = items
-        ; cth_source = None
+        ; cth_source = omap (fun ths_base -> { ths_base }) source
         ; cth_loca   = loca
         ; cth_mode   = mode
         } in

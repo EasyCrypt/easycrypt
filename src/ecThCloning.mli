@@ -85,6 +85,7 @@ and evtags = ([`Include | `Exclude] * symbol) list
 and evinfo = ptactic_core option * clmode * bool (* explicit *)
 
 val evc_empty : evclone
+val evc_is_empty : evclone -> bool
 
 (* -------------------------------------------------------------------- *)
 type axclone = {

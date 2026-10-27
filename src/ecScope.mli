@@ -185,6 +185,7 @@ module Theory : sig
        ?import:bool
     -> ?pempty:[`ClearOnly | `Full | `Alias | `No]
     -> ?clears:(pqsymbol option) list
+    -> ?source:EcPath.path
     -> scope -> symbol * scope
 
   (* [import scope name] find and import theory [name] in scope
