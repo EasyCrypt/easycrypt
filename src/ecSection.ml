@@ -1513,12 +1513,12 @@ let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
     sc_items = [];
     sc_deps  = scenv.sc_deps; }
 
-let exit_theory ?clears ?pempty scenv =
+let exit_theory ?clears ?pempty ?source scenv =
   match scenv.sc_name with
   | Sc _    -> hierror "cannot close a theory containing pending sections"
   | Top     -> hierror "no theory to close"
   | Th (name, lc, mode) ->
-    let cth = EcEnv.Theory.close ?clears ?pempty lc mode scenv.sc_env in
+    let cth = EcEnv.Theory.close ?clears ?pempty ?source lc mode scenv.sc_env in
     let scenv = { (oget scenv.sc_top) with sc_deps = scenv.sc_deps } in
     name, cth, scenv
 

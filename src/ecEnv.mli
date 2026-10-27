@@ -322,6 +322,7 @@ module Theory : sig
   val close :
        ?clears:(path list)
     -> ?pempty:[`Full | `Alias | `ClearOnly | `No]
+    -> ?source:path
     -> EcTypes.is_local
     -> EcTheory.thmode
     -> env -> compiled_theory option
