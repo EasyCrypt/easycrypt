@@ -383,6 +383,27 @@ module Hints = struct
       | None -> assert false
       | Some `Include -> true
       | Some `Exclude -> false
+
+  let included (m : hints) =
+    let rec doit prefix (m : hints) (inherited : hflag) acc =
+      let this =
+        match m.ht_this with
+        | `Inherit -> inherited
+        | #hflag as flag -> flag in
+      let sub x =
+        match prefix with
+        | None   -> EcPath.psymbol x
+        | Some p -> EcPath.pqname p x in
+      match prefix, this with
+      | None  , `Include -> `All :: acc
+      | Some p, `Include -> if inherited = `Include then acc else `Theory p :: acc
+      | _     , `Exclude ->
+          let acc =
+            Msym.fold
+              (fun x flag acc -> if flag = `Include then `Lemma (sub x) :: acc else acc)
+              m.ht_axs acc in
+          Msym.fold (fun x m acc -> doit (Some (sub x)) m this acc) m.ht_sub acc
+    in doit None m `Exclude []
 end
 
 (* -------------------------------------------------------------------- *)
