@@ -1942,12 +1942,13 @@ module Theory = struct
     in { scope with sc_clears = scope.sc_clears @ clears }
 
   (* -------------------------------------------------------------------- *)
-  let exit_r ?pempty (scope : scope) =
+  let exit_r ?pempty ?source (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
     | Some sup ->
       let clears   = scope.sc_clears in
-      let _, cth, _ = EcSection.exit_theory ?pempty ~clears scope.sc_env in
+      let _, cth, _ =
+        EcSection.exit_theory ?pempty ?source ~clears scope.sc_env in
       let loaded   = scope.sc_loaded in
       let required = scope.sc_required in
       let sup = {
@@ -1957,10 +1958,10 @@ module Theory = struct
       ((cth, required), scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
-  let exit ?import ?(pempty = `ClearOnly) ?(clears =[]) (scope : scope) =
+  let exit ?import ?(pempty = `ClearOnly) ?(clears =[]) ?source (scope : scope) =
     assert (scope.sc_pr_uc = None);
 
-    let cth = exit_r ~pempty (add_clears clears scope) in
+    let cth = exit_r ~pempty ?source (add_clears clears scope) in
     let ((cth, required), (name, _), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
     let scope = ofold (fun cth scope -> bind ?import scope cth) scope cth in
@@ -2150,8 +2151,8 @@ module Cloning = struct
 
   (* ------------------------------------------------------------------ *)
   let hooks ~(override_locality: is_local option) : scope R.ovrhooks =
-    let thexit sc ~import pempty =
-      snd (Theory.exit ~import ?clears:None ~pempty sc) in
+    let thexit sc ~import ?source pempty =
+      snd (Theory.exit ~import ?clears:None ?source ~pempty sc) in
     let add_item scope ~import item =
       let item = EcTheory.mkitem ~import item in
       { scope with sc_env = EcSection.add_item ~override_locality item scope.sc_env } in
@@ -2222,10 +2223,17 @@ module Cloning = struct
     let cpath = EcEnv.root (env scope) in
     let npath = if incl then cpath else EcPath.pqname cpath name in
 
+    (* A clone that changes nothing is a pristine copy of its source:
+       it records it, and a theory override between two pristine copies
+       of the same theory is then replayed as a renaming. *)
+    let source =
+      if   C.evc_is_empty ovrds && List.is_empty rnms && Sp.is_empty ntclr && not incl
+      then Some opath else None in
+
     let (proofs, scope) =
       EcTheoryReplay.replay (hooks ~override_locality:thcl.pthc_local)
         ~abstract:opts.R.clo_abstract ~override_locality:thcl.pthc_local ~incl
-        ~clears:ntclr ~renames:rnms ~opath ~npath ovrds
+        ~clears:ntclr ~renames:rnms ~opath ~npath ?source ovrds
         scope (name, false, oth.cth_items, oth.cth_loca)
     in
 

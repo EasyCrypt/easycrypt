@@ -112,6 +112,18 @@ let evc_empty =
       evc_ths      = Msym.empty;
       evc_target   = None; }
 
+let evc_is_empty (evc : evclone) =
+     Msym.is_empty evc.evc_types
+  && Msym.is_empty evc.evc_ops
+  && Msym.is_empty evc.evc_preds
+  && Msym.is_empty evc.evc_abbrevs
+  && Msym.is_empty evc.evc_modexprs
+  && Msym.is_empty evc.evc_modtypes
+  && List.is_empty evc.evc_lemmas.ev_global
+  && Msym.is_empty evc.evc_lemmas.ev_bynames
+  && Msym.is_empty evc.evc_ths
+  && is_none evc.evc_target
+
 let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone) =
   match nm with
   | []      -> upt evc
