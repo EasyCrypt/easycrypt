@@ -1679,6 +1679,38 @@ let select env pi hyps concl execute_task =
     let init_select p ax =
       ax.ax_smt && not (P.Hints.mem p pi.P.pr_unwanted) in
     (execute_task (EcEnv.Ax.all ~check:init_select env) = Some true)
+  else if pi.P.pr_max <= 0 then
+    (* No lemma is selected beyond the ones given (this is the case of
+       `smt(lemmas)` without `maxlemmas`): the relevance tables, which
+       scan every axiom of the environment, are not built, and the given
+       lemmas are resolved by their path, the given theories walked. The
+       items of abstract theories are not bound in the environment and
+       are skipped, as the scan would have. *)
+    let wanted = pi.P.pr_wanted in
+    let rec of_theory (p : EcPath.path) (cth : EcTheory.ctheory) acc =
+      if cth.EcTheory.cth_mode = `Abstract then acc else
+      List.fold_left (fun acc (item : EcTheory.theory_item) ->
+          match item.ti_item with
+          | EcTheory.Th_axiom (x, ax) ->
+              let p = EcPath.pqname p x in
+              if P.Hints.mem p wanted then (p, ax) :: acc else acc
+          | EcTheory.Th_theory (x, sub) ->
+              of_theory (EcPath.pqname p x) sub acc
+          | _ -> acc)
+        acc cth.cth_items in
+    let toadd =
+      List.fold_left (fun acc h ->
+          match h with
+          | `All ->
+              EcEnv.Ax.all ~check:(fun p _ -> P.Hints.mem p wanted) env @ acc
+          | `Lemma p ->
+              Option.fold ~none:acc ~some:(fun ax -> (p, ax) :: acc)
+                (EcEnv.Ax.by_path_opt p env)
+          | `Theory p ->
+              Option.fold ~none:acc ~some:(fun cth -> of_theory p cth acc)
+                (EcEnv.Theory.by_path_opt ~mode:`All p env))
+        [] (P.Hints.included wanted) in
+    (execute_task toadd = Some true)
   else
     let rs = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
     let ri, other = init_relevant env pi rs in
