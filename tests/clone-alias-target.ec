@@ -13,6 +13,7 @@ end T.
 clone T as T1.
 
 expect "
+(* clone T as T1 *)
 theory T1.
   (* import *) theory X.
                  (* import *) type u.
