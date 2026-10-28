@@ -70,6 +70,15 @@ type kpattern =
   | KProj of kpattern * int
 
 (* -------------------------------------------------------------------- *)
+(* Local program variables are translated as uninterpreted functions of
+   the memory, one per (name, type), like global variables are. *)
+module Hlv = Hashtbl.Make(struct
+  type t = string * WTy.ty
+  let equal (x1, t1) (x2, t2) = String.equal x1 x2 && WTy.ty_equal t1 t2
+  let hash (x, t) = Hashtbl.hash (x, WTy.ty_hash t)
+end)
+
+(* -------------------------------------------------------------------- *)
 type tenv = {
   (*---*) te_env        : EcEnv.env;
   mutable te_task       : WTask.task;
@@ -82,6 +91,7 @@ type tenv = {
   mutable te_lam        : WTerm.term Mta.t;
   (*---*) te_gen        : WTerm.term Hf.t;
   (*---*) te_xpath      : WTerm.lsymbol Hx.t;  (* proc and global var *)
+  (*---*) te_lvar       : WTerm.lsymbol Hlv.t; (* local var           *)
   (*---*) te_absmod     : w3absmod Hid.t;      (* abstract module     *)
 }
 
@@ -97,6 +107,7 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_lam        = Mta.empty;
     te_gen        = Hf.create 0;
     te_xpath      = Hx.create 0;
+    te_lvar       = Hlv.create 0;
     te_absmod     = Hid.create 0;
   }
 
@@ -257,9 +268,6 @@ let wproj_tuple genv arg i =
   load_tuple genv n;
   let fs = Tuples.proj (n,i) in
   WTerm.t_app_infer fs [arg]
-
-let wfst genv arg = wproj_tuple genv arg 0
-let wsnd genv arg = wproj_tuple genv arg 1
 
 (* -------------------------------------------------------------------- *)
 let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
@@ -463,14 +471,6 @@ and trans_tydecl genv (p, tydecl) =
   ts
 
 (* -------------------------------------------------------------------- *)
-let trans_memtype ((genv, _) as env) mt =
-  match EcMemory.local_type mt with
-  | None -> ty_mem
-  | Some ty ->
-    let ty = trans_ty env ty in
-    wty_tuple genv [ty; ty_mem]
-
-(* -------------------------------------------------------------------- *)
 exception CanNotTranslate
 let trans_binding genv lenv (x, xty) =
   let lenv, wty =
@@ -478,7 +478,7 @@ let trans_binding genv lenv (x, xty) =
     | GTty ty ->
       lenv, trans_ty (genv, lenv) ty
     | GTmem mt ->
-      { lenv with le_mt = Mid.add x mt lenv.le_mt }, trans_memtype (genv, lenv) mt
+      { lenv with le_mt = Mid.add x mt lenv.le_mt }, ty_mem
 
     | _ -> raise CanNotTranslate
   in
@@ -850,19 +850,40 @@ and trans_op (genv:tenv) p =
   try Hp.find genv.te_op p with Not_found -> create_op ~body:true genv p
 
 (* -------------------------------------------------------------------- *)
+and trans_lvar ((genv, _) as env) (x : string) (ty : ty) (m : WTerm.term) =
+  let wty = trans_ty env ty in
+  let ls =
+    match Hlv.find_opt genv.te_lvar (x, wty) with
+    | Some ls -> ls
+    | None ->
+      let ls = WTerm.create_lsymbol (WIdent.id_fresh x) [ty_mem] (Some wty) in
+      genv.te_task <- WTask.add_param_decl genv.te_task ls;
+      Hlv.add genv.te_lvar (x, wty) ls; ls
+  in
+  WTerm.t_app_infer ls [m]
+
 and trans_pvar ((genv, lenv) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
   let mt = get_memtype lenv mem in
   match pv with
   | PVloc x ->
-    let m = trans_mem env ~forglobal:false mem in
+    let m = trans_mem env mem in
     begin match EcMemory.lookup x mt with
-    | Some (_,_,Some i) -> wproj_tuple genv m i
-    | Some (_,_,None)   -> m
-    | None              -> assert false
+    | Some (v, _, _) when not (EcMemory.is_arg x mt) ->
+      trans_lvar env x v.v_type m
+    | Some _ ->
+      (* the whole argument: the tuple of the declared variables *)
+      let tr i (ov : ovariable) =
+        let name = odfl (Printf.sprintf "_arg%d" i) ov.ov_name in
+        trans_lvar env name ov.ov_type m in
+      begin match EcMemory.decls mt with
+      | [ov] -> tr 0 ov
+      | decls -> wt_tuple genv (List.mapi tr decls)
+      end
+    | None -> assert false
     end
   | PVglob xp ->
-    let m =  trans_mem env ~forglobal:true mem in
+    let m =  trans_mem env mem in
     let ls =
       match Hx.find_opt genv.te_xpath xp with
       | Some ls -> ls
@@ -877,7 +898,7 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
 
 (* -------------------------------------------------------------------- *)
 and trans_glob ((genv, _) as env) m mem =
-  let wmem = trans_mem env ~forglobal:true mem in
+  let wmem = trans_mem env mem in
   let w3op =
     match Hid.find_opt genv.te_lc m with
     | Some w3op -> w3op
@@ -895,29 +916,20 @@ and trans_glob ((genv, _) as env) m mem =
   in apply_wop genv w3op [] [wmem]
 
 (* -------------------------------------------------------------------- *)
-and trans_mem (genv,lenv) ~forglobal mem =
-  let wmem =
-    match Hid.find_opt genv.te_lc mem with
-    | Some w3op -> apply_wop genv w3op [] []
-    | None -> WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv)) in
-  let mt = get_memtype lenv mem in
-  let has_locals = EcMemory.has_locals mt in
-  if forglobal then
-    if has_locals then wsnd genv wmem
-    else wmem
-  else
-    (assert has_locals; wfst genv wmem)
+and trans_mem (genv,lenv) mem =
+  match Hid.find_opt genv.te_lc mem with
+  | Some w3op -> apply_wop genv w3op [] []
+  | None -> WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv))
 
 (* -------------------------------------------------------------------- *)
 and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
-  let wmem = trans_mem env ~forglobal:true pr_mem in
+  let wmem = trans_mem env pr_mem in
   let warg = trans_form_b env pr_args in
 
   (* Translate the procedure *)
   let xp = NormMp.norm_xfun genv.te_env pr_fun in
   let _, mt = EcEnv.Fun.prF_memenv (EcIdent.create "&dummy") pr_fun genv.te_env in
-  let mty = trans_memtype env mt in
-  let tyr = ty_distr mty in
+  let tyr = ty_distr ty_mem in
   let ls =
     let trans () =
       let tya = oget warg.WTerm.t_ty in
@@ -1197,9 +1209,8 @@ let trans_hyp ((genv, lenv) as env) (x, ty) =
     env
 
   | LD_mem    mt ->
-    let wty = trans_memtype env mt in
     let lenv = { lenv with le_mt = Mid.add x mt lenv.le_mt } in
-    let wcodom = Some wty in
+    let wcodom = Some ty_mem in
       let ls =  WTerm.create_lsymbol (preid x) [] wcodom in
       let w3op = {
         w3op_fo = `LDecl ls;
@@ -1668,6 +1679,38 @@ let select env pi hyps concl execute_task =
     let init_select p ax =
       ax.ax_smt && not (P.Hints.mem p pi.P.pr_unwanted) in
     (execute_task (EcEnv.Ax.all ~check:init_select env) = Some true)
+  else if pi.P.pr_max <= 0 then
+    (* No lemma is selected beyond the ones given (this is the case of
+       `smt(lemmas)` without `maxlemmas`): the relevance tables, which
+       scan every axiom of the environment, are not built, and the given
+       lemmas are resolved by their path, the given theories walked. The
+       items of abstract theories are not bound in the environment and
+       are skipped, as the scan would have. *)
+    let wanted = pi.P.pr_wanted in
+    let rec of_theory (p : EcPath.path) (cth : EcTheory.ctheory) acc =
+      if cth.EcTheory.cth_mode = `Abstract then acc else
+      List.fold_left (fun acc (item : EcTheory.theory_item) ->
+          match item.ti_item with
+          | EcTheory.Th_axiom (x, ax) ->
+              let p = EcPath.pqname p x in
+              if P.Hints.mem p wanted then (p, ax) :: acc else acc
+          | EcTheory.Th_theory (x, sub) ->
+              of_theory (EcPath.pqname p x) sub acc
+          | _ -> acc)
+        acc cth.cth_items in
+    let toadd =
+      List.fold_left (fun acc h ->
+          match h with
+          | `All ->
+              EcEnv.Ax.all ~check:(fun p _ -> P.Hints.mem p wanted) env @ acc
+          | `Lemma p ->
+              Option.fold ~none:acc ~some:(fun ax -> (p, ax) :: acc)
+                (EcEnv.Ax.by_path_opt p env)
+          | `Theory p ->
+              Option.fold ~none:acc ~some:(fun cth -> of_theory p cth acc)
+                (EcEnv.Theory.by_path_opt ~mode:`All p env))
+        [] (P.Hints.included wanted) in
+    (execute_task toadd = Some true)
   else
     let rs = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
     let ri, other = init_relevant env pi rs in

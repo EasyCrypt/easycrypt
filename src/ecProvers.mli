@@ -13,6 +13,10 @@ module Hints : sig
   val addm : path -> hflag -> hints -> hints
 
   val mem : path -> hints -> bool
+
+  (* The inclusions of the hints: the lemmas flagged so, the theories
+     flagged so that no included theory contains, or everything. *)
+  val included : hints -> [ `All | `Lemma of path | `Theory of path ] list
 end
 
 (* -------------------------------------------------------------------- *)
