@@ -22,7 +22,7 @@
   dune-site
   markdown
   (pcre2 (>= 8))
-  (why3 (and (>= 1.8.0) (< 1.9)))
+  (why3 (and (>= 1.9.0) (< 1.10)))
   yojson
   (zarith (>= 1.10))
 ))
