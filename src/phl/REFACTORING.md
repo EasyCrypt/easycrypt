@@ -342,18 +342,24 @@ parameterized by an entry of a **catalogue** of transformations:
   Entries live in `rules/transforms/`, one module `EcTr<Name>` each.
 - **The obligations** are **abstract** and form a small closed set; each
   logic's rule states them as premises of its own (first, in order, then the
-  transformed judgement — same pre/post, possibly extended memory). The only
-  kind so far is `OPrefixPost (hd, cond)`: every terminating run of the prefix
-  `hd` from the precondition ends in a state satisfying `cond`. Per logic:
-  - hoare: `hoare [hd : P ==> cond | E]` (the goal's exceptional
-    postconditions kept);
-  - ehoare: `hoare [hd : P_bool ==> cond]`, the precondition having the form
-    ``P_bool `|` f``;
-  - bdhoare: `hoare [hd : P ==> cond]`;
-  - equiv (transformation of side `i`): `forall &j, hoare [hd : P ==> cond]`,
-    the relation read on side `i` with the other memory quantified.
+  transformed judgement — same pre/post, possibly extended memory). The
+  kinds so far:
+  - `OPrefixPost (hd, cond)`: every terminating run of the prefix `hd` from
+    the precondition ends in a state satisfying `cond`. Per logic:
+    - hoare: `hoare [hd : P ==> cond | E]` (the goal's exceptional
+      postconditions kept);
+    - ehoare: `hoare [hd : P_bool ==> cond]`, the precondition having the
+      form ``P_bool `|` f``;
+    - bdhoare: `hoare [hd : P ==> cond]`;
+    - equiv (transformation of side `i`): `forall &j, hoare [hd : P ==>
+      cond]`, the relation read on side `i` with the other memory
+      quantified.
 
-  These are the premises `rcondt` / `rcondf` have always stated.
+    These are the premises `rcondt` / `rcondf` have always stated.
+  - `OLossless ks`: the statement `ks` terminates with probability 1 from
+    every state; in every logic `phoare [ks : true ==> true] = 1`, in the
+    memory of the transformed program (the premise `kill` has always
+    stated).
 - **The rules** `t_<logic>_transform` (`rules/<logic>/Ec<Logic>Transform`;
   equiv: one side at a time, the other program and memory unchanged) record
   `(transformation, resolved parameters)` (and the side) in their node. The
@@ -394,7 +400,27 @@ Current catalogue:
   parameters and locals renamed to fresh program variables added to the
   memory, result assigned (component-wise through fresh variables for a
   tuple pattern without `tuple`); no obligation), used by `inline` in every
-  logic.
+  logic;
+- `kill` (`EcTrKill`): removes the `n` instructions `ks` at a (possibly
+  nested) position, provided that what they write is read neither by the
+  code that may run after them (in their block and the enclosing ones, and
+  the guard and whole body of each enclosing loop) nor by the postcondition
+  (for hoare, including the exceptional ones); obligation `OLossless ks`;
+- `alias` (`EcTrAlias`): `lv <- e` / `lv <$ d` / `lv <@ f(a)` becomes
+  `x' <- e; lv <- x'` (resp. `<$`, `<@`), `x'` a fresh program variable;
+  no obligation;
+- `set` (`EcTrSet`): inserts `x' <- e` at a position, `x'` fresh; no
+  obligation;
+- `set-match` (`EcTrSetMatch`): names the subterm `t` matched in the
+  expression of an instruction, `x' <- t; i(e[occ := x'])`, the selected
+  occurrences being alpha-equivalent to `t`; no obligation;
+- `cfold` (`EcTrCFold`): propagates an assignment to local variables into
+  the following instructions as long as valid (eager or not), and
+  materializes it afterwards; no obligation;
+- `asgn-case` (`EcTrAsgnCase`): splits a tuple assignment into one
+  assignment per variable (`case <-`); no obligation;
+- `simplify-if` (`EcTrSimplifyIf`): turns a conditional whose branches are
+  assignments into a single assignment (`simplify if`); no obligation.
 
 The decisions of a conditional or a match are computed by `EcPlRCond`.
 The `if` and `match` tactics are push + rule on the conditional alone: they
@@ -402,7 +428,7 @@ push the continuation into the branches (when there is one) through the
 transformation rule (on each side, for the two-sided equiv forms), then
 apply the `if` / `match` rule of their logic (`Ec<Logic>If`,
 `Ec<Logic>Match`), stated on the conditional alone. Further entries come
-with the tactics that use them: kill/alias/cfold/set and proc rewrite.
+with the tactics that use them: the loop transformations and proc rewrite.
 
 Exception: the framed form of `match C k` (used when the variables of the
 discriminant `e` are neither read nor written by the prefix, and the
