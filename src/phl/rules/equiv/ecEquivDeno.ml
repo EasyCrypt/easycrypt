@@ -6,7 +6,6 @@ open EcTypes
 open EcFol
 open EcEnv
 open EcPV
-open EcPhlPrRw
 open EcHiGoal
 open EcSubst
 
@@ -119,10 +118,8 @@ let () =
 
 (* ==================================================================== *)
 (* Derived (no proof-node): the upto-bad forms, from the rule and the
-   lemmas of [Real] on probabilities.
-
-   TEMPORARY: the probability rewritings still come from the
-   not-yet-migrated [EcPhlPrRw]. *)
+   lemmas of [Real] on probabilities, the probability rewritings being
+   [rewrite Pr] ([EcBdHoarePrFact]). *)
 let real_le_trans     = EcCoreLib.CI_Real.real_order_lemma "ler_trans"
 let real_ler_add      = EcCoreLib.CI_Real.real_order_lemma "ler_add"
 let real_eq_le        = EcCoreLib.CI_Real.real_order_lemma "lerr_eq"
@@ -166,8 +163,8 @@ let t_pr_pos tc =
     with DestrError _ -> tc_error !!tc "invalid goal shape" in
   let prf = f_pr_r { pr with pr_event = { m = pr.pr_event.m; inv = f_false; }; } in
   (t_real_le_trans prf @+
-    [ t_pr_rewrite ("mu_false", None) @! t_true;
-      t_pr_rewrite ("mu_sub", None) @! t_true]) tc
+    [ EcBdHoarePrFact.t_pr_rewrite ("mu_false", None) @! t_true;
+      EcBdHoarePrFact.t_pr_rewrite ("mu_sub", None) @! t_true]) tc
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno_bad pre tc =
@@ -194,12 +191,12 @@ let t_equiv_deno_bad pre tc =
        t_id;
        t_id;
        t_intros_s (`Symbol ["_";"_"]) @! t_apply_prept (`UG real_upto_or) ];
-      t_pr_rewrite_i ("mu_disjoint", None) @+
+      EcBdHoarePrFact.t_pr_rewrite ("mu_disjoint", None) @+
        [ t_intro_s (`Symbol "_") @! t_false;
          t_apply_prept
            (`App (`UG real_ler_add, [`F pra;`F fpr2;`F fprb;`F fprb; `H_; `H_]))
            @+ [
-             t_pr_rewrite_i ("mu_sub",None) @+ [
+             EcBdHoarePrFact.t_pr_rewrite ("mu_sub",None) @+ [
                t_intros_s (`Symbol ["_"]) @! t_apply_prept (`UG real_upto_sub);
                t_trivial;
              ];
@@ -268,8 +265,8 @@ let t_equiv_deno_bad2 pre bad1 tc =
                 (process_congr PCongrDefault) @! (* abs *)
                 (process_congr PCongrDefault) @~ (* add *)
                 (t_last (process_congr PCongrDefault)) @~+ (* opp *)
-                [ t_pr_rewrite_i ("mu_split", Some bad1) @! t_reflex;
-                  t_pr_rewrite_i ("mu_split", Some bad2) @! t_reflex ] ;
+                [ EcBdHoarePrFact.t_pr_rewrite ("mu_split", Some bad1) @! t_reflex;
+                  EcBdHoarePrFact.t_pr_rewrite ("mu_split", Some bad2) @! t_reflex ] ;
               t_apply_prept (`UG real_upto) @+
                 [ t_pr_pos;
                   t_pr_pos;
@@ -278,7 +275,7 @@ let t_equiv_deno_bad2 pre bad1 tc =
                     t_apply_hyp hcpre;
                     t_intros_s (`Symbol ["_"; "_"]) @!
                       t_apply_prept (`UG real_upto_imp_bad) ];
-                  t_pr_rewrite ("mu_sub",None) @! t_trivial;
+                  EcBdHoarePrFact.t_pr_rewrite ("mu_sub",None) @! t_trivial;
                   t_deno @+ [
                     t_apply_hyp hequiv;
                     t_apply_hyp hcpre;
