@@ -33,7 +33,8 @@ open EcEnv
    (deciding a [match], its unframed form), [EcTrIfPush] and
    [EcTrMatchPush] (pushing the continuation of a leading conditional /
    [match] into its branches; the [if] and [match] tactics are push + rule
-   on the conditional alone). Entries live in [rules/transforms/], as
+   on the conditional alone), [EcTrSwap] (moving a block of a possibly
+   nested block). Entries live in [rules/transforms/], as
    [EcTr<Name>]. The framed form of [match C k] changes the precondition:
    it is not a transformation, but a separate rule of each logic
    ([Ec<Logic>RMatch]). *)
@@ -65,6 +66,12 @@ type tr_ctxt = {
   trc_post : EcPV.PV.t Lazy.t;     (* program variables of [trc_me] read
                                       by the postcondition (for hoare,
                                       including the exceptional ones) *)
+  trc_exn  : bool;                 (* the judgement observes exceptions:
+                                      a hoare postcondition constraining
+                                      some exception
+                                      ([EcLowPhlGoal.hs_observes_exn]);
+                                      otherwise, raising is as good as
+                                      not terminating *)
 }
 
 (* The result of an entry: the (possibly extended) memory, the

@@ -263,6 +263,13 @@ module Zipper : sig
   val zipper_of_cpos_r : env -> codepos -> stmt -> zipper * (nm_codepos * stmt)
   val zipper_of_cpos : env -> codepos -> stmt -> zipper
 
+  (* Return the zipper for the stmt [stmt] at the normalized code gap
+   * [nm_codegap], the environment binding the locals of the enclosing
+   * [match] arms. Pure: nothing is resolved. Raise [InvalidCPos] if
+   * [nm_codegap] is not valid for [stmt].
+   *)
+  val zipper_of_nm_cgap : env -> nm_codegap -> stmt -> zipper
+
   (* Return the zipper for the stmt [stmt] from the start of the code position
    * range [codepos_range]. It also returns a code position relative to
    * the zipper that represents the final position in the range.
