@@ -4,7 +4,7 @@ open EcCoreGoal.FApi
 open EcMatching.Position
 
 (* ==================================================================== *)
-(* Rules (trusted)                                                      *)
+(* Derived tactics                                                      *)
 
 type bdhoare_rndsem_rule = {
   brsr_at     : codegap1;   (* start k of the suffix *)
@@ -12,23 +12,18 @@ type bdhoare_rndsem_rule = {
 }
 
 (* [t_bdhoare_rndsem { brsr_at = k; brsr_reduce = red }] — semantic
-   sampling of a straight-line suffix, with [~] the goal's comparison:
+   sampling of the straight-line suffix [c2] of
+   [phoare [c1; c2 : P ==> Q] ~ d], with [c1 = c[0..k)]. Resolves [k] to
+   an index, then applies
 
-       phoare [c1; wr <$ D(c2) : P ==> Q] ~ d
-     ------------------------------------------  c = c1; c2   (c1 = c[0..k))
-               phoare [c : P ==> Q] ~ d
+     [EcBdHoareTransform.t_bdhoare_transform] with
+       [EcTrRndSem.TrRndSem { trrs_at = k (resolved); trrs_reduce = red }]
 
-   where [c2] consists of assignments and samplings only and writes no
-   global, [wr] are the variables written by [c2] — only those occurring
-   in [Q] when [red] — and [D(c2)] is the distribution of their final
-   values (see [EcPlRndSem.semrnd]). When [wr] is empty, a fresh [unit]
-   variable is added to the memory and sampled instead.
+   (no obligation), giving  phoare [c1; wr <$ D(c2) : P ==> Q] ~ d
+   (failing with "semrnd" when [c2] is not straight-line or writes a
+   global).
 
-   As for hoare, the suffix is rewritten in place, keeping the prefix
-   [c1]: a program transformation, not expressible through [seq].
-
-   Node: [RBdHoareRndSem { brsn_at = k (resolved index); brsn_reduce = red }].
-   Checker: "bdhoare-rndsem". *)
+   Visible goal: the transformed judgement. Emits no node of its own. *)
 val t_bdhoare_rndsem : bdhoare_rndsem_rule -> backward
 
 (* ==================================================================== *)
