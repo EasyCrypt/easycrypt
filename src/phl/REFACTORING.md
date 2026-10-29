@@ -153,7 +153,8 @@ src/phl/
                 postcondition), EcPlWp (weakest precondition), EcPlRndSem
                 (semantic sampling), EcPlRCond (deciding a conditional or
                 a match), EcPlTransform (the transformation catalogue and
-                its obligations)
+                its obligations), EcPlMatch (branches of a `match` on
+                fresh program variables)
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -374,11 +375,23 @@ Current catalogue:
 - `rmatch` (`EcTrRMatch`, deciding the `match` at a position, the arguments
   of the constructor being assigned to fresh program variables; obligation
   `OPrefixPost (hd, exists xs, e = C xs)`), used by `match C k` in every
-  logic (its unframed form, see below).
+  logic (its unframed form, see below);
+- `if-push` (`EcTrIfPush`): `if b then c1 else c2; c` becomes the single
+  instruction `if b then { c1; c } else { c2; c }`; no obligation;
+- `match-push` (`EcTrMatchPush`): `match e with C xs => b ...; c` becomes
+  the single instruction `match e with C xs => { b; c } ...`; no
+  obligation. The pattern variables are local identifiers bound in the
+  branch only: the binders of a branch are renamed apart when they occur
+  free in `c`, so that `c` is not captured.
 
 The decisions of a conditional or a match are computed by `EcPlRCond`.
-Further entries come with the tactics that use them: if/match-push, then
-swap, inline, kill/alias/cfold/set and proc rewrite.
+The `if` and `match` tactics are push + rule on the conditional alone: they
+push the continuation into the branches (when there is one) through the
+transformation rule (on each side, for the two-sided equiv forms), then
+apply the `if` / `match` rule of their logic (`Ec<Logic>If`,
+`Ec<Logic>Match`), stated on the conditional alone. Further entries come
+with the tactics that use them: swap, inline, kill/alias/cfold/set and
+proc rewrite.
 
 Exception: the framed form of `match C k` (used when the variables of the
 discriminant `e` are neither read nor written by the prefix, and the
