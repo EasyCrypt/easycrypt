@@ -249,7 +249,8 @@ proof. by move=> ih n; rewrite -(asintK n) &(ih) rg_asint. qed.
 theory DZmodP.
 clone include MFinite with
   type t <- zmod,
-    op Support.enum = map inzmod (range 0 p)
+    op Support.enum = map inzmod (range 0 p),
+    op Support.card = p
 
   proof *.
 
@@ -262,10 +263,13 @@ rewrite !mem_range => rgm rgn /(congr1 asint).
 by rewrite !inzmodK !pmod_small.
 qed.
 
+realize Support.card_spec.
+proof. by rewrite /Support.card /Support.enum size_map size_range; smt(ge2_p). qed.
+
 require import DInterval.
 
 lemma cardE : Support.card = p.
-proof. by rewrite /Support.card size_map size_range; smt(ge2_p). qed.
+proof. by rewrite /Support.card. qed.
 
 lemma dzmodE : dunifin = dmap [0..p-1] inzmod.
 proof.
