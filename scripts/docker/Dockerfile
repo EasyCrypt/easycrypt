@@ -105,7 +105,7 @@ RUN \
 	rm -f cvc5
 
 RUN \
-	version=5.3.2 && glibc=2.39 && \
+	version=5.3.3 && glibc=2.39 && \
 	wget -O z3.zip https://github.com/Z3Prover/z3/releases/download/z3-${version}/z3-${version}-x64-glibc-${glibc}.zip && \
 	unzip -j z3.zip z3-${version}-x64-glibc-${glibc}/bin/z3 && \
 	sudo install -m 0755 z3 /usr/local/bin/z3-${version} && \
