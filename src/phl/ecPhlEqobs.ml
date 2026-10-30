@@ -341,6 +341,17 @@ and f_eqobs_in fl fr sim eqO =
             PV.check_depend env fvr topr
           with TcError _ -> raise EqObsInError
         end;
+        let restr_of adv =
+          { mr_empty with ur_neg = (Sx.empty, Sm.singleton adv) } in
+        let oracle_ok o_l o_r =
+          EcPath.x_equal o_l o_r ||
+          (try
+             EcTyping.check_mem_restr_fun env o_l (restr_of topl);
+             EcTyping.check_mem_restr_fun env o_r (restr_of topr);
+             true
+           with _ -> false) in
+        if not (List.for_all2 oracle_ok (OI.allowed oil) (OI.allowed oir)) then
+          raise EqObsInError;
         sim, (Mpv2.add_glob env top top eqi)
 
       | FBdef funl, FBdef funr ->
