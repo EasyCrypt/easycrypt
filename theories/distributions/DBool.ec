@@ -12,7 +12,7 @@ clone include Distr.MFinite with
   rename "dunifinE" as "dboolE_count"
   rename "dunifin" as "dbool"
   rename "cunifin" as "cdbool"
-proof Support.enum_spec by case.
+proof Support.enum_spec by case, Support.card_spec by done.
 
 lemma dboolE (E : bool -> bool):
   mu dbool E =   (if E true  then 1%r/2%r else 0%r)

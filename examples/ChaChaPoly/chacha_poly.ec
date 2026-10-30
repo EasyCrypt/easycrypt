@@ -89,8 +89,10 @@ theory C.
 
   clone FinType with 
     type t  = counter,
-    op enum = List.map ofintd (iota_ 0 (max_counter + 1))
+    op enum = List.map ofintd (iota_ 0 (max_counter + 1)),
+    op card = size (List.map ofintd (iota_ 0 (max_counter + 1)))
     proof *.
+  realize card_spec by rewrite /card /enum.
   realize enum_spec.  
   proof.
     move=> c; rewrite count_uniq_mem.

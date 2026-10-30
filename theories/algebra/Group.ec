@@ -301,7 +301,7 @@ op log (x : group) = choiceb (log_spec x) 0.
 
 lemma gt0_order : 0 < order.
 proof.
-rewrite /order ltr_neqAle size_ge0 /= eq_sym size_eq0.
+rewrite order_spec ltr_neqAle size_ge0 /= eq_sym size_eq0.
 by apply/negP=> z_elems; have := elemsP g; rewrite z_elems.
 qed.
 
@@ -321,7 +321,7 @@ have nz: forall k, 1 <= k < order => g ^ k <> e.
   * rewrite &(uniq_perm_eq) ?(undup_uniq, elems_uniq).
     move=> x; rewrite elemsP /= mem_undup; apply/mapP.
     by case: (mg x)=> l mg_x; exists l; rewrite mem_range.
-  move/perm_eq_size; rewrite -/order => orderE.
+  move/perm_eq_size; rewrite -order_spec => orderE.
   rewrite -(@ltrr order) {1}orderE (ler_lt_trans _ _ _ (size_undup _)).
   by rewrite size_map size_range /= ler_maxr 1:ltrW /=; case: rg_k.
 rewrite map_inj_in_uniq 2:range_uniq => /= i j.
@@ -351,7 +351,7 @@ have /perm_eq_size := perm_filterC (mem s) elems.
 have: perm_eq (filter (mem s) elems) (filter (mem elems) s).
 + rewrite &(uniq_perm_eq) ?filter_uniq ?(elems_uniq, uniq_cg).
   by move=> x; rewrite !mem_filter andbC.
-rewrite -/order eq_sym size_cat => /perm_eq_size ->.
+rewrite -order_spec eq_sym size_cat => /perm_eq_size ->.
 rewrite eq_in_filter_predT => [x _|]; 1: by rewrite elemsP.
 rewrite size_map size_range /= ler_maxr 1:ge0_order.
 rewrite -{1}(addr0 order) eq_sym => /addrI.
@@ -621,6 +621,7 @@ import ZModpRing.
 clone CyclicGroup as ZModC with
   type group <- zmod,
   op   elems <- map ZModRing.inzmod (range 0 order),
+  op   order <- order,
   op   e     =  ZModRing.zero,
   op   ( * ) =  ZModRing.( + ),
   op   inv   =  ZModRing.([-]),
@@ -635,6 +636,9 @@ rewrite map_inj_in_uniq ?range_uniq // => {x} x y.
 rewrite !mem_range => rgx rgy /= /(congr1 asint).
 by rewrite !inzmodK !pmod_small.
 qed.
+
+realize order_spec.
+proof. by rewrite size_map size_range; smt(ge2_order). qed.
 
 realize mulcC by apply: ZModRing.ZModpRing.addrC.
 realize mul1c by apply: ZModRing.ZModpRing.add0r.
