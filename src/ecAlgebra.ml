@@ -73,9 +73,12 @@ end
 type eq = form * form
 
 (* -------------------------------------------------------------------- *)
-let rapp r op args =
+let rapp r (op : EcPath.path) args =
   let opty = toarrow (List.map f_ty args) r.r_type in
-    f_app (f_op op [] opty) args r.r_type
+  let ta = r.r_insts in
+  let indices = if ta.EcAst.indices = [] then None else Some ta.EcAst.indices in
+  let tyargs  = if ta.EcAst.types   = [] then None else Some ta.EcAst.types   in
+    f_app (f_op op ?indices ?tyargs opty) args r.r_type
 
 let rzero r = rapp r r.r_zero []
 let rone  r = rapp r r.r_one  []
@@ -157,6 +160,9 @@ type cfieldop = [cringop | `Inv | `Div]
 type cfield   = field * (cfieldop Mp.t)
 
 (* -------------------------------------------------------------------- *)
+(* Recognition is keyed by op path, then checked against the ring's
+   shared instantiation: an occurrence of the same path at OTHER
+   indices/types is not this ring's operator. *)
 let cring_of_ring (r : ring) : cring =
   let cr = [(r.r_zero, `Zero);
             (r.r_one , `One );
@@ -192,9 +198,11 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let rec doit form =
     let o, args = destr_app form in
     match o.f_node with
-    | Fop (op, _) -> begin
+    | Fop (op, ta) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
+        | Some _ when not (EcDecl.targs_equal ta r.r_insts) ->
+          abstract form
         | Some op -> begin
           match op,args with
           | `Zero, []           -> PEc c0
@@ -255,9 +263,11 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let rec doit form =
     let o, args = destr_app form in
     match o.f_node with
-    | Fop(op, _) -> begin
+    | Fop(op, ta) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
+        | Some _ when not (EcDecl.targs_equal ta r.EcDecl.f_ring.EcDecl.r_insts) ->
+          abstract form
         | Some op -> begin
           match op,args with
           | `Zero, []           -> FEc c0

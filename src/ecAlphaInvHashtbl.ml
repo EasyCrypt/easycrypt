@@ -5,8 +5,9 @@
    The hash is invariant under the renaming of bound variables: a bound
    occurrence is hashed by the de-Bruijn *level* of its binder (an
    integer, intrinsically stable) rather than by its name, so
-   alpha-equivalent formulas hash equal. Free variables, operators and
-   types are stable under alpha-renaming and are hashed as-is.
+   alpha-equivalent formulas hash equal. Free variables, operators
+   (with their type and index instantiations) and types are stable
+   under alpha-renaming and are hashed as-is.
 
    The hash traverses the whole formula, but is memoized on the hash-cons
    tag ([f_tag]) of every subformula reached with no binder in scope: each
@@ -78,7 +79,7 @@ let hash_memo (memo : (int, int) Hashtbl.t) (f0 : form) : int =
       combine 3 (pv_hash pv)
     | Fglob (mp, _m) -> combine 4 (id_hash mp)
     | Fop (p, tys) ->
-      combine 5 (combine_list (EcPath.p_hash p) (List.map ty_hash tys))
+      combine 5 (targ_hash (EcPath.p_hash p) tys)
     | Fif (c, t, f) -> combine 6 (combine_list 0 [hash e c; hash e t; hash e f])
     | Fmatch (c, bs, ty) ->
       combine 7 (combine_list (ty_hash ty) (hash e c :: List.map (hash e) bs))

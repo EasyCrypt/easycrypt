@@ -48,6 +48,17 @@ val ts_inv_eqglob:
 val f_int_le  : form -> form -> form
 val f_int_lt  : form -> form -> form
 
+(* Instantiate an operator body at explicit [targs]: tyvars via the
+   type substitution, idxvars in BOTH namespaces (tindex positions and
+   int-typed formula-local occurrences). Mirrors [EcEnv.Op.reduce]. *)
+val f_subst_tparams :
+     freshen:bool
+  -> EcIdent.t list  (* idxvars *)
+  -> EcIdent.t list  (* tyvars  *)
+  -> EcAst.targs
+  -> form
+  -> form
+
 (* soft-constructors - reals *)
 val f_rint : zint -> form
 val f_real_of_int : form -> form
@@ -226,7 +237,7 @@ type sform =
   | SFimp   of form * form
   | SFiff   of form * form
   | SFeq    of form * form
-  | SFop    of (path * ty list) * (form list)
+  | SFop    of (path * targs) * (form list)
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS
