@@ -421,17 +421,13 @@ let rec t_lazy_match ?(reduce = `Full) ?(texn = fun _ -> raise InvalidGoalShape)
     let strategy =
       match reduce with
       | `None    -> raise InvalidGoalShape
-      | `Full    ->
-          { EcReduction.full_red with
-              user_local = FApi.tc1_simplify_context tc }
+      | `Full    -> EcReduction.full_red
       | `NoDelta -> EcReduction.nodelta in
-    (* honor proof-local [-delta op] opacity overrides without changing
-       which simplify databases the strategy consults *)
+    (* the proof-local simplify context (activated databases, local
+       rules, opacity overrides) applies to these head reductions too *)
     let strategy =
       { strategy with
-          EcReduction.user_local =
-            EcEnv.SimplifyContext.opacity_only
-              (FApi.tc1_simplify_context tc) } in
+          EcReduction.user_local = FApi.tc1_simplify_context tc } in
     FApi.t_seq (FApi.t_or (t_hred_with_info strategy) texn) (t_lazy_match ~reduce tx) tc
 
 (* -------------------------------------------------------------------- *)
@@ -2554,11 +2550,11 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
     { cs_undosubst = Sid.empty (*Sid.of_list (List.map fst (LDecl.tohyps (FApi.tc1_hyps tc)).h_local)*) ;
       cs_sbeq = (* Sid.of_list (List.map fst (LDecl.tohyps (FApi.tc1_hyps tc)).h_local)*) Sid.empty;
     } in
+  (* the closing pass sees the proof-local simplify context (activated
+     databases, local rules, opacity overrides), as the entry pass does *)
   let final =
     { EcReduction.nodelta with
-        EcReduction.user_local =
-          EcEnv.SimplifyContext.opacity_only
-            (FApi.tc1_simplify_context tc) } in
+        EcReduction.user_local = FApi.tc1_simplify_context tc } in
   FApi.t_seq (entry state) (t_simplify_with_info final) tc
 
 
@@ -2931,11 +2927,11 @@ let t_crush_fwd ?(delta = true) nb_intros (tc : tcenv1) =
     | _ -> t_fail tc
   in
 
+  (* the closing pass sees the proof-local simplify context (activated
+     databases, local rules, opacity overrides), as the entry pass does *)
   let final =
     { EcReduction.nodelta with
-        EcReduction.user_local =
-          EcEnv.SimplifyContext.opacity_only
-            (FApi.tc1_simplify_context tc) } in
+        EcReduction.user_local = FApi.tc1_simplify_context tc } in
   FApi.t_seq
     (aux0 nb_intros)
     (t_simplify_with_info final) tc
