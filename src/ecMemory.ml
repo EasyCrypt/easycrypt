@@ -220,3 +220,13 @@ let local_type (Lmt_concrete mt) =
 
 let has_locals (Lmt_concrete mt) =
   Option.is_some mt
+
+let is_arg (x : symbol) (Lmt_concrete mt) =
+  match mt with
+  | None -> false
+  | Some lmt -> lmt.lmt_name = Some x
+
+let decls (Lmt_concrete mt) =
+  match mt with
+  | None -> []
+  | Some lmt -> lmt.lmt_decl

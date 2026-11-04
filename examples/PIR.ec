@@ -186,6 +186,24 @@ proof.
   apply fsetP => x;rewrite /restr in_fsetI in_fset0 mem_oflist mem_iota /#.
 qed.
 
+lemma restr_addS_eq n s x :
+  0 <= n => is_restr s n =>
+  (fset1 n `|` s = restr x (n + 1)) = (n \in x /\ s = restr x n).
+proof.
+  move=> Hn Hs; rewrite restrS //; case: (n \in x) => /= _.
+  + by rewrite (is_restr_Ueq n s (restr x n) Hs (is_restr_restr n x)).
+  by rewrite fset0U; apply/neqF/is_restr_diff/is_restr_restr.
+qed.
+
+lemma restr_S_eq n s x :
+  0 <= n => is_restr s n =>
+  (s = restr x (n + 1)) = (!n \in x /\ s = restr x n).
+proof.
+  move=> Hn Hs; rewrite restrS //; case: (n \in x) => /= _.
+  + by apply/neqF; rewrite eq_sym; apply/(is_restr_diff n (restr x n) s Hs).
+  by rewrite fset0U.
+qed.
+
 axiom N_pos : 0 <= N.
 
 import RField StdOrder.RealOrder.
@@ -355,8 +373,10 @@ proof.
     skip => &m1 &m2 /> H0j HjN Hrs1 Hrs2 Hs Hj; split.
     + by move=> b _;ring.
     move=> _ b _;split;1: by ring.
-    move=> _; rewrite !oflist_cons !restrS //.
-    smt (is_restr_addS is_restrS is_restr_diff is_restr_Ueq is_restr_restr  fset0U).
+    move=> _; rewrite !oflist_cons !(restr_addS_eq, restr_S_eq) //.
+    have := is_restr_addS _ _ H0j Hrs1; have := is_restr_addS _ _ H0j Hrs2.
+    have := is_restrS _ _ H0j Hrs1; have := is_restrS _ _ H0j Hrs2.
+    smt().
   auto; move => &m1 &m2 />.
   rewrite !restr_0 -set0E /=;smt (is_restr_fset0).
 qed.
