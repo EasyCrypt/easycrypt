@@ -7,7 +7,9 @@ type t.
 
 op enum : t list.
 
-op card : int = size enum.
+op card : int.
+
+axiom card_spec : card = size enum.
 
 axiom enum_spec : forall x, count (pred1 x) enum = 1.
 
@@ -23,7 +25,7 @@ proof. by apply/count_mem_uniq=> x; rewrite enumP enum_spec. qed.
 
 lemma card_gt0 : 0 < card.
 proof.
-rewrite /card; have: mem enum witness by rewrite enumP.
+rewrite card_spec; have: mem enum witness by rewrite enumP.
 by case: enum=> //= x s _; rewrite addzC ltzS size_ge0.
 qed.
 
@@ -49,7 +51,7 @@ apply: uniq_perm_eq.
 qed.
 
 lemma card_size_to_seq : card = size (Finite.to_seq<:t> predT).
-proof. by apply/perm_eq_size/perm_eq_enum_to_seq. qed.
+proof. by rewrite card_spec; apply/perm_eq_size/perm_eq_enum_to_seq. qed.
 end FinType.
 
 (* ==================================================================== *)
@@ -61,8 +63,12 @@ clone FinType as FT2 with type t <- t2.
 
 clone include FinType
   with type t    = t1 * t2,
-         op enum = allpairs (fun x y => (x, y)) FT1.enum FT2.enum
+         op enum = allpairs (fun x y => (x, y)) FT1.enum FT2.enum,
+         op card = FT1.card * FT2.card
   proof *.
+
+realize card_spec.
+proof. by rewrite /card /enum FT1.card_spec FT2.card_spec size_allpairs. qed.
 
 realize enum_spec.
 proof.

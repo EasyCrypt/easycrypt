@@ -52,7 +52,7 @@ move=> i le0_i ih; rewrite wordnS // size_flatten /=.
 rewrite -map_comp (@eq_map _ (fun x => card^i)).
   by move=> x /=; rewrite /(\o) size_map.
 rewrite Bigint.sumzE big_map /(\o) /predT /=.
-by rewrite Bigint.big_constz count_predT -/card mulzC exprS.
+by rewrite Bigint.big_constz count_predT -card_spec mulzC exprS.
 qed.
 
 (* -------------------------------------------------------------------- *)

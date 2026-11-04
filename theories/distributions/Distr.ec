@@ -894,11 +894,11 @@ clone import FinType as Support with type t <- t.
 op dunifin : t distr = MUniform.duniform enum.
 
 lemma dunifin1E (x : t) : mu1 dunifin x = 1%r / card%r.
-proof. by rewrite MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
+proof. by rewrite card_spec MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
 
 lemma dunifinE (E : t -> bool) :
   mu dunifin E = (count E enum)%r / card%r.
-proof. by rewrite MUniform.duniformE ?undup_id // enum_uniq. qed.
+proof. by rewrite card_spec MUniform.duniformE ?undup_id // enum_uniq. qed.
 
 lemma supp_dunifin x: x \in dunifin.
 proof.
@@ -908,7 +908,7 @@ qed.
 lemma dunifin_ll : is_lossless dunifin.
 proof.
 rewrite MUniform.duniform_ll -size_eq0 -lt0n.
-  by rewrite size_ge0. by rewrite Support.card_gt0.
+  by rewrite size_ge0. by rewrite -Support.card_spec Support.card_gt0.
 qed.
 
 lemma dunifin_uni : is_uniform dunifin.
@@ -2377,8 +2377,8 @@ lemma tofunK ['u] us :
   size us = FinT.card => offun<:'u> (tofun us) = us.
 proof.
 move=> sz_us; apply/(eq_from_nth witness).
-- by rewrite size_map sz_us.
-rewrite size_map -/FinT.card => i rg_i.
+- by rewrite size_map sz_us FinT.card_spec.
+rewrite size_map => i rg_i.
 rewrite /offun (@nth_map witness) // /tofun.
 by rewrite index_uniq // FinT.enum_uniq.
 qed.
@@ -2389,7 +2389,7 @@ proof.
 apply: eq_distr => f; rewrite dfun1E_djoin dmap1E /(\o) /pred1.
 apply: mu_eq_support => l /supp_djoinmap [hsz _] /=.
 apply eq_iff; split => [-> | <-]; first by apply offunK.
-by rewrite -/(offun (tofun l)) tofunK // -hsz.
+by rewrite -/(offun (tofun l)) tofunK // FinT.card_spec -hsz.
 qed.
 
 lemma dfun_supp ['u] (d : t -> 'u distr) (f : t -> 'u) :
@@ -2431,7 +2431,7 @@ rewrite -dmapE; congr; apply/eq_distr=> f.
 rewrite dfun1E_djoin dmap1E &(mu_eq_support) /pred1.
 move=> us /supp_djoinmap [/eq_sym sz_us /allP h] @/(\o) /=.
 apply/eq_iff; split => [->|]; first by apply/offunK.
-by move/(congr1 offun); rewrite tofunK.
+by move/(congr1 offun); rewrite tofunK // FinT.card_spec.
 qed.
 
 lemma dfunE ['u] du (p : t -> 'u -> bool) :

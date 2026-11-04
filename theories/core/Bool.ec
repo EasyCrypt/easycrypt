@@ -23,5 +23,5 @@ clone FinType as BoolFin with
   type t    <- bool,
   op enum <- List.(::) true (List.(::) false List."[]"),
   op card <- 2
-proof enum_spec by case.
+proof enum_spec by case, card_spec by done.
 

@@ -183,14 +183,18 @@ qed.
 (* -------------------------------------------------------------------- *)
 clone Tuple as Enum with
   type t <- t,
-    op Support.enum <- enum
-proof * by exact/enum_spec.
+    op Support.enum <- enum,
+    op Support.card <- card
+proof * by (exact/enum_spec || exact/card_spec).
 
 (* -------------------------------------------------------------------- *)
 clone include FinType with
   type t    <- word,
-  op enum = List.map mkword (Enum.wordn n)
+  op enum = List.map mkword (Enum.wordn n),
+  op card = size (List.map mkword (Enum.wordn n))
 proof * rename [op] "enum" as "words".
+
+realize card_spec by rewrite /card /words.
 
 realize enum_spec.
 proof.
@@ -209,7 +213,7 @@ clone MFinite as DWord with
   type t <- word,
   op   Support.enum = List.map mkword (Enum.wordn n),
   op   Support.card <- card
-proof Support.enum_spec by exact/enum_spec.
+proof Support.enum_spec by exact/enum_spec, Support.card_spec by exact/card_spec.
 
 (* -------------------------------------------------------------------- *)
 theory ListSample.

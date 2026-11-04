@@ -160,8 +160,9 @@ clone import FinType with
 import Lazy.
 
 clone include FiniteEager with
-  op enum <- enum
-proof * by exact/enum_spec.
+  op enum <- enum,
+  op card <- card
+proof * by (exact/enum_spec || exact/card_spec).
 
 section.
 declare module D <: Distinguisher { -LRO, -ERO }.

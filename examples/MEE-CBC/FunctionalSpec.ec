@@ -32,11 +32,13 @@ qed.
 clone import Word as Block with
   type Alphabet.t    <- octet,
   op   Alphabet.enum <- Octet.octets,
+  op   Alphabet.card <- Octet.card,
   op   n             <- 16
 rename "word" as "block"
 rename "Word" as "Block"
 proof *.
 realize Alphabet.enum_spec by exact/Octet.enum_spec.
+realize Alphabet.card_spec by exact/Octet.card_spec.
 realize ge0_n by trivial.
 
 abbrev dblock = DBlock.dunifin.
@@ -125,11 +127,13 @@ instance bring with block
 clone import Word as Tag with
   type Alphabet.t    <- octet,
   op   Alphabet.enum <- Octet.octets,
+  op   Alphabet.card <- Octet.card,
   op   n             <- 32
 rename "word" as "tag"
 rename "Word" as "Tag"
 proof *.
 realize Alphabet.enum_spec by exact/Octet.enum_spec.
+realize Alphabet.card_spec by exact/Octet.card_spec.
 realize ge0_n by trivial.
 
 (** Messages are just octet lists **)
