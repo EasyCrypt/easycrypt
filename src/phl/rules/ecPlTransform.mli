@@ -34,7 +34,9 @@ open EcEnv
    [EcTrMatchPush] (pushing the continuation of a leading conditional /
    [match] into its branches; the [if] and [match] tactics are push + rule
    on the conditional alone), [EcTrSwap] (moving a block of a possibly
-   nested block) and [EcTrInline] (inlining procedure calls). Entries live
+   nested block), [EcTrInline] (inlining procedure calls), [EcTrKill],
+   [EcTrAlias], [EcTrSet], [EcTrSetMatch], [EcTrCFold], [EcTrAsgnCase]
+   and [EcTrSimplifyIf] (the code transformations). Entries live
    in [rules/transforms/], as [EcTr<Name>]. The framed form of [match C k]
    changes the precondition: it is not a transformation, but a separate
    rule of each logic ([Ec<Logic>RMatch]). *)
@@ -48,10 +50,14 @@ type transform = ..
    extended one of [c']). *)
 type obligation =
   | OPrefixPost of prefix_post
+  | OLossless   of stmt
 
 (* [OPrefixPost { opp_prefix = hd; opp_cond = cond }]: every terminating
    run of [hd] (a prefix of [c]) from the precondition ends in a state
-   satisfying [cond]. *)
+   satisfying [cond].
+
+   [OLossless ks]: the statement [ks] (a fragment of [c], over its memory)
+   terminates with probability 1 from every state. *)
 and prefix_post = {
   opp_prefix : stmt;     (* the prefix [hd] *)
   opp_cond   : ss_inv;   (* [cond] *)

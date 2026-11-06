@@ -11,6 +11,7 @@ type transform = ..
 
 type obligation =
   | OPrefixPost of prefix_post
+  | OLossless   of stmt
 
 and prefix_post = {
   opp_prefix : stmt;

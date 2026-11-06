@@ -270,6 +270,14 @@ module Zipper : sig
    *)
   val zipper_of_nm_cgap : env -> nm_codegap -> stmt -> zipper
 
+  (* Return the zipper for the stmt [stmt] at the normalized code position
+   * [nm_codepos] (as returned by [zipper_of_cpos_r]): the cursor is before
+   * the designated instruction, or at the end of its block. Needs no
+   * environment ([z_env] is unset). Raise [InvalidCPos] if [nm_codepos] is
+   * not valid for [stmt].
+   *)
+  val zipper_of_nm_cpos : nm_codepos -> stmt -> zipper
+
   (* Return the zipper for the stmt [stmt] from the start of the code position
    * range [codepos_range]. It also returns a code position relative to
    * the zipper that represents the final position in the range.
