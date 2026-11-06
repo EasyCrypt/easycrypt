@@ -7,10 +7,10 @@ open EcFol
 open EcPV
 
 (* -------------------------------------------------------------------- *)
-(* Semantic sampling of a straight-line statement, shared by the [rndsem]
-   rules of every logic: [s] (assignments and samplings only, no global
-   write) is read as the single sampling [wr <$ D(s)] of the variables it
-   writes, [D(s)] being [s] as nested [dlet] / [dunit]. *)
+(* Semantic sampling of a straight-line statement, used by the [rndsem]
+   program transformation ([EcTrRndSem]): [s] (assignments and samplings
+   only, no global write) is read as the single sampling [wr <$ D(s)] of
+   the variables it writes, [D(s)] being [s] as nested [dlet] / [dunit]. *)
 exception InvalidSemRnd
 
 let semrnd env (mem : memenv) (used : PV.t option) (s : instr list) =

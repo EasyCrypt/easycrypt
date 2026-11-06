@@ -4,7 +4,7 @@ open EcCoreGoal.FApi
 open EcMatching.Position
 
 (* ==================================================================== *)
-(* Rules (trusted)                                                      *)
+(* Derived tactics                                                      *)
 
 type hoare_rndsem_rule = {
   hrsr_at     : codegap1;   (* start k of the suffix *)
@@ -12,26 +12,17 @@ type hoare_rndsem_rule = {
 }
 
 (* [t_hoare_rndsem { hrsr_at = k; hrsr_reduce = red }] — semantic sampling
-   of a straight-line suffix:
+   of the straight-line suffix [c2] of [hoare [c1; c2 : P ==> Q]], with
+   [c1 = c[0..k)]. Resolves [k] to an index, fails with "exceptions are not
+   supported" when the goal has an exceptional postcondition, then applies
 
-       hoare [c1; wr <$ D(c2) : P ==> Q]
-     -------------------------------------  c = c1; c2   (c1 = c[0..k))
-             hoare [c : P ==> Q]
+     [EcHoareTransform.t_hoare_transform] with
+       [EcTrRndSem.TrRndSem { trrs_at = k (resolved); trrs_reduce = red }]
 
-   where [c2] consists of assignments and samplings only and writes no
-   global, [wr] are the variables written by [c2] — only those occurring
-   in [Q] when [red] — and [D(c2)] is the distribution of their final
-   values, [c2] read as nested [dlet] / [dunit] (see [EcPlRndSem.semrnd]).
-   When [wr] is empty, a fresh [unit] variable is added to the memory and
-   sampled instead. Side condition: no exceptional postcondition.
+   (no obligation), giving  hoare [c1; wr <$ D(c2) : P ==> Q]  (failing
+   with "semrnd" when [c2] is not straight-line or writes a global).
 
-   This rule rewrites the suffix [c2] in place, keeping the prefix [c1]: it
-   is a program transformation (replacing [c2] by an equivalent sampling),
-   which is not expressible through [seq] without an intermediate assertion
-   after [c1] that the tactic does not have.
-
-   Node: [RHoareRndSem { hrsn_at = k (resolved index); hrsn_reduce = red }].
-   Checker: "hoare-rndsem". *)
+   Visible goal: the transformed judgement. Emits no node of its own. *)
 val t_hoare_rndsem : hoare_rndsem_rule -> backward
 
 (* ==================================================================== *)

@@ -8,10 +8,11 @@ open EcMatching.Position
 open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
-(* The [rnd] and [rndsem] rules live, one module per logic, in
-   [rules/<logic>/]: each owns its parameter records, pure subgoal builder,
-   recheckable proof-node, checker, derived forms and elaboration. This
-   module only keeps the legacy entry points (adapters onto those modules,
+(* The [rnd] rules live, one module per logic, in [rules/<logic>/]: each
+   owns its parameter records, pure subgoal builder, recheckable
+   proof-node, checker, derived forms and elaboration. The [rndsem] tactic
+   ([Ec<Logic>RndSem]) is derived from the transformation rule of each
+   logic ([Ec<Logic>Transform], entry [EcTrRndSem]). This module only keeps the legacy entry points (adapters onto those modules,
    so external callers and this module's interface are unchanged) and the
    logic-agnostic dispatchers. *)
 
