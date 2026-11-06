@@ -387,7 +387,14 @@ Current catalogue:
   at a resolved path to a gap `t` outside it; the independence of the
   exchanged statements and the absence of `raise` are checked by the entry;
   no obligation, same memory), used by `swap` (and `interleave`, a sequence
-  of swaps) in every logic.
+  of swaps) in every logic;
+- `inline` (`EcTrInline`, inlining the calls selected by a resolved pattern
+  of integer offsets, possibly nested in the branches of an `if`, `while` or
+  `match`: arguments assigned to fresh copies of the parameters, body with
+  parameters and locals renamed to fresh program variables added to the
+  memory, result assigned (component-wise through fresh variables for a
+  tuple pattern without `tuple`); no obligation), used by `inline` in every
+  logic.
 
 The decisions of a conditional or a match are computed by `EcPlRCond`.
 The `if` and `match` tactics are push + rule on the conditional alone: they
@@ -395,8 +402,7 @@ push the continuation into the branches (when there is one) through the
 transformation rule (on each side, for the two-sided equiv forms), then
 apply the `if` / `match` rule of their logic (`Ec<Logic>If`,
 `Ec<Logic>Match`), stated on the conditional alone. Further entries come
-with the tactics that use them: inline, kill/alias/cfold/set and proc
-rewrite.
+with the tactics that use them: kill/alias/cfold/set and proc rewrite.
 
 Exception: the framed form of `match C k` (used when the variables of the
 discriminant `e` are neither read nor written by the prefix, and the

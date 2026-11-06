@@ -5,18 +5,22 @@ open EcMaps
 open EcLocation
 open EcPath
 open EcAst
-open EcTypes
 open EcModules
-open EcFol
-open EcEnv
-open EcPV
 
 open EcCoreGoal
 open EcLowGoal
-open EcLowPhlGoal
 
 (* -------------------------------------------------------------------- *)
-type i_pat =
+(* The [inline] tactic is derived: it resolves the calls to inline to a
+   pattern of integer offsets and applies the [inline] program
+   transformation ([EcTrInline]) through the transformation rule of the
+   goal's logic ([Ec<Logic>Transform]; equiv: one side at a time). The
+   derived tactic is the same in every logic, so this module holds it
+   directly (one line per logic), with the resolution and the
+   elaboration. *)
+
+(* -------------------------------------------------------------------- *)
+type i_pat = EcTrInline.i_pat =
   | IPpat
   | IPif    of s_pat pair
   | IPwhile of s_pat
@@ -25,219 +29,21 @@ type i_pat =
 and s_pat = (int * i_pat) list
 
 (* -------------------------------------------------------------------- *)
-module LowSubst = struct
-  let pvsubst m pv =
-    odfl pv (PVMap.find pv m)
+let tr_inline ~use_tuple sp =
+  EcTrInline.TrInline { tri_pat = sp; tri_use_tuple = use_tuple }
 
-  let rec esubst m e =
-    match e.e_node with
-    | Evar pv -> e_var (pvsubst m pv) e.e_ty
-    | _ -> EcTypes.e_map (fun ty -> ty) (esubst m) e
+let t_inline_hoare ~use_tuple sp =
+  EcHoareTransform.t_hoare_transform { htr_tr = tr_inline ~use_tuple sp }
 
-  let lvsubst m lv =
-    match lv with
-    | LvVar   (pv, ty)       -> LvVar (pvsubst m pv, ty)
-    | LvTuple pvs            -> LvTuple (List.map (fst_map (pvsubst m)) pvs)
+let t_inline_ehoare ~use_tuple sp =
+  EcEHoareTransform.t_ehoare_transform { ehtr_tr = tr_inline ~use_tuple sp }
 
-  let rec isubst m (i : instr) =
-    let esubst = esubst m in
-    let ssubst = ssubst m in
+let t_inline_bdhoare ~use_tuple sp =
+  EcBdHoareTransform.t_bdhoare_transform { btr_tr = tr_inline ~use_tuple sp }
 
-    match i.i_node with
-    | Sasgn  (lv, e)     -> i_asgn   (lvsubst m lv, esubst e)
-    | Srnd   (lv, e)     -> i_rnd    (lvsubst m lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst m), f, List.map esubst es)
-    | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
-    | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
-    | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
-    | Sraise e           -> i_raise  (esubst e)
-    | Sabstract _        -> i
-
-  and issubst m (is : instr list) =
-    List.Smart.map (isubst m) is
-
-  and ssubst m (st : stmt) =
-    stmt (issubst m st.s_node)
-end
-
-(* --------------------------------------------------------------------- *)
-module LowInternal = struct
-  let inline ~use_tuple tc me sp s =
-    let hyps = FApi.tc1_hyps tc in
-    let env  = LDecl.toenv hyps in
-
-    let inline1 ~inloop me lv p args =
-      let p = EcEnv.NormMp.norm_xfun env p in
-      let f = EcEnv.Fun.by_xpath p env in
-      let fdef =
-        match f.f_def with
-        | FBdef def -> def
-        | _ -> begin
-            tc_error_lazy !!tc (fun fmt ->
-              let ppe = EcPrinting.PPEnv.ofenv env in
-                Format.fprintf fmt
-                  "abstract function `%a' cannot be inlined"
-                  (EcPrinting.pp_funname ppe) p)
-        end
-      in
-
-      (* The callee's parameters and locals become fresh variables of the
-       * caller. Outside of a loop, these variables are never written
-       * before the inlined body, and hence hold, as the callee's locals,
-       * an unconstrained initial value. Inside a loop body, they are
-       * shared by all iterations and start with the value left by the
-       * previous one, whereas a call starts with fresh locals. Inlining
-       * is then only sound if the callee never reads a local before
-       * writing it (parameters are written by the prelude): the inlined
-       * code does not depend on the initial value of these variables. *)
-      if inloop then begin
-        let uninit = get_uninit_read_of_fun f in
-        if not (EcSymbols.Ssym.is_empty uninit) then
-          tc_error_lazy !!tc (fun fmt ->
-            let ppe = EcPrinting.PPEnv.ofenv env in
-              Format.fprintf fmt
-                "function `%a' cannot be inlined inside a loop: \
-                 it may use the uninitialized local variable(s): %a"
-                (EcPrinting.pp_funname ppe) p
-                (EcPrinting.pp_list ", " EcSymbols.pp_symbol)
-                (EcSymbols.Ssym.elements uninit))
-      end;
-      let _params =
-        let named_arg ov =
-          match ov.ov_name with
-          | None   -> assert false
-          | Some v -> { v_name = v; v_type = ov.ov_type }
-        in List.map named_arg f.f_sig.fs_anames
-      in
-      let me, anames = EcMemory.bindall_fresh f.f_sig.fs_anames me in
-      let me, lnames = EcMemory.bindall_fresh (List.map ovar_of_var fdef.f_locals) me in
-      let subst =
-        let for1 mx v x =
-          PVMap.add (pv_loc (oget v.ov_name)) (pv_loc (oget x.ov_name)) mx
-        in
-        let mx = PVMap.create env in
-        let mx = List.fold_left2 for1 mx f.f_sig.fs_anames anames in
-        let mx = List.fold_left2 for1 mx (List.map ovar_of_var fdef.f_locals) lnames in
-        mx
-      in
-
-      let prelude =
-        let newpv = List.map (fun x -> pv_loc (oget x.ov_name), x.ov_type) anames in
-        if List.length newpv = List.length args then
-          List.map2 (fun npv e -> i_asgn (LvVar npv, e)) newpv args
-        else
-          match newpv with
-          | [x] -> [i_asgn(LvVar x, e_tuple args)]
-          | _   -> [i_asgn(LvTuple newpv, e_tuple args)]
-      in
-
-      let body = LowSubst.ssubst subst fdef.f_body in
-
-      let me, resasgn =
-        match fdef.f_ret, lv with
-        | None, _ -> me , []
-        | Some _, None -> me, []
-        | Some r, Some (LvTuple lvs) when not use_tuple ->
-          let r = LowSubst.esubst subst r in
-          let vlvs =
-            List.map (fun (x,ty) -> { ov_name = Some (symbol_of_pv x); ov_type = ty}) lvs in
-          let me, auxs = EcMemory.bindall_fresh vlvs me in
-          let auxs = List.map (fun v -> pv_loc (oget v.ov_name), v.ov_type) auxs in
-          let s1 =
-            let doit i auxi = i_asgn(LvVar auxi, e_proj_simpl r i (snd auxi)) in
-            List.mapi doit auxs in
-          let s2 =
-            List.map2 (fun lv (pv, ty) -> i_asgn(LvVar lv, e_var pv ty)) lvs auxs in
-          me, s1 @ s2
-
-        | Some r, Some lv ->
-          let r = LowSubst.esubst subst r in
-          me, [i_asgn (lv, r)] in
-
-      me, prelude @ body.s_node @ resasgn in
-
-    let rec inline_i ~inloop me ip i =
-      match ip, i.i_node with
-      | IPpat, Scall (lv, p, args) ->
-          inline1 ~inloop me lv p args
-      | IPif (sp1, sp2), Sif (e, s1, s2) ->
-          let me, s1 = inline_s ~inloop me sp1 s1.s_node in
-          let me, s2 = inline_s ~inloop me sp2 s2.s_node in
-          me, [i_if (e, stmt s1, stmt s2)]
-      | IPwhile sp, Swhile (e, s) ->
-          let me, s = inline_s ~inloop:true me sp s.s_node in
-          me, [i_while (e, stmt s)]
-      | IPmatch sps, Smatch (e, bs) ->
-          let me, bs = List.fold_left_map (fun me (sp, (xs, s)) ->
-              let me, s = inline_s ~inloop me sp s.s_node in (me, (xs, stmt s)))
-            me (List.combine sps bs)
-          in me, [i_match (e, bs)]
-
-      | _, _ -> assert false (* FIXME error message *)
-
-    and inline_s ~inloop me sp s =
-      match sp with
-      | [] -> me, s
-      | (toskip, ip)::sp ->
-        let r, i, s = List.pivot_at toskip s in
-        let me, si = inline_i ~inloop me ip i in
-        let me, s  = inline_s ~inloop me sp s in
-        (me, List.rev_append r (si @ s))
-
-    in
-
-    snd_map stmt (inline_s ~inloop:false me sp s.s_node)
-end
-
-(* -------------------------------------------------------------------- *)
-let t_inline_hoare_r ~use_tuple sp tc =
-  let hs           = tc1_as_hoareS tc in
-  let (_,mt), stmt = LowInternal.inline ~use_tuple tc hs.hs_m sp hs.hs_s in
-  let concl        = f_hoareS mt (hs_pr hs) stmt (hs_po hs) in
-
-  FApi.xmutate1 tc `Inline [concl]
-
-(* -------------------------------------------------------------------- *)
-let t_inline_ehoare_r ~use_tuple sp tc =
-  let ehs          = tc1_as_ehoareS tc in
-  let (_,mt), stmt = LowInternal.inline ~use_tuple tc ehs.ehs_m sp ehs.ehs_s in
-  let concl        = f_eHoareS mt (ehs_pr ehs) stmt (ehs_po ehs) in
-
-  FApi.xmutate1 tc `Inline [concl]
-
-(* -------------------------------------------------------------------- *)
-let t_inline_bdhoare_r ~use_tuple sp tc =
-  let bhs           = tc1_as_bdhoareS tc in
-  let (_, mt), stmt = LowInternal.inline ~use_tuple tc bhs.bhs_m sp bhs.bhs_s in
-  let concl         = f_bdHoareS mt (bhs_pr bhs) stmt (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
-
-
-  FApi.xmutate1 tc `Inline [concl]
-
-(* -------------------------------------------------------------------- *)
-let t_inline_equiv_r ~use_tuple side sp tc =
-  let es = tc1_as_equivS tc in
-  let concl =
-    match side with
-    | `Left  ->
-        let ((_,mt), stmt) = LowInternal.inline ~use_tuple tc es.es_ml sp es.es_sl in
-          f_equivS mt (snd es.es_mr) (es_pr es) stmt es.es_sr (es_po es)
-    | `Right ->
-        let ((_,mt), stmt) = LowInternal.inline ~use_tuple tc es.es_mr sp es.es_sr in
-          f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl stmt (es_po es)
-  in
-
-  FApi.xmutate1 tc `Inline [concl]
-
-(* -------------------------------------------------------------------- *)
-let t_inline_hoare ~use_tuple =
-  FApi.t_low1 "hoare-inline"   (t_inline_hoare_r ~use_tuple)
-let t_inline_ehoare  ~use_tuple =
-  FApi.t_low1 "hoare-inline"   (t_inline_ehoare_r ~use_tuple)
-let t_inline_bdhoare ~use_tuple =
-  FApi.t_low1 "bdhoare-inline" (t_inline_bdhoare_r ~use_tuple)
-let t_inline_equiv ~use_tuple =
-  FApi.t_low2 "equiv-inline"   (t_inline_equiv_r ~use_tuple)
+let t_inline_equiv ~use_tuple side sp =
+  EcEquivTransform.t_equiv_transform
+    { etr_side = side; etr_tr = tr_inline ~use_tuple sp }
 
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
