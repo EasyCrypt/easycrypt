@@ -333,11 +333,11 @@ parameterized by an entry of a **catalogue** of transformations:
   (`EcPlTransform.register`, a registry of partial handlers like the rule
   checkers). An entry is a pure, deterministic function of a context and of
   the statement `c`; it acts at the statement level only and may extend the
-  memory with fresh program variables. Its context holds the environment, the
-  memory of `c` and what it needs from the judgement — so far the program
-  variables read by the postcondition — computed by each logic's rule from its
-  own judgement, so that the checker recomputes it from the goal (a recorded
-  set is never trusted). `EcPlTransform.apply` runs an entry, raising
+  memory with fresh program variables. Its context holds the hypotheses and
+  environment of the goal, the memory of `c` and what it needs from the
+  judgement — so far the program variables read by the postcondition —
+  computed by each logic's rule from its own judgement, so that the checker
+  recomputes it from the goal (a recorded set is never trusted). `EcPlTransform.apply` runs an entry, raising
   `InvalidTransform` with a user-facing message when it does not apply.
   Entries live in `rules/transforms/`, one module `EcTr<Name>` each.
 - **The obligations** are **abstract** and form a small closed set; each
@@ -360,6 +360,28 @@ parameterized by an entry of a **catalogue** of transformations:
     every state; in every logic `phoare [ks : true ==> true] = 1`, in the
     memory of the transformed program (the premise `kill` has always
     stated).
+  - `OExprEq (xs, e, e')`: in every memory of the transformed program's
+    type and for every value of the local identifiers `xs`, `e` and `e'`
+    evaluate to the same value; in every logic `forall &m, forall xs, e =
+    e'`, `&m` named after the program's memory (the premises `proc
+    rewrite` has always stated, one per rewritten expression).
+  - `OLocalEquiv (xs, s, s', R, W, M)`: for every value of the match-arm
+    locals `xs` in scope, from states agreeing on `R` (and satisfying, on
+    the side of `s`, the frame), the fragment `s` of the program and the
+    new fragment `s'` end in states agreeing on `W`; in every logic
+    `forall xs, equiv [s ~ s' : ={R} /\ F{1} ==> ={W}]`, left memory
+    type that of the program, right that of the transformed program (the
+    premise `proc change` has always stated). The frame `F` is the
+    obligation depending on the precondition: it is computed by each
+    rule from its own precondition (`EcPlTransform.frame`), as the
+    top-level conjuncts of the boolean precondition that only mention the
+    memory of the program and are independent from `M` (what may be
+    written before `s` runs):
+    - hoare, bdhoare: the precondition;
+    - ehoare: the boolean part `P` of a precondition ``P `|` f``, no frame
+      otherwise;
+    - equiv (transformation of side `i`): the relational precondition,
+      the conjuncts mentioning only the memory of side `i`.
 - **The rules** `t_<logic>_transform` (`rules/<logic>/Ec<Logic>Transform`;
   equiv: one side at a time, the other program and memory unchanged) record
   `(transformation, resolved parameters)` (and the side) in their node. The
@@ -434,7 +456,31 @@ Current catalogue:
   for` stays derived: rcond, wp, seq, conseq, cfold);
 - `splitwhile` (`EcTrSplitWhile`): `while e do c` becomes
   `while (e /\ b) do c; while e do c`; no obligation; used by
-  `splitwhile`.
+  `splitwhile`;
+- `expr-change` (`EcTrExprChange`): replaces expressions of a — possibly
+  nested — range (or of the whole statement), enumerated in program
+  order, each replacement being stated over identifiers recorded for the
+  match-arm locals in scope (renamed back in the program, with
+  type and capture side conditions); obligation `OExprEq` per replaced
+  expression; used by `proc rewrite` and `proc rewrite /=` in every
+  logic, which discharge the obligations on the spot;
+- `stmt-change` (`EcTrStmtChange`): replaces a — possibly nested — range
+  by a statement over the memory extended with fresh locals (bound by the
+  entry with `EcMemory.bindall_fresh`, deterministically); obligation
+  `OLocalEquiv` between the two fragments, on the variables read by both
+  and the written variables observable afterwards (by the code that may
+  run after the range, the postcondition, and, in a loop, the fragments
+  themselves); used by `proc change` in every logic;
+- `circuit-change` (`EcTrCircuitChange`): replaces the `n` instructions
+  at a — possibly nested — position by a statement over fresh locals,
+  provided that they are circuit-equivalent (`EcCircuits.instrs_equiv`,
+  run by the entry, under the context's hypotheses) on the variables
+  observable afterwards; assignments to local variables only, hence no
+  `raise` (the entry is sound with exceptional postconditions, whose
+  variables are observable); no obligation; used by `proc change
+  circuit` (hoare only);
+- `idassign` (`EcTrIdAssign`): inserts `x <- x` at a — possibly nested —
+  position; no obligation; used by `idassign` (hoare only).
 
 The decisions of a conditional or a match are computed by `EcPlRCond`.
 The `if` and `match` tactics are push + rule on the conditional alone: they
@@ -442,7 +488,7 @@ push the continuation into the branches (when there is one) through the
 transformation rule (on each side, for the two-sided equiv forms), then
 apply the `if` / `match` rule of their logic (`Ec<Logic>If`,
 `Ec<Logic>Match`), stated on the conditional alone. Further entries come
-with the tactics that use them: proc rewrite / change.
+with the tactics that use them.
 
 Exception: the framed form of `match C k` (used when the variables of the
 discriminant `e` are neither read nor written by the prefix, and the

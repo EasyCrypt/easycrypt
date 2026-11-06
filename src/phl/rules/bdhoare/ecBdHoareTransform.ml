@@ -29,6 +29,7 @@ let bdhoare_transform_subgoals
   let env = LDecl.toenv hyps in
   let m   = fst bhs.bhs_m in
   let ctxt = {
+    trc_hyps = hyps;
     trc_env  = env;
     trc_me   = bhs.bhs_m;
     trc_post = lazy (EcPV.PV.fv env m (bhs_po bhs).inv);
@@ -41,7 +42,11 @@ let bdhoare_transform_subgoals
         f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd (POE.lift cond)
     | OLossless ks ->
         f_bdHoareS (snd bhs.bhs_m)
-          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 } in
+          { m; inv = f_true } ks { m; inv = f_true } FHeq { m; inv = f_r1 }
+    | OExprEq o ->
+        f_expr_eq r.trr_me o
+    | OLocalEquiv o ->
+        f_local_equiv env bhs.bhs_m (snd r.trr_me) (Some (bhs_pr bhs).inv) o in
   List.map obligation r.trr_obl
   @ [f_bdHoareS (snd r.trr_me)
        (bhs_pr bhs) r.trr_s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs)]
