@@ -159,7 +159,10 @@ src/phl/
                 the single-call statement of `proc*`), EcPlCall (the
                 result assignment and argument substitution of a call),
                 EcPlWeakMem (restricting a memory weakened by fresh local
-                variables)
+                variables), EcPlExists (pulling the existentials of a
+                precondition to the front, quantifying a precondition
+                over values), EcPlECall (the elaboration of `ecall`:
+                typing the contract, abstracting its program variables)
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -190,6 +193,16 @@ uniform across logics or relate several judgements:
   variables it does not mention (the shared computation in
   `EcPlWeakMem`); the `weakmem` tactic is derived: a cut of the weakened
   hypothesis, closed by the rule and the hypothesis;
+- the existential rules (`Ec<Logic>Exists`, statement and procedure
+  forms) eliminate the existentials of a precondition (`elim*`):
+  `forall xs, J [P']` concludes `J [P]`, `P'` being `P` with its
+  existential binders pulled to the front (`EcPlExists`); `exists*` /
+  `exlim` are derived (the consequence rule, its premise closed by the
+  witnesses, then the elimination rule), and so is `ecall`
+  (`Ec<Logic>ECall`, hoare, bdhoare and equiv: the program variables of
+  the contract abstracted by the existential rules, `seq`, then the
+  `call` rule of the logic; the forward hoare form frames the
+  precondition with the split and frame rules);
 - a rule relating judgements of two logics (the `pr` bridges, `hoare` from
   `phoare`, …) lives with the logic of its conclusion;
 - a rule concluding a statement on probabilities from a judgement
