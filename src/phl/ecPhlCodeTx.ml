@@ -31,7 +31,8 @@ module TTC = EcProofTyping
    logic-agnostic dispatcher [t_transform] below, and no per-logic module.
 
    [weakmem] is not a program transformation (it changes the memory type
-   of the goal and adds an implication): it is not migrated. *)
+   of a hypothesis and adds an implication): it has its own rule in each
+   logic ([Ec<Logic>WeakMem], see [process_weakmem] below). *)
 
 (* -------------------------------------------------------------------- *)
 (* The memory and statement transformed: the program of the goal (hoare,
@@ -180,11 +181,17 @@ let process_set_match (side, cpos, id, pattern) tc =
     tc
 
 (* -------------------------------------------------------------------- *)
+(* [weakmem h (xs : t)]: the hypothesis [h], a judgement on a statement,
+   weakened by the fresh local variables [xs] (in the memory of the given
+   side for equiv, both memories by default), is added as a premise of the
+   goal. Derived in each logic (cut, then the [weakmem] rule of the logic
+   of [h], [Ec<Logic>WeakMem]); the variables are typed first, the logic
+   being then the one of [h]. *)
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
   let hyps = FApi.tc1_hyps tc in
   let env = FApi.tc1_env tc in
-  let _, f =
+  let h, f =
     try LDecl.hyp_by_name (unloc id) hyps
     with LDecl.LdeclError _ ->
       tc_lookup_error !!tc ~loc:id.pl_loc `Local ([], unloc id)
@@ -198,42 +205,28 @@ let process_weakmem (side, id, params) tc =
 
   let decls = List.map process_decl params in
 
-  let bind me =
-    try EcMemory.bindall decls me
-    with EcMemory.DuplicatedMemoryBinding x ->
-      tc_error ~loc:id.pl_loc !!tc "variable %s already declared" x in
-
-  let h =
+  let t =
     match f.f_node with
-    | FhoareS hs ->
-      let _, mt = bind hs.hs_m in
-      f_hoareS mt (hs_pr hs) hs.hs_s (hs_po hs)
+    | FhoareS _ ->
+      EcHoareWeakMem.t_hoare_weakmem_hyp h { hwm_vars = decls }
 
-    | FeHoareS hs ->
-      let _, mt = bind hs.ehs_m in
-      f_eHoareS mt (ehs_pr hs) hs.ehs_s (ehs_po hs)
+    | FeHoareS _ ->
+      EcEHoareWeakMem.t_ehoare_weakmem_hyp h { ehwm_vars = decls }
 
-    | FbdHoareS hs ->
-      let _, mt = bind hs.bhs_m in
-      f_bdHoareS mt (bhs_pr hs) hs.bhs_s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
+    | FbdHoareS _ ->
+      EcBdHoareWeakMem.t_bdhoare_weakmem_hyp h { bwm_vars = decls }
 
-    | FequivS es ->
-      let do_side side (ml, mr) =
-        let es_ml, es_mr = if side = `Left then bind ml, mr else ml, bind mr in
-        (es_ml, es_mr)
-      in
-      let ((_, mtl), (_, mtr)) =
-        match side with
-        | None -> do_side `Left (do_side `Right (es.es_ml, es.es_mr))
-        | Some side -> do_side side (es.es_ml, es.es_mr) in
-      f_equivS mtl mtr (es_pr es) es.es_sl es.es_sr (es_po es)
+    | FequivS _ ->
+      EcEquivWeakMem.t_equiv_weakmem_hyp h side decls
 
     | _ ->
       tc_error ~loc:id.pl_loc !!tc
         "the hypothesis need to be a hoare/phoare/ehoare/equiv on statement"
   in
-  let concl = f_imp h (FApi.tc1_goal tc) in
-  FApi.xmutate1 tc `WeakenMem [concl]
+
+  try t tc
+  with EcMemory.DuplicatedMemoryBinding x ->
+    tc_error ~loc:id.pl_loc !!tc "variable %s already declared" x
 
 (* -------------------------------------------------------------------- *)
 (* [case <- p]: split the tuple assignment at [p]. The checks done before
