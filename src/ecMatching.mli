@@ -110,6 +110,9 @@ module Position : sig
 
   val normalize_cpos : env ->  codepos -> stmt -> (env * stmt) * nm_codepos
 
+  (* The code position denoting a normalized one (absolute positions only). *)
+  val cpos_of_nm_cpos : nm_codepos -> codepos
+
   val cpos1 : int -> codepos1
 
   (* --- Gap types --- *)
