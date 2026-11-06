@@ -154,7 +154,9 @@ src/phl/
                 (semantic sampling), EcPlRCond (deciding a conditional or
                 a match), EcPlTransform (the transformation catalogue and
                 its obligations), EcPlMatch (branches of a `match` on
-                fresh program variables)
+                fresh program variables), EcPlFun (unfolding a procedure,
+                the oracle conditions of the abstract-procedure rules,
+                the single-call statement of `proc*`)
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -167,6 +169,12 @@ uniform across logics or relate several judgements:
   (`EcHoareWp`, `EcEquivSp`, …), the shared computation being in
   `EcPlWp` / `EcPlSp`;
 - `sym` and `trans` are equiv-only rules, in `rules/equiv/`;
+- the `proc` rules are logic rules in `rules/<logic>/`: `Ec<Logic>FunDef`
+  (a concrete procedure, by its body), `Ec<Logic>FunAbs` (an abstract
+  procedure with an invariant, stated on `[f : I ==> I]`, `proc I` being
+  the consequence rule then the rule), `EcEquivFunAbsUpto` (the abstract
+  upto rule) and `Ec<Logic>FunToCode` (`proc*`, also `EcEagerFunToCode`
+  in `rules/eager/`);
 - a rule relating judgements of two logics (the `pr` bridges, `hoare` from
   `phoare`, …) lives with the logic of its conclusion;
 - program transformations go through the transformation rule of each logic
