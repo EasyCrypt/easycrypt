@@ -338,10 +338,11 @@ while (i = x /\ test = X) (if test x r then 1 else 0) 1 (mu (dt x) (predC (X x))
   + by wp; rnd.
   by conseq ih=> &m' />; smt(ge0_mu dexceptedE).
 + by auto.
-split.
-+ by move=> &m' />; rewrite mu_not #smt:(mu_bounded).
-move=> z; conseq (: _ ==> !X x r)=> />.
-by rnd; skip.
++ split.
+  + by move=> &m' />; rewrite mu_not #smt:(mu_bounded).
+  move=> z; conseq (: _ ==> !X x r)=> />.
+  by rnd; skip.
+by move=> &m' _; case: (X x r{m'}) => _ /=; [exact: le1_mu | case: (P r{m'})].
 qed.
 
 lemma phoare_sampleWi P :
