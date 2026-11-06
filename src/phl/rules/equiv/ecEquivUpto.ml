@@ -11,7 +11,6 @@ open EcFol
 open EcCoreGoal
 open EcLowGoal
 open EcHiGoal
-open EcPhlPrRw
 open EcCoreLib.CI_Real
 
 (* -------------------------------------------------------------------- *)
@@ -381,16 +380,15 @@ let destr_sub_maxr f1 f2 =
   let fe2nb = f_pr pre2.pr_mem pre2.pr_fun pre2.pr_args fenb in
   fe1, fe1b, fe1nb, fe2, fe2b, fe2nb, fbad, fe1b', fe2b'
 
-(* TEMPORARY: the facts on probabilities are closed by [rewrite Pr], from
-   the not-yet-migrated [EcPhlPrRw]. *)
+(* The facts on probabilities are closed by [rewrite Pr]. *)
 let t_split_pr fbad =
-  t_pr_rewrite_i ("mu_split", Some fbad) @! t_trivial
+  EcBdHoarePrFact.t_pr_rewrite ("mu_split", Some fbad) @! t_trivial
 
 let t_ge0_pr =
-  t_pr_rewrite_i ("mu_ge0", None) @! t_trivial
+  EcBdHoarePrFact.t_pr_rewrite ("mu_ge0", None) @! t_trivial
 
 let t_sub_pr =
-  t_pr_rewrite_i ("mu_sub", None) @! t_trivial
+  EcBdHoarePrFact.t_pr_rewrite ("mu_sub", None) @! t_trivial
 
 let process_upto (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in

@@ -168,5 +168,8 @@ src/phl/
 - The upto rule of `byupto` (`EcEquivUpto`, a premise-free rule concluding
   `Pr[f1 : E /\ !bad] = Pr[f2 : E /\ !bad]` for procedures equal up to
   `bad`) is relational: it lives in `rules/equiv/`.
+- The facts on probabilities of `rewrite Pr` (`EcBdHoarePrFact`, a
+  premise-free axiom schema on the probabilities of one procedure) live
+  in `rules/bdhoare/`; `rewrite Pr` itself is derived.
 - Program transformations use the transformation rule of each logic; only
   their catalogue entries live in `rules/transforms/`.
