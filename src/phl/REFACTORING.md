@@ -185,6 +185,10 @@ uniform across logics or relate several judgements:
   `rules/bdhoare/`; it is stated on the whole procedure body (an implicit
   seq at the end of the initialization, there being no seq rule on
   probabilities);
+- the upto rule (`EcEquivUpto`, `byupto`), whose conclusion is an
+  equality of probabilities of two procedures, is relational and lives in
+  `rules/equiv/`; the forms of `byupto` other than `Pr[_] = Pr[_]` are
+  derived (a lemma of the real theory, the rule and `rewrite Pr`);
 - program transformations go through the transformation rule of each logic
   (`Ec<Logic>Transform`); only their catalogue entries live in
   `rules/transforms/`.
