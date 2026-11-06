@@ -29,11 +29,14 @@ open EcEnv
    logic's rule states them as premises of its own (see its [.mli]).
 
    Current catalogue: [EcTrRndSem] (semantic sampling of a straight-line
-   suffix), [EcTrRCond] (deciding an [if] / [while]) and [EcTrRMatch]
-   (deciding a [match], its unframed form). Entries live in
-   [rules/transforms/], as [EcTr<Name>]. The framed form of [match C k]
-   changes the precondition: it is not a transformation, but a separate
-   rule of each logic ([Ec<Logic>RMatch]). *)
+   suffix), [EcTrRCond] (deciding an [if] / [while]), [EcTrRMatch]
+   (deciding a [match], its unframed form), [EcTrIfPush] and
+   [EcTrMatchPush] (pushing the continuation of a leading conditional /
+   [match] into its branches; the [if] and [match] tactics are push + rule
+   on the conditional alone). Entries live in [rules/transforms/], as
+   [EcTr<Name>]. The framed form of [match C k] changes the precondition:
+   it is not a transformation, but a separate rule of each logic
+   ([Ec<Logic>RMatch]). *)
 
 (* -------------------------------------------------------------------- *)
 (* An entry of the catalogue, with its resolved parameters. *)
