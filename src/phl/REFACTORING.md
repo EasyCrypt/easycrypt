@@ -382,7 +382,12 @@ Current catalogue:
   the single instruction `match e with C xs => { b; c } ...`; no
   obligation. The pattern variables are local identifiers bound in the
   branch only: the binders of a branch are renamed apart when they occur
-  free in `c`, so that `c` is not captured.
+  free in `c`, so that `c` is not captured;
+- `swap` (`EcTrSwap`, moving the block `[s..f)` of the possibly nested block
+  at a resolved path to a gap `t` outside it; the independence of the
+  exchanged statements and the absence of `raise` are checked by the entry;
+  no obligation, same memory), used by `swap` (and `interleave`, a sequence
+  of swaps) in every logic.
 
 The decisions of a conditional or a match are computed by `EcPlRCond`.
 The `if` and `match` tactics are push + rule on the conditional alone: they
@@ -390,8 +395,8 @@ push the continuation into the branches (when there is one) through the
 transformation rule (on each side, for the two-sided equiv forms), then
 apply the `if` / `match` rule of their logic (`Ec<Logic>If`,
 `Ec<Logic>Match`), stated on the conditional alone. Further entries come
-with the tactics that use them: swap, inline, kill/alias/cfold/set and
-proc rewrite.
+with the tactics that use them: inline, kill/alias/cfold/set and proc
+rewrite.
 
 Exception: the framed form of `match C k` (used when the variables of the
 discriminant `e` are neither read nor written by the prefix, and the

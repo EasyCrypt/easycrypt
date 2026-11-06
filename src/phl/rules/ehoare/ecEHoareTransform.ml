@@ -33,6 +33,7 @@ let ehoare_transform_subgoals
     trc_env  = env;
     trc_me   = hs.ehs_m;
     trc_post = lazy (EcPV.PV.fv env m (ehs_po hs).inv);
+    trc_exn  = false;
   } in
   let r = apply ctxt n.ehtr_tr hs.ehs_s in
   let pre () =

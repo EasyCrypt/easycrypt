@@ -4,8 +4,6 @@ open EcParsetree
 open EcLocation
 open EcAst
 open EcModules
-open EcFol
-open EcPV
 open EcMatching.Position
 open EcCoreGoal
 open EcLowGoal
@@ -17,133 +15,60 @@ type swap_kind = {
 }
 
 (* -------------------------------------------------------------------- *)
-module LowInternal = struct
-  (* [exn] holds when the goal observes exceptions (a hoare goal whose
-     postcondition constrains some exception, see
-     [EcLowPhlGoal.hs_observes_exn]). Swapping two independent blocks
-     preserves the final state of the runs that terminate normally, but
-     not the state in which an exception is raised: if one of the blocks
-     raises, the other one has run (or not) before. Hence:
-     - blocks that contain a [raise] are never swapped;
-     - when the goal observes exceptions, blocks that may raise (through
-       a procedure call, see [EcLowPhlGoal.s_may_raise]) are not swapped
-       either. Otherwise, raising is as good as not terminating, which
-       the swap preserves. *)
-  let check_swap
-      (pf : proofenv) ~(exn : bool) (env : EcEnv.env) (s1 : stmt) (s2 : stmt)
-  =
-    let is_contains_raise =
-      let exception HasRaise in
+(* [swap] is derived in every logic: the positions are resolved here
+   (failing as before the migration when they are invalid), then the
+   [swap] program transformation ([EcTrSwap], which checks the
+   independence of the exchanged statements) is applied through the
+   transformation rule of the logic. The derived tactic is the same in
+   every logic, hence a single dispatcher on the goal kind. *)
+let resolve_swap (pf : proofenv) (env : EcEnv.env) (info : swap_kind) (s : stmt) =
+  let zpr, _, (path, (start, fin)) = try
+    EcMatching.Zipper.zipper_and_split_of_cgap_range env info.interval s
+  with InvalidCPos ->
+    tc_error_lazy pf (fun fmt ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.fprintf fmt "invalid range: %a" (EcPrinting.pp_codegap_range ppe) info.interval
+    )
+  in
 
-      let rec i_contains_raise (i : instr) =
-        match i.i_node with
-        | Sraise _ -> raise HasRaise
-        | _ -> EcModules.i_iter i_contains_raise i in
+  let env = odfl env zpr.z_env in
+  let s = stmt (List.rev_append zpr.z_head zpr.z_tail) in
 
-      fun (s : stmt) ->
-        try
-          List.iter i_contains_raise s.s_node;
-          false
-        with HasRaise -> true in
+  let target = try
+    resolve_gap_offset env (start, fin) info.offset s
+  with InvalidCPos ->
+    tc_error pf "invalid offset for swap"
+  in
 
-    if List.exists is_contains_raise [s1; s2] then
-      tc_error pf "cannot swap blocks that contain exceptions";
-
-    if exn && List.exists (EcLowPhlGoal.s_may_raise env) [s1; s2] then
-      tc_error pf
-        "cannot swap blocks that may raise an exception \
-         (through a procedure call) when the postcondition \
-         constrains exceptions";
-
-    let m1,m2 = s_write env s1, s_write env s2 in
-    let r1,r2 = s_read  env s1, s_read  env s2 in
-    (* FIXME: this is not sufficient *)
-    let m2r1 = PV.interdep env m2 r1 in
-    let m1m2 = PV.interdep env m1 m2 in
-    let m1r2 = PV.interdep env m1 r2 in
-
-    let error mode d =
-      tc_error_lazy pf (fun fmt ->
-        Format.fprintf fmt
-          "the two statements are not independent, %t"
-          (fun fmt ->
-            let (s1, s2) =
-              match mode with
-              | `RW -> "reads" , "written"
-              | `WR -> "writes", "read"
-              | `WW -> "writes", "written"
-            in
-              Format.fprintf fmt
-                "the first statement %s %a which is %s by the second"
-                s1 (PV.pp env) d s2))
-    in
-      if not (PV.is_empty m2r1) then error `RW m2r1;
-      if not (PV.is_empty m1m2) then error `WW m1m2;
-      if not (PV.is_empty m1r2) then error `WR m1r2
-
-
-  let swap_stmt
-    (pf   : proofenv   )
-   ~(exn  : bool       )
-    (env  : EcEnv.env  )
-    (info : swap_kind  )
-    (s    : stmt       )
-  =
-    let zpr, _, (_, (start, fin)) = try
-      EcMatching.Zipper.zipper_and_split_of_cgap_range env info.interval s
-    with InvalidCPos ->
-      tc_error_lazy pf (fun fmt ->
-        let ppe = EcPrinting.PPEnv.ofenv env in
-        Format.fprintf fmt "invalid range: %a" (EcPrinting.pp_codegap_range ppe) info.interval
-      )
-    in
-
-    let env = odfl env zpr.z_env in
-    let s = stmt (List.rev_append zpr.z_head zpr.z_tail) in
-
-    let target = try
-      resolve_gap_offset env (start, fin) info.offset s
-    with InvalidCPos ->
-      tc_error pf "invalid offset for swap"
-    in
-
-    match split_by_nmcgaps
-      (if target <= start
-      then [target; start; fin]
-      else [start; fin; target]
-      ) s
-    with 
-    | [hd; s1; s2; tl] -> check_swap pf ~exn env (stmt s1) (stmt s2);
-      EcMatching.Zipper.zip
-        { zpr with z_head = []; z_tail = List.flatten [hd; s2; s1; tl] }
-    | _ -> assert false
-end
+  EcTrSwap.TrSwap { trsw_range = (path, (start, fin)); trsw_target = target; }
 
 (* -------------------------------------------------------------------- *)
-let t_swap_r (side : oside) (info : swap_kind) (tc : tcenv1) =
-  let env = FApi.tc1_env tc in
-  let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
-  let exn =
-    match (FApi.tc1_goal tc).f_node with
-    | FhoareS hs -> EcLowPhlGoal.hs_observes_exn (hs_po hs)
-    | _ -> false in
-  let stmt = LowInternal.swap_stmt !!tc ~exn env info stmt in
-  FApi.xmutate1 tc `Swap [EcLowPhlGoal.hl_set_stmt side (FApi.tc1_goal tc) stmt]
-
-(* -------------------------------------------------------------------- *)
-let t_swap = FApi.t_low2 "swap" t_swap_r
+let t_swap (side : oside) (info : swap_kind) (tc : tcenv1) =
+  let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let tr = resolve_swap !!tc (FApi.tc1_env tc) info s in
+  match side, (FApi.tc1_goal tc).f_node with
+  | None, FhoareS _ ->
+      EcHoareTransform.t_hoare_transform { htr_tr = tr } tc
+  | None, FeHoareS _ ->
+      EcEHoareTransform.t_ehoare_transform { ehtr_tr = tr } tc
+  | None, FbdHoareS _ ->
+      EcBdHoareTransform.t_bdhoare_transform { btr_tr = tr } tc
+  | Some side, FequivS _ ->
+      EcEquivTransform.t_equiv_transform { etr_side = side; etr_tr = tr } tc
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let rec process_swap1 (info : (oside * pswap_kind) located) (tc : tcenv1) =
   let side, pos = info.pl_desc in
   let concl = FApi.tc1_goal tc in
 
-  if is_equivS concl && Option.is_none side then
+  match side, concl.f_node with
+  | None, FequivS _ ->
     FApi.t_seq
       (process_swap1 { info with pl_desc = (Some `Left , pos)})
       (process_swap1 { info with pl_desc = (Some `Right, pos)})
       tc
-  else
+  | _ ->
     let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
     let env = EcEnv.Memory.push_active_ss me (FApi.tc1_env tc) in
 

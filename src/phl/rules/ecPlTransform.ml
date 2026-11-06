@@ -21,6 +21,7 @@ type tr_ctxt = {
   trc_env  : env;
   trc_me   : memenv;
   trc_post : EcPV.PV.t Lazy.t;
+  trc_exn  : bool;
 }
 
 type tr_result = {

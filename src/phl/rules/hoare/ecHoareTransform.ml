@@ -33,6 +33,7 @@ let hoare_transform_subgoals (hyps : LDecl.hyps) (hs : sHoareS) (n : hoare_trans
     trc_post = lazy (POE.fold
                        (fun fv f -> EcPV.PV.union fv (EcPV.PV.fv env m f))
                        EcPV.PV.empty po.hsi_inv);
+    trc_exn  = hs_observes_exn po;
   } in
   let r = apply ctxt n.htr_tr hs.hs_s in
   let obligation = function
