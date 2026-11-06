@@ -177,6 +177,9 @@ uniform across logics or relate several judgements:
   in `rules/eager/`);
 - a rule relating judgements of two logics (the `pr` bridges, `hoare` from
   `phoare`, …) lives with the logic of its conclusion;
+- a rule concluding a statement on probabilities from a judgement
+  (`byphoare`, `byehoare`, `byequiv`) lives with the logic of that
+  judgement (`EcBdHoareDeno`, `EcEHoareDeno`, `EcEquivDeno`);
 - program transformations go through the transformation rule of each logic
   (`Ec<Logic>Transform`); only their catalogue entries live in
   `rules/transforms/`.

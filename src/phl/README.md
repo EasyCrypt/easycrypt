@@ -157,5 +157,8 @@ src/phl/
   logic rules in `rules/<logic>/`; `proc I` is derived (consequence + rule).
 - A rule relating two logics (e.g. the `pr` bridges) lives with the logic of
   its conclusion.
+- A rule concluding a probability statement from a judgement (`byphoare`,
+  `byehoare`, `byequiv`: `Ec<Logic>Deno`) lives with the logic of that
+  judgement.
 - Program transformations use the transformation rule of each logic; only
   their catalogue entries live in `rules/transforms/`.
