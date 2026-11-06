@@ -71,7 +71,8 @@ let () =
    two-sided rule (the other side split at its end) followed by [conseq]
    steps that discharge the one-sided part.
 
-   TEMPORARY: depends on the not-yet-migrated [EcPhlConseq]. *)
+   TEMPORARY: the consequence rule still comes from the not-yet-migrated
+   [EcPhlConseq]. *)
 let t_equiv_seq_onesided side i pre post tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in

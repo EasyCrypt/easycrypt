@@ -139,7 +139,8 @@ let () =
    write the bounds [f2] / [g2]. This is what the surface [seq] tactic and the
    legacy positional entry (EcPhlSeq.t_bdhoare_seq) use.
 
-   TEMPORARY: depends on the not-yet-migrated [EcPhlConseq]. *)
+   TEMPORARY: the consequence rule still comes from the not-yet-migrated
+   [EcPhlConseq]. *)
 let t_bdhoare_seq_full (r : bdhoare_seq_rule) tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in

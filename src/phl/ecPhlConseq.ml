@@ -404,245 +404,52 @@ let t_conseq (pre : inv) (post : inv) (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 
 
-(* Build the non-modification side-condition for equivF:
- * universally quantify the pre-memories, substitute the result variables,
- * then generalize over program variables modified by each procedure.
- * Returns (cond, bound_mems, other_bindings). *)
+(* The notmod rules are the frame rules of [EcHoareFrame], [EcBdHoareFrame]
+   and [EcEquivFrame]; their conditions are built by [EcPlFrame]. The
+   functions below are adapters keeping this module's legacy entry points. *)
+
 let cond_equivF_notmod ?(mk_other=false) (tc : tcenv1) (cond : ts_inv) =
   let (env, hyps, _) = FApi.tc1_eflat tc in
-  let ef = tc1_as_equivF tc in
-  let fl, fr = ef.ef_fl, ef.ef_fr in
-  let (mprl,mprr),(mpol,mpor) = Fun.equivF_memenv ef.ef_ml ef.ef_mr fl fr env in
-  let fsigl = (Fun.by_xpath fl env).f_sig in
-  let fsigr = (Fun.by_xpath fr env).f_sig in
-  let pvresl = pv_res and pvresr = pv_res in
-  let vresl = LDecl.fresh_id hyps "result_L" in
-  let vresr = LDecl.fresh_id hyps "result_R" in
-  let fresl = f_local vresl fsigl.fs_ret in
-  let fresr = f_local vresr fsigr.fs_ret in
-  let ml, mr = fst mpol, fst mpor in
-  assert (ml = cond.ml && mr = cond.mr);
-  let s = PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in
-  let cond = map_ts_inv1 (PVM.subst env s) cond in
-  let modil, modir = f_write env fl, f_write env fr in
-  let cond, bdgr, bder = generalize_mod_right_ env modir cond in
-  let cond, bdgl, bdel = generalize_mod_left_ env modil cond in
-  let cond =
-    map_ts_inv1 (f_forall_simpl
-      [(vresl, GTty fsigl.fs_ret);
-       (vresr, GTty fsigr.fs_ret)])
-      cond in
-  assert (fst mprl = ml && fst mprr = mr);
-  let cond = f_forall_mems_ts_inv mprl mprr (map_ts_inv2 f_imp (ef_pr ef) cond) in
-  let bmem = [ml;mr] in
-  let bother =
-    if mk_other then
-      mk_bind_pvar ml vresl (pvresl, fsigl.fs_ret) ::
-      mk_bind_pvar mr vresr (pvresr, fsigr.fs_ret) ::
-      List.flatten [mk_bind_globs env ml bdgl; mk_bind_pvars ml bdel;
-                    mk_bind_globs env mr bdgr; mk_bind_pvars mr bder]
-    else [] in
-  cond, bmem, bother
+  EcPlFrame.ts_frame_cond_F ~mk_other env hyps (tc1_as_equivF tc) cond
 
-(* equivF notmod rule:
- *
- *   ∀ml mr, P ml mr ⇒
- *     ∀(res_L : ret_L) (res_R : ret_R) (x1 ... xn : modified vars),
- *       Q' ml mr ⇒ Q ml mr
- *   equiv[f1 ~ f2] P ==> Q'
- *   ——————————————————————————————————————————————————————————————————
- *                    equiv[f1 ~ f2] P ==> Q
- *
- * The first premise universally quantifies over the return values and
- * all program variables modified by f1/f2, then checks that Q' ⇒ Q
- * holds under those bindings. *)
-let t_equivF_notmod (post : ts_inv) (tc : tcenv1) =
-  let ef = tc1_as_equivF tc in
-  let post = ts_inv_rebind post ef.ef_ml ef.ef_mr in
-  let cond1, _, _ = cond_equivF_notmod tc (map_ts_inv2 f_imp post (ef_po ef)) in
-  let cond2 = f_equivF (ef_pr ef) ef.ef_fl ef.ef_fr post in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
-
-(* -------------------------------------------------------------------- *)
 let cond_equivS_notmod ?(mk_other=false) (tc : tcenv1) (cond : ts_inv) =
-  let env = FApi.tc1_env tc in
-  let es = tc1_as_equivS tc in
-  let sl, sr = es.es_sl, es.es_sr in
-  let ml, mr = fst es.es_ml, fst es.es_mr in
-  assert (ml = cond.ml && mr = cond.mr);
-  let modil, modir = s_write env sl, s_write env sr in
-  let cond, bdgr, bder = generalize_mod_right_ env modir cond in
-  let cond, bdgl, bdel = generalize_mod_left_ env modil cond in
-  let cond = f_forall_mems_ts_inv es.es_ml es.es_mr (map_ts_inv2 f_imp (es_pr es) cond) in
-  let bmem = [ml;mr] in
-  let bother =
-    if mk_other then
-      List.flatten [mk_bind_globs env ml bdgl; mk_bind_pvars ml bdel;
-                    mk_bind_globs env mr bdgr; mk_bind_pvars mr bder]
-    else [] in
-  cond, bmem, bother
-
-(* equivS notmod rule: same as equivF_notmod but for statements
- * (no result variable generalization needed). *)
-let t_equivS_notmod (post : ts_inv) (tc : tcenv1) =
-  let es = tc1_as_equivS tc in
-  let post = ts_inv_rebind post (fst es.es_ml) (fst es.es_mr) in
-  let cond1,_,_ = cond_equivS_notmod tc (map_ts_inv2 f_imp post (es_po es)) in
-  let cond2 = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) es.es_sl es.es_sr post in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
-
-(* -------------------------------------------------------------------- *)
-(* Shared core for F-level notmod: substitutes the result variable,     *)
-(* generalizes over modified variables, quantifies over the result,     *)
-(* and builds the implication with the precondition.                    *)
-(*                                                                      *)
-(* Returns (cond, bmem, bother) where:                                  *)
-(*   cond   : the fully quantified side-condition formula               *)
-(*   bmem   : memories bound in the quantification ([m])               *)
-(*   bother : when ~mk_other, bindings for result + modified vars;     *)
-(*            otherwise []                                              *)
-
-let cond_F_notmod_core
-    ~(mk_other : bool)
-    (env       : env)
-    (hyps      : LDecl.hyps)
-    (f         : EcPath.xpath)
-    (m         : memory)
-    (pre       : ss_inv)
-    (cond      : ss_inv)
-=
-  let mpr,mpo = Fun.hoareF_memenv m f env in
-  let fsig = (Fun.by_xpath f env).f_sig in
-  let pvres = pv_res in
-  let vres = LDecl.fresh_id hyps "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let m    = fst mpo in
-  let s = PVM.add env pvres m fres PVM.empty in
-  let cond = map_ss_inv1 (PVM.subst env s) cond in
-  let modi = f_write env f in
-  let cond, bdg, bde = generalize_mod_ env modi cond in
-  let cond = map_ss_inv1 (f_forall_simpl [(vres, GTty fsig.fs_ret)]) cond in
-  assert (fst mpr = m);
-  let cond = f_forall_mems_ss_inv mpr (map_ss_inv2 f_imp pre cond) in
-  let bmem = [m] in
-  let bother =
-    if mk_other then
-      mk_bind_pvar m vres (pvres, fsig.fs_ret) ::
-      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
-    else [] in
-  cond, bmem, bother
+  EcPlFrame.ts_frame_cond_S ~mk_other (FApi.tc1_env tc) (tc1_as_equivS tc) cond
 
 let cond_hoareF_notmod ?(mk_other=false) (tc : tcenv1) (cond : ss_inv) =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_hoareF tc in
-  cond_F_notmod_core ~mk_other env hyps hf.hf_f hf.hf_m (hf_pr hf) cond
-
-(* hoareF notmod rule:
- *
- *   ∀m, P m ⇒
- *     ∀(res : ret) (x1 ... xn : modified vars),
- *       Q' m ⇒ Q m  [∧ Qe_i' ⇒ Qe_i for each exception]
- *   hoare[f] P ==> Q' / Qe'
- *   ———————————————————————————————————————————————————————
- *                hoare[f] P ==> Q / Qe
- *
- * Q / Qe denotes the normal postcondition Q together with the
- * per-exception postconditions Qe_i (if any). *)
-let t_hoareF_notmod (post : hs_inv) (tc : tcenv1) =
-  let hf = tc1_as_hoareF tc in
-  let p = hs_inv_rebind post hf.hf_m in
-  let post, epost = POE.destruct p.hsi_inv in
-  let fpost, fepost = POE.destruct (hf_po hf).hsi_inv in
-  let cond = f_imp post fpost in
-  let econd1 = TTC.merge2_poe_list fepost epost in
-  let cond1 = List.fold f_and cond econd1 in
-  let cond1, _, _ = cond_hoareF_notmod tc {m=hf.hf_m;inv=cond1} in
-  let cond2 = f_hoareF (hf_pr hf) hf.hf_f p in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
-
-(* -------------------------------------------------------------------- *)
-(* Shared core for S-level notmod: generalizes over modified variables  *)
-(* and builds the implication with the precondition.                    *)
-
-let cond_S_notmod_core
-    ~(mk_other : bool)
-    (env       : env)
-    (stmt      : stmt)
-    (memenv    : memenv)
-    (pre       : ss_inv)
-    (cond      : ss_inv)
-=
-  let m = fst memenv in
-  let modi = s_write env stmt in
-  let cond, bdg, bde = generalize_mod_ env modi cond in
-  let cond = f_forall_mems_ss_inv memenv (map_ss_inv2 f_imp pre cond) in
-  let bmem = [m] in
-  let bother =
-    if mk_other then
-      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
-    else [] in
-  cond, bmem, bother
+  EcPlFrame.ss_frame_cond_F ~mk_other env hyps hf.hf_f hf.hf_m (hf_pr hf) cond
 
 let cond_hoareS_notmod ?(mk_other=false) (tc : tcenv1) (cond : ss_inv) =
-  let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
-  cond_S_notmod_core ~mk_other env hs.hs_s hs.hs_m (hs_pr hs) cond
+  EcPlFrame.ss_frame_cond_S ~mk_other (FApi.tc1_env tc) hs.hs_s hs.hs_m (hs_pr hs) cond
 
-(* hoareS notmod rule: same as hoareF_notmod but for statements. *)
-let t_hoareS_notmod (post : hs_inv) (tc : tcenv1) =
-  let hs = tc1_as_hoareS tc in
-  let p = hs_inv_rebind post (fst hs.hs_m) in
-  let post, epost = POE.destruct p.hsi_inv in
-  let fpost, fepost = POE.destruct (hs_po hs).hsi_inv in
-  let cond = f_imp post fpost in
-  let econd1 = TTC.merge2_poe_list fepost epost in
-  let cond1 = List.fold f_and cond econd1 in
-  let cond1, _, _ = cond_hoareS_notmod tc {m=fst hs.hs_m;inv=cond1} in
-  let cond2 = f_hoareS (snd hs.hs_m) (hs_pr hs) hs.hs_s p in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
-
-(* -------------------------------------------------------------------- *)
 let cond_bdHoareF_notmod ?(mk_other=false) (tc : tcenv1) (cond : ss_inv) =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_bdhoareF tc in
-  cond_F_notmod_core ~mk_other env hyps hf.bhf_f hf.bhf_m (bhf_pr hf) cond
+  EcPlFrame.ss_frame_cond_F ~mk_other env hyps hf.bhf_f hf.bhf_m (bhf_pr hf) cond
 
-
-(* bdHoareF notmod rule:
- *
- *   ∀m, P m ⇒
- *     ∀(res : ret) (x1 ... xn : modified vars),
- *       Q' m ⇒/⇔/⇐ Q m
- *   phoare[f] P ==> Q' cmp bd
- *   ——————————————————————————————————————————————
- *            phoare[f] P ==> Q cmp bd
- *
- * The direction of the postcondition implication depends on cmp:
- *   FHle (≤): Q' ⇒ Q    FHeq (=): Q' ⇔ Q    FHge (≥): Q ⇒ Q' *)
-let t_bdHoareF_notmod (post : ss_inv) (tc : tcenv1) =
-  let hf = tc1_as_bdhoareF tc in
-  let post = ss_inv_rebind post hf.bhf_m in
-  let _, cond =
-    bdHoare_conseq_conds hf.bhf_cmp (bhf_pr hf) (bhf_po hf) (bhf_pr hf) post in
-  let cond1, _, _ = cond_bdHoareF_notmod tc cond in
-  let cond2 = f_bdHoareF (bhf_pr hf) hf.bhf_f post hf.bhf_cmp (bhf_bd hf) in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
-
-(* -------------------------------------------------------------------- *)
 let cond_bdHoareS_notmod ?(mk_other=false) (tc : tcenv1) (cond : ss_inv) =
-  let env = FApi.tc1_env tc in
   let hs = tc1_as_bdhoareS tc in
-  cond_S_notmod_core ~mk_other env hs.bhs_s hs.bhs_m (bhs_pr hs) cond
+  EcPlFrame.ss_frame_cond_S ~mk_other (FApi.tc1_env tc) hs.bhs_s hs.bhs_m (bhs_pr hs) cond
 
-(* bdHoareS notmod rule: same as bdHoareF_notmod but for statements. *)
-let t_bdHoareS_notmod (post : ss_inv) (tc : tcenv1) =
-  let hs = tc1_as_bdhoareS tc in
-  let post = ss_inv_rebind post (fst hs.bhs_m) in
-  let _, cond =
-    bdHoare_conseq_conds hs.bhs_cmp (bhs_pr hs) (bhs_po hs) (bhs_pr hs) post in
-  let cond1, _, _ = cond_bdHoareS_notmod tc cond in
-  let cond2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s post hs.bhs_cmp (bhs_bd hs) in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
+let t_equivF_notmod (post : ts_inv) =
+  EcEquivFrame.t_equivF_frame { efr_post = post }
+
+let t_equivS_notmod (post : ts_inv) =
+  EcEquivFrame.t_equivS_frame { efr_post = post }
+
+let t_hoareF_notmod (post : hs_inv) =
+  EcHoareFrame.t_hoareF_frame { hfr_post = post }
+
+let t_hoareS_notmod (post : hs_inv) =
+  EcHoareFrame.t_hoareS_frame { hfr_post = post }
+
+let t_bdHoareF_notmod (post : ss_inv) =
+  EcBdHoareFrame.t_bdhoareF_frame { bfr_post = post }
+
+let t_bdHoareS_notmod (post : ss_inv) =
+  EcBdHoareFrame.t_bdhoareS_frame { bfr_post = post }
 
 (* -------------------------------------------------------------------- *)
 let gen_conseq_nm
