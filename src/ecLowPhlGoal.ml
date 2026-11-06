@@ -380,6 +380,15 @@ let hs_observes_exn (po : hs_inv) =
     po.hsi_inv.exnmap
 
 (* -------------------------------------------------------------------- *)
+(* The argument of a call to [fun_], as passed to [Pr[fun_(...) @ &m : _]],
+   read off [arg], the value of its (tuple) argument variable. *)
+let pr_args_of_fun (fun_ : function_) (arg : form) =
+  match fun_.f_sig.fs_anames with
+  | []  -> f_tt
+  | [_] -> arg
+  | lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.ov_type) lv)
+
+(* -------------------------------------------------------------------- *)
 type logicS = [
   | `Hoare   of sHoareS
   | `BdHoare of bdHoareS
