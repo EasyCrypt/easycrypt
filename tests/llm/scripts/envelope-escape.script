@@ -1,0 +1,8 @@
+# exit: 0
+# A reply body may hold a line that is itself envelope-shaped, which
+# would close the frame early. `LOAD -trace' echoes the traced
+# sentence's source verbatim, and fixtures/envelope.ec hides a bare
+# `<END>' and a bare `OK [uuid:99]' inside it. Both must come out with
+# one extra leading space, leaving exactly one unescaped `<END>' in the
+# frame -- the sentinel.
+LOAD "fixtures/envelope.ec" 17 -trace

@@ -1,0 +1,14 @@
+# exit: 0
+# COMMIT emits sibling subtrees in DAG order, not in typing order.
+# FOCUS 2 jumps to the second subgoal, which is discharged first; the
+# body COMMIT prints must still open with the first subgoal's tactic,
+# because a proof body replays top to bottom. Emitting the phrases in
+# the order they were typed produced `- by rewrite addz0.' first, and
+# pasting that under `split.' failed with "nothing to rewrite".
+LOAD "fixtures/focorder.ec"
+QUIET ON
+FOCUS 2
+by rewrite addz0.
+by done.
+QUIET OFF
+COMMIT

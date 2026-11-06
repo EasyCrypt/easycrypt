@@ -1,0 +1,26 @@
+READY [uuid:0]
+<END>
+OK [uuid:4] [loaded:fixtures/focorder.ec:10] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+x: int
+y: int
+------------------------------------------------------------------------
+x = x
+<END>
+OK [uuid:4]
+<END>
+OK [uuid:5] [focus: 1/2]
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:7]
+<END>
+OK [uuid:7]
+<END>
+OK [uuid:7]
+- by done.
+- by rewrite addz0.
+<END>

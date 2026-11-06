@@ -39,6 +39,10 @@ let aslist (ld : ecloader) =
   ld.ecl_idirs
 
 (* -------------------------------------------------------------------- *)
+let setidirs (idirs : ((namespace option * string) * idx_t) list) (ld : ecloader) =
+  ld.ecl_idirs <- idirs
+
+(* -------------------------------------------------------------------- *)
 let dup (ld : ecloader) = { ecl_idirs = ld.ecl_idirs; }
 
 (* -------------------------------------------------------------------- *)

@@ -1,0 +1,13 @@
+# exit: 0
+# The interactive front-ends keep the theories a `require' elaborates
+# across the scope rebuild a LOAD does, so that reloading a file does
+# not re-read everything under it. Whether that happened is not
+# visible on the wire, and must not be: the contract is that a reload
+# answers exactly what the first load answered. The two LOAD frames
+# below are that contract -- same uuid, same tag, same goal -- and so
+# are the two `print' frames, which read the served theory rather than
+# the reloaded file.
+LOAD "fixtures/sub/reload.ec" 7
+print neighbour.
+LOAD "fixtures/sub/reload.ec" 7
+print neighbour.

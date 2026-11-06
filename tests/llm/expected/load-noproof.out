@@ -1,0 +1,30 @@
+READY [uuid:0]
+<END>
+OK [uuid:23] [loaded:fixtures/noproof.ec:32] [noproof] [focus: 1/3]
+added lemma: `first_and'
+added lemma: `second_and'
+added lemma: `third_and'
+Current goal (remaining: 3)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:23] [focus: 1/3]
+  [1.1] 1 = 1 <- focused
+  [1.2] 2 = 2
+[2] 3 = 3
+<END>
+OK [uuid:23] [focus: 1/3]
+* In [lemmas or axioms]:
+
+lemma first_and: 1 = 1 /\ 2 = 2.
+
+Current goal (remaining: 3)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>

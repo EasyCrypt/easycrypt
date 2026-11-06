@@ -1,0 +1,29 @@
+READY [uuid:0]
+<END>
+ERROR [uuid:0]
+RESUME: strict mode is off
+No active proof.
+<END>
+OK [uuid:0]
+strict: on -- a failure stops the session until UNDO, REVERT, LOAD or RESUME
+<END>
+OK [uuid:2] [loaded:fixtures/simple.ec:5]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:2]
+RESUME: the session is not stopped
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:2]
+strict: off
+<END>

@@ -1,0 +1,19 @@
+READY [uuid:0]
+<END>
+OK [uuid:27] [loaded:fixtures/noproof.ec:36] [noproof]
+added lemma: `first_and'
+added lemma: `second_and'
+added lemma: `third_and'
+added lemma: `target_and'
+No active proof.
+<END>
+ERROR [uuid:30]
+: line 1 (40-44): cannot save an incomplete proof
+source: qed.
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+false
+<END>

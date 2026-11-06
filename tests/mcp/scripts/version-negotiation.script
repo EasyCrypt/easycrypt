@@ -1,0 +1,7 @@
+# exit: 0
+# Version negotiation. An unsupported revision gets the latest one we
+# speak; a supported older revision is echoed back; a missing or
+# non-string protocolVersion also falls back to the latest.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2099-01-01","capabilities":{},"clientInfo":{"name":"golden","version":"0"}}}
+{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}
+{"jsonrpc":"2.0","id":3,"method":"initialize","params":{"capabilities":{}}}

@@ -1,0 +1,22 @@
+# exit: 0
+# Protocol-level failures, which are JSON-RPC errors and never
+# isError results: malformed JSON (-32700), a batch array and a
+# malformed envelope (-32600), an unknown method (-32601), and the
+# -32602 family -- unknown tool, missing and ill-typed arguments,
+# `col' without `line', and an unparsable ec_focus path.
+{not json at all
+[{"jsonrpc":"2.0","id":1,"method":"ping"}]
+{"jsonrpc":"2.0","id":2,"method":"server/discover"}
+{"jsonrpc":"2.0","id":3}
+{"jsonrpc":"2.0","id":4,"method":42}
+"just a string"
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ec_nosuchtool","arguments":{}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"arguments":{}}}
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":17,"arguments":{}}}
+{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"ec_step","arguments":{}}}
+{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"ec_goals","arguments":{"all":"yes"}}}
+{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","col":3}}}
+{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","line":"6"}}}
+{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"ec_focus","arguments":{"path":"1.oops"}}}
+{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"ec_focus","arguments":{"path":"0"}}}
+{"jsonrpc":"2.0","id":14,"method":"tools/call","params":"not an object"}

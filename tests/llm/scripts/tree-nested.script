@@ -1,0 +1,10 @@
+# exit: 0
+# Nested splits: TREE and TREE ALL show dotted labels [1.1.1] ... [2].
+LOAD "fixtures/nested.ec" 6
+QUIET ON
+split.
+split.
+split.
+QUIET OFF
+TREE
+TREE ALL

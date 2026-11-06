@@ -1,0 +1,105 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/simple.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:3]
+checkpoint 'start' set at uuid 3
+<END>
+OK [uuid:4] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:3]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:4] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:5]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+2 = 2
+<END>
+OK [uuid:4] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:3]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:3]
+CHECKPOINT: missing name
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:3]
+REVERT: missing uuid or checkpoint name
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:3]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:3]
+REVERT: 'nosuch' is not a valid uuid or checkpoint name
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+ERROR [uuid:3]
+REVERT: uuid 999 out of range [0, 3]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>

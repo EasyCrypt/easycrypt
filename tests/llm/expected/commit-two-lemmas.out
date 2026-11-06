@@ -1,0 +1,48 @@
+READY [uuid:0]
+<END>
+OK [uuid:3] [loaded:fixtures/simple.ec:6]
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1 /\ 2 = 2
+<END>
+OK [uuid:3]
+<END>
+OK [uuid:4] [focus: 1/2]
+<END>
+OK [uuid:5]
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:7]
+added lemma: `simple_and'
+<END>
+OK [uuid:8]
+<END>
+OK [uuid:9]
+<END>
+OK [uuid:10] [focus: 1/2]
+<END>
+OK [uuid:11]
+<END>
+OK [uuid:12]
+<END>
+OK [uuid:13]
+added lemma: `two_and'
+<END>
+OK [uuid:13]
+<END>
+OK [uuid:13]
+split.
+- trivial.
+- trivial.
+qed.
+lemma two_and : 3 = 3 /\ 4 = 4.
+proof.
+split.
+- trivial.
+- trivial.
+qed.
+<END>
