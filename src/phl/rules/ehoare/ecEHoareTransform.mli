@@ -24,9 +24,6 @@ type ehoare_transform = {
      have the form \"_ `|` _\"").
    Side condition: [t] applies to [c] (otherwise fails with its message).
 
-   No catalogue entry is used on ehoare goals yet (there is no ehoare
-   [rndsem]).
-
    Node: [REHoareTransform { ehtr_tr = t }]. Checker: "ehoare-transform"
    (it re-runs the entry on the goal's program). *)
 val t_ehoare_transform : ehoare_transform -> backward

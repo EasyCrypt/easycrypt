@@ -83,7 +83,7 @@ Run the test suite with `EC_RECHECK=1` to exercise every migrated checker.
 ## Program transformations
 
 Tactics that replace the program by an equivalent one and keep the judgement
-(rndsem, and later rcond, inline, swap, …) go through **one** trusted
+(rndsem, rcond, and later inline, swap, …) go through **one** trusted
 transformation rule per logic, `t_<logic>_transform` (`Ec<Logic>Transform`;
 equiv: one side at a time), parameterized by an entry of a catalogue:
 
@@ -105,9 +105,11 @@ equiv: one side at a time), parameterized by an entry of a catalogue:
   ("<logic>-transform") re-runs it on the goal's program and compares the
   subgoals up to conversion (programs up to alpha-equivalence).
 
-Current catalogue: `rndsem` (`EcTrRndSem`). Further entries come with the
-tactics that use them. The framed form of `match C k` changes the
-precondition: it stays a separate trusted rule. See `REFACTORING.md` §7f.
+Current catalogue: `rndsem` (`EcTrRndSem`), `rcond` (`EcTrRCond`) and
+`rmatch` (`EcTrRMatch`). Further entries come with the tactics that use
+them. The framed form of `match C k` changes the precondition: it stays a
+separate trusted rule of each logic, `t_<logic>_rmatch_framed`
+(`Ec<Logic>RMatch`). See `REFACTORING.md` §7f.
 
 ## Directory layout
 
@@ -123,7 +125,7 @@ src/phl/
                 Ec<Logic><Rule>: one module per (logic, rule)
     transforms/ EcTr<Name>: catalogue entries of the program transformations
     ecPl*.ml    computations shared by the rules of every logic: EcPlFrame,
-                EcPlSp, EcPlWp, EcPlRndSem, EcPlTransform
+                EcPlSp, EcPlWp, EcPlRndSem, EcPlRCond, EcPlTransform
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
