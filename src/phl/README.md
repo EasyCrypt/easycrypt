@@ -141,10 +141,11 @@ src/phl/
     hoare/  ehoare/  bdhoare/  equiv/  eager/
                 Ec<Logic><Rule>: one module per (logic, rule)
     transforms/ EcTr<Name>: catalogue entries of the program transformations
+    fol/        EcFol<Rule>: rules whose conclusion is a plain formula
     ecPl*.ml    computations shared by the rules of every logic: EcPlFrame,
                 EcPlSp, EcPlWp, EcPlRndSem, EcPlRCond, EcPlTransform,
                 EcPlMatch, EcPlFun, EcPlCall, EcPlWeakMem, EcPlExists,
-                EcPlECall
+                EcPlECall, EcPlCircuit
   ecPlRecheck.ml     checker scaffolding
   ecPhl<Tactic>.ml   legacy: thin dispatchers and adapters, not-yet-migrated
                      tactics
@@ -167,6 +168,11 @@ src/phl/
   a precondition (`elim*`); `exists*` / `exlim` (consequence + rule) and
   `ecall` (`Ec<Logic>ECall`: existential rules, `seq` and the `call` rule
   of the logic) are derived.
+- The `circuit` rules (`EcHoareCircuit`, `EcEquivCircuit`,
+  `EcHoareCircuitSimplify`, `EcHoareExtens`; on formulas `EcFolCircuit`,
+  `EcFolExtens` in `rules/fol/`) close or rewrite a goal by the circuit
+  backend; their checkers re-run the decision (only under `EC_RECHECK`).
+  `extens` is derived (the rule, then the given tactic on each premise).
 - A rule relating two logics (e.g. the `pr` bridges) lives with the logic of
   its conclusion.
 - A rule concluding a probability statement from a judgement (`byphoare`,
