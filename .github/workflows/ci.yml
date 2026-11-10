@@ -263,6 +263,7 @@ jobs:
             opam exec -- make -C easycrypt build install
             rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
             opam exec -- easycrypt why3config
+            if [ -f ~/why3.conf.patch ]; then patch ~/.config/easycrypt/why3.conf ~/why3.conf.patch; fi
             cd project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
             opam exec -- easycrypt runtest  \
               -report report.log            \

@@ -103,10 +103,16 @@ module Evictions = struct
     pe_cause = `Inconsistent;
     pe_test  = `ByVersion ("Alt-Ergo", (`Le, VP.of_tuple (2, 3, 0)));
   }
+
+  let alt_ergo_2_6_4 = {
+    pe_cause = `Inconsistent;
+    pe_test  = `ByVersion ("Alt-Ergo", (`Eq, VP.of_tuple (2, 6, 4)));
+  }
 end
 
 let evictions : prover_eviction_test list = [
   Evictions.alt_ergo_le_0_99_1;
+  Evictions.alt_ergo_2_6_4;
 ]
 
 (* -------------------------------------------------------------------- *)
