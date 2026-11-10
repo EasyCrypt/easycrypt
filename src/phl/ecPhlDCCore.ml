@@ -815,6 +815,36 @@ let destr_dcond tc (d_cond : EcTypes.expr) =
       tc_error !!tc ~who:"dc cond_l"
         "S-side trailing sample does not have the form [Distr.dcond d p]"
 
+(* Side conditions shared by the conditioning rules (Resample_L).
+   The conditioned sample [x <$ dcond d (fun v => e[v/x] = y)] is
+   evaluated after [x <$ d; y <- e] has run, so the predicate and the
+   distribution must denote the same function as at observation time:
+     y not in Fv(e)          (y is the only variable changed by the body)
+     y <> x                  (the sample must not be overwritten)
+     {x, y} disjoint Fv(d)   (d is re-evaluated after x and y changed) *)
+let check_cond_side_conditions ~who tc env m lv_y e_y lv_x d_orig =
+  let pv_of_lv lv =
+    match lv with
+    | EcAst.LvVar (pv, ty) -> EcPV.PV.add env pv ty EcPV.PV.empty
+    | EcAst.LvTuple pvs ->
+        List.fold_left
+          (fun s (pv, ty) -> EcPV.PV.add env pv ty s)
+          EcPV.PV.empty pvs
+  in
+  let fv_y = pv_of_lv lv_y in
+  let fv_x = pv_of_lv lv_x in
+  let fv_e = EcPV.PV.fv env m (form_of_expr ~m e_y) in
+  let fv_d = EcPV.PV.fv env m (form_of_expr ~m d_orig) in
+  if not (EcPV.PV.indep env fv_y fv_e) then
+    tc_error !!tc ~who
+      "the observed variable must not occur in the observed expression";
+  if not (EcPV.PV.indep env fv_y fv_x) then
+    tc_error !!tc ~who
+      "the observed variable must differ from the sampled variable";
+  if not (EcPV.PV.indep env (EcPV.PV.union fv_x fv_y) fv_d) then
+    tc_error !!tc ~who
+      "the sampled and observed variables must not occur in the distribution"
+
 let t_dc_cond_l_r tc =
   let es = tc1_as_dcEquivS tc in
   let hyps = FApi.tc1_hyps tc in
@@ -833,6 +863,8 @@ let t_dc_cond_l_r tc =
   (* R_l must end in a random assignment x <$ d. *)
   let (r_pre, r_last) = split_last ~who:"dc cond_l" tc es.dces_rl in
   let (lv_x, d_orig)  = destr_rnd_i tc r_last in
+
+  check_cond_side_conditions ~who:"dc cond_l" tc env ml lv_y e_y lv_x d_orig;
 
   (* S_l must end in a random assignment on the same lvalue. *)
   let (s_pre, s_last) = split_last ~who:"dc cond_l" tc es.dces_sl in
@@ -1066,6 +1098,9 @@ let t_dc_cond_l_intro_r tc =
   (* R_l must end in a random assignment x <$ d. *)
   let (r_pre, r_last) = split_last ~who:"dc cond intro" tc es.dces_rl in
   let (lv_x, d_orig)  = destr_rnd_i tc r_last in
+
+  check_cond_side_conditions ~who:"dc cond intro" tc env (fst es.dces_ml)
+    lv_y e_y lv_x d_orig;
 
   (* S_l must equal R_l's prefix (R_l minus the trailing sample). *)
   if not (EcReduction.EqTest.for_stmt env es.dces_sl r_pre) then
