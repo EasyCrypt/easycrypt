@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore Finite Distr DList List.
-require import Ring IntMin Bigalg StdBigop StdOrder.
+require import Ring IntMin Bigalg StdBigop StdOrder Ideal.
 require (*--*) Subtype.
 (*---*) import Bigint IntID IntOrder.
 
@@ -723,11 +723,171 @@ end BigPoly.
 import BigPoly.
 
 (* -------------------------------------------------------------------- *)
+clone import IdealComRing as PIdeal with
+    type t               <- poly,
+  theory IComRing        <- PolyComRing,
+      op BigDom.BAdd.big <- BigPoly.PCA.big<:'a>,
+      op BigDom.BMul.big <- BigPoly.PCM.big<:'a>
+
+  remove abbrev BigDom.BAdd.bigi
+  remove abbrev BigDom.BMul.bigi.
+
+(* -------------------------------------------------------------------- *)
 op peval (p : poly) (a : coeff) =
   BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = Coeff.zeror.
+
+(* -------------------------------------------------------------------- *)
+lemma peval_degE p a :
+  peval p a = BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p).
+proof.
+rewrite /peval (BCA.big_cat_int (deg p)) ?ge0_deg // 1:/#.
+by rewrite BCA.big_int1 /= gedeg_coeff // mul0r addr0.
+qed.
+
+lemma pevalwE n p a : deg p <= n =>
+  peval p a = BCA.bigi predT (fun i => p.[i] * exp a i) 0 n.
+proof.
+move=> le_pn; rewrite peval_degE (BCA.big_cat_int (deg p) 0 n) ?ge0_deg //.
+rewrite (BCA.big1_seq _ _ (range (deg p) n)) ?addr0 //=.
+by move=> i /mem_range [le_pi _]; rewrite gedeg_coeff // mul0r.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma pevalC c a : peval (polyC c) a = c.
+proof.
+by rewrite (pevalwE 1) ?degC_le // BCA.big_int1 /= polyCE /= expr0 mulr1.
+qed.
+
+lemma peval0 a : peval poly0 a = Coeff.zeror.
+proof. by apply: pevalC. qed.
+
+lemma peval1 a : peval poly1 a = Coeff.oner.
+proof. by apply: pevalC. qed.
+
+lemma pevalX a : peval X a = a.
+proof.
+rewrite peval_degE degX (BCA.big_cat_int 1) // !BCA.big_int1 /=.
+by rewrite !polyXE /= mul0r add0r expr1 mul1r.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma pevalD p q a : peval (p + q) a = peval p a + peval q a.
+proof.
+pose n := max (deg p) (deg q); rewrite (pevalwE n (p + q)) 1:degD //.
+rewrite (pevalwE n p) 1:/# (pevalwE n q) 1:/# BCA.sumrD.
+by apply: BCA.eq_bigr => i _ /=; rewrite polyDE mulrDl.
+qed.
+
+lemma pevalN p a : peval (-p) a = - peval p a.
+proof.
+rewrite /peval degN BCA.sumrN; apply: BCA.eq_bigr => i _ /=.
+by rewrite polyNE mulNr.
+qed.
+
+lemma pevalB p q a : peval (p - q) a = peval p a - peval q a.
+proof. by rewrite pevalD pevalN. qed.
+
+lemma pevalZ c p a : peval (c ** p) a = c * peval p a.
+proof.
+rewrite (pevalwE (deg p)) 1:degZ_le peval_degE BCA.mulr_sumr.
+by apply: BCA.eq_bigr => i _ /=; rewrite polyZE mulrA.
+qed.
+
+lemma peval_sum ['a] P F s a :
+  peval (PCA.big<:'a> P F s) a = BCA.big P (fun x => peval (F x) a) s.
+proof.
+elim: s => [|x s ih]; first by rewrite PCA.big_nil BCA.big_nil peval0.
+by rewrite PCA.big_cons BCA.big_cons; case: (P x); rewrite ?pevalD ih.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma pevalMX p a : peval (p * X) a = peval p a * a.
+proof.
+rewrite (pevalwE (deg p + 1)).
+- apply: deg_leP => [|i le_i]; first by rewrite ler_paddl // ge0_deg.
+  by rewrite polyMXE gedeg_coeff //#.
+rewrite BCA.big_int_recl ?ge0_deg //= polyMXE lt0_coeff //= mul0r add0r.
+rewrite peval_degE BCA.mulr_suml !BCA.big_seq &(BCA.eq_bigr) /=.
+by move=> i /mem_range [ge0_i _]; rewrite polyMXE /= exprSr // mulrA.
+qed.
+
+lemma pevalMXn p a i : 0 <= i => peval (p * exp X i) a = peval p a * exp a i.
+proof.
+elim: i => [|i ge0_i ih]; first by rewrite !expr0 mulr1 Coeff.mulr1.
+by rewrite exprSr // mulrA pevalMX ih exprSr // mulrA.
+qed.
+
+lemma pevalXn a i : 0 <= i => peval (exp X i) a = exp a i.
+proof.
+by move=> ge0_i; rewrite -(mul1r (exp X i)) pevalMXn // peval1 mul1r.
+qed.
+
+lemma pevalM p q a : peval (p * q) a = peval p a * peval q a.
+proof.
+rewrite {1}(polyE q) PCA.mulr_sumr peval_sum (peval_degE q) BCA.mulr_sumr.
+rewrite !BCA.big_seq &(BCA.eq_bigr) => i /mem_range [ge0_i _] /=.
+by rewrite scalepE mulrCA -scalepE pevalZ pevalMXn // mulrCA.
+qed.
+
+lemma peval_exp p a i : 0 <= i => peval (exp p i) a = exp (peval p a) i.
+proof.
+elim: i => [|i ge0_i ih]; first by rewrite !expr0 peval1.
+by rewrite !exprS // pevalM ih.
+qed.
+
+lemma pevalXsubC a b : peval (X - polyC a) b = b - a.
+proof. by rewrite pevalB pevalX pevalC. qed.
+
+(* -------------------------------------------------------------------- *)
+(* Division by (X - a) leaves the remainder peval p a                  *)
+lemma peval_factor p a : exists q, p = q * (X - polyC a) + polyC (peval p a).
+proof.
+have hXn: forall i, 0 <= i =>
+  exists q, exp X i = (X - polyC a) * q + polyC (exp a i).
+- elim=> [|i ge0_i [q qE]]; first by exists poly0; rewrite !expr0 mulr0 add0r.
+  exists (X * q + polyC (exp a i)); rewrite exprS // qE Coeff.exprS // polyCM.
+  by rewrite !mulrDr -addrA -mulrDl subrK mulrCA.
+have: forall s, (forall i, i \in s => 0 <= i) => exists q,
+  PCA.big predT (fun i => p.[i] ** exp X i) s
+  = (X - polyC a) * q + polyC (BCA.big predT (fun i => p.[i] * exp a i) s).
+- elim=> [|i s ih] hs.
+  - by exists poly0; rewrite PCA.big_nil BCA.big_nil mulr0 add0r.
+  case: (ih _) => [j js|q qE]; first by apply: hs; rewrite /= js.
+  case: (hXn i _) => [|r rE]; first by apply: hs.
+  exists (p.[i] ** r + q); rewrite PCA.big_cons BCA.big_cons /= qE rE polyCD.
+  by rewrite scalepDr !scalepE polyCM mulrDr mulrCA addrACA.
+move/(_ (range 0 (deg p)) _); first by move=> i /mem_range [].
+by case=> q qE; exists q; rewrite peval_degE (mulrC q) -qE -polyE.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma root0 x : root poly0 x.
+proof. by rewrite peval0. qed.
+
+lemma rootC c x : root (polyC c) x <=> c = Coeff.zeror.
+proof. by rewrite pevalC. qed.
+
+lemma rootX x : root X x <=> x = Coeff.zeror.
+proof. by rewrite pevalX. qed.
+
+lemma rootN p x : root (-p) x <=> root p x.
+proof. by rewrite pevalN oppr_eq0. qed.
+
+lemma root_XsubC a x : root (X - polyC a) x <=> x = a.
+proof. by rewrite pevalXsubC subr_eq0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma factor_theorem p a : root p a <=> exists q, p = q * (X - polyC a).
+proof.
+split=> [rt|[q ->]]; last by rewrite pevalM pevalXsubC subrr mulr0.
+by case: (peval_factor p a) => q; rewrite rt addr0 => qE; exists q.
+qed.
+
+lemma root_factor_theorem p a : root p a <=> (X - polyC a) %| p.
+proof. by rewrite factor_theorem dvdrP. qed.
 
 (* -------------------------------------------------------------------- *)
 op prepolyL (a : coeff list) = fun i => nth Coeff.zeror a i.
@@ -970,5 +1130,74 @@ lemma degV (p : poly) : deg (polyV p) = deg p.
 proof.
 rewrite /polyV; case: (deg p = 1); last done.
 by case/deg_eq1=> c [nz_c ->>]; rewrite !degC polyCE /= invr_eq0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma deg_XsubC a : deg (X - polyC a) = 2.
+proof. by rewrite degDl ?degX // degN degC; case: (a = IDCoeff.zeror). qed.
+
+lemma rootM p q x : root (p * q) x <=> root p x \/ root q x.
+proof. by rewrite pevalM mulf_eq0. qed.
+
+lemma rootZ c p x : c <> IDCoeff.zeror => root (c ** p) x <=> root p x.
+proof. by move=> nz_c; rewrite pevalZ mulf_eq0 nz_c. qed.
+
+lemma factor_theorem_deg p a : p <> poly0 => root p a =>
+  exists q, deg q = deg p - 1 /\ p = q * (X - polyC a).
+proof.
+move=> nz_p /factor_theorem [q ->>]; exists q => /=.
+have nz_q: q <> poly0 by apply: contra nz_p => ->; rewrite mul0r.
+by rewrite degM // -?deg_eq0 deg_XsubC //; ring.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* A non-zero polynomial has finitely many roots, less than its degree *)
+lemma roots_finite p : p <> poly0 =>
+  exists rs, uniq rs /\ size rs < deg p /\ forall x, root p x <=> x \in rs.
+proof.
+have: forall n, 0 <= n => forall p, p <> poly0 => deg p <= n =>
+  exists rs, uniq rs /\ size rs < deg p /\ forall x, root p x <=> x \in rs.
+- elim=> [|n ge0_n ih] q nz_q le_qn.
+  - by move: le_qn; rewrite lerNgt deg_gt0 nz_q.
+  case: (exists x, root q x) => [[x rx]|nrq]; last first.
+  - exists []; rewrite /= deg_gt0 nz_q /= => y; apply/negP => ry.
+    by apply: nrq; exists y.
+  case: (factor_theorem_deg q x nz_q rx) => r [degr ->>].
+  have nz_r: r <> poly0 by apply: contra nz_q => ->; rewrite mul0r.
+  case: (ih r nz_r _) => [/#|rs [_ [sz_rs hrs]]].
+  exists (undup (x :: rs)); split; first by apply: undup_uniq.
+  split=> [|y]; last by rewrite mem_undup /= -hrs rootM root_XsubC orbC.
+  by apply: (ler_lt_trans (size (x :: rs))) => [|/#]; apply: size_undup.
+by move=> h nz_p; apply: (h (deg p)) => //; apply: ge0_deg.
+qed.
+
+lemma max_poly_roots p rs :
+  p <> poly0 => all (root p) rs => uniq rs => size rs < deg p.
+proof.
+move=> nz_p /allP rts uq_rs; case: (roots_finite p nz_p) => s [_ [sz hs]].
+apply: (ler_lt_trans _ _ _ _ sz); apply: uniq_leq_size => // x /rts /=.
+by rewrite hs.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mu_root_le (d : coeff distr) p m :
+     p <> poly0
+  => (forall x, mu1 d x <= m)
+  => mu d (root p) <= (deg p - 1)%r * m.
+proof.
+move=> nz_p le_m; case: (roots_finite p nz_p) => rs [_ [sz hrs]].
+rewrite (mu_eq d _ (mem rs)) => [x /=|]; first by rewrite hrs.
+apply: (RealOrder.ler_trans _ _ _ (mu_mem_le_mu1 d rs m le_m)).
+apply: RealOrder.ler_wpmul2r; last by rewrite le_fromint /#.
+by apply: (RealOrder.ler_trans _ _ _ (ge0_mu d (pred1 witness)) (le_m witness)).
+qed.
+
+lemma mu_root_uni (d : coeff distr) p :
+     p <> poly0 => is_lossless d => is_uniform d
+  => mu d (root p) <= (deg p - 1)%r / (size (to_seq (support d)))%r.
+proof.
+move=> nz_p d_ll d_uni; apply: mu_root_le => // x.
+rewrite mu1_uni_ll // RField.div1r; case: (x \in d) => // _.
+by rewrite RealOrder.invr_ge0 le_fromint size_ge0.
 qed.
 end Poly.
