@@ -800,7 +800,7 @@ let read_ini_file (filename : string) =
       ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
       ini_rdirs    = List.map parse_idir (trylist "rdirs");
-      ini_quotes   = List.filter_map parse_quote (trylist "quote"); } in
+      ini_quotes   = List.filter_map parse_quote (trylist "quote");
       ini_pragmas  = trylist "pragmas"; } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
@@ -811,5 +811,5 @@ let read_ini_file (filename : string) =
     ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
     ini_rdirs    = ini.ini_rdirs;
-    ini_quotes   = ini.ini_quotes; }
+    ini_quotes   = ini.ini_quotes;
     ini_pragmas  = ini.ini_pragmas; }
