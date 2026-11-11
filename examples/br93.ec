@@ -363,7 +363,7 @@ auto; call (_: true).
 + exact A_a1_ll. (* adversary *)
 + by proc; call (LRO_o_ll _); auto=> /=; apply: dptxt_ll. (* oracle *)
 auto=> />; rewrite dkeys_ll drand_ll dptxt_ll /predT /=.
-by move=> _ _ _ _ _ _ r; rewrite dbool1E pred1E.
+by move=> _ _ _ _ _ _ r; rewrite dbool1E.
 qed.
 
 (* Step 3: The reduction step -- if A queries the RO with the randomness *)

@@ -79,7 +79,7 @@ theory DHIES.
     pkl = map (snd \o snd) kk =>
     menc pkl tag ptxt = dmap (mencDHIES tag ptxt kk) (List.map (snd \o snd)).
   proof.
-  rewrite /mencDHIES /menc /dlistmap /zipks /encDHIES /=.
+  rewrite /mencDHIES /menc /encDHIES /=.
   rewrite djoin_dmap.
   move=> ->; rewrite -map_comp /(\o) /=.
   congr; congr; apply fun_ext => x.
@@ -985,8 +985,8 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     case _: (Adv2_Procs.kindex.[(pk, ctxt.`1)]{2}).
     + by move: H10; rewrite -mem_fdom H -H2 mem_fdom domE.
     smt ().
-   wp; skip; rewrite /inv /= /#.
-  wp; skip; rewrite /inv /#.
+   by auto=> |> &1 &2 @/inv |> _ + _ _ _ _ _ _ _ _ _ _ /#.
+  by auto=> |> &1 &2 @/inv |> _ _ + _ _ _ _ _ _ _ /#.
 + by auto => />.
 + by auto => />.
 qed.

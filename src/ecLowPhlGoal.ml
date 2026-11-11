@@ -235,13 +235,18 @@ let tc1_process_codepos1 tc (side, cpos) =
   EcTyping.trans_codepos1 env cpos
 
 (* -------------------------------------------------------------------- *)
-let hl_set_stmt (side : side option) (f : form) (s : stmt) =
+(* [mt] overrides the memtype of the active side (the one whose statement is
+   being replaced), e.g. when the new statement [s] mentions fresh locals.
+   The memory identifier is untouched, so the pre/post-conditions keep
+   referring to it. *)
+let hl_set_stmt ?(mt : memtype option) (side : side option) (f : form) (s : stmt) =
+  let mtof (dfl : memenv) = odfl (snd dfl) mt in
   match side, f.f_node with
-  | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs)
-  | None       , FeHoareS  hs -> f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
-  | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
-  | Some `Left , FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
-  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) es.es_sl s (es_po es)
+  | None       , FhoareS   hs -> f_hoareS (mtof hs.hs_m) (hs_pr hs) s (hs_po hs)
+  | None       , FeHoareS  hs -> f_eHoareS (mtof hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
+  | None       , FbdHoareS hs -> f_bdHoareS (mtof hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
+  | Some `Left , FequivS   es -> f_equivS (mtof es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
+  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (mtof es.es_mr) (es_pr es) es.es_sl s (es_po es)
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -336,6 +341,43 @@ let push_memenvs_pre (hyps : LDecl.hyps) (f : form) =
     let hyps = EcEnv.LDecl.push_active_ts ml mr hyps in
     ([ml; mr], hyps)
   | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+(* Exceptions. A hoare postcondition maps the exceptions it names (and,
+   for the default branch [_ => Q], [None]) to the condition they must
+   satisfy; an exception neither named nor covered by a default branch is
+   unconstrained (as if [_ => true]).
+
+   [s_may_raise env s] holds when running [s] may raise an exception: [s]
+   contains a [raise], an abstract instruction, or a call to a procedure
+   that may raise (whose body may raise; abstract procedures are assumed
+   to possibly raise). *)
+let rec s_may_raise (env : env) (s : stmt) =
+  List.exists (i_may_raise env) s.s_node
+
+and i_may_raise (env : env) (i : instr) =
+  match i.i_node with
+  | Sraise _ | Sabstract _ -> true
+  | Sasgn _ | Srnd _ -> false
+  | Scall (_, f, _) -> f_may_raise env f
+  | Sif (_, s1, s2) -> s_may_raise env s1 || s_may_raise env s2
+  | Swhile (_, s) -> s_may_raise env s
+  | Smatch (_, bs) -> List.exists (fun (_, s) -> s_may_raise env s) bs
+
+and f_may_raise (env : env) (f : EcPath.xpath) =
+  let f = NormMp.norm_xfun env f in
+  match (Fun.by_xpath f env).f_def with
+  | FBdef fd  -> s_may_raise env fd.f_body
+  | FBalias f -> f_may_raise env f
+  | FBabs _   -> true
+
+(* [hs_observes_exn po] holds when the hoare postcondition [po] constrains
+   some exception, i.e. has a branch other than [_ => true] / [e _ =>
+   true]. Otherwise, raising an exception is as good as not terminating. *)
+let hs_observes_exn (po : hs_inv) =
+  EcPath.Mop.exists
+    (fun _ f -> not (f_equal (snd (decompose_lambda f)) f_true))
+    po.hsi_inv.exnmap
 
 (* -------------------------------------------------------------------- *)
 type logicS = [
@@ -799,8 +841,10 @@ let t_code_transform (side : oside) cpos tr tx tc =
       match concl.f_node with
       | FhoareS hs ->
           let pr, po = hs_pr hs, hs_po hs in
-          (* FIXME: This is very suspicious why only main is provided ? *)
-          let po = po.hsi_inv.main in
+          (* The transformations only use the postcondition for the
+             program variables it reads: give them the conjunction of the
+             main and exceptional postconditions, so that none is missed. *)
+          let po = f_ands (POE.fold (fun fs f -> fs @ [f]) [] po.hsi_inv) in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po) (hs.hs_m, hs.hs_s) in
           let concl =

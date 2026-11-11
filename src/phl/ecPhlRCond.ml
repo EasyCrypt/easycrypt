@@ -157,7 +157,14 @@ module LowMatch = struct
 
     ((stmt head, subs, tail), (e, f), infos, cvars)
 
-  let gen_rcond_full (pf, env) c me0 at_pos s =
+  (* [can_frame]: whether the judgement may use the framed form when the
+     prefix [hd] is not empty. The framed form adds [e = C ys] to the
+     precondition, which is only valid in the initial memories where [hd]
+     terminates: harmless for hoare, ehoare and phoare-[<=] judgements
+     (diverging runs carry no obligation, or contribute 0 to an upper
+     bound), unsound for phoare-[=]/[>=] and equiv ones. With an empty
+     prefix it is always sound. *)
+  let gen_rcond_full ~(can_frame : bool) (pf, env) c me0 at_pos s =
     let m  = EcMemory.memory me0 in
     let (hd, s, tl), (e, f), ((typ, _tyd, tyinst), cname), cvars =
       gen_rcond (pf,env) c m at_pos s in
@@ -194,9 +201,10 @@ module LowMatch = struct
       (s, pvs) in
 
     let frame =
-      EcPV.PV.indep env
-        (EcPV.e_read env e)
-        (EcPV.PV.union (EcPV.s_read env hd) (EcPV.s_write env hd)) in
+         (can_frame || List.is_empty hd.s_node)
+      && EcPV.PV.indep env
+           (EcPV.e_read env e)
+           (EcPV.PV.union (EcPV.s_read env hd) (EcPV.s_write env hd)) in
 
     let epr, asgn =
     if frame then begin
@@ -223,7 +231,7 @@ module LowMatch = struct
   let t_hoare_rcond_match_r c at_pos tc =
     let hs = tc1_as_hoareS tc in
     let (epr, hd, po1), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.hs_m at_pos hs.hs_s in
+      gen_rcond_full ~can_frame:true (!!tc, FApi.tc1_env tc) c hs.hs_m at_pos hs.hs_s in
 
     let pr = ofold (map_ss_inv2 f_and) (hs_pr hs) epr in
     let po1 = update_hs_ss po1 (hs_po hs) in
@@ -237,11 +245,21 @@ module LowMatch = struct
   let t_ehoare_rcond_match_r c at_pos tc =
     let hs = tc1_as_ehoareS tc in
     let (epr, hd, po1), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.ehs_m at_pos hs.ehs_s in
+      gen_rcond_full ~can_frame:true (!!tc, FApi.tc1_env tc) c hs.ehs_m at_pos hs.ehs_s in
 
-    let pr = ofold (map_ss_inv2 f_and) (ehs_pr hs) epr in
+    (* The precondition has the form [P `|` f], with [P] boolean: as for
+       [rcond], the prefix obligation is a hoare judgement on [P], and the
+       framed condition is added to [P]. *)
+    let p, f =
+      match destr_app (ehs_pr hs).inv with
+      | o, [p; f] when f_equal o fop_interp_ehoare_form -> p, f
+      | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
+    let p = { m = (ehs_pr hs).m; inv = p; } in
+    let pr =
+      map_ss_inv1 (fun p -> f_interp_ehoare_form p f)
+        (ofold (map_ss_inv2 f_and) p epr) in
 
-    let concl1  = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) hd po1 in
+    let concl1  = f_hoareS (snd hs.ehs_m) p hd (POE.lift po1) in
     let concl2  = f_eHoareS (snd me) pr full (ehs_po hs) in
 
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
@@ -250,7 +268,8 @@ module LowMatch = struct
   let t_bdhoare_rcond_match_r c at_pos tc =
     let bhs = tc1_as_bdhoareS tc in
     let (epr, hd, po1), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in
+      gen_rcond_full ~can_frame:(bhs.bhs_cmp = FHle)
+        (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in
 
     let pr = ofold (map_ss_inv2 f_and) (bhs_pr bhs) epr in
     let po1 = POE.lift po1 in
@@ -271,7 +290,7 @@ module LowMatch = struct
       | `Right -> es.es_mr, es.es_ml, es.es_sr in
 
     let (epr, hd, po1), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c m at_pos s in
+      gen_rcond_full ~can_frame:false (!!tc, FApi.tc1_env tc) c m at_pos s in
 
     let ss_inv_generalize_other inv = sideif side
       (ss_inv_generalize_right inv mr) (ss_inv_generalize_left inv ml) in

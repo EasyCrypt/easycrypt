@@ -74,6 +74,12 @@ module ZImpl : EcBigIntCore.TheInterface = struct
 
   let to_why3 (x : zint) =
     Why3.BigInt.of_string (to_string x)
+
+  let to_zt (x: zint) : Z.t =
+    x
+
+  let of_zt (z: Z.t) : zint =
+    z
 end
 
 (* -------------------------------------------------------------------- *)
@@ -150,6 +156,12 @@ module BigNumImpl : EcBigIntCore.TheInterface = struct
 
   let to_why3 (x : zint) =
     Why3.BigInt.of_string (to_string x)
+
+  let to_zt (x: zint) : Z.t =
+    x |> to_string |> Z.of_string
+
+  let of_zt (z: Z.t) : zint =
+    z |> Z.to_string |> of_string
 end
 
 (* -------------------------------------------------------------------- *)

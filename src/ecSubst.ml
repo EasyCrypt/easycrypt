@@ -24,16 +24,39 @@ exception SubstNameClash of subst_name_clash
 exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
+(* A module-definition substitution: references to a source module
+   expression are re-rooted onto a destination module.  The source is a
+   concrete module expression [P(a1..an).q] (possibly applied, possibly
+   a sub-module), recorded as its top-level path [P] (the map key), its
+   arguments [sm_args] and its inner path [sm_sub].  A reference
+   [`Concrete (P, sub)] applied at [args] is rewritten iff:
+
+     - [sub] lies at or below [sm_sub] (trivially true when [sm_sub] is
+       [None]); and
+     - [args] is empty (references to program variables carry no
+       arguments) or extends [sm_args].
+
+   The remainders (the inner path below [sm_sub], the arguments beyond
+   [sm_args]) are transplanted onto the destination.  References that do
+   not match (an enclosing module's state, sibling sub-modules, other
+   applications) denote state that is not copied along with the source's
+   items, and are left untouched.  See [subst_mpath]. *)
+type sub_moddef = {
+  sm_args : EcPath.mpath list;
+  sm_sub  : EcPath.path option;
+  sm_dst  : EcPath.mpath;
+}
+
 type subst = {
   sb_module   : EcPath.mpath Mid.t;
   sb_path     : EcPath.path Mp.t;
   sb_tyvar    : ty Mid.t;
-  sb_elocal   : expr Mid.t;
+  sb_elocal   : expr option Lazy.t Mid.t;
   sb_flocal   : EcCoreFol.form Mid.t;
   sb_fmem     : EcIdent.t Mid.t;
   sb_tydef    : (EcIdent.t list * ty) Mp.t;
   sb_def      : (EcIdent.t list * [`Op of  expr | `Pred of form]) Mp.t;
-  sb_moddef   : EcPath.mpath Mp.t; (* Only top-level modules *)
+  sb_moddef   : sub_moddef Mp.t; (* keyed by the source's TOP-LEVEL path *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -74,27 +97,73 @@ let rec _subst_path (s : EcPath.path Mp.t) (p : EcPath.path) =
 let subst_path (s : subst) (p : EcPath.path) = _subst_path s.sb_path p
 
 (* -------------------------------------------------------------------- *)
+(* Try to match a reference [`Concrete (p, sub)] at (substituted)
+   arguments [args] against a module-definition entry for [p].  On a
+   match, return the rewritten mpath; otherwise return [None] and let
+   the caller fall through to the ordinary path substitution. *)
+let _moddef_apply (md : sub_moddef) (args : EcPath.mpath list)
+                  (sub : EcPath.path option) : EcPath.mpath option =
+  (* Sub component: the reference must lie at or below the source's
+     inner path; the remainder survives below the destination. *)
+  let sub_rem =
+    match md.sm_sub with
+    | None -> Some sub
+    | Some q ->
+      match sub with
+      | None -> None
+      | Some sp ->
+        omap
+          (List.fold_left (fun acc x -> Some (EcPath.pqoname acc x)) None)
+          (EcPath.remprefix ~prefix:q ~path:sp)
+  in
+
+  (* Args component: program-variable references carry no arguments;
+     other self-references are applied at the source's arguments,
+     possibly further applied.  The excess arguments survive after the
+     destination's own.  ([sm_args] is compared as recorded: the callers
+     build single-purpose substitutions, so the reference's arguments
+     cannot have been rewritten by other entries.) *)
+  let args_rem =
+    if List.is_empty args then
+      Some []
+    else if List.length args < List.length md.sm_args then
+      None
+    else
+      let pre, rest = List.takedrop (List.length md.sm_args) args in
+      if List.for_all2 EcPath.m_equal pre md.sm_args then Some rest else None
+  in
+
+  match sub_rem, args_rem with
+  | Some sub_rem, Some args_rem ->
+    let (d_p, d_sub, d_args) =
+      match md.sm_dst with
+      | { m_top = `Concrete (d_p, d_sub); m_args = d_args } ->
+        (d_p, d_sub, d_args)
+      | _ -> assert false in
+    let cat_sub =
+      match d_sub with
+      | None       -> sub_rem
+      | Some d_sub -> Some (EcPath.poappend d_sub sub_rem) in
+    Some (EcPath.mpath_crt d_p (d_args @ args_rem) cat_sub)
+
+  | _, _ -> None
+
 let subst_mpath (s : subst) (mp : EcPath.mpath) =
   let rec doit s (mp : EcPath.mpath) =
       let args = List.map (doit s) mp.m_args in
       match mp.m_top with
-      | `Concrete (p, sub) when Mp.mem p s.sb_moddef -> begin
-        let s_p, s_sub, s_args =
-          match Mp.find p s.sb_moddef with
-          | { m_top = `Concrete (s_p, s_sub); m_args } -> (s_p, s_sub, m_args)
-          | _ -> assert false in
-
-        let cat_sub =
-          match s_sub with
-          | None -> sub
-          | Some s_sub -> Some (EcPath.poappend s_sub sub) in
-
-        EcPath.mpath_crt s_p (s_args @ mp.m_args) cat_sub
+      | `Concrete (p, sub) -> begin
+        let rewritten =
+          obind
+            (fun md -> _moddef_apply md args sub)
+            (Mp.find_opt p s.sb_moddef)
+        in
+        match rewritten with
+        | Some mp -> mp
+        | None ->
+          let p = _subst_path s.sb_path p in
+          EcPath.mpath_crt p args sub
       end
-
-      | `Concrete (p, sub) ->
-        let p = _subst_path s.sb_path p in
-        EcPath.mpath_crt p args sub
 
       | `Local id ->
          match Mid.find_opt id s.sb_module with
@@ -193,7 +262,7 @@ let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
     { s with sb_module = Mid.change merger x s.sb_module }
 
 let add_elocal (s : subst) (x : EcIdent.t) (e : expr) =
-  { s with sb_elocal = Mid.add x e s.sb_elocal }
+  { s with sb_elocal = Mid.add x (Lazy.from_val (Some e)) s.sb_elocal }
 
 let add_elocals (s : subst) (xs : EcIdent.t list) (es : expr list) =
   List.fold_left2 add_elocal s xs es
@@ -216,8 +285,14 @@ let fresh_elocal_opt (s : subst) ((x, ty) : EcIdent.t option * ty) =
 let fresh_elocals_opt (s : subst) (locals : (EcIdent.t option * ty) list) =
   List.fold_left_map fresh_elocal_opt s locals
 
+(* Expression-level binding converted on demand (see
+   [EcCoreSubst.f_bind_local]); [None] when not translatable. *)
 let add_flocal (s : subst) (x : EcIdent.t) (f : EcCoreFol.form) =
-  { s with sb_flocal = Mid.add x f s.sb_flocal }
+  let e = lazy (
+    try  Some (EcCoreFol.expr_of_form f)
+    with EcCoreFol.CannotTranslate -> None) in
+  { s with sb_flocal = Mid.add x f s.sb_flocal;
+           sb_elocal = Mid.add x e s.sb_elocal; }
 
 let add_flocals (s : subst) (xs : EcIdent.t list) (fs : EcCoreFol.form list) =
   List.fold_left2 add_flocal s xs fs
@@ -244,9 +319,7 @@ let rename_flocal (s : subst) xfrom xto ty =
   let xf = EcCoreFol.f_local xto ty in
   let xe = EcTypes.e_local xto ty in
   let s  = add_flocal s xfrom xf in
-
-  let merger o = assert (o = None); Some xe in
-  { s with sb_elocal = Mid.change merger xfrom s.sb_elocal }
+  { s with sb_elocal = Mid.add xfrom (Lazy.from_val (Some xe)) s.sb_elocal }
 
 let add_memory (s : subst) (m : EcIdent.t) (target : EcIdent.t) =
   { s with sb_fmem = Mid.add m target s.sb_fmem }
@@ -280,10 +353,19 @@ let add_pddef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
   { s with sb_def = Mp.add p (ids, `Pred f) s.sb_def }
 
-let add_moddef (s : subst) ~(src : EcPath.path) ~(dst : EcPath.mpath) =
-  assert (Mp.find_opt src s.sb_moddef = None);
+(* [src] is a concrete module expression (possibly applied, possibly a
+   sub-module); references to it (and to its sub-modules) get re-rooted
+   onto [dst].  See the [sub_moddef] documentation above. *)
+let add_moddef (s : subst) ~(src : EcPath.mpath) ~(dst : EcPath.mpath) =
+  let (p, sub) =
+    match src.m_top with
+    | `Concrete (p, sub) -> (p, sub)
+    | `Local _ -> assert false in
+  assert (Mp.find_opt p s.sb_moddef = None);
   assert (EcPath.is_concrete dst);
-  { s with sb_moddef = Mp.add src dst s.sb_moddef }
+  { s with sb_moddef =
+      Mp.add p { sm_args = src.m_args; sm_sub = sub; sm_dst = dst; }
+        s.sb_moddef }
 
 (* -------------------------------------------------------------------- *)
 let subst_flocal (s : subst) (f : form) =
@@ -320,9 +402,9 @@ let subst_expr_lpattern (s : subst) (lp : lpattern) =
 let rec subst_expr (s : subst) (e : expr) =
   match e.e_node with
   | Elocal id -> begin
-      match Mid.find id s.sb_elocal with
-      | aout -> aout
-      | exception Not_found -> e_local id (subst_ty s e.e_ty)
+      match obind Lazy.force (Mid.find_opt id s.sb_elocal) with
+      | Some aout -> aout
+      | None -> e_local id (subst_ty s e.e_ty)
     end
 
   | Evar pv ->
@@ -802,6 +884,8 @@ and subst_module (s : subst) (m : module_expr) =
             add_module s a (EcPath.mident a'), decl)
         s m.me_params in
 
+  if is_empty sbody then m else
+
   let me_body = subst_module_body sbody m.me_body in
   let me_comps = subst_module_comps sbody m.me_comps in
   let me_sig_body = subst_modsig_body sbody m.me_sig_body in
@@ -873,10 +957,11 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
       (fun (carrier, pred) -> (subst_ty s carrier, subst_form s pred))
       tyd.tyd_subtype in
 
-  { tyd_params  = tparams;
-    tyd_type    = body;
-    tyd_loca    = tyd.tyd_loca;
-    tyd_subtype = subtype; }
+  { tyd_params   = tparams;
+    tyd_type     = body;
+    tyd_loca     = tyd.tyd_loca;
+    tyd_clinline = tyd.tyd_clinline;
+    tyd_subtype  = subtype; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =
@@ -989,7 +1074,8 @@ let fresh_scparams (s : subst) (xtys : (EcIdent.t * ty) list) =
 
 (* -------------------------------------------------------------------- *)
 let subst_ring (s : subst) cr =
-  { r_type  = subst_ty s cr.r_type;
+  { r_name  = cr.r_name;
+    r_type  = subst_ty s cr.r_type;
     r_zero  = subst_path s cr.r_zero;
     r_one   = subst_path s cr.r_one;
     r_add   = subst_path s cr.r_add;
@@ -1026,6 +1112,122 @@ let subst_tc (s : subst) tc =
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
     { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
 
+(* -------------------------------------------------------------------- *)
+let subst_binding_size ?(red: (form -> int option) option) (s: subst) (bsize: binding_size) = 
+  let fsize = subst_form s (fst bsize) in
+  let csize = match red with
+  | Some red when Option.is_none (snd bsize) -> red fsize
+  | _ -> (snd bsize) 
+  in (fsize, csize)
+
+let subst_bv_opkind ?(red: (form -> int option) option) (s: subst) (opk: bv_opkind) = 
+  let ssize = subst_binding_size ?red s in
+  match opk with
+  | `Extend (s1, s2, sgn) -> `Extend (ssize s1, ssize s2, sgn) 
+  | `Rem (s, sgn) -> `Rem (ssize s, sgn)  
+  | `Div (s, sgn) -> `Div (ssize s, sgn) 
+  | `Add (s) -> `Add (ssize s) 
+  | `Lt (s, sgn) -> `Lt (ssize s, sgn) 
+  | `Shl (s) -> `Shl (ssize s) 
+  | `Shls (s1, s2) -> `Shls (ssize s1, ssize s2) 
+  | `ASliceSet ((s1, s2), s3) -> `ASliceSet ((ssize s1, ssize s2), ssize s3) 
+  | `And s -> `And (ssize s) 
+  | `Extract (s1, s2, aligned) -> `Extract (ssize s1, ssize s2, aligned) 
+  | `Map (s1, s2, s3) -> `Map (ssize s1, ssize s2, ssize s3) 
+  | `AInit (s1, s2) -> `AInit (ssize s1, ssize s2)
+  | `PAInit s -> `PAInit (ssize s)
+  | `Sub s -> `Sub (ssize s) 
+  | `Get s -> `Get (ssize s) 
+  | `Ror s -> `Ror (ssize s) 
+  | `Le (s, sgn) -> `Le (ssize s, sgn) 
+  | `Concat (s1, s2, s3) -> `Concat (ssize s1, ssize s2, ssize s3) 
+  | `Truncate (s1, s2) -> `Truncate (ssize s1, ssize s2) 
+  | `Not (s) -> `Not (ssize s) 
+  | `Opp (s) -> `Opp (ssize s) 
+  | `Or (s) -> `Or (ssize s) 
+  | `Init (s) -> `Init (ssize s) 
+  | `Insert (s1, s2) -> `Insert (ssize s1, ssize s2) 
+  | `Xor (s) -> `Xor (ssize s) 
+  | `Shr (s, sgn) -> `Shr (ssize s, sgn) 
+  | `Shrs (s1, s2, sgn) -> `Shrs (ssize s1, ssize s2, sgn) 
+  | `Mul (s) -> `Mul (ssize s) 
+  | `Rol (s) -> `Rol (ssize s) 
+  | `A2B ((s1, s2), s3) -> `A2B ((ssize s1, ssize s2), ssize s3) 
+  | `ASliceGet ((s1, s2), s3) -> `ASliceGet ((ssize s1, ssize s2), ssize s3) 
+  | `B2A (s1, (s2, s3)) -> `B2A (ssize s1, (ssize s2, ssize s3)) 
+
+(* -------------------------------------------------------------------- *)
+let subst_crb_theory1_kind (s : subst) (kind : crb_theory1_kind) =
+  match kind with
+  | CRBT_Type p ->
+    assert (not (Mp.mem p s.sb_tydef));
+    CRBT_Type (subst_path s p)
+  | CRBT_Op (tparams, body) ->
+    let s, tparams = fresh_tparams s tparams in
+    let body = subst_expr s body in
+    CRBT_Op (tparams, body)
+  | CRBT_Lemma p ->
+    CRBT_Lemma (subst_path s p)
+
+(* -------------------------------------------------------------------- *)
+let subst_crb_theory1 (s : subst) (crbth1 : crb_theory1) =
+  { kind = subst_crb_theory1_kind s crbth1.kind
+  ; name = crbth1.name }
+
+(* -------------------------------------------------------------------- *)
+let subst_crb_theory (s : subst) (crbth : crb_theory) =
+  List.map (subst_crb_theory1 s) crbth
+
+(* -------------------------------------------------------------------- *)
+let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbinding) =
+  match crb with
+  | CRB_Bitstring bs ->
+    assert (not (Mp.mem bs.type_ s.sb_tydef));
+    assert (not (Mp.mem bs.from_ s.sb_def));
+    assert (not (Mp.mem bs.to_ s.sb_def));
+    assert (not (Mp.mem bs.touint s.sb_def));
+    assert (not (Mp.mem bs.tosint s.sb_def));
+    assert (not (Mp.mem bs.ofint s.sb_def));
+    CRB_Bitstring {
+      type_  = subst_path s bs.type_;
+      from_  = subst_path s bs.from_;
+      to_    = subst_path s bs.to_;
+      touint  = subst_path s bs.touint;
+      tosint  = subst_path s bs.tosint;
+      ofint  = subst_path s bs.ofint;
+      size   = subst_binding_size ?red s bs.size;
+      theory = subst_crb_theory s bs.theory; }
+
+  | CRB_Array ba ->
+    assert (not (Mp.mem ba.type_ s.sb_tydef));
+    assert (not (Mp.mem ba.get s.sb_def));
+    assert (not (Mp.mem ba.set s.sb_def));
+    assert (not (Mp.mem ba.tolist s.sb_def));
+    assert (not (Mp.mem ba.oflist s.sb_def));
+    CRB_Array {
+      type_  = subst_path s ba.type_;
+      get    = subst_path s ba.get;
+      set    = subst_path s ba.set;
+      tolist = subst_path s ba.tolist;
+      oflist = subst_path s ba.oflist;
+      size   = subst_binding_size ?red s ba.size;
+      theory = subst_crb_theory s ba.theory }
+
+  | CRB_BvOperator op ->
+    assert (List.for_all (fun ty -> not (Mp.mem ty s.sb_tydef)) op.types);
+    assert (not (Mp.mem op.operator s.sb_def));
+    CRB_BvOperator {
+      kind     = subst_bv_opkind ?red s op.kind;
+      types    = List.map (subst_path s) op.types;
+      operator = subst_path s op.operator; }
+
+  | CRB_Circuit cr ->
+      assert (not (Mp.mem cr.operator s.sb_def));
+      CRB_Circuit {
+        name     = cr.name;
+        circuit  = cr.circuit;
+        operator = subst_path s cr.operator; }
+  
 
 (* -------------------------------------------------------------------- *)
 let subst_exception (s : subst) (ex : exception_) =
@@ -1066,14 +1268,17 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_addrw (b, ls, lc) ->
       Th_addrw (subst_path s b, List.map (subst_path s) ls, lc)
 
-  | Th_reduction rules ->
-      let rules =
-        List.map (fun (p, opts, _) -> (subst_path s p, opts, None)) rules
-      in Th_reduction rules
+  | Th_reduction ({ red_rules } as red) ->
+      let red_rules =
+        List.map (fun (p, opts, _) -> (subst_path s p, opts, [])) red_rules
+      in Th_reduction { red with red_rules }
 
   | Th_auto ({ axioms } as auto_rl) ->
       Th_auto { auto_rl with axioms =
         List.map (fst_map (subst_path s)) axioms }
+
+  | Th_crbinding (bd, lc) ->
+      Th_crbinding (subst_crbinding s bd, lc)
 
   | Th_alias (name, target) ->
       Th_alias (name, subst_path s target)
@@ -1160,6 +1365,9 @@ let ss_inv_generalize_as_right ({inv;m}: ss_inv) (ml: memory) (mr: memory) : ts_
 let f_forall_mems_ss_inv menv inv =
   f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv
 
+let f_exists_mems_ss_inv menv inv =
+  f_exists_mems [menv] (ss_inv_rebind inv (fst menv)).inv
+
 let ts_inv_rebind_left ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
   if ml = m then
     { inv; ml; mr }
@@ -1191,12 +1399,23 @@ let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
 let f_forall_mems_ts_inv menvl menvr inv =
   f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
 
+let f_exists_mems_ts_inv menvl menvr inv =
+  f_exists_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
+
 let ss_inv_forall_ml_ts_inv menvl inv =
   let inv' = f_forall_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
   { inv=inv'; m=inv.mr}
 
 let ss_inv_forall_mr_ts_inv menvr inv =
   let inv' = f_forall_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
+  { inv=inv'; m=inv.ml }
+
+let ss_inv_exists_ml_ts_inv menvl inv =
+  let inv' = f_exists_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
+  { inv=inv'; m=inv.mr}
+
+let ss_inv_exists_mr_ts_inv menvr inv =
+  let inv' = f_exists_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
   { inv=inv'; m=inv.ml }
 
 (* -------------------------------------------------------------------- *)
@@ -1214,4 +1433,3 @@ let inv_rebind (inv : inv) (ms : memory list) : inv =
   | Inv_ts ts, [ml; mr] -> Inv_ts (ts_inv_rebind ts ml mr)
   | Inv_hs hs, [m] -> Inv_hs (hs_inv_rebind hs m)
   | _, _ -> assert false
-

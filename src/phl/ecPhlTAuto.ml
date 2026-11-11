@@ -44,6 +44,14 @@ let t_core_exfalso_r tc =
   let pre   = tc1_get_pre tc in
     if not (f_equal (inv_of_inv pre) f_false) then
       tc_error !!tc "pre-condition is not `false'";
-    FApi.xmutate1 tc `ExFalso []
+    match (FApi.tc1_goal tc).f_node with
+    | FbdHoareS bhs ->
+      FApi.xmutate1 tc `ExFalso [EcSubst.f_forall_mems_ss_inv bhs.bhs_m 
+        (map_ss_inv1 (f_real_le f_r0) (bhs_bd bhs))]
+    | FbdHoareF bhf ->
+      let (me, _) = EcEnv.Fun.hoareF_memenv (bhf.bhf_m) bhf.bhf_f (FApi.tc1_env tc) in
+      FApi.xmutate1 tc `ExFalso [EcSubst.f_forall_mems_ss_inv me 
+        (map_ss_inv1 (f_real_le f_r0) (bhf_bd bhf))]
+    | _ -> FApi.xmutate1 tc `ExFalso []
 
 let t_core_exfalso = FApi.t_low0 "core-exfalso" t_core_exfalso_r

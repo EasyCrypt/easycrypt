@@ -44,8 +44,10 @@ lemma row_eq_upto_increase (i m : int) (a1 a2 : bool array):
    <=> row_eq_upto (i + 1) m a1 a2).
 proof.
 move=> ? @/row_eq_upto @/cell_eq_upto; split.
-- move=> ? i' j' ??.
-  by case: (i' < i) => /#.
+- move=> [] H_lti H_i i' j' [] ge0_i' /ltzS /lez_eqVlt + H_j.
+  case=> [->>|lti_i'].
+  + by rewrite H_i.
+  + by rewrite H_lti.
 - move=> h; split.
   - move => i' j' ??.
     have ?: 0 <= i' < i + 1 by smt().

@@ -93,6 +93,7 @@ type ini_options = {
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
   ini_quotes   : (string * string) list;
+  ini_pragmas  : string list;
 }
 
 type ini_context = {
@@ -120,6 +121,7 @@ module Ini : sig
   val get_rdirs : ini_context -> (string option * string) list
 
   val get_quotes : ini_context -> (string * string) list
+  val get_pragmas : ini_context -> string list
 
   (* ------------------------------------------------------------------ *)
   val get_all_ppwidth : ini_context list -> int option
@@ -139,6 +141,7 @@ module Ini : sig
   val get_all_rdirs : ini_context list -> (string option * string) list
 
   val get_all_quotes : ini_context list -> (string * string) list
+  val get_all_pragmas : ini_context list -> string list
 end = struct
   (* ------------------------------------------------------------------ *)
   let absolute ?(root : string option) (filename : string) =
@@ -194,6 +197,8 @@ end = struct
       | _ -> cmd
     in
     List.map (snd_map resolve) ini.inic_ini.ini_quotes
+  let get_pragmas (ini : ini_context) =
+    ini.inic_ini.ini_pragmas
 
   (* ------------------------------------------------------------------ *)
   let get_all_ppwidth (ini : ini_context list) =
@@ -222,6 +227,8 @@ end = struct
 
   let get_all_quotes (ini : ini_context list) =
     List.flatten (List.map get_quotes ini)
+  let get_all_pragmas (ini : ini_context list) =
+    List.flatten (List.map get_pragmas ini)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -390,7 +397,7 @@ let specs = {
       `Group "loader";
       `Group "provers";
       `Spec  ("gcstats", `Flag  , "Display GC statistics");
-      `Spec  ("tstats" , `String, "Save timing statistics to <file>");
+      `Spec  ("tstats" , `String, "Save timing and memory statistics to <file>");
       `Spec  ("script" , `Flag  , "Computer-friendly output");
       `Spec  ("no-eco" , `Flag  , "Do not cache verification results");
       `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");
@@ -569,7 +576,8 @@ let prv_options_of_values ini values =
         | None -> Ini.get_all_quorum ini
         | Some _ as i -> i
       end;
-      prvo_pragmas   = get_string_list "pragmas" values;
+      prvo_pragmas   =
+        (Ini.get_all_pragmas ini) @ (get_string_list "pragmas" values);
       prvo_ppwidth   = begin
         match get_int "pp-width" values with
         | None -> Ini.get_all_ppwidth ini
@@ -793,6 +801,7 @@ let read_ini_file (filename : string) =
       ini_idirs    = List.map parse_idir (trylist "idirs");
       ini_rdirs    = List.map parse_idir (trylist "rdirs");
       ini_quotes   = List.filter_map parse_quote (trylist "quote"); } in
+      ini_pragmas  = trylist "pragmas"; } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
     ini_why3     = omap expand ini.ini_why3;
@@ -803,3 +812,4 @@ let read_ini_file (filename : string) =
     ini_idirs    = ini.ini_idirs;
     ini_rdirs    = ini.ini_rdirs;
     ini_quotes   = ini.ini_quotes; }
+    ini_pragmas  = ini.ini_pragmas; }

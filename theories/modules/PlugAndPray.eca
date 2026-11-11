@@ -40,7 +40,7 @@ seq  1: (phi (glob G) o)
         _ 0%r => //.
   (* FIXME: This is more verbose than it should be! *)
 + call (: (glob G) = (glob G){m} /\ x = x0 ==> phi (glob G) res) => //.
-  bypr=> &m0 @/p [#] eq_globs ->.
+  bypr=> &m0 @/p; rewrite Pr[mu_ge0] => [#] [] eq_globs ->.
   byequiv (: ={glob G, x} ==> ={glob G, res})=> //=.
   by proc true.
 + rnd (pred1 (psi (glob G) o)); skip=> /> &m0 hphi.

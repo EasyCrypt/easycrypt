@@ -83,6 +83,20 @@ and check_f_bad_true env bad f =
       EcPV.PV.check_depend env fv (m_functor f.x_top)) bad;
     List.iter (check_f_bad_true env bad) (OI.allowed o)
 
+(* -------------------------------------------------------------------- *)
+(* The two procedures have the same parameters (in the same order) and the
+   same local variables: their bodies are then compared syntactically, the
+   variables of one standing for the same ones of the other. *)
+let same_vars env fun1 fun2 fd1 fd2 =
+  let check_param a1 a2 =
+       a1.ov_name = a2.ov_name
+    && EqTest.for_type env a1.ov_type a2.ov_type in
+  let check_local x1 x2 =
+    x1.v_name = x2.v_name && EqTest.for_type env x1.v_type x2.v_type in
+     List.all2 check_param fun1.f_sig.fs_anames fun2.f_sig.fs_anames
+  && List.all2 check_local fd1.f_locals fd2.f_locals
+
+(* -------------------------------------------------------------------- *)
 let rec s_upto_r env alpha bad s1 s2 =
   match s1, s2 with
   | [], [] -> true
@@ -157,9 +171,7 @@ and f_upto env bad f1 f2 =
   match fun1.f_def, fun2.f_def with
   | FBalias _, _ | _, FBalias _ -> assert false
   | FBdef fd1, FBdef fd2 ->
-    let check_param x1 x2 =
-      x1.v_name = x2.v_name && EqTest.for_type env x1.v_type x2.v_type in
-    List.all2 check_param fd1.f_locals fd2.f_locals &&
+    same_vars env fun1 fun2 fd1 fd2 &&
     oall2 (EqTest.for_expr env) fd1.f_ret fd2.f_ret &&
     s_upto env EcIdent.Mid.empty bad fd1.f_body fd2.f_body
 
@@ -193,11 +205,9 @@ let f_upto_init env bad f1 f2 =
   match fun1.f_def, fun2.f_def with
   | FBalias _, _ | _, FBalias _ -> assert false
   | FBdef fd1, FBdef fd2 ->
-    let check_param x1 x2 =
-      x1.v_name = x2.v_name && EqTest.for_type env x1.v_type x2.v_type in
     let alpha = EcIdent.Mid.empty in
     let body1 = fd1.f_body and body2 = fd2.f_body in
-    List.all2 check_param fd1.f_locals fd2.f_locals &&
+    same_vars env fun1 fun2 fd1 fd2 &&
     oall2 (EqTest.for_expr env) fd1.f_ret fd2.f_ret &&
     ( s_upto_init env alpha bad body1.s_node body2.s_node ||
       s_upto      env alpha (Some bad) body1 body2 )

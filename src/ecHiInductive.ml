@@ -83,10 +83,11 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let tpath = EcPath.pqname (EcEnv.root env) (unloc name) in
   let env0  =
     let myself = {
-      tyd_params  = EcUnify.UniEnv.tparams ue;
-      tyd_type    = Abstract;
-      tyd_loca    = lc;
-      tyd_subtype = None;
+      tyd_params   = EcUnify.UniEnv.tparams ue;
+      tyd_type     = Abstract;
+      tyd_loca     = lc;
+      tyd_clinline = false;
+      tyd_subtype  = None;
     } in
       EcEnv.Ty.bind (unloc name) myself env
   in
@@ -467,7 +468,8 @@ let trans_matchfix
           match List.nth_opt args pos with
           | Some { e_node = Elocal a } when Sid.mem a pvars -> ()
           | _ -> fxerror loc env TT.FXE_SynCheckFailure
-          end
+          end;
+          List.iter check_body args
         | _ -> EcTypes.e_iter check_body e
       in
       check_body e

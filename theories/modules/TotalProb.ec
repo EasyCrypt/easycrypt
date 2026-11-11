@@ -89,7 +89,7 @@ seq 1 :
 + by auto.
 + by rnd (pred1 x'); auto.
 + call (: i = i' /\ x = x' /\ glob M = (glob M){m} ==> res).
-  + bypr => &hr [#] -> -> glob_eq.
+  + bypr => &hr; rewrite Pr[mu_ge0] /= => [#] -> -> glob_eq.
     by byequiv (: ={i, x, glob M} ==> ={res}) => //; sim.
 + by auto.
 by hoare; call (: true); auto; smt().

@@ -13,7 +13,8 @@
  (sites (lib theories) (libexec commands) (lib doc) (lib config))
  (depends
   (ocaml (>= 4.08.0))
-  (batteries (>= 3))
+  (batteries (>= 3.9))
+  bitwuzla-cxx
   (camlp-streams (>= 5))
   camlzip
   dune
@@ -21,7 +22,7 @@
   dune-site
   markdown
   (pcre2 (>= 8))
-  (why3 (and (>= 1.8.0) (< 1.9)))
+  (why3 (and (>= 1.9.0) (< 1.10)))
   yojson
   (zarith (>= 1.10))
 ))

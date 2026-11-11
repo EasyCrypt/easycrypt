@@ -121,6 +121,9 @@ If the conclusion is a probabilistic Hoare logic statement judgement whose progr
     which can be provided explicitly. When `E`` is not
     specified, it is inferred from the current postcondition.
 
+    The `rnd` tactic additionally verifies that the bound is non-negative,
+    as a separate goal, and tries to close it automatically.
+
 .. ecproof::
    :title: Probabilistic Hoare logic example (upper bound)
 
@@ -145,9 +148,11 @@ If the conclusion is a probabilistic Hoare logic statement judgement whose progr
         (* The post now has two clauses, the first is to prove the
            probability upper bound on the event, and the second one is to
            prove that the event holding implies the
-           previous postcondition. *)
-     skip => *;split.
-     + by smt(dbool1E). 
+           previous postcondition. A third goal requires the bound to
+           be non-negative. *)
+     + skip => *;split.
+       + by smt(dbool1E).
+       by smt().
      by smt().
    qed.
 

@@ -54,6 +54,11 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   FApi.t_try (process1_core ttenv t) tc
 
 (* -------------------------------------------------------------------- *)
+and process1_extens (ttenv : ttenv) ((t, v) : ptactic_core * psymbol option) (tc : tcenv1) =
+  let v = Option.map unloc v in
+  EcPhlBDep.t_extens v (process1_core ttenv t) tc
+
+(* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
   EcLowGoal.t_admit tc
 
@@ -115,6 +120,19 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
   aux ts (tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
+(* [with hint h (ts)]: run [ts] under the local hint command [h], then
+   restore the simplify context on all resulting subgoals. *)
+and process1_with (ttenv : ttenv) (h : plocalhint) (ts : ptactic list) (tc : tcenv1) =
+  let simpl = tc1_simplify_context tc in
+  let tc = process_local_hint h tc in
+  let tc = process1_seq ttenv ts (as_tcenv1 tc) in
+  t_onall
+    (fun tc ->
+      tcenv_of_tcenv1
+        (map_pregoal1 (fun goal -> { goal with g_simpl = simpl }) tc))
+    tc
+
+(* -------------------------------------------------------------------- *)
 and process1_nstrict (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   if ttenv.tt_smtmode <> `Strict then
     tc_error !!tc "try! can only be used in strict proof mode";
@@ -133,13 +151,13 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Psplit (`Default i) -> process_split ?i
     | Psplit (`All `Maybe)-> process_split_all ~must:false
     | Psplit (`All `One)  -> process_split_all ~must:true
-    | Pfield st           -> process_algebra `Solve `Field st
-    | Pring st            -> process_algebra `Solve `Ring  st
+    | Pfield (nm, st)     -> process_algebra `Solve `Field ?name:nm st
+    | Pring  (nm, st)     -> process_algebra `Solve `Ring  ?name:nm st
     | Palg_norm           -> EcStrongRing.t_alg_eq
     | Pexists fs          -> process_exists fs
     | Pleft               -> process_left
     | Pright              -> process_right
-    | Pcongr              -> process_congr
+    | Pcongr mode         -> process_congr mode
     | Ptrivial            -> process_trivial
     | Pelim pe            -> process_elim pe
     | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
@@ -156,6 +174,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pmemory m           -> process_memory m
     | Pwlog (ids, b, f)   -> process_wlog ~suff:b ids f
     | Pgenhave gh         -> process_genhave ttenv gh
+    | PlocalHint h        -> process_local_hint h
     | Prwnormal _         -> assert false
     | Pcoq (m, n, pi)     -> process_coq ~loc:(loc t) ~name:n.pl_desc ttenv m pi
   in
@@ -188,7 +207,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
     | Punroll info              -> EcPhlLoopTx.process_unroll info
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
-    | Pcall (side, info)        -> EcPhlCall.process_call side info
+    | Pcall info                -> EcPhlCall.process_call info
     | Pcallconcave info         -> EcPhlCall.process_call_concave info
     | Pswap sw                  -> EcPhlSwap.process_swap sw
     | Pinline info              -> EcPhlInline.process_inline info
@@ -235,6 +254,8 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
     | Pprocrewriteat (x, f)     -> EcPhlRewrite.process_rewrite_at x f
     | Pchangestmt (s, b, p, c)  -> EcPhlRewrite.process_change_stmt s b p c 
+    | Pcircuit `Solve           -> EcPhlBDep.t_bdep_solve
+    | Pcircuit `Simplify        -> EcPhlBDep.t_bdep_simplify
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
     | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in
@@ -326,8 +347,10 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Psolve    t           -> `One (process1_solve    ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)
+    | Pextens   (t, v)      -> `One (process1_extens   ttenv (t, v))
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
+    | Pwith     (h, ts)     -> `One (process1_with     ttenv h ts)
     | Pcase     es          -> `One (process1_case     ttenv es)
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)

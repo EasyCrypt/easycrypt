@@ -26,7 +26,8 @@ and theory_item_r =
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   (* reduction rule does not survive to section so no locality *)
-  | Th_reduction of (EcPath.path * rule_option * rule option) list
+  | Th_reduction of reduction_rule
+  | Th_crbinding of crbinding * is_local
   | Th_auto      of auto_rule
   | Th_alias     of (symbol * path)
 
@@ -64,6 +65,11 @@ and rule = {
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
+}
+
+and reduction_rule = {
+  red_base : symbol option;
+  red_rules : (path * rule_option * rule list) list;
 }
 
 and auto_rule = {

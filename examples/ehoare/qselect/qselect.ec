@@ -251,7 +251,10 @@ proof.
     have -> : 4 * sumid (pos + 1)(hi + 1) = 2 * (2 * sumid (pos + 1)(hi + 1)) by ring.
     rewrite sumidE_rm 1:/#.
     apply RealOrder.ler_pdivr_mulr; 1: smt().
-    rewrite !to_pos_pos 1,3,4:/#.
+    rewrite !to_pos_pos 3,4:/#.
+    + rewrite le_fromint.
+      pose h1 := hi + 1; pose p1 := pos + 1. pose lo1 := 1+ lo.
+      by apply IntOrder.mulr_ge0 => /#.
     + rewrite le_fromint.
       pose h1 := hi + 1; pose p1 := pos + 1. pose lo1 := 1+ lo.
       have -> : 2 * ((h1 - p1) * (h1 + p1 - 1)) + 4 * ((- lo1) * (h1 - p1)) = 

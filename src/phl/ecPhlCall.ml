@@ -111,7 +111,7 @@ let compute_equiv_call_post
   let fpost =
     let s =
       PVM.of_list env
-        [((pv_res, mr), fresr.inv); ((pv_res, ml), fresl.inv)] in    
+        [((pv_res, mr), fresr.inv); ((pv_res, ml), fresl.inv)] in
     PVM.subst env s fpost in
 
   let post =
@@ -247,13 +247,13 @@ let t_ehoare_call_core fpre fpost tc =
   let hyps, env, hs, s, f, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   if not (List.is_empty s.s_node) then
     tc_error !!tc  "ehoare call core rule: only single call statements are accepted";
-  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs) wppost) then
+  if not (EcReduction.ss_inv_is_conv hyps (ehs_po hs) wppost) then
     (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong post-condition %a instead %a"
        (EcPrinting.pp_form ppe) (ehs_po hs).inv (EcPrinting.pp_form ppe) wppost.inv);
 
-  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_pr hs) wppre) then
+  if not (EcReduction.ss_inv_is_conv hyps (ehs_pr hs) wppre) then
     (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong pre-condition %a instead %a"
@@ -310,6 +310,23 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let bhs_bd = ss_inv_rebind (bhs_bd bhs) m in
   let bhs_po = ss_inv_rebind (bhs_po bhs) m in
   let bhs_pr = ss_inv_rebind (bhs_pr bhs) m in
+
+  (* The bound of the specification of the called procedure (the bound of
+     the conclusion, or [opt_bd]) is interpreted in the memory the procedure
+     starts from: after [s], and with the local variables of the callee.
+     The bound of the conclusion is interpreted in the initial memory, with
+     the local variables of the caller. The two coincide only if this bound
+     depends neither on local variables nor on variables written by [s]. *)
+  let callee_bd = odfl bhs_bd opt_bd in
+  let fv_bd = PV.fv env callee_bd.m callee_bd.inv in
+
+  if List.exists (fun (pv, _) -> is_loc pv) (fst (PV.elements fv_bd)) then
+    tc_error !!tc "The bound cannot depend on local variables";
+
+  if not (PV.indep env (s_write env s) fv_bd) then
+    tc_error !!tc
+      "The bound cannot depend on variables written by the \
+       statements preceding the call";
 
   (* The function satisfies the specification *)
   let f_concl =
@@ -531,7 +548,7 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
 let ensure_none_poe tc poe =
   if not (is_none poe) then tc_error !!tc "exception are not supported"
 
-let process_call side info tc =
+let process_call (side, info) tc =
   let process_spec_2 tc side pre post =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side with
@@ -649,7 +666,7 @@ let process_call side info tc =
         let ml, mr = fst es.es_ml, fst es.es_mr in
         let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
         let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-        let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
+        let weakened_pre,bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
         let bad2 = ss_inv_generalize_as_right bad ml mr in
         let invP = ts_inv_rebind invP ml mr in
         let invQ = ts_inv_rebind invQ ml mr in
@@ -664,7 +681,7 @@ let process_call side info tc =
         let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
         let pre    = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands (eq_params::lpre)) in
         let post   = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands [eq_res;eqglob;invP]) in
-        (bad,invP,invQ, f_equivF pre fl fr post)
+        (weakened_pre,bad,invP,invQ, f_equivF pre fl fr post)
 
     | _ -> tc_error !!tc "the conclusion is not an equiv" in
 
@@ -691,10 +708,10 @@ let process_call side info tc =
       end
 
     | CI_upto info ->
-      let bad, p, q, form = process_upto tc side info in
+      let weakened_pre, bad, p, q, form = process_upto tc side info in
       let t_tr = FApi.t_or (t_assumption `Conv) t_trivial in
       subtactic := (fun tc ->
-        FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto bad p q tc));
+        FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto weakened_pre bad p q tc));
       form
 
   in
@@ -733,21 +750,32 @@ let process_call_concave (fc, info) tc =
 
     | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 
-  let process_spec tc =
-    let _, concl = FApi.tc1_flat tc in
+  (* As for [call] (see [process_call]), the specification is typed in the
+     memories of the called procedure, and the invariant in an abstract
+     memory: the local variables of the caller are not in scope (they
+     would be read as the callee's variables of the same name). *)
+  let process_spec tc pre post =
+    let hyps, concl = FApi.tc1_flat tc in
       match concl.f_node  with
       | FeHoareS hs ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          (txreal, fun pre post -> f_eHoareF pre f post)
+          let m = EcIdent.create "&hr" in
+          let penv, qenv = LDecl.hoareF m f hyps in
+          let pre  = TTC.pf_process_form !!tc penv txreal pre  in
+          let post = TTC.pf_process_form !!tc qenv txreal post in
+          f_eHoareF {m; inv = pre} f {m; inv = post}
 
       | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 
-  let process_inv tc =
-      let _, concl = FApi.tc1_flat tc in
+  let process_inv tc inv =
+    let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
     | FeHoareS hs ->
+        let m = fst hs.ehs_m in
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-        (txreal, fun inv -> f_eHoareF inv f inv)
+        let hyps = LDecl.push_active_ss (EcMemory.abstract m) hyps in
+        let inv = {m; inv = TTC.pf_process_form !!tc hyps txreal inv} in
+        (f_eHoareF inv f inv, inv)
 
     | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 
@@ -756,17 +784,13 @@ let process_call_concave (fc, info) tc =
   let process_cut tc info =
     match info with
     | CI_spec (pre, epost) ->
-      let ty,fmake = process_spec tc in
-      let _, pre = TTC.tc1_process_Xhl_form tc ty pre in
-      let _, post = TTC.tc1_process_Xhl_form tc ty epost.pnormal in
-      fmake pre post
+      process_spec tc pre epost.pnormal
 
     | CI_inv inv ->
-      let ty, fmake = process_inv tc in
-      let _, inv = TTC.tc1_process_Xhl_form tc ty inv in
+      let spec, inv = process_inv tc inv in
       subtactic := (fun tc ->
         FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun (Inv_ss inv) tc));
-      fmake inv
+      spec
 
     | _ ->
         tc_error !!tc "cannot supply additional information for call /"

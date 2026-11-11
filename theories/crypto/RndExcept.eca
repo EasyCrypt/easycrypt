@@ -277,13 +277,14 @@ abstract theory AdversaryN.
     + rewrite BRA.sumr_const RField.intmulr count_predT.
       smt (size_range q_pos).
     + inline *;auto.
-    + proc;inline *;sp 1;if;last by hoare.
-      sp 3;wp;if;last by hoare.
+    + proc;inline *;sp 1;if; last hoare => //; smt(n_pos p_pos).
+      sp 3;wp;if;last hoare => //; smt(n_pos p_pos).
       wp;conseq (_ : _ ==> r1 \in X1)=> [ /# | ].
-      rnd;auto => &hr /> ??? Hs.
+      rnd; last by move=> &hr />; smt(p_pos n_pos).
+      auto => &hr /> ??? Hs.
       apply (ler_trans (BRA.big predT (fun (x : t) => 1%r/n%r) X{hr})).
       + apply (ler_trans _ _ _ (mu_mem_le (d i{hr}) X{hr})).
-        by apply ler_sum_seq => /= ???;rewrite d_uni.
+        by apply ler_sum_seq => /= ??;rewrite d_uni.
       rewrite BRA.sumr_const RField.intmulr count_predT.
       by have /# : 0%r < inv n%r; apply invr_gt0; rewrite lt_fromint n_pos.
     + move=> c;proc;sp;inline *.

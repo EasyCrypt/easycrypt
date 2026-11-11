@@ -75,12 +75,18 @@ have uniq_s: uniq s; first apply: uniq_flatten_map.
 have mem_s: forall x, (x \in s) <=> (x \in range 0 p).
 - move=> x; rewrite mem_range; split.
   - case/flatten_mapP=> j [/= /mem_range rgj] /=.
-    case/mapP => [k [/mem_range rgk]] ->; split; [smt()|smt(@IntDiv)].
+    case/mapP => [k [/mem_range rgk]] ->; split=> [/#|_].
+    rewrite (divz_eq p q) dvd_qp /=.
+    apply: (ltr_le_trans ((p %/ q - 1) * q + q)); last first.
+    + by rewrite -(mulzDl _ 1).
+    by apply: ler_lt_add=> [|/#]; apply: ler_pmul=> //#.
   - case=> ge0x lex; apply/flatten_mapP => /=.
     exists (x %/ q); rewrite mem_range.
-    rewrite divz_ge0 // ge0x /=; split; 1: smt(@IntDiv).
+    rewrite divz_ge0 // ge0x /=; split.
+    + rewrite -(ltr_pmul2r q gt0_q) (divzK q p dvd_qp).
+      by apply/(ler_lt_trans x _ _ _ lex)/lez_floor=> /#.
     apply/mapP; exists (x %% q); rewrite mem_range.
-    rewrite modz_ge0 1:gtr_eqF //= ltz_pmod //= &(divz_eq).
+    by rewrite modz_ge0 1:gtr_eqF //= ltz_pmod //= &(divz_eq).
 have eqs: perm_eq s (range 0 p).
 - by apply: uniq_perm_eq => //; apply/range_uniq.
 rewrite dmap1E duniformE /= undup_id ?range_uniq /pred1 /(\o).

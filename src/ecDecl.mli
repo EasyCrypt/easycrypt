@@ -30,9 +30,10 @@ type ty_body =
 
 
 type tydecl = {
-  tyd_params  : ty_params;
-  tyd_type    : ty_body;
-  tyd_loca    : locality;
+  tyd_params   : ty_params;
+  tyd_type     : ty_body;
+  tyd_loca     : locality;
+  tyd_clinline : bool;
   (* For [subtype]-declared types: the carrier and the predicate. The
      declared type itself stays [tyd_type = Abstract], because a
      subtype is semantically a fresh abstract type — but its dependency
@@ -41,7 +42,7 @@ type tydecl = {
      carrier+predicate fv into the type's fv when this field is set,
      so a subtype declared inside [section. declare type c.] gets the
      section's tparams added at close, just like type aliases do.      *)
-  tyd_subtype : (EcTypes.ty * EcCoreFol.form) option;
+  tyd_subtype  : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
@@ -127,7 +128,7 @@ type operator = {
   op_unfold   : int option;
 }
 
-and opopaque = { smt: bool; reduction: bool; }
+and opopaque = { smt: bool; reduction: bool; inline: bool; }
 
 val op_ty        : operator -> ty
 val is_pred      : operator -> bool
@@ -139,6 +140,13 @@ val is_fix       : operator -> bool
 val is_abbrev    : operator -> bool
 val is_prind     : operator -> bool
 val is_exception : operator -> bool
+
+(* The delta-reduction policy: the (uninstantiated) body of a plain
+   operator or predicate, provided the reduction mode allows unfolding
+   it with [nargs] arguments at hand. *)
+val operator_body :
+  mode:[`Force | `IfTransparent | `IfApplied] -> nargs:int
+  -> operator -> form option
 
 val optransparent : opopaque
 
@@ -198,6 +206,7 @@ type rkind = [
 ]
 
 type ring = {
+  r_name  : EcSymbols.symbol option;
   r_type  : EcTypes.ty;
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
@@ -219,3 +228,89 @@ type field = {
   f_div  : EcPath.path option;
 }
 val field_equal : field -> field -> bool
+
+(* -------------------------------------------------------------------- *)
+type binding_size = form * (int option)
+
+type crb_theory1_kind =
+  | CRBT_Type   of EcPath.path
+  | CRBT_Op     of ty_params * expr
+  | CRBT_Lemma  of EcPath.path
+
+type crb_theory1 = 
+  { name: EcSymbols.symbol
+  ; kind: crb_theory1_kind }
+
+type crb_theory =
+  crb_theory1 list
+
+type crb_bitstring =
+  { type_  : EcPath.path
+  ; from_  : EcPath.path
+  ; to_    : EcPath.path
+  ; ofint  : EcPath.path
+  ; touint : EcPath.path
+  ; tosint : EcPath.path
+  ; size   : binding_size
+  ; theory : crb_theory }
+  
+type crb_array =
+  { type_  : EcPath.path
+  ; get    : EcPath.path
+  ; set    : EcPath.path
+  ; tolist : EcPath.path
+  ; oflist : EcPath.path
+  ; size   : binding_size
+  ; theory : crb_theory }
+  
+type bv_opkind = [
+  | `Add      of binding_size (* size *)
+  | `Sub      of binding_size (* size *)
+  | `Mul      of binding_size (* size *)
+  | `Div      of binding_size * bool (* size + sign *)
+  | `Rem      of binding_size * bool (* size + sign *)
+  | `Shl      of binding_size (* size *)
+  | `Shr      of binding_size * bool (* size + sign *)
+  | `Shls     of binding_size * binding_size (* size *)
+  | `Shrs     of binding_size * binding_size * bool (* size + sign *)
+  | `Rol      of binding_size (* size *)
+  | `Rol      of binding_size (* size *)
+  | `Ror      of binding_size (* size *)
+  | `And      of binding_size (* size *)
+  | `Or       of binding_size (* size *)
+  | `Xor      of binding_size (* size *)
+  | `Not      of binding_size (* size *)
+  | `Opp      of binding_size (* size *)
+  | `Lt       of binding_size * bool (* size + sign *) 
+  | `Le       of binding_size * bool (* size + sign *)
+  | `Extend   of binding_size * binding_size * bool (* size in + size out + sign *)
+  | `Truncate of binding_size * binding_size (* size in + size out *)
+  | `Extract  of binding_size * binding_size * bool (* size in + size out * aligned *)
+  | `Insert   of binding_size * binding_size (* size in + size out *)
+  | `Concat   of binding_size * binding_size * binding_size (* size in1 + size in2 *)
+  | `Init     of binding_size (* size_out *)
+  | `Get      of binding_size (* size_in *)
+  | `AInit    of binding_size * binding_size (* arr_len + size_out *)
+  | `PAInit   of binding_size (* arr_len; element size resolved at use (polymorphic) *)
+  | `Map      of binding_size * binding_size * binding_size (* size_in + size_out + arr_size *)
+  | `A2B      of (binding_size * binding_size) * binding_size (* (arr_len, elem_sz), out_size *)
+  | `B2A      of binding_size * (binding_size * binding_size) (* size in, (arr_len, elem_sz)  *)
+  | `ASliceGet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_out *)
+  | `ASliceSet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_in *)
+]
+  
+type crb_bvoperator =
+  { kind     : bv_opkind
+  ; types    : EcPath.path list
+  ; operator : EcPath.path }
+  
+type crb_circuit =
+{ name     : string
+; circuit  : Lospecs.Ast.adef
+; operator : EcPath.path }
+
+type crbinding =
+| CRB_Bitstring  of crb_bitstring
+| CRB_Array      of crb_array
+| CRB_BvOperator of crb_bvoperator
+| CRB_Circuit    of crb_circuit

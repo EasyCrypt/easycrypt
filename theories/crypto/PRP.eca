@@ -474,7 +474,7 @@ section Upto.
     by move=> &hr x_notin_m r_in_rng_m; apply excepted_lossless; exists x{hr}.
     move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
     proc; if; auto=> />; rewrite dD_ll //=.
-    move=> &0 x x' x'_neq_x x_in_m x'_in_m x_coll_x' x0_notin_m v _ _.
+    move=> &0 x x' x'_neq_x x_in_m x'_in_m x_coll_x' x0_notin_m v _.
     by exists x x'=> />; rewrite !mem_set x_in_m x'_in_m /= !get_set_neqE 1,2:/#.
   inline *; auto=> />; split=> [|_].
   + by rewrite no_collision=> x x'; rewrite mem_empty.

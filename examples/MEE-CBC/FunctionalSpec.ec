@@ -466,18 +466,50 @@ phoare mee_encrypt_correct _mk _ek _p _c:
 proof.
   have->: mu1 (dapply (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) _c
           = mu1 (dmap dblock (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)) _c by move.
-  rewrite dmap1E /preim /pred1 /=.
+  rewrite dmap1E /pred1 /=.
   proc; inline MAC.tag PRPc.PseudoRP.f.
   swap 6 -5 => //=; alias 2 iv = s.
+  seq 2 : (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p = _c)
+          (mu dblock ((fun (x0 : block list) => x0 = _c) \o fun (iv0 : block) => iv0 :: mee_enc AES hmac_sha256 _ek _mk iv0 _p))
+          1%r 1%r 0%r
+          (key = (_ek, _mk) /\ p = _p /\ iv = s)=> //.
+  + by auto.
+  + by wp; rnd.
+  + while (   0 <= i <= size (pad _p (hmac_sha256 _mk _p))
+           /\ ek = _ek
+           /\ p' = pad _p (hmac_sha256 _mk _p)
+           /\ s  = nth witness c i
+           /\ size c = 1 + i
+           /\ c      = iv :: cbc_enc AES _ek iv (take i (pad _p (hmac_sha256 _mk _p))))
+          (size (pad _p (hmac_sha256 _mk _p)) - i).
+      auto=> /> &hr le0_i _ /addzI szcbc_eq_i lti_szpadded.
+      split; last by smt ().
+      split; first by smt().
+      split; last first.
+        split; first by rewrite size_cat /= szcbc_eq_i.
+        rewrite (take_nth witness) //= -cbc_enc_rcons -cats1 /=.
+        by rewrite size_take // lti_szpadded.
+      have -> /=: i{hr} + 1 <> 0 by smt ().
+      by rewrite cats1 nth_rcons size_cbc_enc size_take // lti_szpadded /=.
+    wp=> //=.
+    conseq (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
+      move=> &m [#] ->> ->> ->> <<- //=.
+      split=> [|c n s0]; 1:by split; [rewrite size_ge0|rewrite take0].
+      split=> [[[le0_n le_n_size] [s0_is_nth [size_c]]] c_is_enc|].
+        by rewrite StdOrder.IntOrder.ler_subl_addr add0z=> /StdOrder.IntOrder.ler_gtF.
+      rewrite -lezNgt=> le_size_n [[le0_n le_n_size]] [_] [_] ->.
+      have [_ ->] //:= eqz_leq n (size (pad _p (hmac_sha256 _mk _p))).
+      by rewrite take_size.
+  (* the sampled IV is wrong: the loop cannot produce _c *)
+  hoare.
   while (   0 <= i <= size (pad _p (hmac_sha256 _mk _p))
          /\ ek = _ek
          /\ p' = pad _p (hmac_sha256 _mk _p)
          /\ s  = nth witness c i
          /\ size c = 1 + i
-         /\ c      = iv :: cbc_enc AES _ek iv (take i (pad _p (hmac_sha256 _mk _p))))
-        (size (pad _p (hmac_sha256 _mk _p)) - i).
-    auto=> /> &hr le0_i _ /addzI szcbc_eq_i lti_szpadded.
-    split; last by smt ().
+         /\ c      = iv :: cbc_enc AES _ek iv (take i (pad _p (hmac_sha256 _mk _p)))
+         /\ iv :: mee_enc AES hmac_sha256 _ek _mk iv _p <> _c).
+    auto=> /> &hr le0_i _ /addzI szcbc_eq_i c_neq lti_szpadded.
     split; first by smt().
     split; last first.
       split; first by rewrite size_cat /= szcbc_eq_i.
@@ -485,23 +517,11 @@ proof.
       by rewrite size_take // lti_szpadded.
     have -> /=: i{hr} + 1 <> 0 by smt ().
     by rewrite cats1 nth_rcons size_cbc_enc size_take // lti_szpadded /=.
-  wp=> //=.
-  conseq (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
-    move=> &m [->>] ->> iv //=; split=> [[[le0_size _] h]|<<-].
-      have -> //=:= h (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
-                      (size (pad _p (hmac_sha256 _mk _p)))
-                      (nth witness (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
-                                   (size (pad _p (hmac_sha256 _mk _p)))).
-      split=> //=.
-      split; 1:by rewrite /mee_enc /= size_cbc_enc addzC.
-      by rewrite take_size.
-    split=> [|c n s0]; 1:by split; [rewrite size_ge0|rewrite take0].
-    split=> [[[le0_n le_n_size] [s0_is_nth [size_c]]] c_is_enc|].
-      by rewrite StdOrder.IntOrder.ler_subl_addr add0z=> /StdOrder.IntOrder.ler_gtF.
-    rewrite -lezNgt=> le_size_n [[le0_n le_n_size]] [_] [_] ->.
-    have [_ ->] //:= eqz_leq n (size (pad _p (hmac_sha256 _mk _p))).
-    by rewrite take_size.
-  by rnd.
+  wp; skip=> &m [#] ->> ->> ->> c_neq /=.
+  split=> [|c n s0]; 1:by rewrite size_ge0 take0 /= c_neq.
+  rewrite -lezNgt=> le_size_n [#] le0_n le_n_size _ _ ->.
+  have [_ ->] //:= eqz_leq n (size (pad _p (hmac_sha256 _mk _p))).
+  by rewrite take_size /mee_enc.
 qed.
 
 phoare mee_decrypt_correct _mk _ek _c:
@@ -528,7 +548,7 @@ conseq (_: true ==> true) (_: _ ==> _)=> //=.
   rewrite (ler_asym (size p) (size (behead _c)) _);
     rewrite ?ge_szc_p ?le_szc_p // take_size => p_def.
   split.
-  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t.
+  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= - [] m t.
     by rewrite /mee_dec /= -p_def=> -> /=.
   by rewrite /mee_dec -p_def /= => ->.
  proc; inline *; wp; while true (size c - i); auto =>/#.

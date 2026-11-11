@@ -614,7 +614,8 @@ section Security_Aux.
 
   local lemma pr_G2_res &m: Pr[G2.main() @ &m : res] <= 1%r/2%r.
   proof.
-    byphoare=> //;proc;rnd;conseq (_: _ ==> true) => //=.
+    byphoare=> //;proc;rnd; last by move=> &hr /=; smt().
+    conseq (_: _ ==> true) => //=.
     by move=> ?;rewrite DBool.dbool1E.
   qed.
 
@@ -761,7 +762,7 @@ section Security_Aux.
   local lemma pr_G3_y2log &m :
     Pr[G3.main() @ &m : G1.y2 \in G3.y2log] <= PKE_.qD%r / order%r.
   proof.
-    byphoare => //;proc;wp;rnd.
+    byphoare => //;proc;wp;rnd; last by move=> &hr /=; smt(qD_pos gt1_q).
     conseq (_: _ ==> size G3.y2log <=  PKE_.qD) => /=.
     + move=> y2log Hsize;apply (ler_trans ((size y2log)%r/order%r)).
       + by apply (mu_mem_le_mu1 dt y2log (inv order%r)) => x;rewrite dt1E.
@@ -868,8 +869,10 @@ section Security_Aux.
     (forall (x : 'a), mu1 dt x <= r) => mu dt (mem l) <= n%r * r.
   proof.
     move=> Hsize Hmu1;apply (ler_trans ((size l)%r * r)).
-    + by apply mu_mem_le_mu1.
-    apply ler_wpmul2r; 1: smt (mu_bounded).
+    + by apply: mu_mem_le_mu1.
+    apply: ler_wpmul2r.
+    + apply: (ler_trans (mu1 dt witness)); 1:exact: ge0_mu.
+      exact: Hmu1.
     by apply le_fromint.
   qed.
 
@@ -904,7 +907,8 @@ section Security_Aux.
     + hoare;conseq (_ : _ ==> true) => // /#.
     + move=> &hr _;apply lerr_eq;ring.
     + by auto.
-    + rnd;skip => /> &hr Hsize _;pose m' := map _ _.
+    + rnd; last by move=> &hr /=; smt(qD_pos gt1_q).
+      skip => /> &hr Hsize _;pose m' := map _ _.
       apply (mu_mem_le_mu1_size dt m') => //.
       + by rewrite /m' size_map.
       by move=> ?;rewrite dt1E.
@@ -914,7 +918,8 @@ section Security_Aux.
     + hoare;conseq (_ : _ ==> true) => // /#.
     + move=> &hr _;apply lerr_eq;ring.
     + by auto.
-    + rnd;skip => /> &hr Hsize _;pose m' := map _ _.
+    + rnd; last by move=> &hr /=; smt(qD_pos gt1_q).
+      skip => /> &hr Hsize _;pose m' := map _ _.
       apply (mu_mem_le_mu1_size (dt \ pred1 G1.u{hr}) m') => //.
       + by rewrite /m' size_map.
       move=> x;rewrite dexcepted1E {1}/pred1.
@@ -930,12 +935,14 @@ section Security_Aux.
       + rewrite expr2; smt (gt1_q).
       + smt (gt1_q).
     + by auto.
-    + rnd;skip => /> &hr Hsize _;pose m' := map _ _.
+    + rnd; last by move=> &hr /=; smt(qD_pos gt1_q).
+      skip => /> &hr Hsize _;pose m' := map _ _.
       apply (mu_mem_le_mu1_size dt m') => //.
       + by rewrite /m' size_map.
       by move=> ?;rewrite dt1E.
     conseq (_ : _ ==> (r \in map (fun (g4 : ciphertext) => loge g4.`4) G3.cilog)) => //.
-    rnd;skip => /> &hr Hsize _;pose m' := map _ _.
+    rnd; last by move=> &hr /=; smt(qD_pos gt1_q).
+    skip => /> &hr Hsize _;pose m' := map _ _.
     apply (mu_mem_le_mu1_size dt m') => //.
     + by rewrite /m' size_map.
     by move=> ?;rewrite dt1E.

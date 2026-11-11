@@ -53,7 +53,7 @@ module User : sig
 
   type rule = EcEnv.Reduction.rule
 
-  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule
+  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule list
 end
 
 (* -------------------------------------------------------------------- *)
@@ -70,6 +70,9 @@ type reduction_info = {
   logic   : rlogic_info;       (* perform logical simplification *)
   modpath : bool;              (* reduce module path *)
   user    : bool;              (* reduce user defined rules *)
+  user_db : EcSymbols.symbol list option; (* use-site database selection *)
+  user_local : EcEnv.simplify_context; (* proof-local simplify overlay *)
+  user_hd : EcEnv.SimplifyContext.head_filter option; (* head filter *)
 }
 
 and deltap      = [EcEnv.Op.redmode | `No]
@@ -119,3 +122,5 @@ val xconv : xconv -> LDecl.hyps -> form -> form -> bool
 val ss_inv_alpha_eq : LDecl.hyps -> ss_inv -> ss_inv -> bool
 val ts_inv_alpha_eq : LDecl.hyps -> ts_inv -> ts_inv -> bool
 val hs_inv_alpha_eq : LDecl.hyps -> hs_inv -> hs_inv -> bool
+
+val ss_inv_is_conv :  ?ri:reduction_info -> LDecl.hyps -> ss_inv -> ss_inv -> bool

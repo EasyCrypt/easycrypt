@@ -115,7 +115,10 @@ let t_ehoare_deno_r pre post tc =
   let concl_po = map_ss_inv2 f_xreal_le (map_ss_inv1 f_b2xr ev) post in
   let concl_po = f_forall_mems_ss_inv mpo concl_po in
 
-  FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
+  (* 0%r <= bd *)
+  let concl_nn = f_real_le f_r0 bd in
+
+  FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po; concl_nn]
 
 (* -------------------------------------------------------------------- *)
 let cond_pre env prl prr pre =
@@ -262,7 +265,11 @@ let process_ehoare_deno info tc =
       (ehf_pr hf, ehf_po hf)
   in
 
-  FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_ehoare_deno pre post tc)
+  (* [t_ehoare_deno] always emits the [0%r <= bd] non-negativity goal last; try
+     to close it automatically so trivially non-negative bounds stay effort-free
+     (a genuinely negative bound is left as an unprovable goal). *)
+  FApi.t_last (FApi.t_try t_trivial)
+    (FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_ehoare_deno pre post tc))
 
 
 (* -------------------------------------------------------------------- *)
@@ -299,6 +306,8 @@ let t_equiv_deno_bad pre tc =
   let env, _hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
   let pr1 = destr_pr fpr1 and pr2 = destr_pr fpr2 and prb = destr_pr fprb in
+  if not (pr2.pr_mem = prb.pr_mem) then
+    tc_error !!tc "invalid goal shape";
   let m = prb.pr_event.m in
   let ev2 = ss_inv_rebind pr2.pr_event m in
   let fand = map_ss_inv2 f_and ev2 (map_ss_inv1 f_not prb.pr_event) in
@@ -354,6 +363,8 @@ let t_equiv_deno_bad2 pre bad1 tc =
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
   let pr1 = destr_pr fpr1 and pr2 = destr_pr fpr2 and
       prb = destr_pr fprb in
+  if not (pr2.pr_mem = prb.pr_mem) then
+    tc_error !!tc "invalid goal shape";
   let f1 = pr1.pr_fun and f2 = pr2.pr_fun in
   let ev1 = pr1.pr_event and ev2 = pr2.pr_event in
   let ev1 = ss_inv_rebind ev1 bad1.m in
@@ -370,8 +381,8 @@ let t_equiv_deno_bad2 pre bad1 tc =
   let cpre = cond_pre env pr1 pr2 pre in
   let fpreb1 = f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 bad1) in
   let fpren1 = f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 (map_ss_inv1 f_not bad1)) in
-  let fpreb2 = f_pr pr1.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 bad2) in
-  let fpren2 = f_pr pr1.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 (map_ss_inv1 f_not bad2)) in
+  let fpreb2 = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 bad2) in
+  let fpren2 = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 (map_ss_inv1 f_not bad2)) in
   let fabs' =
     f_real_abs
       (f_real_sub (f_real_add fpreb1 fpren1) (f_real_add fpreb2 fpren2)) in
@@ -383,9 +394,9 @@ let t_equiv_deno_bad2 pre bad1 tc =
           t_intros_i [hcpre; hequiv] @!
             t_real_le_trans fabs' @+
             [ t_apply_prept (`UG real_eq_le) @!
-                process_congr @! (* abs *)
-                process_congr @~ (* add *)
-                (t_last process_congr) @~+ (* opp *)
+                (process_congr PCongrDefault) @! (* abs *)
+                (process_congr PCongrDefault) @~ (* add *)
+                (t_last (process_congr PCongrDefault)) @~+ (* opp *)
                 [ t_pr_rewrite_i ("mu_split", Some bad1) @! t_reflex;
                   t_pr_rewrite_i ("mu_split", Some bad2) @! t_reflex ] ;
               t_apply_prept (`UG real_upto) @+

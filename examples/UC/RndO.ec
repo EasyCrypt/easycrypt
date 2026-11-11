@@ -318,7 +318,7 @@ module LRO : RO = {
 lemma RRO_resample_ll : islossless RRO.resample.
 proof. 
   proc; call (iter_ll RRO.I _)=> //; proc; auto=> /= ?;
-    by split; first apply sampleto_ll. 
+    by apply sampleto_ll. 
 qed.
 
 (* now we use the eager tactics to show a series of lemmas

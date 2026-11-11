@@ -669,3 +669,57 @@ theory ProcChangePostReadYFailTest.
   fail by auto.
   abort.
 end ProcChangePostReadYFailTest.
+
+(* -------------------------------------------------------------------- *)
+(* Regression: [proc change {N} [..]] on an equiv goal whose pre contains
+   [={glob X}] used to leak the opposite-side memory ident into the
+   local-equivalence subgoal, which would later make [auto] crash with
+   [LookupError "&_/<stamp>", please report] inside [t_subst]'s
+   [is_eq_for_subst].
+
+   Cause: [EcPV.form_read] did not handle [Fglob] references, so
+   [={glob X}] (which expands to [f_eq (Fglob X &1) (Fglob X &2)]) was
+   invisible to the read-tracker and trivially passed [t_change_stmt]'s
+   frame filter despite reading from both memories.  After substitution
+   of [(fst me)] only, the opposite-side memory remained as a free
+   reference in goal1's frame.  When [auto] later ran [progress] and
+   then [subst] on a hypothesis whose body inherited that stale memory,
+   [LDecl.by_id] failed because the stale ident was not in the LDecl.
+
+   The trigger requires [auto] to actually invoke [t_subst] on a
+   hypothesis whose body contains the leaked memory.  The minimal
+   shape that reaches that state involves an abstract module call
+   inside the replacement, so that [inline; wp; sim; auto] leaves a
+   residual implication for [progress] to intro. *)
+theory ProcChangeGlobFrameTest.
+  module type Adv = {
+    proc main() : int
+  }.
+
+  module M = {
+    var x : int
+  }.
+
+  module Wrap (A : Adv) = {
+    proc main() : int = {
+      var r;
+      M.x <- 0;
+      r <@ A.main();
+      return r;
+    }
+  }.
+
+  section.
+    declare module A <: Adv {-M}.
+
+    local lemma L &m :
+      equiv[Wrap(A).main ~ Wrap(A).main :
+              ={glob A, glob M} ==> ={res, glob M}].
+    proof.
+    proc.
+    proc change {1} [1..2] : { r <@ Wrap(A).main(); }.
+    + inline; wp; sim; auto.
+    inline; wp; sim.
+    qed.
+  end section.
+end ProcChangeGlobFrameTest.

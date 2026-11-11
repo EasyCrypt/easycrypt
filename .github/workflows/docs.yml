@@ -41,12 +41,21 @@ jobs:
         run: |
           make -C doc sphinx-deps
 
+      # Since git 2.46, fetch/clone spawn a detached `git maintenance` job
+      # that races with opam scanning the freshly cloned repository
+      # (ocaml/opam#7031); disable it and fetch the repository as a tarball.
+      - name: Disable git background maintenance
+        run: |
+          git config --global maintenance.auto false
+          git config --global gc.auto 0
+
       - name: Set-up OCaml
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: 5.4
           opam-disable-sandboxing: true
-          dune-cache: true
+          opam-repositories: |
+            default: https://opam.ocaml.org
 
       - name: Install EasyCrypt dependencies
         run: |

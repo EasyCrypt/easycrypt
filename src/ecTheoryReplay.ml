@@ -187,12 +187,22 @@ end = struct
       let tparams = List.map tvar params in
       let ty_body1 = tyd1.tyd_type in
       let ty_body2 = EcSubst.open_tydecl tyd2 tparams in
+      let subtype1 = CS.Tvar.sty_subst ~freshen:false tyd1.tyd_params tparams tyd1.tyd_subtype in
+      let subtype2 = CS.Tvar.sty_subst ~freshen:false tyd2.tyd_params tparams tyd2.tyd_subtype in
 
       let hyps = EcEnv.LDecl.init env params in
 
       match ty_body1, ty_body2 with
-      | Abstract, _ -> ()
-
+      | Abstract, _ -> begin
+        match subtype1, subtype2 with
+        | Some (ty1, f1), Some (ty2, f2) ->
+          if not (EcReduction.EqTest.for_type (toenv hyps) ty1 ty2) then
+            raise (Incompatible (SubtypeType (ty1, Some ty2)));
+          if not (EcReduction.is_conv ~ri:ri_compatible hyps f1 f2) then
+            raise (Incompatible (SubtypePred (f1, f2)))
+        |  Some (ty1, _), None -> raise (Incompatible (SubtypeType (ty1, None)))
+        | _, _ -> ()
+        end
       | _, _ -> tybody hyps ty_body1 ty_body2
 
     with CoreIncompatible -> raise (Incompatible TyBody)
@@ -341,15 +351,13 @@ let check_evtags ?(tags : evtags option) (src : symbol list) =
       let dfl =
         not (List.mem explicit src) &&
         not (List.exists (fun (mode, _) -> mode = `Include) tags) in
-      let stt =
-        List.map (fun src ->
-          let do1 status (mode, dst) =
-            match mode with
-            | `Exclude -> if sym_equal src dst then raise Reject; status
-            | `Include -> status || (sym_equal src dst)
-          in List.fold_left do1 dfl tags)
-          src
-      in List.mem true stt
+      let has_tag dst = List.exists (fun s -> sym_equal s dst) src in
+      let do1 status (mode, dst) =
+        match mode with
+        | `Exclude -> if has_tag dst then raise Reject; status
+        | `Include -> status || has_tag dst
+      in
+      List.fold_left do1 dfl tags
 
   with Reject -> false
 
@@ -409,6 +417,62 @@ let rename ove subst (kind, name) =
   with Not_found -> (subst, name)
 
 (* -------------------------------------------------------------------- *)
+exception InvInstPath
+
+(* -------------------------------------------------------------------- *)
+let for_op_path
+   (subst : EcSubst.subst)
+  ~(opath : EcPath.path)
+  ~(ops   : _ Mp.t)
+   (p     : EcPath.path)
+=
+  match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
+  | None | Some [] -> None
+  | Some (x :: px) ->
+      let q = EcPath.fromqsymbol (List.rev px, x) in
+
+      match Mp.find_opt q ops with
+      | None ->
+          Some (EcSubst.subst_path subst p)
+      | Some (op, alias) ->
+          match alias with
+          | true  -> Some (EcSubst.subst_path subst p)
+          | false ->
+              match op.EcDecl.op_kind with
+              | OB_pred _
+              | OB_nott _    -> assert false
+              | OB_oper None -> None
+              | OB_oper (Some (OP_Constr _))
+              | OB_oper (Some (OP_Record _))
+              | OB_oper (Some (OP_Proj   _))
+              | OB_oper (Some (OP_Fix    _))
+              | OB_oper (Some (OP_TC      ))
+              | OB_oper (Some (OP_Exn    _)) ->
+                  Some (EcSubst.subst_path subst p)
+              | OB_oper (Some (OP_Plain f)) ->
+                  match f.f_node with
+                  | Fop (r, _) -> Some r
+                  | _ -> raise InvInstPath
+
+(* -------------------------------------------------------------------- *)
+let for_op_path subst ~opath ~ops p =
+  odfl p (for_op_path subst ~opath ~ops p)
+ 
+(* -------------------------------------------------------------------- *)
+let for_ty_path (subst : EcSubst.subst) ?(nargs = 0) (p : EcPath.path) =
+  let tyargs = List.init nargs (fun _ -> tvar (EcIdent.create "_")) in
+
+  match (EcSubst.subst_ty subst (tconstr p tyargs)).ty_node with
+  | Tconstr (p, tyargs') when List.equal ty_equal tyargs tyargs' -> p
+  | _ -> raise InvInstPath
+
+(* -------------------------------------------------------------------- *)
+let for_ty_path (env : EcEnv.env) (subst : EcSubst.subst) (p : EcPath.path) =
+  let env = EcEnv.Theory.env_of_theory (oget (EcPath.prefix p)) env in
+  let nargs = List.length ((EcEnv.Ty.by_path p env).tyd_params) in
+  for_ty_path subst ~nargs p
+
+(* -------------------------------------------------------------------- *)
 let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd) =
   let scenv = ove.ovre_hooks.henv scope in
   let env   = EcSection.env scenv in
@@ -428,20 +492,36 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
                           nargs in
             let ue    = EcUnify.UniEnv.create (Some nargs) in
             let ntyd  = EcTyping.transty EcTyping.tp_tydecl env ue ntyd in
+            let subtype =
+              match ntyd.ty_node with
+              | Tconstr (p, tys) ->
+                  let reftyd = EcEnv.Ty.by_path p env in
+                  CS.Tvar.sty_subst ~freshen:false reftyd.tyd_params tys reftyd.tyd_subtype
+              | _ -> None in
             let decl  =
-              { tyd_params  = nargs;
-                tyd_type    = Concrete ntyd;
-                tyd_loca    = otyd.tyd_loca;
-                tyd_subtype = None; }
+              { tyd_params   = nargs;
+                tyd_type     = Concrete ntyd;
+                tyd_loca     = otyd.tyd_loca;
+                tyd_clinline = (mode <> `Alias);
+                tyd_subtype  = subtype; }
 
             in (decl, ntyd)
 
         | `ByPath p -> begin
             match EcEnv.Ty.by_path_opt p env with
             | Some reftyd ->
-                let tyargs = List.map tvar reftyd.tyd_params in
-                let body   = tconstr p tyargs in
-                let decl   = { reftyd with tyd_type = Concrete body; } in
+                let body =
+                  if reftyd.tyd_clinline then
+                    (match reftyd.tyd_type with
+                     | Concrete body -> body
+                     | _ -> assert false)
+                  else
+                    let tyargs = List.map tvar reftyd.tyd_params in
+                    tconstr p tyargs in
+                let decl =
+                  { reftyd with
+                      tyd_type     = Concrete body;
+                      tyd_clinline = (mode <> `Alias); } in
                 (decl, body)
 
             | _ -> assert false
@@ -449,12 +529,13 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
 
         | `Direct ty -> begin
           assert (List.is_empty otyd.tyd_params);
+          assert (otyd.tyd_subtype = None);
           let decl  =
-            { tyd_params  = [];
-              tyd_type    = Concrete ty;
-              tyd_loca    = otyd.tyd_loca;
-              tyd_subtype = None; }
-
+            { tyd_params   = [];
+              tyd_type     = Concrete ty;
+              tyd_loca     = otyd.tyd_loca;
+              tyd_clinline = (mode <> `Alias);
+              tyd_subtype  = None; }
           in (decl, ty)
     end
       in
@@ -465,36 +546,39 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             rename ove subst (`Type, x)
 
         | `Inline _ ->
-          let subst =
-            EcSubst.add_tydef
-              subst (xpath ove x) (newtyd.tyd_params, body) in
+            let subst =
+              EcSubst.add_tydef
+                subst (xpath ove x) (newtyd.tyd_params, body) in
+            (subst, x) in
 
-          let subst =
-            (* FIXME: HACK *)
-            match otyd.tyd_type, body.ty_node with
-            | Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
-                match (EcEnv.Ty.by_path np env).tyd_type with
-                | Datatype { tydt_ctors = _ } ->
-                  let newtparams = newtyd.tyd_params in
-                  let newtparams_ty = List.map tvar newtparams in
-                  let newdtype = tconstr np newtparams_ty in
-                  let tysubst = CS.Tvar.init otyd.tyd_params newtparams_ty in
+      let subst =
+        (* FIXME: HACK -- when a datatype is overridden by another datatype,
+           the source constructors are not re-created, so redirect them to the
+           target's constructors. This is needed for every override mode (alias
+           or inline); skipping it leaves references to the source constructors
+           (e.g. in operator bodies) pointing at non-existent paths. *)
+        match otyd.tyd_type, body.ty_node with
+        | Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
+            match (EcEnv.Ty.by_path np env).tyd_type with
+            | Datatype { tydt_ctors = _ } ->
+              let newtparams = newtyd.tyd_params in
+              let newtparams_ty = List.map tvar newtparams in
+              let newdtype = tconstr np newtparams_ty in
+              let tysubst = CS.Tvar.init otyd.tyd_params newtparams_ty in
 
-                  List.fold_left (fun subst (name, tyargs) ->
-                    let np = EcPath.pqoname (EcPath.prefix np) name in
-                    let newtyargs =
-                      List.map
-                        (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
-                        tyargs in
-                    EcSubst.add_opdef subst
-                      (xpath ove name)
-                      (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
-                    ) subst octors
-                | _ -> subst
-              end
-            | _, _ -> subst
-
-          in (subst, x) in
+              List.fold_left (fun subst (name, tyargs) ->
+                let np = EcPath.pqoname (EcPath.prefix np) name in
+                let newtyargs =
+                  List.map
+                    (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
+                    tyargs in
+                EcSubst.add_opdef subst
+                  (xpath ove name)
+                  (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
+                ) subst octors
+            | _ -> subst
+          end
+        | _, _ -> subst in
 
       let refotyd = EcSubst.subst_tydecl subst otyd in
 
@@ -537,6 +621,26 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
       (subst, ops, proofs, ove.ovre_hooks.hadd_item scope ~import (Th_operator (x, oopd)))
 
   | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
+      let bypath (p : EcPath.path) =
+        match EcEnv.Op.by_path_opt p env with
+        | Some ({ op_kind = OB_oper _ } as refop) ->
+          let tyargs = List.map tvar refop.op_tparams in
+          let body =
+            if refop.op_clinline then
+              (match refop.op_kind with
+              | OB_oper (Some (OP_Plain body)) -> body
+              | _ -> assert false)
+            else EcFol.f_op p tyargs refop.op_ty in
+          let decl =
+            { refop with
+                op_kind = OB_oper (Some (OP_Plain body));
+                op_clinline = (opmode <> `Alias) } in
+          (decl, body)
+
+        | _ ->
+          clone_error env (CE_UnkOverride(OVK_Operator, EcPath.toqsymbol p))
+      in
+
       let refop = EcSubst.subst_op subst oopd in
       let (reftyvars, refty) = (refop.op_tparams, refop.op_ty) in
 
@@ -576,27 +680,15 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                   tparams ty (Some (OP_Plain body)) refop.op_loca in
               (newop, body)
 
-          | `ByPath p -> begin
-            match EcEnv.Op.by_path_opt p env with
-            | Some ({ op_kind = OB_oper _ } as refop) ->
-                let tyargs = List.map tvar refop.op_tparams in
-                let body =
-                  if refop.op_clinline then
-                    (match refop.op_kind with
-                    | OB_oper (Some (OP_Plain body)) -> body
-                    | _ -> assert false)
-                  else EcFol.f_op p tyargs refop.op_ty in
-                let decl   =
-                  { refop with
-                      op_kind = OB_oper (Some (OP_Plain body));
-                      op_clinline = (opmode <> `Alias) } in
-                (decl, body)
+          | `ByPath p ->
+            bypath p
 
-            | _ -> clone_error env (CE_UnkOverride(OVK_Operator, EcPath.toqsymbol p))
-          end
+          | `Direct (tps, { f_node = Fop (p, tys) })
+              when List.for_all2 ty_equal (List.map tvar tps) tys ->
+            bypath p
 
-          | `Direct body ->
-            assert (List.is_empty refop.op_tparams);
+          | `Direct (tparams, body) ->
+            assert (List.compare_lengths tparams refop.op_tparams = 0);
             let newop =
               mk_op
                 ~opaque:optransparent ~clinline:(opmode <> `Alias)
@@ -879,11 +971,61 @@ and replay_modtype
 and replay_mod
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, (me : top_module_expr))
 =
+  match Msym.find_opt me.tme_expr.me_name ove.ovre_ovrd.evc_modexprs with
+  | None ->
     let subst, name = rename ove subst (`Module, me.tme_expr.me_name) in
     let me = EcSubst.subst_top_module subst me in
     let me = { me with tme_expr = { me.tme_expr with me_name = name } } in
     let item = (Th_module me) in
     (subst, ops, proofs, ove.ovre_hooks.hadd_item scope ~import item)
+
+  (* Both modules are state-free (enforced when the override is elaborated),
+     hence indiscernible once their components are found AST-equal below. *)
+  | Some { pl_desc = (target, mode) } ->
+    let name = me.tme_expr.me_name in
+    let env  = EcSection.env (ove.ovre_hooks.henv scope) in
+
+    assert (EcCoreModules.module_own_state me.tme_expr = None);
+
+    let mp, (newme, newlc) = EcEnv.Mod.lookup (unloc target) env in
+
+    let () =
+      match mp.EcPath.m_top with
+      | `Concrete (_, None) -> () | _ -> assert false in
+
+    let substme =
+      EcSubst.add_moddef subst
+        ~src:(EcPath.mpath_crt (xpath ove name) [] None) ~dst:mp in
+
+    let me    = EcSubst.subst_top_module substme me in
+    let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
+    let newme = { newme with me_name = name } in
+    let newme = { tme_expr = newme; tme_loca = Option.get newlc; } in
+
+    if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
+      clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
+
+    let subst, name =
+      match mode with
+      | `Alias    -> rename ove subst (`Module, name)
+      | `Inline _ -> substme, name in
+
+    let scope =
+      if keep_of_mode mode then
+        let alias =
+          ME_Alias (
+            List.length newme.tme_expr.me_params,
+            EcPath.m_apply mp
+              (List.map
+                 (fun (id, _) -> EcPath.mident id)
+                 newme.tme_expr.me_params)) in
+        let newme =
+          { newme with tme_expr =
+              { newme.tme_expr with me_name = name; me_body = alias } } in
+        ove.ovre_hooks.hadd_item scope ~import (Th_module newme)
+      else scope in
+
+    (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
 and replay_export
@@ -928,27 +1070,29 @@ and replay_auto
 (* -------------------------------------------------------------------- *)
 and replay_reduction
   (ove : _ ovrenv) (subst, ops, proofs, scope)
-  (import, rules : _ * (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
+  (import, ({ red_rules } as red) : _ * EcTheory.reduction_rule)
 =
-  let for1 (p, opts, rule) =
+  let for1 (p, opts, rules) =
     let exception Removed in
 
     let p = EcSubst.subst_path subst p in
 
-    let rule =
-      obind (fun rule ->
+    let rules =
+      match rules with
+      | [] -> []
+      | rule :: _ ->
         let env = EcSection.env (ove.ovre_hooks.henv scope) in
 
         try
           if not (is_some (EcEnv.Ax.by_path_opt p env)) then
             raise Removed;
-          Some (EcReduction.User.compile ~opts ~prio:rule.rl_prio env p)
-        with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
+          EcReduction.User.compile ~opts ~prio:rule.rl_prio env p
+        with EcReduction.User.InvalidUserRule _ | Removed -> []
 
-    in (p, opts, rule) in
+    in (p, opts, rules) in
 
-  let rules = List.map for1 rules in
-  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_reduction rules) in
+  let red_rules = List.map for1 red_rules in
+  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_reduction { red with red_rules }) in
 
   (subst, ops, proofs, scope)
 
@@ -957,47 +1101,14 @@ and replay_instance
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, (typ, ty), tc, lc)
 =
   let opath = ove.ovre_opath in
-  let npath = ove.ovre_npath in
-
-  let module E = struct exception InvInstPath end in
-
-  let forpath (p : EcPath.path) =
-    match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
-    | None | Some [] -> None
-    | Some (x::px) ->
-        let q = EcPath.fromqsymbol (List.rev px, x) in
-
-        match Mp.find_opt q ops with
-        | None ->
-            Some (EcPath.pappend npath q)
-        | Some (op, alias) ->
-            match alias with
-            | true  -> Some (EcPath.pappend npath q)
-            | false ->
-                match op.EcDecl.op_kind with
-                | OB_pred _
-                | OB_nott _    -> assert false
-                | OB_oper None -> None
-                | OB_oper (Some (OP_Constr _))
-                | OB_oper (Some (OP_Record _))
-                | OB_oper (Some (OP_Proj   _))
-                | OB_oper (Some (OP_Fix    _))
-                | OB_oper (Some (OP_Exn    _))
-                | OB_oper (Some (OP_TC      )) ->
-                    Some (EcPath.pappend npath q)
-                | OB_oper (Some (OP_Plain f)) ->
-                    match f.f_node with
-                    | Fop (r, _) -> Some r
-                    | _ -> raise E.InvInstPath
-  in
-
-  let forpath p = odfl p (forpath p) in
+  let forpath = for_op_path subst ~opath ~ops in
 
   try
     let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
     let tc =
       let rec doring cr =
-        { r_type  = EcSubst.subst_ty subst cr.r_type;
+        { r_name  = cr.r_name;
+          r_type  = EcSubst.subst_ty subst cr.r_type;
           r_zero  = forpath cr.r_zero;
           r_one   = forpath cr.r_one;
           r_add   = forpath cr.r_add;
@@ -1027,8 +1138,180 @@ and replay_instance
     let scope = ove.ovre_hooks.hadd_item scope ~import (Th_instance ((typ, ty), tc, lc)) in
     (subst, ops, proofs, scope)
 
-  with E.InvInstPath ->
+  with InvInstPath ->
     (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, bs, lc) =
+  let env = EcSection.env (ove.ovre_hooks.henv scope) in
+  let hyps = EcEnv.LDecl.init env [] in
+
+  let opath = ove.ovre_opath in
+  let oppath = for_op_path subst ~opath ~ops in
+  let typath = for_ty_path env subst in
+
+  let crbpath (kind : crb_theory1_kind) =
+    match kind with
+    | CRBT_Type p ->
+      CRBT_Type (typath p)
+    | CRBT_Op (tparams, body) ->
+      let subst, tparams = EcSubst.fresh_tparams subst tparams in
+      let body = EcSubst.subst_expr subst body in
+      CRBT_Op (tparams, body)
+    | CRBT_Lemma p -> CRBT_Lemma (EcSubst.subst_path subst p)
+  in
+
+  let red f = try
+    Some (
+         EcCallbyValue.norm_cbv EcReduction.full_red hyps f 
+      |> EcCoreFol.destr_int
+      |> BI.to_int
+    )
+  with 
+    | EcCoreFol.DestrError "destr_int" -> None
+    | EcEnv.NotReducible -> None
+  in
+
+  try
+    let to_    = oppath bs.to_ in
+    let from_  = oppath bs.from_ in
+    let touint = oppath bs.touint in
+    let tosint = oppath bs.tosint in
+    let ofint  = oppath bs.ofint in
+    let type_  = typath bs.type_ in
+    let size   = EcSubst.subst_binding_size ~red subst bs.size in 
+    let theory =
+      List.map
+        (fun (crbth : crb_theory1) ->
+          { crbth with kind = crbpath crbth.kind })
+        bs.theory in
+
+    let bs = CRB_Bitstring { to_; from_; touint; tosint; ofint; type_; theory; size; } in
+    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_crbinding (bs, lc)) in
+
+    (subst, ops, proofs, scope)
+
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, lc) =
+  let env = EcSection.env (ove.ovre_hooks.henv scope) in
+  let hyps = EcEnv.LDecl.init env [] in
+
+  let opath = ove.ovre_opath in
+  let oppath = for_op_path subst ~opath ~ops in
+  let typath = for_ty_path env subst in
+
+  let crbpath (kind : crb_theory1_kind) =
+    match kind with
+    | CRBT_Type p ->
+      CRBT_Type (typath p)
+    | CRBT_Op (tparams, body) ->
+      let subst, tparams = EcSubst.fresh_tparams subst tparams in
+      let body = EcSubst.subst_expr subst body in
+      CRBT_Op (tparams, body)
+    | CRBT_Lemma p -> CRBT_Lemma (EcSubst.subst_path subst p)
+  in
+
+  let red f = try
+    Some (
+         EcCallbyValue.norm_cbv EcReduction.full_red hyps f
+      |> EcCoreFol.destr_int
+      |> BI.to_int
+    )
+  with 
+    | EcCoreFol.DestrError "destr_int" -> None
+    | EcEnv.NotReducible -> None
+  in
+
+  try
+    let get    = oppath ba.get in
+    let set    = oppath ba.set in
+    let tolist = oppath ba.tolist in
+    let oflist = oppath ba.oflist in
+    let type_  = typath ba.type_ in
+    let size   = EcSubst.subst_binding_size ~red subst ba.size in
+    let theory =
+      List.map
+        (fun (crbth : crb_theory1) ->
+          { crbth with kind = crbpath crbth.kind })
+        ba.theory in
+
+    let ba = CRB_Array { get; set; tolist; oflist; type_; size; theory; } in
+    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_crbinding (ba, lc)) in
+
+    (subst, ops, proofs, scope)
+
+
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, op, lc) =
+  let env = EcSection.env (ove.ovre_hooks.henv scope) in
+  let hyps = EcEnv.LDecl.init env [] in
+
+  let opath = ove.ovre_opath in
+  let oppath = for_op_path subst ~opath ~ops in
+  let typath = for_ty_path env subst in
+
+  let red f =
+    try
+      Some (
+          EcCallbyValue.norm_cbv EcReduction.full_red hyps f
+        |> EcCoreFol.destr_int
+        |> BI.to_int
+      )
+    with 
+    | EcCoreFol.DestrError "destr_int" -> None
+    | EcEnv.NotReducible -> None
+  in
+
+  try
+    let kind = EcSubst.subst_bv_opkind ~red subst op.kind in
+    let operator = oppath op.operator in
+    let types = List.map typath op.types in
+    let op = CRB_BvOperator { kind; operator; types; } in
+    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_crbinding (op, lc)) in
+
+    (subst, ops, proofs, scope)
+
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_crb_circuit (ove : _ ovrenv) (subst, ops, proofs, scope) (import, cr, lc) =
+  let opath = ove.ovre_opath in
+  let oppath = for_op_path subst ~opath ~ops in
+
+  try
+    let name     = cr.name in
+    let circuit  = cr.circuit in
+    let operator = oppath cr.operator in
+
+    let cr = CRB_Circuit { name; circuit; operator; } in
+    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_crbinding (cr, lc)) in
+
+    (subst, ops, proofs, scope)
+
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_crbinding (ove : _ ovrenv) (subst, ops, proofs, scope) (import, binding, lc) =
+  match binding with
+  | CRB_Bitstring bs ->
+    replay_crb_bitstring ove (subst, ops, proofs, scope) (import, bs, lc)
+
+  | CRB_Array ba ->
+    replay_crb_array ove (subst, ops, proofs, scope) (import, ba, lc)
+  
+  | CRB_BvOperator op ->
+    replay_crb_bvoperator ove (subst, ops, proofs, scope) (import, op, lc)
+  
+  | CRB_Circuit cr ->
+    replay_crb_circuit ove (subst, ops, proofs, scope) (import, cr, lc)  
 
 (* -------------------------------------------------------------------- *)
 and replay_alias
@@ -1041,7 +1324,7 @@ and replay_alias
   if is_none (EcEnv.Theory.by_path_opt p env) then
     (subst, ops, proofs, scope)
   else
-    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_alias (name, target)) in
+    let scope = ove.ovre_hooks.hadd_item scope ~import (Th_alias (name, p)) in
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -1097,6 +1380,12 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
 
   | Th_alias (name, target) ->
      replay_alias ove (subst, ops, proofs, scope) (item.ti_import, name, target)
+
+  | Th_crbinding (binding, lc) when not hidden ->
+     replay_crbinding ove (subst, ops, proofs, scope) (item.ti_import, binding, lc)
+
+  | Th_crbinding _ ->
+     (subst, ops, proofs, scope)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in

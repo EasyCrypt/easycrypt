@@ -37,6 +37,13 @@ type osymbol_r   = psymbol option
 type osymbol     = osymbol_r located
 
 (* -------------------------------------------------------------------- *)
+(* A bullet at the start of a `.`-terminated tactic phrase. The kind
+   identifies the bullet character (`-`, `+`, `*`); the count is the
+   number of repetitions (`>= 1`). *)
+type bullet_kind = [ `Minus | `Plus | `Star ]
+type bullet = { b_kind : bullet_kind; b_count : int; }
+
+(* -------------------------------------------------------------------- *)
 type pcp_match = [
   | `If
   | `While
@@ -501,6 +508,7 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
+  pp_tags   : psymbol list;
   pp_locality  : locality;
 }
 
@@ -559,15 +567,42 @@ type pcutdef = {
 type pmpred_args = (osymbol * pformula) list
 
 (* -------------------------------------------------------------------- *)
+(* The [hint …] clause of a [simplify]/[cbv] call. [ph_select] is the
+   unsigned base database selection (empty = use the proof-local default
+   / active set); [ph_dbs] are signed activate ([true]) / deactivate
+   ([false]) deltas on the current set; [ph_select] and [ph_dbs] are
+   mutually exclusive. [ph_hd] is the optional single-mode head filter;
+   [ph_lemmas] are lemmas added to the default DB for this call (lemma
+   sets are add-only -- the head filter restricts which rules apply). *)
+type psimplify_hint = {
+  ph_select : symbol list;
+  ph_dbs    : (bool * symbol) list;
+  ph_hd     : ([`Include | `Exclude] * pqsymbol list) option;
+  ph_lemmas : pqsymbol list;
+}
+
+let empty_simplify_hint = {
+  ph_select = []; ph_dbs = []; ph_hd = None; ph_lemmas = [];
+}
+
+(* -------------------------------------------------------------------- *)
+(* [pd_all] unfolds every transparent definition; [pd_ops] are unfolded
+   unconditionally, opaque ones included. Both may be set at once. *)
+type pdelta = {
+  pd_all : bool;
+  pd_ops : pqsymbol list;
+}
+
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
-  pdelta   : pqsymbol list option;      (* definition unfolding *)
+  pdelta   : pdelta;                    (* definition unfolding *)
   pzeta    : bool;                      (* let-reduction *)
   piota    : bool;                      (* case/if-reduction *)
   peta     : bool;                      (* η-reduction *)
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
   puser    : bool;                      (* user reduction *)
+  phint    : psimplify_hint;            (* use-site [hint …] clause *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -578,18 +613,25 @@ type pswap_kind = {
 
 type interleave_info = oside * (int * int) * ((int * int) list) * int
 
+type pspattern = unit
+
 type pipattern =
   | PtAny
   | PtAsgn  of psymbol list
   | PtIf    of pspattern * [`NoElse | `MaybeElse | `Else of pspattern]
   | PtWhile of pspattern
 
-and pspattern = unit
+type fun_upto_info = {
+  fui_is_ll_variant : bool option;
+  fui_bad : pformula;
+  fui_pre : pformula;
+  fui_pos : pformula option;
+}
 
 type call_info =
   | CI_spec of (pformula * phoare_post)
   | CI_inv of pformula
-  | CI_upto of (pformula * pformula * pformula option)
+  | CI_upto of fun_upto_info
 
 type p_seq_xt_info =
   | PSeqNone
@@ -660,7 +702,7 @@ type fun_info = [
   | `Def
   | `Code
   | `Abs  of pformula
-  | `Upto of pformula * pformula * pformula option
+  | `Upto of fun_upto_info
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -739,10 +781,10 @@ type conseq_contra =
 type conseq_ppterm = (conseq_contra * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
-type sim_info = {
-  sim_pos  : pcodegap1 pair option;
-  sim_hint : (pgamepath option pair * pformula) list * pformula option;
-  sim_eqs  : pformula option
+type psim_info = {
+  psim_pos  : pcodegap1 pair option;
+  psim_hint : (pgamepath option pair * pformula) list * pformula option;
+  psim_eqs  : pformula option
 }
 
 (* -------------------------------------------------------------------- *)
@@ -768,6 +810,38 @@ type matchmode = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type bdepvar = [`Var of psymbol | `VarRange of psymbol * int | `Slice of psymbol * (pqsymbol * zint)]
+
+type bdep_info =
+  { n     : int
+  ; m     : int
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; pcond : psymbol
+  ; lane  : psymbol
+  ; perm  : psymbol option 
+  ; debug : bool }
+
+type bdep_eval_info =
+  { in_ty     : pty
+  ; out_ty    : pty
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; lane  : psymbol 
+  ; range : pformula 
+  ; sign  : bool }
+
+type bdepeq_info =
+  { n          : int
+  ; inpvs_l    : bdepvar list
+  ; inpvs_r    : bdepvar list
+  ; out_blocks : (int * bdepvar list * bdepvar list) list
+  ; pcond      : psymbol option 
+  ; preprocess : bool }
+
+(* -------------------------------------------------------------------- *)
 type prrewrite = [`Rw of ppterm | `Simpl]
 
 (* -------------------------------------------------------------------- *)
@@ -790,7 +864,7 @@ type phltactic =
   | Pfusion        of (oside * pcodepos * (int * (int * int)))
   | Punroll        of (oside * pcodepos * [`While | `For of bool])
   | Psplitwhile    of (pexpr * oside * pcodepos)
-  | Pcall          of oside * call_info gppterm
+  | Pcall          of (oside * call_info gppterm)
   | Pcallconcave   of (pformula * call_info gppterm)
   | Prcond         of (oside * bool * pcodepos1)
   | Prmatch        of (oside * symbol * pcodepos1)
@@ -823,13 +897,12 @@ type phltactic =
   | Pfel           of (pcodegap1 * fel_info)
   | Phoare
   | Pprbounded
-  | Psim           of crushmode option* sim_info
+  | Psim           of crushmode option* psim_info
   | Ptrans_stmt    of trans_info
   | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
-  | Prwprgm of rwprgm
-  | Pprocrewrite   of side option * pcodepos * prrewrite
+  | Pprocrewrite   of side option * pcodepos_or_range option * prrewrite
   | Pprocrewriteat of psymbol * ppterm
   | Pchangestmt    of side option * ptybindings option * prange1_or_insert * pstmt
   | Phoaresplit
@@ -849,8 +922,20 @@ type phltactic =
   | Pauto
   | Plossless
 
+    (* Map-reduce *)
+  | Pcircuit of circuit_mode
+
+    (* Program rewriting *)
+  | Prwprgm of rwprgm
+
 and rwprgm = [
   | `IdAssign of pcodepos * pqsymbol
+  | `Change   of pcodepos * ptybindings option * int * pstmt
+]
+
+and circuit_mode = [
+  | `Simplify
+  | `Solve
 ]
 
 and pcfold =
@@ -923,7 +1008,7 @@ type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
   | RWSimpl  of [`Default | `Variant]
-  | RWDelta  of (rwoptions * pformula)
+  | RWDelta  of (bool * rwoptions * pformula)
   | RWRw     of (rwoptions * (rwside * ppterm) list)
   | RWPr     of (psymbol * pformula option)
   | RWDone   of [`Default | `Variant] option
@@ -1027,7 +1112,6 @@ type apply_info = [
   | `Apply   of ppterm list * [`Apply|`Exact|`Alpha]
   | `Top     of [`Apply|`Exact|`Alpha]
   | `Alpha   of ppterm
-  | `ExactType of pqsymbol
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -1040,19 +1124,39 @@ type clear_info = [
 type pgenhave = psymbol * intropattern option * psymbol list * pformula
 
 (* -------------------------------------------------------------------- *)
+type pcongr_mode =
+  | PCongrDefault
+  | PCongrStar
+  | PCongrPattern of pformula
+
+(* -------------------------------------------------------------------- *)
+type phintdbmode = [ `Add | `Remove ]
+
+(* A proof-local simplify-hint command. [PLHClause] applies a unified
+   [hint] clause: signed [+d]/[-d] activate/deactivate databases, signed
+   lemma sets [+{L}]/[-{L}] add/remove local lemmas (default DB), an
+   unsigned database list sets the proof-local default databases, and a
+   [+[ops]]/[-[ops]] filter sets the proof-local default head filter.
+   [PLHClear] / [PLHClearDefault] reset the local lemmas / the defaults. *)
+type plocalhint =
+  | PLHClause of psimplify_hint
+  | PLHClear of symbol option
+  | PLHClearDefault
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
   | Psmt        of pprover_infos
   | Psplit      of [ `Default of int option | `All of [ `Maybe | `One ] ]
-  | Pfield      of psymbol list
-  | Pring       of psymbol list
+  | Pfield      of psymbol option * psymbol list
+  | Pring       of psymbol option * psymbol list
   | Palg_norm
   | Pexists     of ppt_arg located list
   | Pleft
   | Pright
   | Ptrivial
-  | Pcongr
+  | Pcongr      of pcongr_mode
   | Pelim       of (prevert * pqsymbol option)
   | Papply      of (apply_info * prevert option)
   | Pcut        of pcut
@@ -1070,6 +1174,7 @@ type logtactic =
   | Pgenhave    of pgenhave
   | Pwlog       of (psymbol list * bool * pformula)
   | Pcoq        of (EcProvers.coq_mode option * psymbol * pprover_infos)
+  | PlocalHint  of plocalhint
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
@@ -1081,11 +1186,13 @@ and ptactic_core_r =
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
   | Pcase       of (bool * pcaseoptions * prevertv)
+  | Pextens     of (ptactic_core * psymbol option)
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option
   | Psubgoal    of ptactic_chain
   | Pnstrict    of ptactic_core
+  | Pwith       of plocalhint * ptactics
   | Padmit
 
 (* -------------------------------------------------------------------- *)
@@ -1148,6 +1255,7 @@ type prealize = {
 (* -------------------------------------------------------------------- *)
 type ptycinstance = {
   pti_name : pqsymbol;
+  pti_as   : psymbol option;
   pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
@@ -1197,6 +1305,7 @@ type pprint =
   | Pr_pr   of pqsymbol
   | Pr_ax   of pqsymbol
   | Pr_mod  of pqsymbol
+  | Pr_proc of pqsymbol
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located
   | Pr_goal of int
@@ -1257,6 +1366,7 @@ and theory_override =
 | PTHO_Op     of op_override
 | PTHO_Pred   of pr_override
 | PTHO_Axiom  of ax_override
+| PTHO_Module of me_override
 | PTHO_ModTyp of mt_override
 | PTHO_Theory of th_override
 
@@ -1325,11 +1435,60 @@ type phint = {
 type puseroption =
   [`Delta | `EqTrue]
 
+(* [hint simplify]: [PURAdd (db, opts, rules)] adds the rules compiled
+   from lemmas to database [db] (the default one when [None]), as a
+   theory item exported to the files requiring this one; [PURSwitch
+   (mode, db, lemmas)] disables / re-enables the rules of [lemmas] in
+   [db] for the rest of the enclosing theory / section of the current
+   file -- never exported. *)
+type puserswitch = [`Disable | `Enable]
+
 type puserred =
-  puseroption list * (pqsymbol list * int option) list
+  | PURAdd    of symbol option * puseroption list * (pqsymbol list * int option) list
+  | PURSwitch of puserswitch * symbol option * pqsymbol list
 
 type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
+
+(* -------------------------------------------------------------------- *)
+type pbind_bitstring =
+  { from_  : pqsymbol
+  ; to_    : pqsymbol
+  ; touint : pqsymbol
+  ; tosint : pqsymbol
+  ; ofint  : pqsymbol
+  ; type_  : pqsymbol
+  ; size   : pformula }
+  
+(* -------------------------------------------------------------------- *)
+type pbind_array =
+  { get    : pqsymbol
+  ; set    : pqsymbol
+  ; tolist : pqsymbol
+  ; oflist : pqsymbol
+  ; type_  : pqsymbol
+  ; size   : pformula }
+
+(* -------------------------------------------------------------------- *)
+type pbind_bvoperator =
+  { name     : string located
+  ; types    : pqsymbol list
+  ; operator : pqsymbol }
+
+(* -------------------------------------------------------------------- *)
+type pbind_circuit =
+  { bindings : (pqsymbol * string located) list 
+  ; file     : string located }
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding_r =
+  | CRB_Bitstring  of pbind_bitstring
+  | CRB_Array      of pbind_array
+  | CRB_BvOperator of pbind_bvoperator
+  | CRB_Circuit    of pbind_circuit
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding = { locality : is_local; binding : pcrbinding_r }
 
 (* -------------------------------------------------------------------- *)
 type global_action =
@@ -1364,17 +1523,19 @@ type global_action =
   | GsctOpen     of osymbol_r
   | GsctClose    of osymbol_r
   | Grealize     of prealize located
-  | Gtactics     of [`Proof | `Actual of ptactic list]
-  | Gtcdump      of (tcdump * ptactic list)
+  | Gtactics     of [`Proof | `Actual of bullet located option * ptactic list]
+  | Gtcdump      of (tcdump * (bullet located option * ptactic list))
   | Gprover_info of pprover_infos
   | Gsave        of save located
   | Gpragma      of psymbol
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
+  | Gcrbinding   of pcrbinding
 
 type global = {
   gl_action : global_action located;
   gl_fail   : bool;
+  gl_expect : string located option;   (* [expect fail "…"]: expected error *)
   gl_debug  : [`Timed | `Break] option;
 }
 

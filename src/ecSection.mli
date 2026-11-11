@@ -28,6 +28,9 @@ val exit_theory  :
 
 val import : EcPath.path -> scenv -> scenv
 
+val disable_reduction : ?base:EcSymbols.symbol -> EcPath.path list -> scenv -> scenv
+val enable_reduction  : ?base:EcSymbols.symbol -> EcPath.path list -> scenv -> scenv
+
 val import_vars : EcPath.mpath -> scenv -> scenv
 
 val add_th  : import:bool -> EcEnv.Theory.compiled_theory -> scenv -> scenv

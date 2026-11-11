@@ -168,7 +168,12 @@ let t_eager_seq_r (i, j) s (r2, r1) tc =
 
   let (_, ml_ty), (_, mr_ty) = (eC.es_ml, eC.es_mr) in
   let c1, c2 = s_split env i c and c1', c2' = s_split env j c' in
-  let eqMem1 = eq_on_form_and_stmt env r1 (stmt c1')
+  let m = EcIdent.create "&m" in
+  let existsP = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr eC) in
+  let eqMem1 =
+    map_ts_inv2 f_and
+      (eq_on_form_and_stmt env r1 (stmt c1'))
+      (ss_inv_generalize_left existsP r1.ml)
   and eqQ1 = eq_on_sided_form env (es_po eC) in
 
   let a =
@@ -243,7 +248,13 @@ let t_eager_while_r i tc =
   if (not (ER.EqTest.for_expr env e (sub_to_left_mem _e))) then
     tc_error !!tc "eager: both while guards must be syntactically equal";
   
-  let eqMem1 = eq_on_form_and_stmt env i c' and eqI = eq_on_sided_form env i in
+  let m = EcIdent.create "&m" in
+  let existsI = EcSubst.ss_inv_exists_ml_ts_inv (m, ml_ty) (es_pr es) in
+  let eqMem1 =
+    map_ts_inv2 f_and
+      (eq_on_form_and_stmt env i c')
+      (ss_inv_generalize_left existsI i.ml)
+  and eqI = eq_on_sided_form env i in
 
   let el = ss_inv_of_expr ml e and er = ss_inv_of_expr mr e in
 
@@ -330,6 +341,27 @@ let t_eager_fun_abs_r i tc =
        equalities";
 
   let s, fl, fr = (eg.eg_sl, eg.eg_fl, eg.eg_fr) in
+
+  (* Side-condition (0): the swapping statement must depend only on global
+     variables. *)
+  check_only_global !!tc env s;
+
+  (* Side-condition (c): the swapping statement must not modify [glob A], where
+     [A] is the abstract module underlying the eager functions [fl]/[fr]. An
+     unrestricted abstract [A] may read/write any concrete global, so writing to
+     a concrete global that [A] is allowed to touch is unsound. *)
+  let (topl, _, _, _), (topr, _, _, _) =
+    abstract_info2 env fl fr in
+  let glob_a = PV.add_glob env topr (PV.add_glob env topl PV.empty) in
+  let bad = PV.interdep env (s_write env s) glob_a in
+  if not (PV.is_empty bad) then begin
+    let bad_s = Format.asprintf "%a" (PV.pp env) bad in
+    tc_error_lazy !!tc (fun fmt ->
+        Format.fprintf fmt
+          "eager: swapping statement may not modify the globals of the \
+           abstract module: %s"
+          bad_s)
+  end;
 
   let pre, post, sg_e = EcPhlFun.FunAbsLow.equivF_abs_spec !!tc env fl fr i in
   let _, _, sg_f = EcPhlFun.FunAbsLow.equivF_abs_spec !!tc env fr fr i in

@@ -204,7 +204,7 @@ qed.
 
 lemma ideal_idgen (xs : t list) : ideal (idgen xs).
 proof. do! split.
-- by exists []; rewrite BAdd.big1 //= => i _; rewrite mul0r.
+- by exists []; rewrite BAdd.big1 //= => i; rewrite mul0r.
 - move=> x y /idgenP[cxs [szx ->]] /idgenP[cys [szy ->]].
   rewrite BAdd.sumrB /=; exists (mkseq (fun i => cxs.[i] - cys.[i]) (size xs)).
   rewrite !BAdd.big_seq &(BAdd.eq_bigr) /= => i /mem_range rg_i.

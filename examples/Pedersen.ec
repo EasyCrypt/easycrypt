@@ -108,7 +108,7 @@ section PedersenSecurity.
     proc; wp.
     swap 4 3.
     rnd (pred1 b'); call ug_ll; wp; rnd; call uc_ll; auto => />.
-    by rewrite dt_ll /= => v _ _ result; rewrite DBool.dbool1E.
+    by rewrite dt_ll /= => v _ result; rewrite DBool.dbool1E.
   qed.
 
   local lemma phi_hi (U<:Unhider) &m:

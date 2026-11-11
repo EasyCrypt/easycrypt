@@ -31,7 +31,7 @@ WORKDIR /home/$user
 
 ENV OPAMYES=true OPAMVERBOSE=0 OPAMJOBS=4
 
-ARG OCAML_VERSION=4.14.2
+ARG OCAML_VERSION=5.4.0
 
 RUN \
 	opam init --disable-sandboxing --compiler=ocaml-base-compiler.${OCAML_VERSION}
@@ -53,7 +53,7 @@ ENV PATH="/home/charlie/bin:$PATH"
 FROM ${BASE_BUILD_LAYER} AS build
 
 RUN \
-	version=2.6.3 && \
+	version=2.6.4 && \
   wget -O alt-ergo https://github.com/OCamlPro/alt-ergo/releases/download/v${version}/alt-ergo-v${version}-x86_64-linux-musl && \
   sudo install -m 0755 alt-ergo /usr/local/bin/alt-ergo-${version} && \
   rm -f alt-ergo
@@ -69,6 +69,13 @@ RUN \
 	wget -O cvc4 https://github.com/CVC4/CVC4-archived/releases/download/${version}/cvc4-${version}-x86_64-linux-opt && \
 	sudo install -m 0755 cvc4 /usr/local/bin/cvc4-${version} && \
 	rm -f cvc4
+
+RUN \
+	version=1.4.2 && \
+	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-${version}/cvc5-Linux-x86_64-libcxx-static.zip && \
+  unzip -j cvc5.zip cvc5-Linux-x86_64-libcxx-static/bin/cvc5 && \
+	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
+	rm -f cvc5 cvc5.zip
 
 RUN \
 	version=1.3.4 && \
@@ -96,6 +103,27 @@ RUN \
 	wget -O cvc5 https://github.com/cvc5/cvc5/releases/download/cvc5-${version}/cvc5-Linux && \
 	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
 	rm -f cvc5
+
+RUN \
+	version=5.3.3 && glibc=2.39 && \
+	wget -O z3.zip https://github.com/Z3Prover/z3/releases/download/z3-${version}/z3-${version}-x64-glibc-${glibc}.zip && \
+	unzip -j z3.zip z3-${version}-x64-glibc-${glibc}/bin/z3 && \
+	sudo install -m 0755 z3 /usr/local/bin/z3-${version} && \
+	rm -f z3 z3.zip
+
+RUN \
+	version=5.1.0 && glibc=2.39 && \
+	wget -O z3.zip https://github.com/Z3Prover/z3/releases/download/z3-${version}/z3-${version}-x64-glibc-${glibc}.zip && \
+	unzip -j z3.zip z3-${version}-x64-glibc-${glibc}/bin/z3 && \
+	sudo install -m 0755 z3 /usr/local/bin/z3-${version} && \
+	rm -f z3 z3.zip
+
+RUN \
+	version=5.0.0 && glibc=2.39 && \
+	wget -O z3.zip https://github.com/Z3Prover/z3/releases/download/z3-${version}/z3-${version}-x64-glibc-${glibc}.zip && \
+	unzip -j z3.zip z3-${version}-x64-glibc-${glibc}/bin/z3 && \
+	sudo install -m 0755 z3 /usr/local/bin/z3-${version} && \
+	rm -f z3 z3.zip
 
 RUN \
 	version=4.16.0 && glibc=2.39 && \

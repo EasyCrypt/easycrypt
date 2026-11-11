@@ -69,3 +69,9 @@ val dump_memtype : memtype -> string
 (* -------------------------------------------------------------------- *)
 val local_type : memtype -> ty option
 val has_locals : memtype -> bool
+
+(* [is_arg x mt]: [x] is the argument variable of [mt] *)
+val is_arg : symbol -> memtype -> bool
+
+(* the declared variables of [mt], in order *)
+val decls : memtype -> ovariable list

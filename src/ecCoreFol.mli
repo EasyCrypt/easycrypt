@@ -109,6 +109,7 @@ val f_forall : bindings -> form -> form
 val f_lambda : bindings -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
+val f_exists_mems : (EcIdent.t * memtype) list -> form -> form
 
 val f_hoareF_r : sHoareF -> form
 val f_hoareS_r : sHoareS -> form

@@ -179,7 +179,7 @@ section Security.
   proof.
   byphoare=> //; proc.
   rnd (pred1 b')=> /=; conseq (_:_ ==> true).
-  + by move=> /> b; rewrite dbool1E pred1E.
+  + by move=> /> b; rewrite dbool1E.
   call Ag_ll; auto.
   by call Ac_ll; auto=> />; rewrite dhkey_ll dt_ll dbits_ll.
   qed.

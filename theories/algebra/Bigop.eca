@@ -439,7 +439,7 @@ lemma big_undup ['a] (P : 'a -> bool) F s :
 proof.
 have <- := eq_big_perm P F _ _ (perm_undup_count s).
 rewrite big_flatten big_map (@big_mkcond P); apply/eq_big => //=.
-by move=> @/(\o) /= x _; apply/big_nseq_cond.
+by move=> @/(\o) /= x; apply/big_nseq_cond.
 qed.
 
 (* -------------------------------------------------------------------- *)

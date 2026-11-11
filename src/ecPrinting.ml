@@ -507,21 +507,58 @@ let pp_xpath fmt (xp: P.xpath) =
   Format.fprintf fmt "%s" (P.x_tostring xp)
 
 (* -------------------------------------------------------------------- *)
+(* [pp_name] is how the category at hand spells a name: an operator needs
+   its parentheses back ([pp_opqsymbol]) to be valid syntax again, whereas
+   a type or a lemma is spelled as it stands. *)
+let pp_shortened
+  ?(pp_name : qsymbol pp = EcSymbols.pp_qsymbol)
+   (fmt : Format.formatter)
+  ((plong, pshort) : qsymbol * qsymbol option)
+=
+  match pshort with
+  | None ->
+    Format.fprintf fmt "%a" pp_name plong
+  | Some pshort ->
+    Format.fprintf fmt "%a (shorten name: %a)"
+    pp_name plong
+    pp_name pshort
+
+(* -------------------------------------------------------------------- *)
 let pp_shorten_path
   (ppe  : PPEnv.t)
   (cond : P.path -> qsymbol -> bool)
   (fmt  : Format.formatter)
   (p    : P.path)
 =
-  let plong, pshort = shorten_path ppe cond p in
+  pp_shortened fmt (shorten_path ppe cond p)
 
-  match pshort with
-  | None ->
-    Format.fprintf fmt "%a" EcSymbols.pp_qsymbol plong
-  | Some pshort ->
-    Format.fprintf fmt "%a (shorten name: %a)"
-    EcSymbols.pp_qsymbol plong
-    EcSymbols.pp_qsymbol pshort
+(* -------------------------------------------------------------------- *)
+(* An object is reachable under a name exactly when looking that name up
+   resolves back to it -- which is the condition [shorten_path] wants. *)
+let locate_path
+  (ppe    : PPEnv.t)
+  (lookup : qsymbol -> EcEnv.env -> (P.path * 'a) option)
+  (p      : P.path)
+  : qsymbol * qsymbol option
+=
+  let cond (p : P.path) (qs : qsymbol) =
+    match lookup qs ppe.PPEnv.ppe_env with
+    | Some (p', _) -> P.p_equal p p'
+    | None -> false
+  in shorten_path ppe cond p
+
+(* [pp_locate_path] says where an object lives: the name it is known under,
+   plus the shortest form that still resolves to it. This is the report the
+   `locate' command lists, and the one `print' prefixes each of the objects
+   it displays with. *)
+let pp_locate_path
+  ?(pp_name : qsymbol pp = EcSymbols.pp_qsymbol)
+   (ppe    : PPEnv.t)
+   (lookup : qsymbol -> EcEnv.env -> (P.path * 'a) option)
+   (fmt    : Format.formatter)
+   (p      : P.path)
+=
+  pp_shortened ~pp_name fmt (locate_path ppe lookup p)
 
 (* -------------------------------------------------------------------- *)
 let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =
@@ -762,10 +799,13 @@ let priority_of_binop name =
   | Some EP.LOP1 _    -> Some e_bin_prio_lop1
   | Some EP.ROP1 _    -> Some e_bin_prio_rop1
   | Some EP.LOP2 _    -> Some e_bin_prio_lop2
+  | Some EP.PLUSn _   -> Some e_bin_prio_lop2
+  | Some EP.MINUSn _  -> Some e_bin_prio_lop2
   | Some EP.ROP2 _    -> Some e_bin_prio_rop2
   | Some EP.PLUS      -> Some e_bin_prio_lop2
   | Some EP.MINUS     -> Some e_bin_prio_lop2
   | Some EP.LOP3 _    -> Some e_bin_prio_lop3
+  | Some EP.STARn _   -> Some e_bin_prio_lop3
   | Some EP.ROP3 _    -> Some e_bin_prio_rop3
   | Some EP.STAR      -> Some e_bin_prio_lop3
   | Some EP.SLASH     -> Some e_bin_prio_lop3
@@ -928,6 +968,10 @@ let pp_opname (fmt : Format.formatter) ((nm, op) : symbol list * symbol) =
     else op
 
   in EcSymbols.pp_qsymbol fmt (nm, op)
+
+(* [pp_opname] under a name the path-level [pp_opname] defined below does
+   not shadow. *)
+let pp_opqsymbol : qsymbol pp = pp_opname
 
 (* -------------------------------------------------------------------- *)
 let pp_opname_with_tvi
@@ -2465,7 +2509,7 @@ let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : CP.codeoff
   | `Absolute p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
   | `Relative o -> Format.fprintf fmt "%d" o
 
-let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) = 
+let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) =
   Format.fprintf fmt "%s"
   (match br with
   | `Cond true -> "."
@@ -2473,7 +2517,7 @@ let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) =
   | `Match cp -> Format.sprintf "#%s." cp
   | `MatchByPos ix -> Format.sprintf "#%i" ix)
 
-let pp_codepos_step (ppe: PPEnv.t) (fmt: Format.formatter) ((cp, br): CP.codepos_step) = 
+let pp_codepos_step (ppe: PPEnv.t) (fmt: Format.formatter) ((cp, br): CP.codepos_step) =
   Format.fprintf fmt "%a%a" (pp_codepos1 ppe) cp pp_codepos_brsel br
 
 let pp_codepos_path ppe =
@@ -2492,16 +2536,16 @@ let pp_codegap1 (ppe : PPEnv.t) (fmt : Format.formatter) (g : CP.codegap1) =
 let pp_codegap (ppe : PPEnv.t) (fmt : Format.formatter) ((cpath, g1) : CP.codegap) =
   Format.fprintf fmt "%a%a" (pp_codepos_path ppe) cpath (pp_codegap1 ppe) g1
 
-let symbol_and_codepos1_of_codegap1_range_edge (cg: CP.codegap1) : symbol * CP.codepos1 = 
+let symbol_and_codepos1_of_codegap1_range_edge (cg: CP.codegap1) : symbol * CP.codepos1 =
   match cg with
   | GapBefore cp -> "[", cp
   | GapAfter cp  -> "]", cp
 
 (* -------------------------------------------------------------------- *)
 let pp_codegap1_range (ppe: PPEnv.t) (fmt: Format.formatter) ((start, fin) : CP.codegap1_range) =
-  let s, cps = symbol_and_codepos1_of_codegap1_range_edge start in 
-  let e, cpe = symbol_and_codepos1_of_codegap1_range_edge fin in 
-  Format.fprintf fmt "%s%a;%a%s" s (pp_codepos1 ppe) cps (pp_codepos1 ppe) cpe e 
+  let s, cps = symbol_and_codepos1_of_codegap1_range_edge start in
+  let e, cpe = symbol_and_codepos1_of_codegap1_range_edge fin in
+  Format.fprintf fmt "%s%a;%a%s" s (pp_codepos1 ppe) cps (pp_codepos1 ppe) cpe e
 
 (* FIXME: change when we can change the syntax *)
 let pp_codegap_range (ppe: PPEnv.t) (fmt: Format.formatter) ((cpath, cp1r) : CP.codegap_range) =
@@ -3645,6 +3689,44 @@ and pp_block ppe fmt s =
 and pp_stmt ppe fmt s =
   pp_list "@," (pp_instr ppe) fmt s.s_node
 
+let pp_function ppe fmt (fun_ : function_) =
+  let pp_item ppe fmt = function
+    | `Var pv ->
+        Format.fprintf fmt "@[<hov 2>var %a;@]" (pp_pvdecl ppe) pv
+    | `Instr i ->
+        Format.fprintf fmt "%a" (pp_instr ppe) i
+    | `Return e ->
+        Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]" (pp_expr ppe) e
+  in
+
+  let pp_funhdr ppe fmt fun_ =
+    let with_sig = match fun_.f_def with FBalias _ -> false | _ -> true in
+    Format.fprintf fmt "%a" (pp_funsig ~with_sig ppe) fun_.f_sig in
+
+  let pp_fundef ppe fmt fun_ =
+    match fun_.f_def with
+    | (FBdef def) ->
+      let dummy_mem = EcIdent.create "&hr_dummy" in
+      let _, me = EcEnv.Fun.actmem_body dummy_mem fun_ in
+      let ppe  = PPEnv.push_mem ppe ~active:true me in
+      let vars = List.map (fun x -> `Var    x) def.f_locals in
+      let stmt = List.map (fun x -> `Instr  x) def.f_body.s_node in
+      let ret  = List.map (fun x -> `Return x) (otolist def.f_ret) in
+      let all  = List.filter (fun x -> not (List.is_empty x)) [vars; stmt; ret] in
+
+      if List.is_empty all then Format.fprintf fmt "{}" else
+        Format.fprintf fmt "{@,  @[<v>%a@]@,}"
+          (pp_list "@,@," (pp_list "@," (pp_item ppe))) all;
+
+    | FBalias g ->
+        Format.fprintf fmt "%a" (pp_funname ppe) g
+
+    | FBabs _ ->
+        Format.fprintf fmt "?ABSTRACT?"
+  in
+
+  Format.fprintf fmt "@[<v>%a = %a@]" (pp_funhdr ppe) fun_ (pp_fundef ppe) fun_
+
 let rec pp_modexp ppe fmt (p, me) =
   let params =
     match me.me_body with
@@ -3676,42 +3758,7 @@ and pp_moditem ppe fmt (p, i) =
       Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe) v
 
   | MI_Function f ->
-    let pp_item ppe fmt = function
-      | `Var pv ->
-          Format.fprintf fmt "@[<hov 2>var %a;@]" (pp_pvdecl ppe) pv
-      | `Instr i ->
-          Format.fprintf fmt "%a" (pp_instr ppe) i
-      | `Return e ->
-          Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]" (pp_expr ppe) e
-    in
-
-    let pp_funsig ppe fmt fun_ =
-      let with_sig = match fun_.f_def with FBalias _ -> false | _ -> true in
-      Format.fprintf fmt "%a" (pp_funsig ~with_sig ppe) fun_.f_sig in
-
-    let pp_fundef ppe fmt fun_ =
-      match fun_.f_def with
-      | (FBdef def) ->
-        let dummy_mem = EcIdent.create "&hr_dummy" in
-        let _, me = EcEnv.Fun.actmem_body dummy_mem fun_ in
-        let ppe  = PPEnv.push_mem ppe ~active:true me in
-        let vars = List.map (fun x -> `Var    x) def.f_locals in
-        let stmt = List.map (fun x -> `Instr  x) def.f_body.s_node in
-        let ret  = List.map (fun x -> `Return x) (otolist def.f_ret) in
-        let all  = List.filter (fun x -> not (List.is_empty x)) [vars; stmt; ret] in
-
-        if List.is_empty all then Format.fprintf fmt "{}" else
-          Format.fprintf fmt "{@,  @[<v>%a@]@,}"
-            (pp_list "@,@," (pp_list "@," (pp_item ppe))) all;
-
-      | FBalias g ->
-          Format.fprintf fmt "%a" (pp_funname ppe) g
-
-      | FBabs _ ->
-          Format.fprintf fmt "?ABSTRACT?"
-    in
-
-    Format.fprintf fmt "@[<v>%a = %a@]" (pp_funsig ppe) f (pp_fundef ppe) f
+    pp_function ppe fmt f
 
 let pp_modexp ppe fmt (mp, me) =
   Format.fprintf fmt "%a." (pp_modexp ppe) (mp, me)
@@ -3744,6 +3791,28 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
     thkw basename
     (pp_list "@,@," (pp_th_item ppe path)) cth.cth_items
     basename
+
+ and pp_crb_theory1 (ppe : PPEnv.t) (fmt : Format.formatter) (item : crb_theory1) =
+  match item.kind with
+  | CRBT_Type p ->
+    Format.fprintf fmt "%s/ty:%a" item.name (pp_tyname ppe) p
+  | CRBT_Op (tparams, { e_node = Eop (p, tys) })
+      when List.for_all2 ty_equal (List.map tvar tparams) tys
+    ->
+    let ppe = PPEnv.add_locals ppe tparams in
+    Format.fprintf fmt "%s/op: %a"
+      item.name (pp_opname ppe) p
+  | CRBT_Op (tparams, e) ->
+    let ppe = PPEnv.add_locals ppe tparams in
+    Format.fprintf fmt "%s/op:[%a] %a"
+      item.name
+      (pp_list ",@ " (pp_tyvar ppe)) tparams
+      (pp_expr ppe) e
+  | CRBT_Lemma p ->
+    Format.fprintf fmt "%s/ax:%a" item.name (pp_axname ppe) p
+
+ and pp_crb_theory (ppe : PPEnv.t) (fmt : Format.formatter) (crbth : crb_theory) =
+  Format.fprintf fmt "%a" (pp_list ", " (pp_crb_theory1 ppe)) crbth
 
  and pp_th_item_r ppe p fmt item =
   match item.EcTheory.ti_item with
@@ -3834,9 +3903,16 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         pp_locality lc
         (pp_rwname ppe) p (pp_list "@ " (pp_axname ppe)) l
 
-  | EcTheory.Th_reduction _ ->
-      (* FIXME: section we should add the lemma in the reduction *)
-      Format.fprintf fmt "hint simplify."
+  | EcTheory.Th_reduction { red_base; red_rules; } ->
+      (* [hint simplify <lemmas>.] for the default base; [hint simplify in
+         <base> : <lemmas>.] for a named one (mirrors the grammar). *)
+      let pp_head fmt = function
+        | None      -> Format.fprintf fmt "hint simplify"
+        | Some base -> Format.fprintf fmt "hint simplify in %s :" base in
+      let lemmas = List.map proj3_1 red_rules in
+      Format.fprintf fmt "%a @[<hov 2>%a@]."
+        pp_head red_base
+        (pp_list ",@ " (pp_axname ppe)) lemmas
 
   | EcTheory.Th_auto { level; base; axioms; locality; } ->
       Format.fprintf fmt "%ahint solve %d %s : %a."
@@ -3844,6 +3920,83 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         level (odfl "" base)
         (pp_list "@ " (pp_axhnt ppe)) axioms
 
+  | EcTheory.Th_crbinding (binding, lc) -> begin
+    match binding with
+    | CRB_Bitstring bs ->
+      Format.fprintf fmt "(* %a *) " (pp_crb_theory ppe) bs.theory;
+      Format.fprintf fmt "%abind bitstring %a %a %a %a%s."
+        pp_locality lc
+        (pp_opname ppe) bs.to_
+        (pp_opname ppe) bs.from_
+        (pp_tyname ppe) bs.type_
+        (pp_form ppe) (fst bs.size)
+        (if Option.is_some (snd bs.size) then " (concrete)" else " (abstract)")
+
+    | CRB_Array ba ->
+      Format.fprintf fmt "(* %a *) " (pp_crb_theory ppe) ba.theory;
+      Format.fprintf fmt "%abind array %a %a %a %a %a %a%s."
+        pp_locality lc
+        (pp_tyname ppe) ba.type_
+        (pp_opname ppe) ba.get
+        (pp_opname ppe) ba.set
+        (pp_opname ppe) ba.tolist
+        (pp_opname ppe) ba.oflist
+        (pp_form ppe) (fst ba.size)
+        (if Option.is_some (snd ba.size) then " (concrete)" else " (abstract)")
+
+    | CRB_BvOperator op ->
+      let kind =
+        match op.kind with
+        | `Add      _            -> "add"
+        | `Sub      _            -> "sub"
+        | `Mul      _            -> "mul"
+        | `Div     (_,    false) -> "udiv"
+        | `Div     (_,    true ) -> "sdiv"
+        | `Rem     (_,    false) -> "urem"
+        | `Rem     (_,    true ) -> "srem"
+        | `Shl      _            -> "shl"
+        | `Shls      _           -> "shls"
+        | `Rol      _            -> "rol"
+        | `Ror      _            -> "ror"
+        | `Shr     (_,    false) -> "shr"
+        | `Shr     (_,    true ) -> "ashr"
+        | `Shrs    (_, _, false) -> "shrs"
+        | `Shrs    (_, _, true ) -> "ashrs"
+        | `Not      _            -> "not"
+        | `Opp      _            -> "opp"
+        | `And      _            -> "and"
+        | `Or       _            -> "or"
+        | `Xor      _            -> "xor"
+        | `Lt      (_,    false) -> "ult"
+        | `Lt      (_,    true ) -> "slt"
+        | `Le      (_,    false) -> "ule"
+        | `Le      (_,    true ) -> "sle"
+        | `Init     _            -> "init"
+        | `Get      _            -> "get"
+        | `AInit    _            -> "ainit"
+        | `PAInit   _            -> "painit"
+        | `Extend  (_, _, false) -> "zextend"
+        | `Extend  (_, _, true ) -> "sextend"
+        | `Extract  _            -> "extract"
+        | `Insert   _            -> "insert"
+        | `Concat   _            -> "concat"
+        | `Truncate _            -> "truncate"
+        | `A2B      _            -> "a2b"
+        | `B2A      _            -> "b2a"
+        | `Map      _            -> "map"
+        | `ASliceGet _           -> "asliceget"
+        | `ASliceSet _           -> "asliceset"
+      in
+      Format.fprintf fmt "%abind op [%a] %a \"%s\"."
+        pp_locality lc
+        (pp_list " & " (pp_tyname ppe)) op.types
+        (pp_opname ppe) op.operator
+        kind
+
+  | CRB_Circuit cr ->
+      Format.fprintf fmt "%abind circuit %a \"%s\"."
+        pp_locality lc (pp_opname ppe) cr.operator cr.name
+  end
   | EcTheory.Th_alias (name, target) ->
       Format.fprintf fmt "theory %s = %a." name (pp_thname ~alias:false ppe) target
 
@@ -3930,6 +4083,30 @@ module ObjectInfo = struct
     od_printer : PPEnv.t -> Format.formatter -> 'a -> unit;
   }
 
+  (* ------------------------------------------------------------------ *)
+  (* With [locate], an object is prefixed by the name [locate] reports for
+     it: the one it is known under, and the shortest form that still
+     resolves to it. A name with no namespace prefix says nothing the
+     declaration does not, and is left out -- the same convention as the
+     [~long] flag of the declaration printers, which the report
+     supersedes. *)
+  let pp_located
+    ?(locate = false)
+    ?pp_name
+     (lookup : qsymbol -> EcEnv.env -> (P.path * 'a) option)
+     (pp     : PPEnv.t -> (P.path * 'a) pp)
+     (ppe    : PPEnv.t)
+     (fmt    : Format.formatter)
+    ((p, _) as obj : P.path * 'a)
+  =
+    if locate then begin
+      match locate_path ppe lookup p with
+      | (([], _), None) -> ()
+      | located ->
+          Format.fprintf fmt "(* %a *)@ " (pp_shortened ?pp_name) located
+    end;
+    pp ppe fmt obj
+
   (* -------------------------------------------------------------------- *)
   let pr_gen_r ?(prcat = false) dumper = fun fmt env qs ->
     let ppe = PPEnv.ofenv env in
@@ -3949,30 +4126,35 @@ module ObjectInfo = struct
         theprinter fmt env qs
       with NoObject ->
         Format.fprintf fmt
-          "no such object in the category [%s]@." dumper.od_name
+          "no object `%a' in the category [%s]@\n@."
+          EcSymbols.pp_qsymbol qs dumper.od_name
 
   (* ------------------------------------------------------------------ *)
-  let pr_ty_r =
+  let pr_ty_r ?locate () =
     { od_name    = "type declarations";
       od_lookup  = EcEnv.Ty.lookup;
-      od_printer = pp_typedecl; }
+      od_printer = pp_located ?locate EcEnv.Ty.lookup_opt pp_typedecl; }
 
-  let pr_ty = pr_gen pr_ty_r
+  let pr_ty ?locate fmt env qs = pr_gen (pr_ty_r ?locate ()) fmt env qs
 
   (* ------------------------------------------------------------------ *)
-  let pr_op_r =
+  let pr_op_r ?(locate = false) () =
     let get_ops qs env =
       let l = EcEnv.Op.all ~name:qs env in
       if l = [] then raise NoObject;
       l in
+    let pp_one =
+      pp_located ~locate ~pp_name:pp_opqsymbol EcEnv.Op.lookup_opt
+        (pp_opdecl ~long:(not locate)) in
     { od_name    = "operators, predicates or exceptions";
       od_lookup  = get_ops;
       od_printer =
         fun ppe fmt l ->
+          (* an annotated object spans two lines: keep the entries apart *)
           Format.fprintf fmt "@[<v>%a@]"
-            (pp_list "@ " (pp_opdecl ~long:true ppe)) l; }
+            (pp_list (if locate then "@ @ " else "@ ") (pp_one ppe)) l; }
 
-  let pr_op = pr_gen pr_op_r
+  let pr_op ?locate fmt env qs = pr_gen (pr_op_r ?locate ()) fmt env qs
 
   (* ------------------------------------------------------------------ *)
   let pr_th_r =
@@ -3983,19 +4165,23 @@ module ObjectInfo = struct
   let pr_th = pr_gen pr_th_r
 
   (* ------------------------------------------------------------------ *)
-  let pr_ax_r =
+  let pr_ax_r ?(locate = false) () =
     let get_ops qs env =
       let l = EcEnv.Ax.all ~name:qs env in
       if l = [] then raise NoObject;
       l in
+    let pp_one =
+      pp_located ~locate EcEnv.Ax.lookup_opt
+        (pp_axiom ~long:(not locate)) in
     { od_name    = "lemmas or axioms";
       od_lookup  = get_ops;
       od_printer =
         fun ppe fmt l ->
+          (* an annotated object spans two lines: keep the entries apart *)
           Format.fprintf fmt "@[<v>%a@]"
-            (pp_list "@ " (pp_axiom ~long:true ppe)) l; }
+            (pp_list (if locate then "@ @ " else "@ ") (pp_one ppe)) l; }
 
-  let pr_ax = pr_gen pr_ax_r
+  let pr_ax ?locate fmt env qs = pr_gen (pr_ax_r ?locate ()) fmt env qs
 
   (* ------------------------------------------------------------------ *)
   let pr_mod_r =
@@ -4004,6 +4190,31 @@ module ObjectInfo = struct
       od_printer = pp_modexp_lc; }
 
   let pr_mod = pr_gen pr_mod_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_fun_r =
+    (* Prefer the substituting lookup so that a concrete or fully-applied
+       procedure prints with its instantiated names.  When the enclosing
+       module still has functor parameters, that lookup fails; we then fall
+       back to the suspended view, which keeps the parameters abstract. *)
+    let lookup qs env =
+      try
+        let (xp, f) = EcEnv.Fun.lookup qs env in
+        (xp, { EcEnv.sp_target = f; sp_params = (0, []); })
+      with EcEnv.LookupFailure _ -> EcEnv.Fun.sp_lookup qs env in
+    { od_name    = "procedures";
+      od_lookup  = lookup;
+      od_printer =
+        (fun ppe fmt (_, susp) ->
+          let (_, params) = susp.EcEnv.sp_params in
+          let (ppe, pp_params) = pp_mod_params ppe params in
+          if List.is_empty params then
+            pp_function ppe fmt susp.EcEnv.sp_target
+          else
+            Format.fprintf fmt "@[<v>(* in functor %t *)@ %a@]"
+              pp_params (pp_function ppe) susp.EcEnv.sp_target); }
+
+  let pr_fun = pr_gen pr_fun_r
 
   (* ------------------------------------------------------------------ *)
   let pr_mty_r =
@@ -4045,11 +4256,12 @@ module ObjectInfo = struct
 
   (* ------------------------------------------------------------------ *)
   let pr_any fmt env qs =
-    let printers = [pr_gen_r ~prcat:true pr_ty_r ;
-                    pr_gen_r ~prcat:true pr_op_r ;
+    let printers = [pr_gen_r ~prcat:true (pr_ty_r ~locate:true ());
+                    pr_gen_r ~prcat:true (pr_op_r ~locate:true ());
                     pr_gen_r ~prcat:true pr_th_r ;
-                    pr_gen_r ~prcat:true pr_ax_r ;
+                    pr_gen_r ~prcat:true (pr_ax_r ~locate:true ());
                     pr_gen_r ~prcat:true pr_mod_r;
+                    pr_gen_r ~prcat:true pr_fun_r;
                     pr_gen_r ~prcat:true pr_mty_r;
                     pr_gen_r ~prcat:true pr_rw_r ;
                     pr_gen_r ~prcat:true pr_at_r ; ] in
@@ -4060,7 +4272,8 @@ module ObjectInfo = struct
       (fun f -> try f fmt env qs with NoObject -> decr ok)
       printers;
     if !ok = 0 then
-      Format.fprintf fmt "%s@." "no such object in any category"
+      Format.fprintf fmt "no object `%a' in any category@\n@."
+        EcSymbols.pp_qsymbol qs
 end
 
 (* ------------------------------------------------------------------ *)

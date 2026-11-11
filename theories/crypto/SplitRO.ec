@@ -185,9 +185,17 @@ section PROOFS.
       have hn := o_pair_none <: from, to1, to2>.
       by rewrite /pair_map merge_empty // map_empty /= => ?; rewrite !mem_empty. 
     + by conseq RO_get.
-    + by proc; inline *; auto => />;
-       smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE topairK).
-    + by proc; inline *; auto; smt (map_rem rem_merge mem_map mem_pair_map mem_rem).
+    + proc; inline *; auto => |> &2 ih; split.
+      + apply: fmap_eqP=> z; rewrite mapE /= mergeE // !get_setE; case: (z = x{2}).
+        + by case _: (topair y{2})=> y1 y2 |> @/o_pair /= <-; rewrite topairK.
+        by rewrite mapE /= mergeE.
+      move=> z; rewrite !domE !get_setE; case: (z = x{2})=> // _.
+      by rewrite -!domE; exact: ih.
+    + proc; inline *; auto=> |> &2 ih; split.
+      + apply: fmap_eqP=> z; rewrite mapE /= mergeE // !remE; case: (z = x{2})=> //.
+        by move=> _; rewrite mapE /= mergeE.
+      move=> z; rewrite !domE !remE; case: (z = x{2})=> // _.
+      by rewrite -!domE; exact: ih.
     + proc *.
       inline {1} 1.
       outline {2} 1 by { RO_Pair(I1.RO, I2.RO).get(x); }.

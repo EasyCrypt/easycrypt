@@ -17,7 +17,25 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
+type crb_tyrev_binding = [
+  | `Bitstring of crb_bitstring
+  | `Array     of crb_array
+]
+
+type crb_bitstring_operator = crb_bitstring * [`From | `To | `OfInt | `ToUInt | `ToSInt ]
+
+type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]
+
+type crb_oprev_binding = [
+  | `Bitstring  of crb_bitstring_operator
+  | `Array      of crb_array_operator
+  | `BvOperator of crb_bvoperator
+  | `Circuit    of crb_circuit
+]
+
+(* -------------------------------------------------------------------- *)
 type env
+
 type scope = [
   | `Theory
   | `Module of EcPath.mpath
@@ -420,14 +438,39 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
+  type entry = path * EcTheory.rule
   type rule   = EcTheory.rule
   type topsym = [ `Path of path | `Tuple | `Proj of int]
+  (* A reduction database is identified by a flat, global name (not a
+     theory-qualified path), hence a [symbol] rather than a [path]. *)
+  type base = symbol
 
-  val all : env -> (topsym * rule list) list
-  val add1 : path * rule_option * rule option -> env -> env
-  val add  : ?import:bool -> (path * rule_option * rule option) list -> env -> env
-  val get  : topsym -> env -> rule list
+  (* Name of the default database (the empty name). *)
+  val dname : symbol
+  val all : env -> (base * (topsym * rule list) list) list
+  val add1 : ?base:symbol -> path * rule_option * rule list -> env -> env
+  val add  : ?import:bool -> reduction_rule -> env -> env
+  val get  : ?base:symbol -> topsym -> env -> rule list
+  val get_entries : ?base:symbol -> topsym -> env -> entry list
+  val getx : symbol -> env -> (topsym * rule list) list
+
+  (* [hint simplify disable / enable]: switch the rules of the given
+     lemmas off / back on in a database, for the rest of the enclosing
+     theory / section of the current file. Not a theory item, so never
+     exported to requiring files, and independent from [add], which only
+     feeds the database. [has_rules] tells whether a database holds rules
+     compiled from a lemma, [is_disabled] whether they are switched off. *)
+  val disable : ?base:symbol -> path list -> env -> env
+  val enable  : ?base:symbol -> path list -> env -> env
+  val has_rules   : ?base:symbol -> path -> env -> bool
+  val is_disabled : ?base:symbol -> path -> env -> bool
 end
+
+(* Proof-local simplify context; defined in [EcSimplifyContext] and
+   re-exported here. *)
+type simplify_context = EcSimplifyContext.simplify_context
+
+module SimplifyContext = EcSimplifyContext
 
 (* -------------------------------------------------------------------- *)
 module Auto : sig
@@ -526,5 +569,41 @@ module LDecl : sig
   val inv_memenv  : memory -> memory -> hyps -> hyps
   val inv_memenv1 : memory -> hyps -> hyps
 end
+
+(* -------------------------------------------------------------------- *)
+module Circuit : sig  
+  val bind_bitstring  : ?import:bool -> is_local -> crb_bitstring -> env -> env
+  val bind_array      : ?import:bool -> is_local -> crb_array -> env -> env
+  val bind_bvoperator : ?import:bool -> is_local -> crb_bvoperator -> env -> env
+  val bind_circuit    : ?import:bool -> is_local -> crb_circuit -> env -> env
+  val bind_crbinding  : ?import:bool -> is_local -> crbinding -> env -> env
+
+  val lookup_bitstring           : env -> ty      -> crb_bitstring option
+  val lookup_bitstring_path      : env -> path    -> crb_bitstring option
+  val lookup_bitstring_size      : env -> ty      -> int option
+  val lookup_bitstring_size_path : env -> path    -> int option
+
+  val lookup_bvoperator_path     : env -> path    -> crb_bvoperator option
+  val lookup_bvoperator          : env -> qsymbol -> crb_bvoperator option
+
+  val lookup_array      : env -> ty -> crb_array option
+  val lookup_array_path : env -> path -> crb_array option
+  val lookup_array_size : env -> ty -> int option
+
+  val lookup_array_and_bitstring : env -> ty -> (crb_array * crb_bitstring) option
+
+  val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
+  val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
+
+  val reverse_type     : env -> path -> crb_tyrev_binding list
+  val reverse_operator : env -> path -> crb_oprev_binding list
+
+  val reverse_bitstring_operator : env -> path -> crb_bitstring_operator option
+  val reverse_array_operator : env -> path -> crb_array_operator option
+  val reverse_bvoperator : env -> path -> crb_bvoperator option
+  val reverse_circuit : env -> path -> crb_circuit option
+
+  val get_specification_by_name : filename:string -> symbol -> Lospecs.Ast.adef option
+end 
 
 val pp_debug_form : (env -> form -> unit) ref

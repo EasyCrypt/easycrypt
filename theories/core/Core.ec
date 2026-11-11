@@ -17,7 +17,6 @@ lemma oget_some (x : 'a): oget (Some x) = x.
 proof. by done. qed.
 hint simplify oget_some, oget_none.
 
-
 lemma some_oget (x : 'a option): x <> None => x = Some (oget x).
 proof. by case: x. qed.
 
@@ -31,6 +30,13 @@ proof. by case: ox. qed.
 lemma oget_omap_some ['a 'b] (f : 'a -> 'b) ox :
   ox <> None => oget (omap f ox) = f (oget ox).
 proof. by case: ox. qed.
+
+lemma ogetI ['a] (x y : 'a option) :
+     x <> None
+  => y <> None
+  => oget x = oget y
+  => x = y.
+proof. by case x; case y. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma frefl  (f     : 'a -> 'b): f == f by [].
@@ -143,6 +149,14 @@ proof. by move=> fK gK x y; rewrite -{1}[y]gK; apply (can_eq f g). qed.
 (* -------------------------------------------------------------------- *)
 lemma inj_idfun: injective (idfun<:'a>).
 proof. by []. qed.
+
+lemma comp_idfunL ['a 'b] (f : 'a -> 'b) : idfun \o f = f.
+proof. by []. qed.
+
+lemma comp_idfunR ['a 'b] (f : 'a -> 'b) : f \o idfun = f.
+proof. by []. qed.
+
+hint simplify comp_idfunL, comp_idfunR.
 
 lemma inj_can_sym (f:'a -> 'b) f':
   cancel f f' => injective f' => cancel f' f.

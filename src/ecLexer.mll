@@ -68,6 +68,7 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "expect"      , EXPECT     ;        (* KW: tactical *)
+    "extens"      , EXTENS     ;        (* KW: tactical *)
 
     (* Lambda tactics *)
     "beta"        , BETA       ;        (* KW: tactic *)
@@ -168,7 +169,11 @@
     "splitwhile"  , SPLITWHILE ;        (* KW: tactic *)
     "kill"        , KILL       ;        (* KW: tactic *)
     "eager"       , EAGER      ;        (* KW: tactic *)
-
+    
+    "array"       , ARRAY      ;        (* KW: global *)
+    "bind"        , BIND       ;        (* KW: global *)
+    "circuit"     , CIRCUIT    ;        (* KW: global *)
+    "bitstring"   , BITSTRING  ;        (* KW: global *)
     "axiom"       , AXIOM      ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
@@ -302,7 +307,22 @@
     | _                     -> LOP4 (name |> odfl op)
 
   (* ------------------------------------------------------------------ *)
+  (* Repeated bullet characters (`--`, `+++`, `***`, ...) are emitted as
+     a single token so that the parser can distinguish them from two
+     separate operator characters. Single-character forms keep going
+     through the standard operator path for backward compatibility. *)
+  let lex_bullet_chunk (op : string) =
+    let n = String.length op in
+    if      EcRegexp.match_ (`S "^-{2,}$"  ) op then Some (MINUSn n)
+    else if EcRegexp.match_ (`S "^\\+{2,}$") op then Some (PLUSn  n)
+    else if EcRegexp.match_ (`S "^\\*{2,}$") op then Some (STARn  n)
+    else None
+
+  (* ------------------------------------------------------------------ *)
   let lex_operators (op : string) =
+    match lex_bullet_chunk op with
+    | Some tok -> [tok]
+    | None ->
     let baseop (op : string) =
       try  fst (Hashtbl.find operators op)
       with Not_found ->

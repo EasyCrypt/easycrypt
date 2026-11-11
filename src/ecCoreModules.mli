@@ -84,6 +84,19 @@ val i_asgn_of_pve : ((prog_var * ty) * expr) list -> instr option
 val i_iter : (instr -> unit) -> instr -> unit
 val i_map_expr : (expr -> expr) -> instr -> instr
 
+(* Fold-map over the expressions of an instruction in program order,
+   recursing into the bodies of [if]/[while]/[match]. The callback
+   receives the match-arm locals in scope (on top of [locals]). *)
+val i_fold_map_expr :
+     ?locals:(EcIdent.t * ty) list
+  -> ((EcIdent.t * ty) list -> 'a -> expr -> 'a * expr)
+  -> 'a -> instr -> 'a * instr
+
+val s_fold_map_expr :
+     ?locals:(EcIdent.t * ty) list
+  -> ((EcIdent.t * ty) list -> 'a -> expr -> 'a * expr)
+  -> 'a -> stmt -> 'a * stmt
+
 (* -------------------------------------------------------------------- *)
 val get_uninit_read : stmt -> Sx.t
 
@@ -256,6 +269,10 @@ type top_module_expr = {
 }
 
 val is_me_body_alias : module_body -> bool
+
+(* Component path of the first program variable owned by the module, [None] if
+   it owns none (transitively through its sub-modules). *)
+val module_own_state : module_expr -> symbol list option
 
 (* -------------------------------------------------------------------- *)
 val mty_equal :

@@ -37,7 +37,18 @@ Here:
   right program in relational goals. If omitted, the tactic applies to the
   single program under consideration.
 
-- `{codepos1}` denotes a *top-level code position*.
+- `{codepos1}` denotes a code position in the program.
+
+- Any `{codepos1}` or block `[{codepos1}..{codepos1}]` may be prefixed with a
+  *code path*, selecting a nested block in which the swap takes place. Each
+  step of the path is a code position followed by a branch selector: `.`
+  for the then-branch of a conditional or the body of a loop, `?` for the
+  else-branch of a conditional, and `#C.` for the arm of a `match` labelled
+  by the constructor `C`. A single position directly follows the path,
+  while a block is separated from it by `:`. For instance, `2#Some.1`
+  designates the first command of the `Some` arm of the `match` at position
+  `2`, and `1.:[1..2]` the block formed by the first two commands of the
+  then-branch (or loop body) of the command at position `1`.
 
 - A `{codeoffset1}` is either:
 
@@ -63,6 +74,11 @@ The meaning of these forms is as follows:
 
 In all cases, the swap is only valid when the exchanged fragments are
 independent, so that the transformation preserves the program semantics.
+
+When a code path is given, positions and offsets are interpreted relative
+to the selected block, the destination must lie inside that block, and the
+enclosing command (conditional, loop or `match`) and its other branches are
+left unchanged.
 
 ------------------------------------------------------------------------
 Example (single statement)
@@ -134,6 +150,41 @@ commands with a later, independent command.
     swap [2..3] 1.
 
     (* The goal is the same, but with the program rewritten. *)
+    admit.
+  qed.
+
+------------------------------------------------------------------------
+Example (swapping inside a branch)
+------------------------------------------------------------------------
+
+The following example uses a code path to swap two commands located in the
+then-branch of a conditional. The conditional itself and its else-branch are
+preserved.
+
+.. ecproof::
+
+  require import AllCore.
+
+  module M = {
+    var x : bool
+    var y : int
+
+    proc branch(b : bool) : unit = {
+      if (b) { x <- true; y <- 2; } else { x <- false; y <- 6; }
+    }
+  }.
+
+  lemma branch_correct : hoare [ M.branch : !b ==> !M.x ].
+  proof.
+    proc.
+
+    (*$*)
+    (* Swap the first command of the then-branch of command 1 with the
+       following command of that branch. The program becomes
+       `if (b) { y <- 2; x <- true; } else { x <- false; y <- 6; }`. *)
+    swap 1.:[1..1] 1.
+
+    (* The conditional is still there. *)
     admit.
   qed.
 

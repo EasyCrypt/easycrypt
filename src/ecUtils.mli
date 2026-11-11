@@ -302,6 +302,7 @@ module List : sig
   val reduce1    : ('a list -> 'a) -> 'a list -> 'a
   val find_dup   : ?cmp:('a -> 'a -> int) -> 'a list -> 'a option
   val has_dup    : ?cmp:('a -> 'a -> int) -> 'a list -> bool
+  val chunkify   : int -> 'a list -> 'a list list
 
   val takedrop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
 

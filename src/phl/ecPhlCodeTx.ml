@@ -34,9 +34,21 @@ let t_kill_r side cpos olen tc =
           List.takedrop len zpr.Zpr.z_tail
     in
 
-    (* FIXME [BG]: check the usage of po_rd *)
+    (* [ks] is replaced by [skip]. This is sound if [ks] is lossless
+       (side goal below) and if the variables it writes ([ks_wr]) are
+       read neither by the postcondition nor by any code that may run
+       after [ks]: then both programs end in states that agree outside
+       of [ks_wr]. The code that may run after [ks] is, for each
+       enclosing block, the code that follows the block's cursor, and,
+       for each enclosing while loop, the loop guard and the whole loop
+       body (with [ks] removed): the next iterations run them again,
+       including the part of the body before [ks]. This is what
+       [EcPV.zpr_pv `Read `After] computes. *)
     let ks_wr = is_write env ks in
     let po_rd = PV.fv env (fst me) po in
+    let af_rd =
+      EcPV.zpr_pv `Read `After env PV.empty
+        ((zpr.Zpr.z_head, tl), zpr.Zpr.z_path) in
 
     let pp_of_name =
       let ppe = EcPrinting.PPEnv.ofenv env in
@@ -46,23 +58,14 @@ let t_kill_r side cpos olen tc =
           | `PV     p -> EcPrinting.pp_pv     ppe fmt p
     in
 
-    List.iteri
-      (fun i is ->
-         let is_rd = is_read env is in
-         let indp  = PV.interdep env ks_wr is_rd in
-           match PV.pick indp with
-           | None   -> ()
-           | Some x ->
-               match i with
-               | 0 ->
-                   tc_error !!tc
-                     "code writes variables (%a) used by the current block"
-                     pp_of_name x
-               | _ ->
-                   tc_error !!tc
-                     "code writes variables (%a) used by the %dth parent block"
-                     pp_of_name x i)
-      (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
+    begin
+      match PV.pick (PV.interdep env ks_wr af_rd) with
+      | None   -> ()
+      | Some x ->
+          tc_error !!tc
+            "code writes variables (%a) used by the code that may run after it"
+            pp_of_name x
+    end;
 
     begin
       match PV.pick (PV.interdep env ks_wr po_rd) with
@@ -527,7 +530,14 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
 
     let lv, e = destr_asgn i in
 
-    let pvl = EcPV.lp_write env lv in
+    let pvl = 
+      match lv with
+      | LvVar _ -> PV.empty
+      | LvTuple lvs ->
+        let lvs = List.tl (List.rev lvs) in
+        let lvs = Option.get (lv_of_list lvs) in
+        EcPV.lp_write env lvs in
+
     let pve = EcPV.e_read env e in
     let lv  = lv_to_list lv in
 
@@ -538,7 +548,11 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
       match lv, e.e_node with
       | [_], _         -> [e]
       | _  , Etuple es -> es
-      | _  ,_          -> assert false in
+      | _  ,_          ->
+        let tys =
+          match (EcEnv.Ty.hnorm e.e_ty env).ty_node with
+          | Ttuple tys -> tys | _ -> assert false in
+        List.mapi (fun i ty -> e_proj e i ty) tys in
 
     let s = List.map2 (fun pv e -> i_asgn (LvVar (pv, e.e_ty), e)) lv e in
 

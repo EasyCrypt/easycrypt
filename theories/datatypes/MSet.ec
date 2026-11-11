@@ -1,20 +1,34 @@
-require import Core Int List StdRing StdOrder FMap FSet StdBigop.
+require import Core Int List StdRing StdOrder FMap FSet StdBigop Quotient.
 (*---*) import IntOrder.
 
 
 (* -------------------------------------------------------------------- *)
 (* Finite multisets are represented as lists up to permutation          *)
 
-type 'a mset.
+section.
+declare type a.
 
-op elems  : 'a mset -> 'a list.
-op oflist : 'a list -> 'a mset.
+clone include Quotient.EquivQuotient with
+  type T   <- a list,
+  op eqv <- perm_eq
+  rename "pi"      as "oflist"
+  rename "repr"    as "elems"
+  rename "qT"      as "mset"
+  rename "quot"    as "mset"
+  rename "oflistK" as "oflistK'"
+  proof *.
 
-axiom elemsK: cancel elems<:'a> oflist.
-axiom oflistK (s : 'a list): perm_eq s (elems (oflist s)).
+realize EqvEquiv.eqv_refl by apply perm_eq_refl.
+realize EqvEquiv.eqv_sym by rewrite /symmetric => x y; rewrite perm_eq_sym.
+realize EqvEquiv.eqv_trans by apply perm_eq_trans.
+end section.
 
-axiom mset_eq (s1 s2 : 'a mset):
+lemma oflistK (s : 'a list): perm_eq s (elems (oflist s)).
+proof. by apply eqv_oflist; rewrite elemsK. qed.
+
+lemma mset_eq (s1 s2 : 'a mset):
   (perm_eq (elems s1) (elems s2)) => (s1 = s2).
+proof. by rewrite eqv_oflist !elemsK. qed.
 
 (* -------------------------------------------------------------------- *)
 

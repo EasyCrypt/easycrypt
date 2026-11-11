@@ -469,6 +469,9 @@ abstract theory ComRing.
   lemma expr1 x: exp x 1 = x.
   proof. by rewrite /exp /= iterop1. qed.
 
+  lemma exprE_ge0 (x : t) n : 0 <= n => exp x n = iter n (( * ) x) oner.
+  proof. by move=> ge0_n; rewrite /exp ltzNge ge0_n /= MulMonoid.iteropE. qed.
+
   lemma exprS (x : t) i: 0 <= i => exp x (i+1) = x * (exp x i).
   proof.
     move=> ge0i; rewrite /exp !ltzNge ge0i addz_ge0 //=.
@@ -698,7 +701,7 @@ abstract theory ComRingDflInv.
 
   realize mulVr.
   proof.
-  move=> x ^ un_x [y ^ -> <-] @/invr_.
+  move=> x ^ un_x [y ^ -> <-].
   by have /= -> := choicebP _ x un_x.
   qed.
 
@@ -707,7 +710,7 @@ abstract theory ComRingDflInv.
 
   realize unitout.
   proof.
-  by move=> x; rewrite /unit_ negb_exists => /choiceb_dfl /(_ x).
+  by move=> x; rewrite negb_exists => /choiceb_dfl /(_ x).
   qed.
 end ComRingDflInv.
 

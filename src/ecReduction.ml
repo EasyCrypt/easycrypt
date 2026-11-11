@@ -185,7 +185,7 @@ module EqMod_base(Fe : sig
   val for_expr : env -> norm:bool -> (ident * ty) Mid.t -> expr -> expr -> bool
 end) = struct
   open EqTest_base
-  open Fe
+  include Fe
 
   (* ------------------------------------------------------------------ *)
   let rec for_stmt env alpha ~norm s1 s2 =
@@ -292,6 +292,16 @@ end) = struct
     List.for_all2 (for_module_sig_body_item env) b1 b2
 
   (* ------------------------------------------------------------------ *)
+  (* Allowed oracle calls are compared as sets, per procedure. *)
+  and for_oracle_infos env ~norm ois1 ois2 =
+    let allowed oi =
+      let calls = OI.allowed oi in
+      let calls = if norm then List.map (NormMp.norm_xfun env) calls else calls in
+      Sx.of_list calls in
+    EcSymbols.Msym.equal
+      (fun oi1 oi2 -> Sx.equal (allowed oi1) (allowed oi2)) ois1 ois2
+
+  (* ------------------------------------------------------------------ *)
   and for_module_sig env ~norm ms1 ms2 =
     let p1 = ms1.mis_params in
     let p2 = ms2.mis_params in
@@ -300,7 +310,10 @@ end) = struct
     let env, s = add_modules env p2 p1 in
     let body1 = ms1.mis_body in
     let body2 = EcSubst.subst_modsig_body s ms2.mis_body in
-    for_module_sig_body env body1 body2
+    for_module_sig_body env body1 body2 &&
+    let ois1 = ms1.mis_oinfos in
+    let ois2 = EcSubst.subst_oracle_infos s ms2.mis_oinfos in
+    for_oracle_infos env ~norm ois1 ois2
 
   (* ------------------------------------------------------------------ *)
   let for_variable env v1 v2 =
@@ -343,6 +356,9 @@ end) = struct
   let rec for_module_expr env ~norm ~body me1 me2 =
     me1.me_name = me2.me_name &&
       for_module_sig_body env me1.me_sig_body me2.me_sig_body &&
+    List.for_all2
+      (fun (_, mt1) (_, mt2) -> for_module_type env ~norm mt1 mt2)
+      me1.me_params me2.me_params &&
     let env, s = add_modules env me2.me_params me1.me_params in
     let comps1 = me1.me_comps in
     let comps2 = EcSubst.subst_module_comps s me2.me_comps in
@@ -642,6 +658,12 @@ type reduction_info = {
   logic   : rlogic_info;
   modpath : bool;
   user    : bool;
+  (* Databases selected at the use-site: [None] = no explicit selection
+     (fall back to the proof-local context), [Some dbs] = use exactly
+     [dbs] (replacing the active set). *)
+  user_db : EcSymbols.symbol list option;
+  user_local : EcEnv.simplify_context;
+  user_hd : EcEnv.SimplifyContext.head_filter option;
 }
 
 and deltap      = [Op.redmode | `No]
@@ -658,6 +680,9 @@ let full_red = {
   logic   = Some `Full;
   modpath = true;
   user    = true;
+  user_db = None;
+  user_local = EcEnv.SimplifyContext.empty;
+  user_hd = None;
 }
 
 let no_red = {
@@ -670,6 +695,9 @@ let no_red = {
   logic   = None;
   modpath = false;
   user    = false;
+  user_db = None;
+  user_local = EcEnv.SimplifyContext.empty;
+  user_hd = None;
 }
 
 let beta_red     = { no_red with beta = true; }
@@ -741,8 +769,54 @@ let reduce_user_gen simplify ri env hyps f =
     | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
 
-  let rules = EcEnv.Reduction.get p env in
+  (* An explicit use-site head filter wins; otherwise the proof-local
+   * default one (set by [hint +[..]] / [hint -[..]]) applies. Resolving
+   * the default here, and not only in the [simplify]/[cbv] front-ends,
+   * makes every reduction path that threads [user_local] honour it:
+   * [/=], [done], [progress], rewriting, conversion checks, ... *)
+  let user_hd =
+    match ri.user_hd with
+    | Some _ as hd -> hd
+    | None -> EcEnv.SimplifyContext.default_hd ri.user_local in
 
+  begin match user_hd, p with
+  | Some (`Include hs), `Path p when not (EcPath.Sp.mem p hs) -> raise nohead
+  | Some (`Exclude hs), `Path p when EcPath.Sp.mem p hs -> raise nohead
+  | _ -> ()
+  end;
+
+  let get_rules_for_base base =
+    let rules =
+      EcEnv.Reduction.get_entries ~base p env
+      |> List.map snd
+    in
+    let added =
+      EcEnv.SimplifyContext.added ~base ri.user_local
+      |> List.filter_map (fun ((_, rule) : EcEnv.Reduction.entry) ->
+        let p' : EcEnv.Reduction.topsym =
+          match rule.rl_ptn with
+          | Rule (`Op p, _)   -> `Path (fst p)
+          | Rule (`Tuple, _)  -> `Tuple
+          | Rule (`Proj i, _) -> `Proj i
+          | Var _ | Int _     -> assert false
+        in
+        if p' = p then Some rule else None)
+    in
+    rules @ added
+  in
+
+  (* Use-site selection replaces the active set; otherwise fall back to
+     the proof-local default databases, then to the active set. *)
+  let bases =
+    match ri.user_db with
+    | Some dbs -> dbs
+    | None ->
+        match EcEnv.SimplifyContext.default_db ri.user_local with
+        | Some dbs -> dbs
+        | None -> EcSymbols.Ssym.elements (EcEnv.SimplifyContext.active ri.user_local)
+  in
+
+  let rules = List.flatten (List.map get_rules_for_base bases) in
   if rules = [] then raise nohead;
 
   let module R = EcTheory in
@@ -932,11 +1006,14 @@ let reduce_head simplify ri env hyps f =
 
     (* ζ-reduction *)
   | Flet (LSymbol(x,_), e1, e2) when ri.zeta ->
+      if not (Mid.mem x e2.f_fv) then e2 else
       let s = Fsubst.f_bind_local Fsubst.f_subst_id x e1 in
       Fsubst.f_subst s e2
 
-    (* ι-reduction (let-tuple) *)
+    (* ι-reduction (let-tuple): a binding whose variables do not occur in
+       the body is dropped without reducing its value *)
   | Flet (LTuple ids, e1, e2) when ri.iota ->
+    if List.for_all (fun (x, _) -> not (Mid.mem x e2.f_fv)) ids then e2 else
     if is_tuple e1 then
       let es = destr_tuple e1 in
       let s =
@@ -949,6 +1026,9 @@ let reduce_head simplify ri env hyps f =
 
     (* ι-reduction (let-records) *)
   | Flet (LRecord (_, ids), f1, f2) when ri.iota ->
+    if List.for_all (fun (x, _) ->
+         match x with None -> true | Some x -> not (Mid.mem x f2.f_fv)) ids
+    then f2 else
     if is_record env f1 then
       let args  = snd (EcFol.destr_app f1) in
       let subst =
@@ -1471,7 +1551,8 @@ let rec conv ri env f1 f2 stk =
         && List.length args1 = List.length args2 -> begin
     (* So that we do not unfold operators *)
     match f1'.f_node, f2'.f_node with
-    | Fop(p1, _), Fop(p2, _) when EcPath.p_equal p1 p2 ->
+    | Fop(p1, tys1), Fop(p2, tys2)
+        when EcPath.p_equal p1 p2 && List.all2 (EqTest_i.for_type env) tys1 tys2 ->
       conv_next ri env f1' (zapp args1 args2 f1.f_ty stk)
     | _, _ ->
       conv ri env f1' f2' (zapp args1 args2 f1.f_ty stk)
@@ -1686,6 +1767,12 @@ let check_conv ?ri hyps f1 f2 =
   if is_conv ?ri hyps f1 f2 then ()
   else raise (IncompatibleForm ((LDecl.toenv hyps), (f1, f2)))
 
+let ss_inv_is_conv ?(ri = full_red) hyps (inv1 : ss_inv) (inv2 : ss_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.m inv2.m in
+  let f1 = Fsubst.f_subst subst inv1.inv in
+  let f2 = inv2.inv in
+  is_conv ~ri hyps f1 f2
+
 (* -------------------------------------------------------------------- *)
 let h_red ri hyps f =
   try
@@ -1736,7 +1823,16 @@ module User = struct
   let empty_cst : compile_st =
     { cst_ty_vs = Sid.empty; cst_f_vs = Sid.empty; }
 
-  let compile ~opts ~prio (env : EcEnv.env) p =
+  (* One rewrite rule to be compiled: a conjunct of the axiom body, with
+     the binders & conditions it inherits from its ancestors. *)
+  type leaf = {
+    lf_bds   : (EcIdent.t * ty) list;
+    lf_conds : form list;
+    lf_lhs   : form;
+    lf_rhs   : form;
+  }
+
+  let compile ~opts ~prio (env : EcEnv.env) p : rule list =
     let simp =
       if opts.EcTheory.ur_delta then
         let hyps = EcEnv.LDecl.init env [] in
@@ -1744,105 +1840,139 @@ module User = struct
       else fun f -> f in
 
     let ax = EcEnv.Ax.by_path p env in
-    let bds, rl = EcFol.decompose_forall (simp ax.ax_spec) in
 
-    let bds =
+    let tybds (bds : bindings) : (EcIdent.t * ty) list =
       let filter = function
         | (x, GTty ty) -> (x, ty)
         | _ -> raise (InvalidUserRule RuleDependsOnMemOrModule)
       in List.map filter bds in
 
-    let lhs, rhs, conds =
-      try
-        let rec doit conds f =
-          match sform_of_form (simp f) with
-          | SFimp (f1, f2) -> doit (f1 :: conds) f2
-          | SFiff (f1, f2)
-          | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
-          | _ when ty_equal tbool (EcEnv.ty_hnorm f.f_ty env) ->
-            (f, f_true, List.rev conds)
-          | _ -> raise (InvalidUserRule NotAnEq)
-        in doit [] rl
+    let mkleaf bds conds lhs rhs : leaf =
+      (* A binder that the conjunct does not mention cannot be inferred by
+         matching, and needs not be: it is irrelevant to this rule. *)
+      let bds =
+        let occurs (x, _) =
+          List.exists
+            (fun f -> Mid.mem x (f_fv f))
+            (lhs :: rhs :: conds)
+        in List.filter occurs bds
 
-      with InvalidUserRule NotAnEq
-        when opts.EcTheory.ur_eqtrue &&
-             ty_equal tbool (EcEnv.ty_hnorm rl.f_ty env)
-        -> (rl, f_true, List.rev [])
+      in { lf_bds = bds; lf_conds = conds; lf_lhs = lhs; lf_rhs = rhs; } in
+
+    let bds, rl = EcFol.decompose_forall (simp ax.ax_spec) in
+    let bds = tybds bds in
+
+    let leaves =
+      let rec split bds conds (f : form) : leaf list =
+        let f = simp f in
+
+        match sform_of_form f with
+        | SFquant (Lforall, _, _) ->
+            let xs, f = EcFol.decompose_forall f in
+            split (bds @ tybds xs) conds f
+
+        | SFimp (c, f) ->
+            split bds (c :: conds) f
+
+        | SFand (_, (f1, f2)) ->
+            split bds conds f1 @ split bds conds f2
+
+        | SFiff (f1, f2)
+        | SFeq  (f1, f2) ->
+            [mkleaf bds (List.rev conds) f1 f2]
+
+        | _ when ty_equal tbool (EcEnv.ty_hnorm f.f_ty env) ->
+            [mkleaf bds (List.rev conds) f f_true]
+
+        | _ -> raise (InvalidUserRule NotAnEq)
+
+      in
+        try split bds [] rl
+        with InvalidUserRule NotAnEq
+          when opts.EcTheory.ur_eqtrue &&
+               ty_equal tbool (EcEnv.ty_hnorm rl.f_ty env)
+          -> [mkleaf bds [] rl f_true]
     in
 
-    let rule =
-      let rec rule (f : form) : EcTheory.rule_pattern =
-        match EcFol.destr_app f with
-        | { f_node = Fop (p, tys) }, args ->
-            R.Rule (`Op (p, tys), List.map rule args)
-        | { f_node = Ftuple args }, [] ->
-            R.Rule (`Tuple, List.map rule args)
-        | { f_node = Fproj (target, i) }, [] ->
-            R.Rule (`Proj i, [rule target])
-        | { f_node = Fint i }, [] ->
-            R.Int i
-        | { f_node = Flocal x }, [] ->
-            R.Var x
-        | _ -> raise (InvalidUserRule NotFirstOrder)
+    let compile1 (leaf : leaf) : rule =
+      let { lf_bds = bds; lf_conds = conds; lf_lhs = lhs; lf_rhs = rhs; } =
+        leaf in
 
-      in rule lhs in
+      let rule =
+        let rec rule (f : form) : EcTheory.rule_pattern =
+          match EcFol.destr_app f with
+          | { f_node = Fop (p, tys) }, args ->
+              R.Rule (`Op (p, tys), List.map rule args)
+          | { f_node = Ftuple args }, [] ->
+              R.Rule (`Tuple, List.map rule args)
+          | { f_node = Fproj (target, i) }, [] ->
+              R.Rule (`Proj i, [rule target])
+          | { f_node = Fint i }, [] ->
+              R.Int i
+          | { f_node = Flocal x }, [] ->
+              R.Var x
+          | _ -> raise (InvalidUserRule NotFirstOrder)
 
-    let cst =
-      let rec doit cst = function
-        | R.Var x ->
-          { cst with cst_f_vs = Sid.add x cst.cst_f_vs }
+        in rule lhs in
 
-        | R.Int _ -> cst
+      let cst =
+        let rec doit cst = function
+          | R.Var x ->
+            { cst with cst_f_vs = Sid.add x cst.cst_f_vs }
 
-        | R.Rule (op, args) ->
-            let ltyvars =
-              match op with
-              | `Op (_, tys) ->
-                List.fold_left (
-                    let rec doit ltyvars = function
-                      | { ty_node = Tvar a } -> Sid.add a ltyvars
-                      | _ as ty -> ty_fold doit ltyvars ty in doit)
-                  cst.cst_ty_vs tys
-              | `Tuple -> cst.cst_ty_vs
-              | `Proj _ -> cst.cst_ty_vs in
-            let cst = {cst with cst_ty_vs = ltyvars } in
-            List.fold_left doit cst args
+          | R.Int _ -> cst
 
-      in doit empty_cst rule in
+          | R.Rule (op, args) ->
+              let ltyvars =
+                match op with
+                | `Op (_, tys) ->
+                  List.fold_left (
+                      let rec doit ltyvars = function
+                        | { ty_node = Tvar a } -> Sid.add a ltyvars
+                        | _ as ty -> ty_fold doit ltyvars ty in doit)
+                    cst.cst_ty_vs tys
+                | `Tuple -> cst.cst_ty_vs
+                | `Proj _ -> cst.cst_ty_vs in
+              let cst = {cst with cst_ty_vs = ltyvars } in
+              List.fold_left doit cst args
 
-    let s_bds   = Sid.of_list (List.map fst bds)
-    and s_tybds = Sid.of_list ax.ax_tparams in
+        in doit empty_cst rule in
 
-    (* Variables appearing in types and formulas are always, respectively,
-     * type and formula variables.
-     *)
-    let lvars   = cst.cst_f_vs
-    and ltyvars = cst.cst_ty_vs in
+      let s_bds   = Sid.of_list (List.map fst bds)
+      and s_tybds = Sid.of_list ax.ax_tparams in
 
-    (* Sanity check *)
-    assert (Sid.disjoint lvars   ltyvars);
+      (* Variables appearing in types and formulas are always, respectively,
+       * type and formula variables.
+       *)
+      let lvars   = cst.cst_f_vs
+      and ltyvars = cst.cst_ty_vs in
 
-    (* We check that the binded variables all appear in the lhs.
-       This ensures that, when applying the rule, we can infer how to
-       instantiate the axiom by matching with the lhs. *)
-    let mvars   = Sid.diff s_bds lvars in
-    let mtyvars = Sid.diff s_tybds ltyvars in
+      (* Sanity check *)
+      assert (Sid.disjoint lvars   ltyvars);
 
-    if not (Sid.is_empty mvars) then
-      raise (InvalidUserRule (MissingVarInLhs (Sid.choose mvars)));
-    if not (Sid.is_empty mtyvars) then
-      raise (InvalidUserRule (MissingTyVarInLhs (Sid.choose mtyvars)));
+      (* We check that the binded variables all appear in the lhs.
+         This ensures that, when applying the rule, we can infer how to
+         instantiate the axiom by matching with the lhs. *)
+      let mvars   = Sid.diff s_bds lvars in
+      let mtyvars = Sid.diff s_tybds ltyvars in
 
-    begin match rule with
-    | R.Var _ -> raise (InvalidUserRule (HeadedByVar));
-    | _       -> () end;
+      if not (Sid.is_empty mvars) then
+        raise (InvalidUserRule (MissingVarInLhs (Sid.choose mvars)));
+      if not (Sid.is_empty mtyvars) then
+        raise (InvalidUserRule (MissingTyVarInLhs (Sid.choose mtyvars)));
 
-    R.{ rl_tyd   = ax.ax_tparams;
-        rl_vars  = bds;
-        rl_cond  = conds;
-        rl_ptn   = rule;
-        rl_tg    = rhs;
-        rl_prio  = prio; }
+      begin match rule with
+      | R.Var _ -> raise (InvalidUserRule (HeadedByVar));
+      | _       -> () end;
+
+      R.{ rl_tyd   = ax.ax_tparams;
+          rl_vars  = bds;
+          rl_cond  = conds;
+          rl_ptn   = rule;
+          rl_tg    = rhs;
+          rl_prio  = prio; }
+
+    in List.map compile1 leaves
 
 end
 
@@ -1866,8 +1996,9 @@ module EqTest = struct
 
   include EqMod_base(struct
     let for_expr env ~norm:_ alpha e1 e2 =
+      let dummy_mem = EcIdent.create "&dummy" in
       let convert e =
-        let f = (ss_inv_of_expr (EcIdent.create "&dummy") e).inv in
+        let f = (ss_inv_of_expr dummy_mem e).inv in
 
         if Mid.is_empty alpha then f else
 

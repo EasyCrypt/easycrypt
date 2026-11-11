@@ -7,9 +7,10 @@ exception Restart
 (* -------------------------------------------------------------------- *)
 type loader
 
-val loader   : loader
-val addidir  : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
+val loader : loader
+val addidir : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (EcLoader.namespace option * string) list
+val set_current_path : string -> unit
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit
@@ -72,3 +73,4 @@ val pragma_check   : EcScope.Ax.proofmode -> unit
 exception InvalidPragma of string
 
 val apply_pragma : string -> unit
+val apply_pragma_option : string -> unit

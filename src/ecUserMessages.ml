@@ -389,6 +389,75 @@ end = struct
         msg "for the following parameters' type:@\n";
         List.iteri (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) tys
 
+    | UnappliedOp (name, esig, _retty, failures) ->
+        let pp_reason fmt = function
+          | EcUnify.OF_result (got, expected) ->
+              Format.fprintf fmt
+                "it returns a value of type@\n  @[%a@]@\nbut a value of type@\n  @[%a@]@\nwas expected"
+                pp_type got pp_type expected
+          | EcUnify.OF_argument (i, expected, got) ->
+              Format.fprintf fmt
+                "its #%d argument is expected to have type@\n  @[%a@]@\nbut is applied to a value of type@\n  @[%a@]"
+                i pp_type expected pp_type got
+          | EcUnify.OF_arity (provided, atmost) ->
+              Format.fprintf fmt
+                "it is applied to %d argument(s) but takes at most %d"
+                provided atmost
+        in
+        let pp_instance fmt instance =
+          if not (List.is_empty instance) then begin
+            Format.fprintf fmt "where the type parameters were inferred as:@\n";
+            List.iter
+              (fun (tp, ty) ->
+                Format.fprintf fmt "  @[%a = %a@]@\n"
+                  pp_type (tvar tp) pp_type ty)
+              instance
+          end
+        in
+        let pp_kind fmt = function
+          | `Op (p, _, _) ->
+              Format.fprintf fmt "operator `%a'" EcPrinting.pp_path p
+          | `Pv (pv, _) ->
+              Format.fprintf fmt "program variable `%a'" (EcPrinting.pp_pv env) pv
+          | `Lc (id, _) ->
+              Format.fprintf fmt "local variable `%a'" (EcPrinting.pp_local env) id
+        in
+        let pp_details fmt (cand, fail) =
+          begin match cand with
+          | `Op (_, instance, declty) ->
+              if not (List.is_empty instance) then
+                Format.fprintf fmt "its type is@\n  @[%a@]@\n%a"
+                  pp_type declty pp_instance instance
+          | `Pv (_, ty) | `Lc (_, ty) ->
+              Format.fprintf fmt "it has type@\n  @[%a@]@\n" pp_type ty
+          end;
+          pp_reason fmt fail
+        in
+        let pp_args () =
+          if List.is_empty esig then
+            msg ":@\n"
+          else begin
+            msg " to arguments of type:@\n";
+            List.iteri
+              (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) esig
+          end
+        in
+        begin match failures with
+        | [(cand, fail)] ->
+            msg "%a cannot be applied" pp_kind cand;
+            pp_args ();
+            msg "@[<v>%a@]" pp_details (cand, fail)
+        | _ ->
+            msg "`%a' cannot be applied" pp_qsymbol name;
+            pp_args ();
+            msg "the candidates cannot be applied:@\n";
+            List.iter
+              (fun (cand, fail) ->
+                msg "  [%a]:@\n    @[<v>%a@]@\n"
+                  pp_kind cand pp_details (cand, fail))
+              failures
+        end
+
     | MultipleOpMatch (name, tys, matches) -> begin
         let uvars = List.map Tuni.univars tys in
         let uvars = List.fold_left Suid.union Suid.empty uvars in
@@ -756,6 +825,7 @@ end = struct
     | OVK_Abbrev    -> "abbreviation"
     | OVK_Theory    -> "theory"
     | OVK_Lemma     -> "lemma/axiom"
+    | OVK_ModExpr   -> "module"
     | OVK_ModType   -> "module type"
 
   let pp_incompatible env fmt = function
@@ -770,6 +840,17 @@ end = struct
       Format.fprintf fmt "incompatible body"
     | TyBody  ->
       Format.fprintf fmt "incompatible type declaration"
+    | SubtypeType (ty1, None) ->
+      Format.fprintf fmt "incompatible type. Not a subtype of %a"
+        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty1
+    | SubtypeType (ty1, Some ty2) ->
+      Format.fprintf fmt "incompatible type. The type is a subtype of %a instead of %a"
+        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty2
+        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty1
+    | SubtypePred (f1, f2) ->
+      Format.fprintf fmt "incompatible predicate for subtypes. The predicate for the subtype is %a instead of %a"
+        (EcPrinting.pp_form  (EcPrinting.PPEnv.ofenv env)) f2
+        (EcPrinting.pp_form  (EcPrinting.PPEnv.ofenv env)) f1
 
   let pp_clone_error env fmt error =
     let msg x = Format.fprintf fmt x in
@@ -787,9 +868,9 @@ end = struct
         msg "unknown %s `%s'"
           (string_of_ovkind kd) (string_of_qsymbol x)
 
-    | CE_ThyOverride x ->
-        msg "Cannot override theory `%s`: contains module or exception"
-          (string_of_qsymbol x)
+    | CE_ThyOverride (x, m) ->
+        msg "Cannot override theory `%s': contains stateful module `%s'"
+          (string_of_qsymbol x) (string_of_qsymbol m)
 
     | CE_UnkAbbrev x ->
         msg "unknown abbreviation: `%s'" (string_of_qsymbol x)
@@ -816,6 +897,15 @@ end = struct
 
     | CE_ModIncompatible x ->
         msg "module `%s` is incompatible"
+          (string_of_qsymbol x)
+
+    | CE_ModStateful (x, path) ->
+        let path = List.take (List.length path - 1) path in
+        msg "module `%s' declares state and cannot be overridden"
+          (String.concat "." (fst x @ [snd x] @ path))
+
+    | CE_ModNotConcrete x ->
+        msg "module `%s' is not a concrete top-level module"
           (string_of_qsymbol x)
 
     | CE_InvalidRE x ->

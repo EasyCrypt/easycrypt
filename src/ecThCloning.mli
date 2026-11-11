@@ -9,6 +9,8 @@ type incompatible =
 | DifferentType of EcTypes.ty * EcTypes.ty
 | OpBody (* of (EcPath.path * EcDecl.operator) * (EcPath.path * EcDecl.operator) *)
 | TyBody (* of (EcPath.path * EcDecl.tydecl) * (EcPath.path * EcDecl.tydecl) *)
+| SubtypeType of (EcTypes.ty * EcTypes.ty option)
+| SubtypePred of (EcAst.form * EcAst.form)
 
 type ovkind =
 | OVK_Type
@@ -17,13 +19,14 @@ type ovkind =
 | OVK_Abbrev
 | OVK_Theory
 | OVK_Lemma
+| OVK_ModExpr
 | OVK_ModType
 
 type clone_error =
 | CE_UnkTheory         of qsymbol
 | CE_DupOverride       of ovkind * qsymbol
 | CE_UnkOverride       of ovkind * qsymbol
-| CE_ThyOverride       of qsymbol
+| CE_ThyOverride       of qsymbol * qsymbol
 | CE_UnkAbbrev         of qsymbol
 | CE_TypeArgMism       of ovkind * qsymbol
 | CE_OpIncompatible    of qsymbol * incompatible
@@ -31,6 +34,8 @@ type clone_error =
 | CE_TyIncompatible    of qsymbol * incompatible
 | CE_ModTyIncompatible of qsymbol
 | CE_ModIncompatible   of qsymbol
+| CE_ModStateful       of qsymbol * symbol list
+| CE_ModNotConcrete    of qsymbol
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
@@ -45,8 +50,10 @@ type xty_override =
   [ty_override_def genoverride | `Direct of EcAst.ty] * clmode
 
 (* ------------------------------------------------------------------ *)
-type xop_override =
-  [op_override_def genoverride | `Direct of EcAst.form] * clmode
+type xop_override = [
+  | op_override_def genoverride
+  | `Direct of EcDecl.ty_params * EcAst.form
+] * clmode
 
 (* ------------------------------------------------------------------ *)
 type xpr_override =
@@ -58,9 +65,12 @@ type evclone = {
   evc_ops      : (xop_override located) Msym.t;
   evc_preds    : (xpr_override located) Msym.t;
   evc_abbrevs  : (nt_override located) Msym.t;
+  evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : (evclone * bool) Msym.t;
+  evc_target   : EcPath.path option;
+    (* the target of the theory override of this (sub-)theory, if any *)
 }
 
 and evlemma = {

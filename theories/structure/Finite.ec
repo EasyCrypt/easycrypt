@@ -256,7 +256,7 @@ lemma finite_fixfinfun ['a 'b] dom codom :
   => is_finite<:'b> codom
   => is_finite<: 'a -> 'b> (fixfinfun dom codom).
 proof.
-case=> [sa [uqa @/predT /= ha]] [sb [uqb @/predT /= hb]]; apply/finiteP.
+case=> [sa [uqa /= ha]] [sb [uqb /= hb]]; apply/finiteP.
 pose F (s : ('a * 'b) list) (a : 'a) := odflt witness (assoc s a).
 exists (map F (fingraph sa sb)) => /= f hfix.
 apply/mapP; pose s := map (fun a => (a, f a)) sa.

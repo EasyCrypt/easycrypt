@@ -2238,8 +2238,9 @@ section PROOFS.
       rcondf 1; 1: by auto; smt(size_eq0 size_ge0).
       by hoare; auto; smt(size_ge0 ge0_pr_zeropol).
     call(: Mem.lc = l /\ ROout.m = roout /\ 0 < size l <= qdec /\ 0 < size l1 ==> UF.forged); auto.
-    bypr=> {&m} &m [#] *.
-
+    bypr=> {&m} &m. 
+    split => [|[#] *].
+    - smt(ge0_pr_zeropol size_ge0).
     fel 4 UFCMA4.cforged                (* the query counter *)
         (fun i => (size (filter (fun (c:ciphertext) => c.`1 = nth witness l1 i) l))%r * pr_zeropol)
                                         (* the probability of bad occuring during ith query *)
@@ -2254,7 +2255,8 @@ section PROOFS.
     + auto=> /> /#.
     + proc; sp 2.
       if; last by hoare; auto; smt(size_ge0 ge0_pr_zeropol).
-      inline*; wp; rnd; auto=> &h /> *.
+      inline*; wp; rnd; last by move=> &h />; smt(size_ge0 ge0_pr_zeropol).
+      auto=> &h /> *.
       by apply pr_TPI_ok_filter=> //=.
     + by move=> c; proc; sp; inline*; sp; if; auto=> /#.
     + by move=> b c; proc; inline*; sp; rcondf 1; auto. 
@@ -2270,8 +2272,9 @@ section PROOFS.
     + inline*; sp; rcondf 1; 1: by auto=> &h />; smt(size_ge0 size_eq0).
       by hoare; auto; smt(size_ge0 mu_bounded).
     call(: Mem.lc = l /\ ROout.m = roout /\ 0 < size l <= qdec /\ 0 < size l2 ==> UFCMA.bad2); auto.
-    bypr=> {&m} &m [#] *.
-
+    bypr=> {&m} &m.
+    split => [| [#] *]. search (0%r <= _ * _).
+    + apply mulr_ge0; smt(size_ge0 ge0_mu).
     fel 4 UFCMA.cbad2                   (* the query counter *)
         (fun i => (size (filter (fun (c:ciphertext) => c.`1 = nth witness l2 i) l))%r * pr1_poly_out)
                                         (* the probability of bad occuring during ith query *)
@@ -2285,12 +2288,14 @@ section PROOFS.
     + by move=> />.
     + by auto=> /> /#.
     + proc; inline*; sp 2; if; 2: auto=> />.
-      wp; rnd=> />; sp; conseq(:_==> true); 2: by auto. 
+      wp; rnd; last by move=> &h />; smt(size_ge0 ge0_mu1).
+      move=> />; sp; conseq(:_==> true); 2: by auto.
       move=> &h /> *. 
       pose lc := List.map _ _.
       have h := mu_mem_le_mu1 dpoly_out lc pr1_poly_out _; 1: smt(dpoly_out_funi).
       rewrite (StdOrder.RealOrder.ler_trans _ _ _ h) //=  ler_wpmul2r; 1: smt(mu_bounded).
       by rewrite le_fromint IntOrder.lerr_eq //= size_map.
+    + move => &hr; smt(size_ge0 ge0_mu mulr_ge0).
     + move=> c; proc; inline*; sp; rcondt 1; 1: auto=> />.
       by wp -1=> />; conseq(:_==> true); auto; smt().
     + by move=> b c; proc; inline*; sp; rcondf 1; auto=> />.
@@ -2383,7 +2388,6 @@ section PROOFS.
   move=> n lenc Hrec [#] log lc c [] H1 H2.
   have/=:=Hrec log lc c H2.
   rewrite !size_flatten /= !sumzE /= !BIA.big_cons /=.
-  pose p1 := predT _; have->/={p1}:p1=true by done. 
   case: (c.`1 \in lenc) => ? H0 * /=.
   + rewrite H0 //=. 
     have-> /= :c.`1 <> n by smt().
@@ -2431,7 +2435,6 @@ section PROOFS.
   proof.
   move=> huniq hnin.
   rewrite !size_flatten /= !sumzE /= !BIA.big_cons /=.
-  pose p1 := predT _; have->/={p1}:p1=true by done. 
   rewrite !size_map; congr.
   rewrite !BIA.big_map /= !predTofV/(\o) /=.
   apply BIA.congr_big_seq  => />; rewrite {1}/predT /= => *.
@@ -2510,7 +2513,7 @@ section PROOFS.
   swap 3 1; swap [4..6] 12; wp -10 -10=> /=.
   swap 4 4; wp -1 -1.
   conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); [2:sim=> /> /#].
-  move=> /> &1 &2 *; do ! split => />.
+  move=> /> &1 &2 H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 *; do ! split => />.
   - smt().  
   - smt().  
   - rewrite size_cat !size_map make_lbad1_size_cons3 //= /#.
@@ -2519,12 +2522,17 @@ section PROOFS.
     smt(get_setE).
   - move => n; case: (n = n{!2}) => />; first by rewrite /dom get_setE.
     smt(get_setE).
-  - move=> ? ? H15; have:=H15; rewrite mem_cat=> [#][] H16 *.
+  - move=> ? ? H16; have:=H16; rewrite mem_cat=> [#][] H17 *.
     + smt(get_setE).
-    have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
+    have:= H17; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
     rewrite mapP /==> [#] [][] x1 x2 x3 x4 /=; rewrite mem_filter /= => [#] <<- ? ->>.
     smt(get_setE).
-  smt(List.mem_filter mem_cat mapP).
+  move => [/H10 [][] tt ? [] t_mem /= <<-|
+           H16 /mapP [] ct [] /List.mem_filter [] /= <<- H17 ->>].
+  - smt(List.mem_filter mem_cat mapP). 
+  exists (ct.`4, ct.`4) => /=.
+  rewrite mem_cat.
+  smt(mapP List.mem_filter).
   qed.
 
   local clone EventPartitioning as EP with 
@@ -2733,7 +2741,8 @@ section PROOFS.
   + by rewrite /= BRA.big_int1 /=. 
   + by auto=> />.
   + proc. 
-    rcondt 2; 1: auto; wp=> />; rnd=> />; skip=> /> &hr *.
+    rcondt 2; 1: auto; wp=> />; rnd; last by move=> &hr />; smt(ge0_mu1).
+    move=> />; skip=> /> &hr *.
     by have <- //=:=dpoly_out_funi witness ti{hr}.
   + move=> c; proc; auto=> />; smt().
   by move=> b c; proc; auto.

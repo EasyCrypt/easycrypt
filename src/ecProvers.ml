@@ -383,6 +383,27 @@ module Hints = struct
       | None -> assert false
       | Some `Include -> true
       | Some `Exclude -> false
+
+  let included (m : hints) =
+    let rec doit prefix (m : hints) (inherited : hflag) acc =
+      let this =
+        match m.ht_this with
+        | `Inherit -> inherited
+        | #hflag as flag -> flag in
+      let sub x =
+        match prefix with
+        | None   -> EcPath.psymbol x
+        | Some p -> EcPath.pqname p x in
+      match prefix, this with
+      | None  , `Include -> `All :: acc
+      | Some p, `Include -> if inherited = `Include then acc else `Theory p :: acc
+      | _     , `Exclude ->
+          let acc =
+            Msym.fold
+              (fun x flag acc -> if flag = `Include then `Lemma (sub x) :: acc else acc)
+              m.ht_axs acc in
+          Msym.fold (fun x m acc -> doit (Some (sub x)) m this acc) m.ht_sub acc
+    in doit None m `Exclude []
 end
 
 (* -------------------------------------------------------------------- *)
@@ -658,12 +679,36 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
       else if !status = 0 then None
       else if !status < pi.pr_quorum then None else Some true)
 
-    (* Clean-up: hard kill + wait for remaining provers *)
+    (* Clean-up: hard kill + wait for remaining provers.                *)
+    (*                                                                  *)
+    (* why3server kills the process group of the prover, which the      *)
+    (* forked child creates itself. An interrupt received right after   *)
+    (* the run request may be handled before that group exists: the     *)
+    (* kill is then lost and the prover runs until its own time limit.  *)
+    (* We therefore re-send the interrupt until the prover is reported  *)
+    (* as finished, instead of blocking on the first one. Retries start *)
+    (* at 10ms (the group exists by then) and back off up to 1s.        *)
     (fun () ->
-      for i = 0 to (Array.length pcs) - 1 do
-        match pcs.(i) with
-        | None -> ()
-        | Some (_prover, pc) ->
-            CP.interrupt_call ~config:(Config.main ()) pc;
-            (try ignore (CP.wait_on_call pc : CP.prover_result) with _ -> ());
-      done)
+      let config = Config.main () in
+
+      let finished pc =
+        match CP.query_call pc with
+        | CP.ProverFinished _
+        | CP.ProverInterrupted
+        | CP.InternalFailure _ -> true
+        | CP.NoUpdates
+        | CP.ProverStarted -> false in
+
+      let interrupt pc =
+        try CP.interrupt_call ~config pc with _ -> () in
+
+      let pcs = List.pmap (omap snd) (Array.to_list pcs) in
+
+      List.iter interrupt pcs;
+      List.iter (fun pc ->
+        let rec wait delay =
+          let finished = try finished pc with _ -> true in
+          if not finished then begin
+            Unix.sleepf delay; interrupt pc; wait (min 1.0 (2.0 *. delay))
+          end
+        in wait 0.01) pcs)

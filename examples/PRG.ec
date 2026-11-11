@@ -270,7 +270,7 @@ section.
     by move=> _ _; islossless.
     (* Psample.prg preserves bad *)
     move=> *; proc; auto=> />; rewrite dseed_ll dout_ll /=.
-    move=> &hr + v1 _ _ v2 _ _; case=> [h|r r_in_log r_in_m].
+    move=> &hr + v1 _ v2 _; case=> [h|r r_in_log r_in_m].
     + by apply/Cycle; rewrite /= h.
     by apply/(@Collision _ _ r)=> /=; [rewrite r_in_log|rewrite r_in_m].
     (* [F.f ~ F.f: I] when Bad does not hold *)
@@ -290,7 +290,7 @@ section.
     case (x \in F.m).
     + by rcondf 3; auto=> />; rewrite dseed_ll dout_ll.
     rcondt 3; first by do !rnd; wp.
-    auto=> />; rewrite dseed_ll dout_ll //= => &hr bad_init x_notin_m v _ _ v0 _ _.
+    auto=> />; rewrite dseed_ll dout_ll //= => &hr bad_init x_notin_m v _ v0 _.
     case: bad_init=> [/(Cycle<:seed,seed * output>) -> //|r r_in_log r_in_m].
     by apply/(@Collision _ _ r)=> //=; rewrite mem_set r_in_m.
   (* Returning to main *)
@@ -512,6 +512,8 @@ section.
   conseq (_ : _ : <= (if Bad P.logP F.m then 1%r else
       (sumid (qF + size P.logP) (qF + n))%r / Support.card%r)).
   + move=> /> &hr.
+    split.
+    + smt(Support.card_gt0 ge0_qP ge0_qF).
     have /= -> /= szlog_le_qP szm_le_qF := negBadE A AaL [] F.m{hr}.
     apply/ler_wpmul2r; first smt w=Support.card_gt0. apply/le_fromint.
     rewrite -{1}(@add0z qF) big_addn /= /predT -/predT.
@@ -524,24 +526,37 @@ section.
   while (n <= qP /\ card (fdom F.m) <= qF).
   + move=> Hw; exists* P.logP, F.m; elim* => logPw m.
     case: (Bad P.logP F.m).
-    + by conseq (_ : _ : <= (1%r))=> // /#.
+    + conseq (_ : _ : <= (1%r))=> //= &hr.
+      split => [|/#].
+      case (Bad P.logP{hr} F.m{hr}) => //=.
+      apply divr_ge0; 2: smt(Support.card_gt0).
+      apply/le_fromint/sumr_ge0_seq.
+      smt(mem_range size_ge0 ge0_qF).
     seq 2: (Bad P.logP F.m)
            ((qF + size logPw)%r / Support.card%r) 1%r 1%r
            ((sumid (qF + (size logPw + 1)) (qF + n))%r / Support.card%r)
            (F.m = m /\ r::logPw = P.logP /\
             n <= qP /\ card (fdom F.m) <= qF)=> //.
     + by wp; rnd=> //.
-    + wp; rnd; auto=> /> &0 _ /le_fromint domF_le_qF _ /pr_newbad ->.
+    + wp; rnd; last by move=> &hr />; smt(Support.card_gt0 size_ge0 ge0_qF).
+      auto=> /> &0 _ /le_fromint domF_le_qF _ /pr_newbad ->.
       apply: ler_wpmul2r.
       + by apply: invr_ge0; smt(Support.card_gt0).
       by rewrite !fromintD ler_add2r.
     + conseq Hw; progress=> //.
+      + apply divr_ge0; 2: smt(Support.card_gt0).
+        apply/le_fromint/sumr_ge0_seq.
+        smt(mem_range size_ge0 ge0_qF).
       by rewrite H1 /= (Ring.IntID.addrC 1) lerr.
     progress=> //; rewrite H2 /= -mulrDl addrA -fromintD.
     rewrite
       (@BIA.big_cat_int (qF + size P.logP{hr} + 1) (_ + List.size _))
       ?BIA.big_int1 /#.
-  by skip; progress=> /#.
+  + by skip; progress=> /#.
+  + by move=> &hr [#] _ _ _ ->.
+  move=> &hr; case: (Bad P.logP{hr} F.m{hr})=> //=.
+  apply/divr_ge0; 2:smt(Support.card_gt0).
+  by apply/le_fromint/Bigint.sumr_ge0_seq=> a /mem_range; smt(ge0_qF size_ge0).
   qed.
 
   lemma conclusion &m:

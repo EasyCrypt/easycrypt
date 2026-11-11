@@ -9,32 +9,98 @@ on:
     tags:
       - 'r[0-9]+.[0-9]+'
   pull_request:
+    # `unlabeled`: removing the `stacked` label (see `gate`) starts the CI.
+    types: [opened, synchronize, reopened, unlabeled]
   merge_group:
 
 env:
   IMAGE_TAG: ci-${{ github.run_id }}
 
 jobs:
+  # ── Phase 0: Decide whether to run ──
+  #
+  # A pull request labelled `stacked` (an intermediate PR of a stack, whose
+  # changes are checked by the CI of the PR at the top of the stack) skips
+  # the CI, unless it targets the default branch. Skipped jobs count as
+  # passing for branch protection, so a PR that can be merged into the
+  # default branch always runs the CI, whatever its labels.
+  #
+  # The labels and base are read from the PR itself, not from the event:
+  # when a stack is pushed, its events can carry a stale snapshot of the
+  # PR. If they cannot be read, the CI runs.
+
+  gate:
+    name: Decide whether to run the CI
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+    - id: decide
+      env:
+        GH_TOKEN: ${{ github.token }}
+        EVENT: ${{ github.event_name }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        DEFAULT: ${{ github.event.repository.default_branch }}
+      run: |
+        run=true
+        if [ "$EVENT" = pull_request ]; then
+          state=$(gh api "repos/$REPO/pulls/$PR" \
+                    --jq '[.base.ref, any(.labels[]; .name == "stacked")] | @tsv') \
+            || state=
+          base=$(printf '%s' "$state" | cut -f1)
+          stacked=$(printf '%s' "$state" | cut -f2)
+          echo "base=${base:-?} stacked=${stacked:-?}"
+          if [ -n "$base" ] && [ "$base" != "$DEFAULT" ] && [ "$stacked" = true ]; then
+            run=false
+          fi
+        fi
+        echo "run=$run"
+        echo "run=$run" >> "$GITHUB_OUTPUT"
+
   # ── Phase 1: Build Docker images and share via artifact ──
 
   docker:
     name: Build Docker images
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
+    permissions:
+      packages: read
     steps:
     - uses: actions/checkout@v4
     - name: Build base image
+      if: github.event_name == 'push'
       run: make -C scripts/docker build VARIANT=base TAG=$IMAGE_TAG
+    - name: Build base-build image
+      if: github.event_name == 'push'
+      run: make -C scripts/docker build VARIANT=base-build TAG=$IMAGE_TAG
+    - uses: docker/login-action@v3
+      if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Retrieve base-build image
+      if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+      run: |
+        docker pull ghcr.io/easycrypt/ec-base-build-box:main
+        docker tag ghcr.io/easycrypt/ec-base-build-box:main ghcr.io/easycrypt/ec-base-build-box:$IMAGE_TAG
     - name: Build build image
-      run: make -C scripts/docker build VARIANT=build TAG=$IMAGE_TAG
+      run: make -C scripts/docker build VARIANT=build TAG=$IMAGE_TAG BARGS='--build-arg BASE_BUILD_LAYER=ghcr.io/easycrypt/ec-base-build-box:${IMAGE_TAG}'
     - name: Save images for downstream jobs
       run: |
         docker save "ghcr.io/easycrypt/ec-base-box:$IMAGE_TAG" | gzip > base-image.tar.gz
+        docker save "ghcr.io/easycrypt/ec-base-build-box:$IMAGE_TAG" | gzip > base-build-image.tar.gz
         docker save "ghcr.io/easycrypt/ec-build-box:$IMAGE_TAG" | gzip > build-image.tar.gz
     - uses: actions/upload-artifact@v4
       with:
         name: docker-images
         path: |
           base-image.tar.gz
+          base-build-image.tar.gz
           build-image.tar.gz
         retention-days: 1
 
@@ -69,17 +135,19 @@ jobs:
 
   compile-nix:
     name: EasyCrypt compilation (nix)
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     env:
       HOME: /home/runner
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Setup Nix
-      uses: cachix/install-nix-action@v26
+      uses: cachix/install-nix-action@v31
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - name: Setup Cachix
-      uses: cachix/cachix-action@v14
+      uses: cachix/cachix-action@v17
       with:
         name: formosa-crypto
         authToken: '${{ secrets.CACHIX_WRITE_TOKEN }}'
@@ -131,6 +199,8 @@ jobs:
 
   fetch-external-matrix:
     name: Fetch EasyCrypt External Projects Matrix
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -214,8 +284,8 @@ jobs:
 
   external-status:
     name: Check EasyCrypt External Projects (set-status)
-    if: always()
-    needs: [external]
+    if: always() && needs.gate.outputs.run == 'true'
+    needs: [gate, external]
     runs-on: ubuntu-24.04
     steps:
     - uses: re-actors/alls-green@release/v1
@@ -227,13 +297,7 @@ jobs:
 
   publish:
     name: Publish Docker images
-    if: |
-      github.event_name == 'push' && (
-        github.ref == 'refs/heads/main' ||
-        github.ref == 'refs/heads/release' ||
-        github.ref == 'refs/heads/latest' ||
-        startsWith(github.ref, 'refs/tags/r')
-      )
+    if: github.event_name == 'push'
     needs: [compile-opam, compile-nix, check, external, external-status, docker]
     runs-on: ubuntu-24.04
     permissions:
@@ -244,6 +308,8 @@ jobs:
       with:
         name: docker-images
     - run: gunzip -c base-image.tar.gz | docker load
+    - run: gunzip -c base-build-image.tar.gz | docker load
+      if: github.ref_name == 'main'
     - run: gunzip -c build-image.tar.gz | docker load
     - uses: docker/login-action@v3
       with:
@@ -255,6 +321,12 @@ jobs:
         docker tag "ghcr.io/easycrypt/ec-base-box:$IMAGE_TAG" \
           "ghcr.io/easycrypt/ec-base-box:${{ github.ref_name }}"
         docker push "ghcr.io/easycrypt/ec-base-box:${{ github.ref_name }}"
+    - name: Push base-build image
+      if: github.ref_name == 'main'
+      run: |
+        docker tag "ghcr.io/easycrypt/ec-base-build-box:$IMAGE_TAG" \
+          "ghcr.io/easycrypt/ec-base-build-box:${{ github.ref_name }}"
+        docker push "ghcr.io/easycrypt/ec-base-build-box:${{ github.ref_name }}"
     - name: Push build image
       run: |
         docker tag "ghcr.io/easycrypt/ec-build-box:$IMAGE_TAG" \
@@ -266,8 +338,8 @@ jobs:
         github.ref == 'refs/heads/latest' ||
         github.ref_type == 'tag'
       run: |
-        make -C scripts/docker build VARIANT=test TAG=${{ github.ref_name }}
-        make -C scripts/docker publish VARIANT=test TAG=${{ github.ref_name }}
+        make -C scripts/docker build publish VARIANT=test TAG=${{ github.ref_name }} \
+          BARGS='--build-arg BUILD_LAYER=ghcr.io/easycrypt/ec-build-box:${{ github.ref_name }}'
 
   # ── Notification ──
 

@@ -274,13 +274,11 @@ module Zipper : sig
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt
 
-  (* [after ~strict zpr] returns all the statements that come after the
-   * zipper cursor. They are returned as a list of statements, where the head
-   * is the list of instructions coming directly after the cursor at the
-   * same level, the next element is the ones coming after the cursor
-   * parent block, and so forth. The cursor is included iff [strict] is [true].
+  (* [in_loop ip] holds iff the path [ip] goes through the body of a
+   * [while] loop, i.e. iff the code at the cursor may be executed more
+   * than once.
    *)
-  val after : strict:bool -> zipper -> instr list list
+  val in_loop : ipath -> bool
 
   type ('a, 'state) folder = env -> 'a -> 'state -> instr -> 'state * instr list
   type ('a, 'state) folder_l = env -> 'a -> 'state -> instr list -> 'state * instr list
@@ -371,7 +369,8 @@ val fmdelta    : fmoptions
 val fmnotation : fmoptions
 
 val f_match_core :
-     fmoptions
+     ?conv_ri:EcReduction.reduction_info
+  -> fmoptions
   -> EcEnv.LDecl.hyps
   -> unienv * mevmap
   -> form
@@ -379,7 +378,8 @@ val f_match_core :
   -> unienv * mevmap
 
 val f_match :
-     fmoptions
+     ?conv_ri:EcReduction.reduction_info
+  -> fmoptions
   -> EcEnv.LDecl.hyps
   -> unienv * mevmap
   -> form

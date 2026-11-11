@@ -149,8 +149,23 @@ let t_bdhoare_while_r inv vrnt tc =
   let post = generalize_mod_ss_inv env modi post in
   let post = map_ss_inv2 f_and_simpl inv post in
   let concl = f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (bhs_bd bhs) in
+  (* From a memory satisfying [post] (invariant + generalized termination
+     and exit conditions), the loop terminates with probability 1 in a
+     memory satisfying the post-condition, so [Pr[s; while] >= Pr[s : post]]
+     always holds. For [<=] and [=], the runs of [s] that reach the loop
+     OUTSIDE [post] contribute an unknown probability (the loop may then
+     diverge, or terminate anywhere), so we additionally require that no
+     terminating run of [s] does so -- except when the bound is [1%r], as
+     [Pr[s; while] <= 1%r] holds unconditionally. *)
+  let inv_concl =
+    match bhs.bhs_cmp with
+    | FHge -> []
+    | FHle | FHeq ->
+      if   f_equal (bhs_bd bhs).inv f_r1
+      then []
+      else [f_hoareS mt (bhs_pr bhs) s (POE.lift post)] in
 
-  FApi.xmutate1 tc `While [b_concl; concl]
+  FApi.xmutate1 tc `While ([b_concl; concl] @ inv_concl)
 
 (* -------------------------------------------------------------------- *)
 (* Rule for <= *)
@@ -170,6 +185,14 @@ let t_bdhoare_while_rev_r inv tc =
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
   let lp_guard = ss_inv_of_expr (EcMemory.memory mem) lp_guard_exp in
 
+  (* The bound of the conclusion is interpreted in the initial memory, while
+     sub-goal 1 interprets it in the memory the loop starts from: the two
+     coincide only if the prefix [rem_s] does not write the bound. *)
+  if not (PV.indep env (s_write env rem_s) (PV.fv env (EcMemory.memory mem) bound.inv)) then
+    tc_error !!tc
+      "The bound cannot depend on variables written by the \
+       statements preceding the loop";
+
   let w_u   = while_info env lp_guard_exp lp_body in
   let w     = EcEnv.LDecl.fresh_id hyps "w" in
   let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in
@@ -185,19 +208,30 @@ let t_bdhoare_while_rev_r inv tc =
       f_imp while_jgmt unfolded_while_jgmt
   in
 
-  (* 2. Sub-goal *)
-  let rem_concl =
-    let modi = s_write env lp_body in
+  (* 2. Sub-goal: the prefix establishes the invariant *)
+  let rem_concl = f_hoareS mt b_pre rem_s (POE.lift inv) in
+
+  (* 3. Sub-goal: on exit with the post-condition, the bound is 1. *)
+  let exit_concl =
     let term_post = map_ss_inv2 f_imp
       (map_ss_inv2 f_and inv (map_ss_inv2 f_and (map_ss_inv1 f_not lp_guard) b_post))
       (map_ss_inv2 f_eq bound {m;inv=f_r1}) in
-    let term_post = generalize_mod_ss_inv env modi term_post in
-    let term_post = map_ss_inv2 f_and inv term_post in
-    let post = { hsi_m = term_post.m; hsi_inv = POE.empty term_post.inv; } in
-    f_hoareS mt b_pre rem_s post
+    EcSubst.f_forall_mems_ss_inv mem term_post
   in
 
-  FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
+  (* 4. Sub-goal: the bound is non-negative. *)
+  let nonneg_concl =
+    EcSubst.f_forall_mems_ss_inv mem
+      (map_ss_inv2 f_real_le {m;inv=f_r0} bound)
+  in
+
+  (* sub-goals 3 and 4 are closed here when trivial *)
+  FApi.t_lasts (FApi.t_try t_trivial) 2
+    (FApi.xmutate1_hyps tc `While
+       [(hyps', body_concl  );
+        (hyps , rem_concl   );
+        (hyps , exit_concl  );
+        (hyps , nonneg_concl)])
 
 (* -------------------------------------------------------------------- *)
 (* Rule for = or >= *)
@@ -569,7 +603,12 @@ let process_while side winfos tc =
       | Some vrnt, None ->
           let _, phi = TTC.tc1_process_Xhl_formula tc phi in
           let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
-          t_bdhoare_while phi vrnt tc
+          (* [t_bdhoare_while] emits, for [<=] and [=], the extra hoare goal
+             stating that the prefix establishes the invariant; try to close
+             it automatically so trivial cases stay effort-free. *)
+          FApi.t_onalli
+            (function 2 -> FApi.t_try EcPhlAuto.t_pl_trivial | _ -> t_id)
+            (t_bdhoare_while phi vrnt tc)
 
       | Some vrnt, Some (`Bd (k, eps)) ->
         let _, phi = TTC.tc1_process_Xhl_formula tc phi in

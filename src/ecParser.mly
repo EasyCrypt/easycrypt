@@ -21,6 +21,15 @@
     pty_locality = locality;
   }
 
+  let map_gppterm f a =
+    let fp_head = match a.fp_head with
+      | FPNamed _ as x -> x
+      | FPCut x -> FPCut (f x)
+    in
+    { a with fp_head }
+
+  let apply_gppterm x = map_gppterm (fun f -> f x)
+
   let opdef_of_opbody ty b =
     match b with
     | None            -> PO_abstr ty
@@ -88,18 +97,18 @@
       pa_kind     = k;
       pa_locality = locality; }
 
-  let mk_simplify l =
+  let mk_simplify ?(hint = empty_simplify_hint) l =
     if l = [] then
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
-        plogic = true; pdelta = None;
-        pmodpath = true; puser = true; }
+        plogic = true; pdelta = { pd_all = true; pd_ops = []; };
+        pmodpath = true; puser = true; phint = hint; }
     else
       let doarg acc = function
-        | `Delta l ->
-            if   l = [] || acc.pdelta = None
-            then { acc with pdelta = None }
-            else { acc with pdelta = Some (oget acc.pdelta @ l) }
+        | `Delta pd ->
+            let pd_all = acc.pdelta.pd_all || pd.pd_all in
+            let pd_ops = acc.pdelta.pd_ops @  pd.pd_ops in
+            { acc with pdelta = { pd_all; pd_ops; } }
 
         | `Zeta    -> { acc with pzeta    = true }
         | `Iota    -> { acc with piota    = true }
@@ -112,8 +121,8 @@
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
-            plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false; } l
+            plogic = false; pdelta = { pd_all = false; pd_ops = []; };
+            pmodpath = false; puser = false; phint = hint; } l
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
@@ -377,6 +386,7 @@
 %token ALIAS
 %token AMP
 %token APPLY
+%token ARRAY
 %token AS
 %token ASSUMPTION
 %token ASYNC
@@ -386,6 +396,8 @@
 %token AXIOMATIZED
 %token BACKSLASH
 %token BETA
+%token BITSTRING
+%token BIND
 %token BY
 %token BYEQUIV
 %token BYPHOARE
@@ -394,6 +406,7 @@
 %token BYUPTO
 %token CALL
 %token CASE
+%token CIRCUIT
 %token CBV
 %token CEQ
 %token CFOLD
@@ -441,6 +454,7 @@
 %token EXLIM
 %token EXPECT
 %token EXPORT
+%token EXTENS
 %token FAIL
 %token FEL
 %token FIRST
@@ -599,6 +613,7 @@
 %token WP
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
+%token <int> PLUSn MINUSn STARn
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 %token <Lexing.position> FINAL
 %token <EcParsetree.dockind * string> DOCCOMMENT
@@ -624,10 +639,10 @@
 %left  LOP1
 %right ROP1
 %right QUESTION
-%left  LOP2 MINUS PLUS PLUSGT
+%left  LOP2 MINUS PLUS PLUSGT MINUSn PLUSn
 %right ROP2
 %right RARROW
-%left  LOP3 STAR SLASH
+%left  LOP3 STAR SLASH STARn
 %right ROP3
 %left  LOP4 AT AMP HAT BACKSLASH
 %right ROP4
@@ -653,7 +668,10 @@ _lident:
 | x=LIDENT   { x }
 | ABORT      { "abort"      }
 | ADMITTED   { "admitted"   }
+| ARRAY      { "array"      }
 | ASYNC      { "async"      }
+| BIND       { "bind"       }
+| BITSTRING  { "bitstring"  }
 | DEBUG      { "debug"      }
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
@@ -709,6 +727,7 @@ _lident:
 
 %inline sword:
 |       n=word {  n }
+| PLUS  n=word {  n }
 | MINUS n=word { -n }
 
 (* -------------------------------------------------------------------- *)
@@ -830,10 +849,12 @@ inlinepat:
 | LE { "<=" }
 
 %inline uniop:
-| x=NOP { Printf.sprintf "[%s]" x }
-| NOT   { "[!]" }
-| PLUS  { "[+]" }
-| MINUS { "[-]" }
+| x=NOP    { Printf.sprintf "[%s]" x }
+| NOT      { "[!]" }
+| PLUS     { "[+]" }
+| MINUS    { "[-]" }
+| n=PLUSn  { Printf.sprintf "[%s]" (String.make n '+') }
+| n=MINUSn { Printf.sprintf "[%s]" (String.make n '-') }
 
 %inline sbinop:
 | EQ        { "="   }
@@ -843,6 +864,9 @@ inlinepat:
 | STAR      { "*"   }
 | SLASH     { "/"   }
 | AT        { "@"   }
+| n=PLUSn   { String.make n '+' }
+| n=MINUSn  { String.make n '-' }
+| n=STARn   { String.make n '*' }
 | OR        { "\\/" }
 | ORA       { "||"  }
 | AND       { "/\\" }
@@ -1709,10 +1733,11 @@ subtype_rename:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| loca=is_local INSTANCE x=qident
+| loca=is_local INSTANCE x=qident nm=bracket(ident)?
     WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
     { pti_name = x;
+      pti_as   = nm;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;
@@ -1721,10 +1746,11 @@ tycinstance:
     }
   }
 
-| loca=is_local INSTANCE x=qident c=uoption(UINT) p=uoption(UINT)
+| loca=is_local INSTANCE x=qident nm=bracket(ident)? c=uoption(UINT) p=uoption(UINT)
     WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
     { pti_name = x;
+      pti_as   = nm;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;
@@ -1862,22 +1888,25 @@ exception_:
 (* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
 predicate:
-| locality=locality PRED x=oident
+| locality=locality PRED tags=bracket(ident*)? x=oident
    { { pp_name     = x;
        pp_tyvars   = None;
        pp_def      = PPabstr [];
+       pp_tags     = odfl [] tags;
        pp_locality = locality; } }
 
-| locality=locality PRED x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
+| locality=locality PRED tags=bracket(ident*)? x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
    { { pp_name     = x;
        pp_tyvars   = tyvars;
        pp_def      = PPabstr sty;
+       pp_tags     = odfl [] tags;
        pp_locality = locality; } }
 
-| locality=locality PRED x=oident tyvars=tyvars_decl? p=ptybindings? EQ f=form
+| locality=locality PRED tags=bracket(ident*)? x=oident tyvars=tyvars_decl? p=ptybindings? EQ f=form
    { { pp_name     = x;
        pp_tyvars   = tyvars;
        pp_def      = PPconcr (odfl [] p, f);
+       pp_tags     = odfl [] tags;
        pp_locality = locality; } }
 
 | locality=locality INDUCTIVE x=oident tyvars=tyvars_decl? p=ptybindings?
@@ -1886,6 +1915,7 @@ predicate:
    { { pp_name     = x;
        pp_tyvars   = tyvars;
        pp_def      = PPind (odfl [] p, b);
+       pp_tags     = [];
        pp_locality = locality; } }
 
 indpred_def:
@@ -2306,6 +2336,13 @@ intro_pattern:
 | cm=crushmode
    { IPCrush cm }
 
+gpterm_head0(F):
+| p=qident tvi=tvars_app?
+   { (false, FPNamed (p, tvi)) }
+
+| LPAREN exp=iboption(AT) UNDERSCORE? COLON f=F RPAREN
+   { (exp, FPCut f) }
+
 gpterm_head(F):
 | exp=iboption(AT) p=qident tvi=tvars_app?
    { (exp, FPNamed (p, tvi)) }
@@ -2344,7 +2381,7 @@ gpterm_arg:
     { EA_tactic `DoneSmt }
 
 gpterm(F):
-| hd=gpterm_head(F)
+| hd=gpterm_head0(F)
    { mk_pterm (fst hd) (snd hd) [] }
 
 | LPAREN hd=gpterm_head(F) args=loc(gpterm_arg)* RPAREN
@@ -2414,8 +2451,8 @@ rwarg1:
 | side=rwside repeat=rwrepeat? occurrence=rwocc? match_=bracket(rwmatch)? fp=rwpterms
    { RWRw ({ side; repeat; occurrence; match_ }, fp) }
 
-| side=rwside repeat=rwrepeat? occurrence=rwocc? SLASH fp=sform_h %prec prec_tactic
-   { RWDelta ({ side; repeat; occurrence; match_ = None }, fp); }
+| side=rwside repeat=rwrepeat? occurrence=rwocc? SLASH rigid=iboption(TILD) fp=sform_h %prec prec_tactic
+   { RWDelta (rigid, { side; repeat; occurrence; match_ = None }, fp); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }
@@ -2485,8 +2522,12 @@ genpattern:
 | AT x=ident
     { `LetIn x }
 
+(* Bare reduction arguments, usable as a keyword-less tactic. The [+]/[-]
+   head filter is NOT allowed here: those tokens are bullet operators and
+   only a keyword ([simplify]/[cbv]) lets them be read as a head filter. *)
 simplify_arg:
-| DELTA l=qoident* { `Delta l }
+| DELTA l=qoident* { `Delta { pd_all = (l = []); pd_ops = l; } }
+| d=delta_arg      { `Delta d }
 | ZETA             { `Zeta }
 | IOTA             { `Iota }
 | BETA             { `Beta }
@@ -2494,16 +2535,79 @@ simplify_arg:
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
 
+(* [delta[f g]]: unfold every transparent definition and force [f] and
+   [g], opaque or not. Plain [delta] is the bracket-less case. *)
+%inline delta_arg:
+| DELTA l=bracket(qoident+) { { pd_all = true; pd_ops = l; } }
+
+%inline pmode:
+| PLUS  { `Plus  }
+| MINUS { `Minus }
+
+(* One item of a [hint] clause: a database (bare name), a head filter
+   ([...]) or a lemma set ({...}); the delimiter disambiguates. The
+   structural constraints (single filter, selection vs deltas) are checked
+   in [simplify_hint_body]. *)
+simplify_hint_item:
+| m=pmode x=lident             { `Db    (m = `Plus, unloc x) }
+| m=pmode l=bracket(qoident+)  { `Hd    (m, l) }
+| l=brace(qident+)             { `Lemma l }
+
+(* The body of a [hint] clause: an unsigned base database selection
+   followed by items. A clause may not both select databases (unsigned
+   list) and use signed [+d]/[-d] deltas, and at most one head filter is
+   allowed. Lemma sets are add-only -- a clause never removes lemmas from
+   a database; use the head filter to restrict the rules that apply.
+   Shared by the [simplify]/[cbv] tactics and the proof-local commands. *)
+simplify_hint_body:
+| sel=lident* items=simplify_hint_item*
+    { let err msg = parse_error (EcLocation.make $startpos $endpos) (Some msg) in
+      let doit h = function
+        | `Db (b, d) -> { h with ph_dbs = h.ph_dbs @ [(b, d)] }
+        | `Hd (m, l) ->
+            if h.ph_hd <> None then err "a hint clause allows at most one head filter";
+            let m = match m with `Plus -> `Include | `Minus -> `Exclude in
+            { h with ph_hd = Some (m, l) }
+        | `Lemma l -> { h with ph_lemmas = h.ph_lemmas @ l }
+      in
+      let h =
+        List.fold_left doit
+          { empty_simplify_hint with ph_select = List.map unloc sel } items
+      in
+      if h.ph_select <> [] && h.ph_dbs <> [] then
+        err "a hint clause cannot mix a database selection with +/- database deltas";
+      h }
+
+(* A [hint] clause as used by the [simplify]/[cbv] tactics. *)
+simplify_hint:
+| HINT h=simplify_hint_body { h }
+
+(* Trailing modifier shared by every keyword [simplify]/[cbv] form: the
+   optional [hint] clause above. *)
+%inline simplify_mod:
+| c=simplify_hint? { odfl empty_simplify_hint c }
+
 simplify:
-| l=simplify_arg+     { l }
-| SIMPLIFY            { simplify_red }
-| SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
-| SIMPLIFY DELTA      { `Delta [] :: simplify_red }
+| l=simplify_arg+
+    { mk_simplify l }
+| SIMPLIFY hint=simplify_mod
+    { mk_simplify ~hint simplify_red }
+| SIMPLIFY l=qoident+ hint=simplify_mod
+    { mk_simplify ~hint (`Delta { pd_all = false; pd_ops = l; } :: simplify_red) }
+| SIMPLIFY DELTA hint=simplify_mod
+    { mk_simplify ~hint (`Delta { pd_all = true; pd_ops = []; } :: simplify_red) }
+| SIMPLIFY d=delta_arg hint=simplify_mod
+    { mk_simplify ~hint (`Delta d :: simplify_red) }
 
 cbv:
-| CBV            { simplify_red }
-| CBV l=qoident+ { `Delta l  :: simplify_red  }
-| CBV DELTA      { `Delta [] :: simplify_red }
+| CBV hint=simplify_mod
+    { mk_simplify ~hint simplify_red }
+| CBV l=qoident+ hint=simplify_mod
+    { mk_simplify ~hint (`Delta { pd_all = false; pd_ops = l; } :: simplify_red) }
+| CBV DELTA hint=simplify_mod
+    { mk_simplify ~hint (`Delta { pd_all = true; pd_ops = []; } :: simplify_red) }
+| CBV d=delta_arg hint=simplify_mod
+    { mk_simplify ~hint (`Delta d :: simplify_red) }
 
 conseq:
 | empty                            { None, None }
@@ -2525,13 +2629,15 @@ conseq_xt:
 
 call_info:
 | f1=form LONGARROW f2=form poe=hoare_epost(none)
-    { CI_spec (f1, { pnormal = f2; pexcept = poe}) }
+    { fun _ -> CI_spec (f1, { pnormal = f2; pexcept = poe}) }
 | f=form
-    { CI_inv  (f) }
-| bad=form COMMA p=form
-    { CI_upto (bad,p,None) }
-| bad=form COMMA p=form COMMA q=form
-    { CI_upto (bad,p,Some q) }
+    { fun _ -> CI_inv  (f) }
+| fui_bad=form COMMA fui_pre=form
+    { fun fui_is_ll_variant ->
+      CI_upto {fui_is_ll_variant; fui_bad; fui_pre; fui_pos = None} }
+| fui_bad=form COMMA fui_pre=form COMMA pos=form
+    { fun fui_is_ll_variant ->
+      CI_upto {fui_is_ll_variant; fui_bad; fui_pre; fui_pos = Some pos} }
 
 icodepos_r:
 | IF       { (`If     :> pcp_match) }
@@ -2637,11 +2743,11 @@ s_codegap1_before_(I):
 | LBRACKET cps=codepos1 DOTDOT cpe=codepos1 RBRACKET
     { (GapBefore cps, GapAfter cpe) }
 
-| LBRACKET cps=codepos1 PLUSGT cpo=loc(mparen(sword)) RBRACKET { 
+| LBRACKET cps=codepos1 PLUSGT cpo=loc(mparen(sword)) RBRACKET {
     if unloc cpo > 0 then begin
         let (offset, base) = cps in
         (GapBefore cps, GapAfter (offset + unloc cpo, base))
-    end else 
+    end else
         parse_error (loc cpo) (Some "cannot give negative offset for codepos range end")
   }
 
@@ -2790,6 +2896,9 @@ logtactic:
 | ASSUMPTION
     { Passumption }
 
+| HINT h=localhint_cmd
+    { PlocalHint h }
+
 | MOVE vw=prefix(SLASH, pterm)* gp=prefix(COLON, revert)?
    { Pmove { pr_rev = odfl prevert0 gp; pr_view = vw; } }
 
@@ -2803,7 +2912,13 @@ logtactic:
    { Pclear (`Include l) }
 
 | CONGR
-   { Pcongr }
+   { Pcongr PCongrDefault }
+
+| CONGR STAR
+   { Pcongr PCongrStar }
+
+| CONGR p=sform_h
+   { Pcongr (PCongrPattern p) }
 
 | TRIVIAL
    { Ptrivial }
@@ -2826,11 +2941,11 @@ logtactic:
 | SPLIT PLUS
     { Psplit (`All `One) }
 
-| FIELD eqs=ident*
-    { Pfield eqs }
+| FIELD nm=bracket(ident)? eqs=ident*
+    { Pfield (nm, eqs) }
 
-| RING eqs=ident*
-    { Pring eqs }
+| RING nm=bracket(ident)? eqs=ident*
+    { Pring (nm, eqs) }
 
 | ALGNORM
    { Palg_norm }
@@ -2881,10 +2996,10 @@ logtactic:
    { Papply (`Apply (es, `Exact), None) }
 
 | l=simplify
-   { Psimplify (mk_simplify l) }
+   { Psimplify l }
 
 | l=cbv
-   { Pcbv (mk_simplify l) }
+   { Pcbv l }
 
 | CHANGE f=sform
    { Pchange f }
@@ -2940,7 +3055,7 @@ eager_tac:
     { Peager_fun_abs f }
 
 | CALL info=gpterm(call_info)
-    { Peager_call info }
+    { Peager_call (apply_gppterm None info) }
 
 form_or_double_form:
 | f=sform
@@ -3018,8 +3133,8 @@ direction:
 | PROC f=sform
    { Pfun (`Abs f) }
 
-| PROC bad=sform p=sform q=sform?
-   { Pfun (`Upto (bad, p, q)) }
+| PROC fui_is_ll_variant=calloptions fui_bad=sform fui_pre=sform fui_pos=sform?
+   { Pfun (`Upto { fui_is_ll_variant; fui_bad; fui_pre; fui_pos }) }
 
 | PROC STAR
    { Pfun `Code }
@@ -3042,11 +3157,11 @@ direction:
 | ASYNC WHILE info=async_while_tac_info
     { Pasyncwhile info }
 
-| CALL s=side? info=gpterm(call_info)
-    { Pcall (s, info) }
+| CALL c=calloptions s=side? info=gpterm(call_info)
+    { Pcall (s, apply_gppterm c info) }
 
 | CALL SLASH fc=sform info=gpterm(call_info)
-    { Pcallconcave (fc,info) }
+    { Pcallconcave (fc, apply_gppterm None info) }
 
 | RCONDT s=side? i=codepos1
     { Prcond (s, true, i) }
@@ -3282,20 +3397,33 @@ direction:
 | PROC CHANGE side=side? pos=codegap COLON b=option(bracket(ptybindings)) s=brace(stmt)
     { Pchangestmt (side, b, Gap pos, s) }
 
-| PROC REWRITE side=side? pos=codepos f=pterm
-    { Pprocrewrite (side, pos, `Rw f) }
+| PROC REWRITE side=side? pos=codepos_or_range f=pterm
+    { Pprocrewrite (side, Some pos, `Rw f) }
 
-| PROC REWRITE side=side? pos=codepos SLASHEQ
+| PROC REWRITE side=side? f=gpterm(form_h?)
+    { Pprocrewrite (side, None, `Rw f) }
+
+| PROC REWRITE side=side? pos=codepos_or_range? SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
 | PROC REWRITE AT tg=ident f=pterm
     { Pprocrewriteat (tg, f) }
+
+| PROC CHANGE CIRCUIT b=option(bracket(ptybindings)) o=codepos PLUS w=word s=brace(stmt)
+    { Prwprgm (`Change (o, b, w, s)) }
 
 | HOARE SPLIT
     { Phoaresplit }
 
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
+
+%public phltactic:
+| CIRCUIT
+  { Pcircuit (`Solve ) }
+
+| CIRCUIT SIMPLIFY
+  { Pcircuit (`Simplify ) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
@@ -3360,9 +3488,9 @@ eqobs_in_eqpost:
 
 eqobs_in:
 | pos=eqobs_in_pos? i=eqobs_in_eqinv p=eqobs_in_eqpost? {
-    { sim_pos  = pos;
-      sim_hint = i;
-      sim_eqs  = p; }
+    { psim_pos  = pos;
+      psim_hint = i;
+      psim_eqs  = p; }
 }
 
 pgoptionkw:
@@ -3421,9 +3549,34 @@ caseoption:
 %inline caseoptions:
 | AT xs=bracket(caseoption+) { xs }
 
+
+calloption:
+| b=boption(MINUS) x=lident {
+    match unloc x with
+    | "ll" -> (not b)
+    | _ ->
+       parse_error x.pl_loc
+         (Some ("invalid option: " ^ (unloc x) ^ ", [-]ll expected"))
+  }
+
+%inline calloptions:
+| AT b=bracket(calloption) { Some b }
+| { None }
+
 %inline do_repeat:
 | n=word? NOT      { (`All, n) }
 | n=word? QUESTION { (`Maybe, n) }
+
+(* Proof-local simplify-hint commands, sharing the unified clause body
+   with the [simplify]/[cbv] tactics. *)
+localhint_cmd:
+| CLEAR d=lident?
+    { match omap unloc d with
+      | Some "default" -> PLHClearDefault
+      | base           -> PLHClear base }
+
+| h=simplify_hint_body
+    { PLHClause h }
 
 tactic_core_r:
 | IDTAC
@@ -3453,6 +3606,9 @@ tactic_core_r:
 | LPAREN s=tactics RPAREN
    { Pseq s }
 
+| WITH HINT h=localhint_cmd LPAREN s=tactics RPAREN
+   { Pwith (h, s) }
+
 | ADMIT
    { Padmit }
 
@@ -3463,6 +3619,9 @@ tactic_core_r:
 
     { Pcase (odfl false eq, odfl [] opts,
              { pr_view = vw; pr_rev = gp; } ) }
+
+| EXTENS v=option(bracket(lident)) COLON t=tactic_core
+  { Pextens (t, v) }
 
 | PROGRESS opts=pgoptions? t=tactic_core? {
     Pprogress (odfl [] opts, t)
@@ -3584,11 +3743,17 @@ tactics0:
 | ts=tactics   { Pseq ts }
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
+%inline bullet:
+| b=loc(MINUS)  { mk_loc b.pl_loc { b_kind = `Minus; b_count = 1          } }
+| b=loc(PLUS)   { mk_loc b.pl_loc { b_kind = `Plus ; b_count = 1          } }
+| b=loc(STAR)   { mk_loc b.pl_loc { b_kind = `Star ; b_count = 1          } }
+| b=loc(MINUSn) { mk_loc b.pl_loc { b_kind = `Minus; b_count = b.pl_desc  } }
+| b=loc(PLUSn)  { mk_loc b.pl_loc { b_kind = `Plus ; b_count = b.pl_desc  } }
+| b=loc(STARn)  { mk_loc b.pl_loc { b_kind = `Star ; b_count = b.pl_desc  } }
+
 toptactic:
-| PLUS  t=tactics { t }
-| STAR  t=tactics { t }
-| MINUS t=tactics { t }
-|       t=tactics { t }
+| b=bullet t=tactics { (Some b, t) }
+|          t=tactics { (None,   t) }
 
 tactics_or_prf:
 | t=toptactic  { `Actual t }
@@ -3760,11 +3925,8 @@ clone_override:
 | LEMMA x=qoident mode=loc(opclmode) y=qoident
   { x, PTHO_Axiom (y, unloc mode) }
 
-| MODULE uqident loc(opclmode) uqident
-   { parse_error
-       (EcLocation.make $startpos $endpos)
-       (Some "Module overriding is no longer supported.")
-   }
+| MODULE x=uqident mode=loc(opclmode) y=uqident
+   { (x, PTHO_Module (y, unloc mode)) }
 
 | MODULE TYPE x=uqident mode=loc(opclmode) y=uqident
    { (x, PTHO_ModTyp (y, unloc mode)) }
@@ -3806,6 +3968,7 @@ print:
 | AXIOM       qs=qident          { Pr_ax   qs            }
 | LEMMA       qs=qident          { Pr_ax   qs            }
 | MODULE      qs=qident          { Pr_mod  qs            }
+| PROC        qs=qident          { Pr_proc qs            }
 | MODULE TYPE qs=qident          { Pr_mty  qs            }
 | GLOB        qs=loc(mod_qident) { Pr_glob qs            }
 | GOAL        n=sword            { Pr_goal n             }
@@ -3890,9 +4053,37 @@ hint:
 
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
+(* The option list is not written [bracket(...)?]: its empty reduction
+   before the first lemma would conflict with the [disable]/[enable]
+   forms below, which also start with an identifier. *)
 reduction:
-| HINT SIMPLIFY opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
-    { (odfl [] opt, xs) }
+| HINT SIMPLIFY IN db=lident COLON opt=bracket(user_red_option*) xs=plist1(user_red_info, COMMA)
+    { PURAdd (Some (unloc db), opt, xs) }
+| HINT SIMPLIFY IN db=lident COLON xs=plist1(user_red_info, COMMA)
+    { PURAdd (Some (unloc db), [], xs) }
+| HINT SIMPLIFY opt=bracket(user_red_option*) xs=plist1(user_red_info, COMMA)
+    { PURAdd (None, opt, xs) }
+| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
+    { PURAdd (None, [], xs) }
+
+(* [hint simplify disable L1, L2] / [hint simplify enable L1, L2]: switch
+   the rules of these lemmas off / back on in the (default / named)
+   database, for the rest of the enclosing theory / section of the
+   current file. *)
+| HINT SIMPLIFY IN db=lident COLON sw=user_red_switch xs=plist1(qident, COMMA)
+    { PURSwitch (sw, Some (unloc db), xs) }
+| HINT SIMPLIFY sw=user_red_switch xs=plist1(qident, COMMA)
+    { PURSwitch (sw, None, xs) }
+
+user_red_switch:
+| x=lident {
+    match unloc x with
+    | "disable" -> `Disable
+    | "enable"  -> `Enable
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("expecting `disable' or `enable', not: " ^ (unloc x)))
+  }
 
 user_red_info:
 | x=qident i=prefix(AT, word)?
@@ -3910,6 +4101,32 @@ user_red_option:
         parse_error x.pl_loc
           (Some ("invalid option: " ^ (unloc x)))
   }
+
+(* -------------------------------------------------------------------- *)
+(* Circuit & bo bindings                                                *)
+spec_binding:
+| op=qoident LARROW circ=loc(STRING)
+  { (op, circ) }
+
+cr_binding_r:
+| BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=qoident size=sform
+  { CRB_Bitstring { from_; to_; touint; tosint; ofint; type_; size; } }
+
+| BIND ARRAY get=qoident set=qoident tolist=qoident oflist=qoident type_=qoident size=sform
+  { CRB_Array { get; set; tolist; oflist; type_; size; } }
+  
+| BIND OP type_=qident operator=qoident name=loc(STRING)
+  { CRB_BvOperator { types = [type_]; operator; name; } }
+
+| BIND OP types=bracket(plist1(qident, AMP)) operator=qoident name=loc(STRING)
+  { CRB_BvOperator { types; operator; name; } }
+
+| BIND CIRCUIT bindings=plist1(spec_binding, COMMA) FROM file=loc(STRING)
+  { CRB_Circuit { bindings; file } }
+
+%inline cr_binding:
+| locality=is_local binding=cr_binding_r
+  { { locality; binding; }}
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
@@ -3949,6 +4166,7 @@ global_action:
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
 | hint             { Ghint        $1 }
+| cr_binding       { Gcrbinding   $1 } 
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | EXPECT s=loc(STRING) BY PRINT p=print
@@ -3978,11 +4196,17 @@ stop:
 | DROP DOT { }
 
 global:
-| db=debug_global? fail=boption(FAIL) g=global_action ep=FINAL
+| db=debug_global? f=failmode g=global_action ep=FINAL
   { let lc = EcLocation.make $startpos ep in
     { gl_action = EcLocation.mk_loc lc g;
-      gl_fail   = fail;
+      gl_fail   = fst f;
+      gl_expect = snd f;
       gl_debug  = db; } }
+
+%inline failmode:
+| (* empty *)               { (false, None  ) }
+| FAIL                      { (true , None  ) }
+| EXPECT FAIL s=loc(STRING) { (true , Some s) }
 
 debug_global:
 | TIME  { `Timed }

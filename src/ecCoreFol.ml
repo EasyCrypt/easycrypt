@@ -214,6 +214,9 @@ let f_lambda b  f     = f_quant Llambda b f
 let f_forall_mems bds f =
   f_forall (List.map (fun (m, mt) -> (m, GTmem mt)) bds) f
 
+let f_exists_mems bds f =
+  f_exists (List.map (fun (m, mt) -> (m, GTmem mt)) bds) f
+
 (* -------------------------------------------------------------------- *)
 let ty_fbool1 = toarrow (List.make 1 tbool) tbool
 let ty_fbool2 = toarrow (List.make 2 tbool) tbool
@@ -951,7 +954,8 @@ let rec form_of_expr_r ?m (e : expr) =
   | Evar pv ->
     begin
      match m with
-     | None -> failwith "expecting memory"
+     | None -> 
+       failwith "expecting memory"
      | Some m -> (f_pvar pv e.e_ty m).inv
     end
 

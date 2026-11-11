@@ -23,6 +23,8 @@ val t_bdHoareF_conseq_bd  : hoarecmp -> ss_inv -> FApi.backward
 
 val t_hoareS_conseq_conj : ss_inv -> hs_inv -> ss_inv -> hs_inv -> FApi.backward
 
+val t_hoareS_conseq_bdhoare : FApi.backward
+
 (* -------------------------------------------------------------------- *)
 val t_equivF_conseq_nm    : ts_inv -> ts_inv -> FApi.backward
 val t_equivS_conseq_nm    : ts_inv -> ts_inv -> FApi.backward

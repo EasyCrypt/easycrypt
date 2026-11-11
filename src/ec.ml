@@ -7,6 +7,36 @@ module EP = EcParsetree
 module T  = EcTerminal
 
 (* -------------------------------------------------------------------- *)
+(* OCaml runtime version as (major, minor), parsed from [Sys.ocaml_version]. *)
+let ocaml_version : int * int =
+  try Scanf.sscanf Sys.ocaml_version "%d.%d" (fun a b -> (a, b))
+  with _ -> (0, 0)
+
+(* EasyCrypt hash-conses its AST and leans heavily on zarith/GMP custom blocks.
+   On OCaml 5.x the default [custom_major_ratio] paces the major GC far too
+   aggressively over that external memory (OCaml issue #14533, pronounced on
+   5.5), which costs a large amount of CPU for no memory benefit. Relaxing the
+   ratio restores 4.14-class performance. *)
+let tune_gc () =
+  if fst ocaml_version >= 5 then
+    Gc.set { (Gc.get ()) with Gc.custom_major_ratio = 250 }
+
+(* OCaml 5.0-5.3's minor GC over-promotes values reachable from ephemeron /
+   weak-table keys (OCaml issue #13643), causing severe memory blowup with
+   EasyCrypt's weak-table hash-consing. Fixed in OCaml 5.4. *)
+let warn_ocaml_version (terminal : T.terminal) =
+  match ocaml_version with
+  | (5, minor) when minor <= 3 ->
+      T.notice ~immediate:true `Warning
+        (Printf.sprintf
+           "running on OCaml %s: OCaml 5.0-5.3 have a garbage-collector \
+            regression (OCaml issue #13643) that can cause severe memory blowup \
+            in EasyCrypt; please upgrade to OCaml >= 5.4"
+           Sys.ocaml_version)
+        terminal
+  | _ -> ()
+
+(* -------------------------------------------------------------------- *)
 let copyright =
   let sentences =
     List.flatten
@@ -117,6 +147,10 @@ let print_config config =
 
 (* -------------------------------------------------------------------- *)
 let main () =
+  (* On OCaml 5.x, relax the major-GC pacing over zarith/GMP custom blocks
+     (see [tune_gc]). *)
+  tune_gc ();
+
   (* When started from Emacs28 on Apple M1, the set of blocks signals *
    * disallows Why3 server to detect external provers completion      *)
   let _ : int list = Unix.sigprocmask Unix.SIG_SETMASK [] in
@@ -619,11 +653,17 @@ let main () =
   in
 
   (match state.input with
-   | Some input -> EcCommands.addidir (Filename.dirname input)
+   | Some input ->
+      EcCommands.addidir (Filename.dirname input);
+      EcCommands.set_current_path (Filename.dirname input)
    | None ->
-       match relocdir with
-       | None     -> EcCommands.addidir Filename.current_dir_name
-       | Some pwd -> EcCommands.addidir pwd);
+      let current_path =
+        match relocdir with
+        | None     -> Filename.current_dir_name
+        | Some pwd -> pwd
+      in
+        EcCommands.addidir current_path;
+        EcCommands.set_current_path current_path);
 
   (* Check if the .eco is up-to-date and exit if so *)
   (if not state.docgen && state.upto = None then
@@ -682,15 +722,36 @@ let main () =
     | None -> ()
   in
 
-  let tstats : EcLocation.t -> float option -> unit =
+  (* [-tstats]: one line per command, with its location and its time,
+   * then its CPU time, the memory it allocated (in MB), the size and
+   * the peak size of the major heap after it (in MB), and the number of
+   * major collections during it. [tstats ()] starts the measure of a
+   * command, the function it returns records it. *)
+  let tstats : unit -> EcLocation.t -> float option -> unit =
     match options.o_command with
     | `Compile { cmpo_tstats = Some out } ->
         let channel = Format.formatter_of_out_channel (open_out out) in
-        let fmt loc tdelta =
-          Format.fprintf channel "%s %f\n%!"
-            (EcLocation.tostring_raw ~with_fname:false loc) tdelta in
-        fun loc tdelta -> oiter (fmt loc) tdelta
-    | _ -> fun _ _ -> () in
+        let sample () = (Sys.time (), Gc.quick_stat ()) in
+        let mb (words : float) =
+          words *. float_of_int (Sys.word_size / 8) /. (1024. *. 1024.) in
+        let alloc (gc : Gc.stat) =
+          gc.Gc.minor_words +. gc.Gc.major_words -. gc.Gc.promoted_words in
+
+        fun () ->
+          let (cpu0, gc0) = sample () in
+          fun loc tdelta ->
+            let (cpu1, gc1) = sample () in
+            tdelta |> oiter (fun tdelta ->
+              Format.fprintf channel
+                "%s %f cpu=%f alloc=%.3f heap=%.1f top=%.1f gc=%d\n%!"
+                (EcLocation.tostring_raw ~with_fname:false loc) tdelta
+                (cpu1 -. cpu0)
+                (mb (alloc gc1 -. alloc gc0))
+                (mb (float_of_int gc1.Gc.heap_words))
+                (mb (float_of_int gc1.Gc.top_heap_words))
+                (gc1.Gc.major_collections - gc0.Gc.major_collections))
+
+    | _ -> fun () _ _ -> () in
 
   (* Instantiate terminal *)
   let lazy terminal = state.terminal in
@@ -709,6 +770,9 @@ let main () =
   (* Display Copyright *)
   if T.interactive terminal then
     T.notice ~immediate:true `Warning copyright terminal;
+
+  (* Warn about GC-regressed OCaml versions (5.0-5.3) *)
+  warn_ocaml_version terminal;
 
   (* Check if a location is past the -upto point *)
   let past_upto (loc : EcLocation.t) =
@@ -754,7 +818,7 @@ let main () =
               ~checkmode
               ~checkproof;
             (try
-               List.iter EcCommands.apply_pragma state.prvopts.prvo_pragmas
+               List.iter EcCommands.apply_pragma_option state.prvopts.prvo_pragmas
              with EcCommands.InvalidPragma x ->
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 
@@ -807,6 +871,7 @@ let main () =
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
                    let ignore_fail = ref false in
+                   let tstats = tstats () in
 
                      state.trace <- state.trace |> Option.map (fun trace ->
                       { State.Trace.trace0 with position = loc.loc_echar } :: trace
@@ -842,6 +907,17 @@ let main () =
                          end;
                          raise (EcScope.toperror_of_exn ~gloc:loc e)
                        end;
+                       p.EP.gl_expect |> oiter (fun expected ->
+                         let actual =
+                           Format.asprintf "%a" EcPException.exn_printer e in
+                         if String.trim actual <> String.trim (EcLocation.unloc expected) then
+                           EcScope.hierror ~loc:(EcLocation.loc expected)
+                             "expect fail: error message mismatch@\n\
+                              --- expected ---@\n\
+                              %s@\n\
+                              --- actual ---@\n\
+                              %s"
+                             (EcLocation.unloc expected) actual);
                        if T.interactive terminal then begin
                         let error =
                           Format.asprintf
