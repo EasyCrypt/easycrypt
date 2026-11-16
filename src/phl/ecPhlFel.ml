@@ -27,19 +27,19 @@ end = struct
 
   let tlist =
     let tlist = EcPath.fromqsymbol (p_List, "list") in
-    fun ty -> EcTypes.tconstr tlist [ty]
+    fun ty -> EcTypes.tconstr ~tyargs:[ty] tlist
 
   let range =
     let rg = EcPath.fromqsymbol (p_List @ ["Range"], "range") in
-    let rg = f_op rg [] (toarrow [tint; tint] (tlist tint)) in
+    let rg = f_op rg (toarrow [tint; tint] (tlist tint)) in
     fun m n -> f_app rg [m; n] (tlist tint)
 
   let felsum =
     let bgty = [tpred tint; tfun tint treal; tlist tint] in
     let bg   = EcPath.fromqsymbol (p_BRA, "big") in
-    let bg   = f_op bg [tint] (toarrow bgty treal) in
+    let bg   = f_op bg ~tyargs:[tint] (toarrow bgty treal) in
     let prT  = EcPath.fromqsymbol ([i_top; "Logic"], "predT") in
-    let prT  = f_op prT [tint] (tpred tint) in
+    let prT  = f_op prT ~tyargs:[tint] (tpred tint) in
     fun f (m, n) -> f_app bg [prT; f; range m n] treal
 
   let loaded (env : env) =

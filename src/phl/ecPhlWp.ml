@@ -20,7 +20,7 @@ module LowInternal = struct
     let f = EcReduction.h_red_until EcReduction.full_red hyps f in
     let (ex, tyargs), args = destr_op_app f in
 
-    assert (List.is_empty tyargs);
+    assert (List.is_empty tyargs.types && List.is_empty tyargs.indices);
 
     (* The postcondition of [ex]: its branch, applied to the arguments,
        or the default branch [_ => Q] (which binds nothing), or [true]

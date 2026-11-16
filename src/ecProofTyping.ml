@@ -22,16 +22,24 @@ let unienv_of_hyps hyps =
    EcUnify.UniEnv.create (Some tv)
 
 (* ------------------------------------------------------------------ *)
+(* [FreeIndexVariables] when the unification env is closed on the
+   type side but not on the index side. *)
+let free_uni_error (ue : EcUnify.unienv) =
+  if   EcUnify.UniEnv.closed_tv ue && not (EcUnify.UniEnv.closed_iu ue)
+  then EcTyping.FreeIndexVariables
+  else EcTyping.FreeTypeVariables
+
+(* ------------------------------------------------------------------ *)
 let process_form_opt ?mv hyps pf oty =
+  let ue = unienv_of_hyps hyps in
   try
-    let ue  = unienv_of_hyps hyps in
     let ff  = EcTyping.trans_form_opt ?mv (LDecl.toenv hyps) ue pf oty in
-    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let ts = EcUnify.UniEnv.close_subst ue in
     EcFol.Fsubst.f_subst ts ff
 
   with EcUnify.UninstantiateUni ->
     EcTyping.tyerror pf.EcLocation.pl_loc
-      (LDecl.toenv hyps) EcTyping.FreeTypeVariables
+      (LDecl.toenv hyps) (free_uni_error ue)
 
 (* ------------------------------------------------------------------ *)
 let process_form ?mv hyps pf ty =
@@ -61,9 +69,9 @@ let process_type hyps pty =
   let ty  = EcTyping.transty EcTyping.tp_tydecl env ue pty in
 
   if not (EcUnify.UniEnv.closed ue) then
-    EcTyping.tyerror (EcLocation.loc pty) env EcTyping.FreeTypeVariables;
+    EcTyping.tyerror (EcLocation.loc pty) env (free_uni_error ue);
 
-  let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+  let ts = EcUnify.UniEnv.close_subst ue in
   EcCoreSubst.ty_subst ts ty
 
 (* ------------------------------------------------------------------ *)
@@ -73,17 +81,17 @@ let process_stmt hyps s =
   let s   = EcTyping.transstmt env ue s in
 
   try
-    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let ts = EcUnify.UniEnv.close_subst ue in
     s_subst ts s
   with EcUnify.UninstantiateUni ->
-    EcTyping.tyerror EcLocation._dummy env EcTyping.FreeTypeVariables
+    EcTyping.tyerror EcLocation._dummy env (free_uni_error ue)
 
 (* ------------------------------------------------------------------ *)
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
   let e   = EcTyping.transexpcast_opt env mode ue oty e in
-  let ts  = Tuni.subst (EcUnify.UniEnv.close ue)  in
+  let ts  = EcUnify.UniEnv.close_subst ue  in
   e_subst ts e
 
 (* ------------------------------------------------------------------ *)
@@ -120,7 +128,7 @@ let pf_process_poe hyps poe =
   let env  = LDecl.toenv hyps in
   let ue = unienv_of_hyps hyps in
   let m = EcTyping.trans_poe env ue poe in
-  let ts  = Tuni.subst (EcUnify.UniEnv.close ue) in
+  let ts  = EcUnify.UniEnv.close_subst ue in
   Mop.map (EcFol.Fsubst.f_subst ts) m
 
 (* ------------------------------------------------------------------ *)
@@ -165,8 +173,7 @@ let tc1_process_stmt ?map hyps tc c =
   let env    = LDecl.toenv hyps in
   let ue     = unienv_of_hyps hyps in
   let c      = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
-  let uidmap = Exn.recast_pe !!tc hyps (fun () -> EcUnify.UniEnv.close ue) in
-  let es     = Tuni.subst uidmap in
+  let es = Exn.recast_pe !!tc hyps (fun () -> EcUnify.UniEnv.close_subst ue) in
   s_subst es c
 
 
@@ -233,16 +240,39 @@ let tc1_process_Xhl_formula_xreal tc pf =
 (* FIXME: TC HOOK - check parameter constraints                       *)
 (* ------------------------------------------------------------------ *)
 let pf_check_tvi (pe : proofenv) (typ : EcDecl.ty_params) (tvi : tvar_inst option) =
+  let check_ix () =
+    match EcUnify.tvi_indices tvi with
+    | EcUnify.IXunamed [] -> ()
+
+    | EcUnify.IXunamed ixargs ->
+        if List.length ixargs <> List.length typ.EcDecl.idxvars then
+          tc_error pe
+            "wrong number of index parameters (%d, expecting %d)"
+            (List.length ixargs) (List.length typ.EcDecl.idxvars)
+
+    | EcUnify.IXnamed ixargs ->
+        (* May be partial: only reject names that bind nothing. *)
+        let ixnames = List.map EcIdent.name typ.EcDecl.idxvars in
+        List.iter
+          (fun (x, _) ->
+            if not (List.mem x ixnames) then
+              tc_error pe "unknown index variable: %s" x)
+          ixargs
+  in
+
+  let typ = typ.tyvars in
   match tvi with
   | None -> ()
 
-  | Some (EcUnify.TVIunamed tyargs) ->
-      if List.length tyargs <> List.length typ then
+  | Some (EcUnify.TVIunamed (_ix, tyargs)) ->
+      check_ix ();
+      if tyargs <> [] && List.length tyargs <> List.length typ then
         tc_error pe
           "wrong number of type parameters (%d, expecting %d)"
           (List.length tyargs) (List.length typ)
 
-  | Some (EcUnify.TVInamed tyargs) ->
+  | Some (EcUnify.TVInamed (_ix, tyargs)) ->
+      check_ix ();
       let typnames = List.map EcIdent.name typ in
       List.iter
         (fun (x, _) ->

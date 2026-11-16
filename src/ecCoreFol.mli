@@ -95,7 +95,8 @@ val f_pvloc : variable -> memory -> ss_inv
 val f_glob  : EcIdent.t -> memory -> ss_inv
 
 (* soft-constructors - common formulas constructors *)
-val f_op     : path -> EcTypes.ty list -> EcTypes.ty -> form
+val f_op     : path -> ?indices:tindex list -> ?tyargs:EcTypes.ty list -> EcTypes.ty -> form
+val f_op_r   : path -> targs -> EcTypes.ty -> form
 val f_app    : form -> form list -> EcTypes.ty -> form
 val f_tuple  : form list -> form
 val f_proj   : form -> int -> EcTypes.ty -> form
@@ -199,6 +200,14 @@ val f_int_mul   : form -> form -> form
 val f_int_pow   : form -> form -> form
 val f_int_edivz : form -> form -> form
 
+(* Project a [tindex] into the int-formula world. Idxvars share the
+   formula-locals namespace (Phase 2): [TIVar id] -> [Flocal id : int].
+   The option variant returns [None] if [ti] still contains any
+   [TIUnivar]; the asserting variant crashes in that case (use it
+   when the caller is sure all univars are resolved). *)
+val f_of_tindex_opt : tindex -> form option
+val f_of_tindex     : tindex -> form
+
 (* -------------------------------------------------------------------- *)
 val f_none : ty -> form
 val f_some : form -> form
@@ -251,13 +260,13 @@ val destr_forall1  : form -> ident * gty * form
 val destr_exists1  : form -> ident * gty * form
 val destr_lambda1  : form -> ident * gty * form
 
-val destr_op        : form -> EcPath.path * ty list
+val destr_op        : form -> EcPath.path * targs
 val destr_local     : form -> EcIdent.t
 val destr_pvar      : form -> prog_var * memory
 val destr_proj      : form -> form * int
 val destr_tuple     : form -> form list
 val destr_app       : form -> form * form list
-val destr_op_app    : form -> (EcPath.path * ty list) * form list
+val destr_op_app    : form -> (EcPath.path * targs) * form list
 val destr_not       : form -> form
 val destr_nots      : form -> bool * form
 val destr_and       : form -> form * form
@@ -330,6 +339,11 @@ exception CannotTranslate
 
 val expr_of_ss_inv : ss_inv -> EcTypes.expr
 val expr_of_form : form -> EcTypes.expr
+
+(* Recognise a formula as a tindex polynomial. Returns [None] when the
+   formula falls outside the polynomial fragment over the naturals
+   (variables, non-negative literals, p_int_add, p_int_mul). *)
+val tindex_of_form : form -> tindex option
 
 (* -------------------------------------------------------------------- *)
 (* A predicate on memory: λ mem. -> pred *)

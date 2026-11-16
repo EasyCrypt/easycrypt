@@ -19,6 +19,7 @@ type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> '
 module EqTest : sig
   val for_type_exn : env -> ty -> ty -> unit
 
+  val for_targs : targs       eqtest
   val for_type  : ty          eqtest
   val for_pv    : prog_var    eqntest
   val for_lv    : lvalue      eqntest
@@ -44,12 +45,16 @@ module User : sig
   type error =
     | MissingVarInLhs   of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
+    | MissingIdxVarInLhs of EcIdent.t
     | NotAnEq
     | NotFirstOrder
+    | IdxNotAffine
     | RuleDependsOnMemOrModule
     | HeadedByVar
 
   exception InvalidUserRule of error
+
+  val string_of_error : error -> string
 
   type rule = EcEnv.Reduction.rule
 
