@@ -1,0 +1,24 @@
+(* ==================================================================== *)
+require import AllCore.
+
+(* ==================================================================== *)
+(* A type equipped with a total order having a least element [bot].     *)
+(*                                                                      *)
+(* This abstraction is exactly what is needed to form a max-monoid:     *)
+(* [maxr x y = if x <= y then y else x] is associative, commutative,    *)
+(* and has [bot] as identity (since [bot <= x] for all [x]).            *)
+(*                                                                      *)
+(* On types without a global minimum (e.g. plain [int]) one must        *)
+(* restrict to a subtype bounded below.                                 *)
+(* ==================================================================== *)
+
+type t.
+
+op (<=) : t -> t -> bool.
+op bot  : t.
+
+axiom le_refl  (x   : t) : x <= x.
+axiom le_trans (y x z : t) : x <= y => y <= z => x <= z.
+axiom le_anti  (x y : t) : x <= y => y <= x => x = y.
+axiom le_total (x y : t) : x <= y \/ y <= x.
+axiom bot_le   (x   : t) : bot <= x.
