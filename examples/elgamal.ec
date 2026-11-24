@@ -11,7 +11,7 @@ pragma +implicits.
 clone DiffieHellman as DH.
 import DH.DDH DH.G DH.GP DH.FD DH.GP.ZModE.
 
-clone DH.GP.ZModE.ZModpField as ZPF.
+clone DH.GP.ZModE.ZModpFieldBd as ZPF.
 
 (** Construction: a PKE **)
 type pkey = group.
@@ -107,8 +107,8 @@ section Security.
       (fun z, z - loge (if b then m1 else m0){2}).
   auto; call (_:true).
   auto; progress.
-  - by rewrite ZPF.addrAC -ZPF.addrA ZPF.subrr ZPF.addr0.
-  - by rewrite  -ZPF.addrA ZPF.subrr ZPF.addr0.
+  - by rewrite ZPF.R.addrAC -ZPF.R.addrA ZPF.R.subrr ZPF.R.addr0.
+  - by rewrite  -ZPF.R.addrA ZPF.R.subrr ZPF.R.addr0.
   - by rewrite expD expgK.
   qed.
 
