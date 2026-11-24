@@ -2091,7 +2091,7 @@ module Mod = struct
         let me_oinfos =
           let keep = List.map (EcPath.mident -| fst) me_params in
           let keep = Sm.of_list keep in
-          Msym.map (OI.filter (fun f -> Sm.mem (f.x_top) keep)) me.me_oinfos in
+          Msym.map (OI.filter (fun f -> Sm.mem (m_functor f.x_top) keep)) me.me_oinfos in
 
         { me with me_params; me_oinfos; }
     in
@@ -2352,7 +2352,7 @@ module ModTy = struct
 
     let keep = List.map (EcPath.mident -| fst) params in
     let keep = Sm.of_list keep in
-    let ois = Msym.map (OI.filter (fun f -> Sm.mem (f.x_top) keep)) ois in
+    let ois = Msym.map (OI.filter (fun f -> Sm.mem (m_functor f.x_top) keep)) ois in
 
     { mis_params = params;
       mis_body   = items;
