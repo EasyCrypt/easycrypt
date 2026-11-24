@@ -213,8 +213,9 @@ hint solve 0 random : dpoly_out_ll dpoly_out_funi dpoly_out_fu.
 
 clone import GenBlock as TPoly with 
   op block_size = poly_in_size + poly_out_size 
-  proof ge0_block_size by smt (ge0_poly_in_size ge0_poly_out_size) 
+  proof *
   rename "block" as "poly".
+realize ge0_poly_size by smt (ge0_poly_in_size ge0_poly_out_size).
 hint solve 0 random : dpoly_ll dpoly_funi dpoly_fu. 
 
 clone import GenBlock as Extra_block
@@ -1383,6 +1384,22 @@ module EncRnd = {
     return None;
   }
    
+}.
+
+(* The ideal AEAD: encryption returns random bytes of the length of the *)
+(* message and a random tag, decryption only accepts the ciphertexts    *)
+(* returned by encryption.                                              *)
+module IdealAEAD : Oracles = {
+  proc init () = { Mem.log <- empty; }
+
+  proc enc (p : plaintext) = {
+    var c;
+    c <@ EncRnd.enc(p);
+    Mem.log.[c] <- p;
+    return c;
+  }
+
+  proc dec (c : ciphertext) = { return Mem.log.[c]; }
 }.
 
 section PROOFS.
@@ -2778,4 +2795,143 @@ section PROOFS.
      by have /# := step4_bad2 &m.
    qed.
 
+  lemma CCA_CPA_IdealAEAD &m :
+    Pr[CCA_game(CCA_CPA_Adv(BNR_Adv(A)), EncRnd).main() @ &m : res] =
+    Pr[CCA_game(BNR_Adv(A), IdealAEAD).main() @ &m : res].
+  proof.
+  byequiv (: ={glob A} ==> ={res}) => //; proc; inline *; wp.
+  call (: ={Mem.log, glob BNR}); 1,2: by sim.
+  by auto.
+  qed.
+
+  lemma conclusion_ideal &m :
+    Pr[CCA_game(BNR_Adv(A), RealOrcls(ChaChaPoly)).main() @ &m : res] <=
+      Pr[CCA_game(BNR_Adv(A), IdealAEAD).main() @ &m : res] +
+      (Pr[Indist.Distinguish(D(BNR_Adv(A)), IndBlock).game() @ &m : res] -
+       Pr[Indist.Distinguish(D(BNR_Adv(A)), IndRO).game() @ &m : res]) +
+       qdec%r * (maxr pr_zeropol pr1_poly_out) +
+       qdec%r * pr1_poly_out.
+  proof. by rewrite -CCA_CPA_IdealAEAD; apply: conclusion. qed.
+
 end section PROOFS.
+
+(* -------------------------------------------------------------------- *)
+(* The same bound on the absolute value of the advantage, obtained by    *)
+(* applying conclusion_ideal to the adversary that negates its output.   *)
+section Abs.
+  declare module A <: CCA_Adv { -BNR, -Mem, -IndBlock, -RO, -FRO}.
+
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+
+  declare axiom neq_w1_w2 : w1 <> w2.
+
+  local module NegA (O : CCA_Oracles) = {
+    proc main () = {
+      var b;
+      b <@ A(O).main();
+      return !b;
+    }
+  }.
+
+  local lemma NegA_ll (O <: CCA_Oracles{-NegA}) :
+    islossless O.enc => islossless O.dec => islossless NegA(O).main.
+  proof. by move=> enc_ll dec_ll; proc; call (A_ll O enc_ll dec_ll). qed.
+
+  local lemma cc_ll : islossless EncRnd.cc.
+  proof.
+  proc; wp; while (true) (size p); last by auto; smt(size_ge0 size_eq0).
+  move=> z; auto => /> &1 hp.
+  smt(dblock_ll size_drop gt0_block_size size_ge0 size_eq0).
+  qed.
+
+  local lemma chacha_enc_ll (O <: Indist.Oracle{-A}) :
+    islossless O.f => islossless D(BNR_Adv(A), O).O.ChaCha.enc.
+  proof.
+  move=> f_ll; proc; while (true) (size p); last by auto; smt(size_ge0 size_eq0).
+  move=> z; wp; call f_ll; auto => /> &1 hp.
+  smt(size_drop gt0_block_size size_ge0 size_eq0).
+  qed.
+
+  local lemma real_ll : islossless CCA_game(BNR_Adv(A), RealOrcls(ChaChaPoly)).main.
+  proof.
+  proc; inline *; wp.
+  call (A_ll (BNR(RealOrcls(ChaChaPoly))) _ _); 1,2: by islossless.
+  by auto; smt(dkey_ll).
+  qed.
+
+  local lemma ideal_ll : islossless CCA_game(BNR_Adv(A), IdealAEAD).main.
+  proof.
+  proc; inline *; wp.
+  call (A_ll (BNR(IdealAEAD)) _ _); 2: by islossless.
+  + proc; sp; if; last by auto.
+    inline IdealAEAD.enc EncRnd.enc; wp; rnd; call cc_ll; auto => /> &hr _.
+    by have := dpoly_out_ll; rewrite /is_lossless /predT => ->.
+  by auto.
+  qed.
+
+  local lemma dist_ll (O <: Indist.Function{-A, -BNR}) :
+    islossless O.init => islossless O.f =>
+    islossless Indist.Distinguish(D(BNR_Adv(A)), O).game.
+  proof.
+  move=> init_ll f_ll; proc; inline *; wp.
+  call (A_ll (<: BNR(D(BNR_Adv(A), O).O)) _ _).
+  + proc; sp; if; last by auto.
+    by inline 1; inline 4; wp; call f_ll; wp; call (chacha_enc_ll O f_ll); auto.
+  + proc; sp; if; last by auto.
+    inline 1; inline 4; wp; seq 9 : true => //; first by wp; call f_ll; auto.
+    by if; [wp; call (chacha_enc_ll O f_ll) | auto].
+  by wp; call init_ll.
+  qed.
+
+  local lemma Pr_real &m :
+    Pr[CCA_game(BNR_Adv(NegA), RealOrcls(ChaChaPoly)).main() @ &m : res] =
+    1%r - Pr[CCA_game(BNR_Adv(A), RealOrcls(ChaChaPoly)).main() @ &m : res].
+  proof.
+  have -> : Pr[CCA_game(BNR_Adv(NegA), RealOrcls(ChaChaPoly)).main() @ &m : res] =
+            Pr[CCA_game(BNR_Adv(A), RealOrcls(ChaChaPoly)).main() @ &m : !res].
+  + byequiv (: ={glob A} ==> res{1} = !res{2}) => //; proc; inline *; wp.
+    by call (: ={glob BNR, Mem.k}); 1,2: sim; auto.
+  by rewrite Pr[mu_not]; congr; byphoare real_ll.
+  qed.
+
+  local lemma Pr_ideal &m :
+    Pr[CCA_game(BNR_Adv(NegA), IdealAEAD).main() @ &m : res] =
+    1%r - Pr[CCA_game(BNR_Adv(A), IdealAEAD).main() @ &m : res].
+  proof.
+  have -> : Pr[CCA_game(BNR_Adv(NegA), IdealAEAD).main() @ &m : res] =
+            Pr[CCA_game(BNR_Adv(A), IdealAEAD).main() @ &m : !res].
+  + byequiv (: ={glob A} ==> res{1} = !res{2}) => //; proc; inline *; wp.
+    by call (: ={glob BNR, Mem.log}); 1,2: sim; auto.
+  by rewrite Pr[mu_not]; congr; byphoare ideal_ll.
+  qed.
+
+  local lemma Pr_dist (O <: Indist.Function{-A, -BNR}) &m :
+    islossless O.init => islossless O.f =>
+    Pr[Indist.Distinguish(D(BNR_Adv(NegA)), O).game() @ &m : res] =
+    1%r - Pr[Indist.Distinguish(D(BNR_Adv(A)), O).game() @ &m : res].
+  proof.
+  move=> init_ll f_ll.
+  have -> : Pr[Indist.Distinguish(D(BNR_Adv(NegA)), O).game() @ &m : res] =
+            Pr[Indist.Distinguish(D(BNR_Adv(A)), O).game() @ &m : !res].
+  + byequiv (: ={glob A, glob O} ==> res{1} = !res{2}) => //; proc; inline *; wp.
+    by call (: ={glob BNR, glob O}); 1,2: sim; wp; call (: true); auto.
+  by rewrite Pr[mu_not]; congr; byphoare (dist_ll O init_ll f_ll).
+  qed.
+
+  lemma conclusion_ideal_abs &m :
+    `|Pr[CCA_game(BNR_Adv(A), RealOrcls(ChaChaPoly)).main() @ &m : res] -
+      Pr[CCA_game(BNR_Adv(A), IdealAEAD).main() @ &m : res]| <=
+      `|Pr[Indist.Distinguish(D(BNR_Adv(A)), IndBlock).game() @ &m : res] -
+        Pr[Indist.Distinguish(D(BNR_Adv(A)), IndRO).game() @ &m : res]| +
+      qdec%r * (maxr pr_zeropol pr1_poly_out) +
+      qdec%r * pr1_poly_out.
+  proof.
+  have h1 := conclusion_ideal A A_ll neq_w1_w2 &m.
+  have h2 := conclusion_ideal NegA NegA_ll neq_w1_w2 &m.
+  move: h2; rewrite Pr_real Pr_ideal.
+  rewrite (Pr_dist IndBlock &m _ _); 1,2: by islossless; smt(dkey_ll).
+  rewrite (Pr_dist IndRO &m _ _); 1,2: by islossless; smt(dblock_ll).
+  smt().
+  qed.
+
+end section Abs.

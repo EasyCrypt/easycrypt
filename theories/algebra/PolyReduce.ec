@@ -16,17 +16,7 @@ clone export PolyComRing as BasePoly
   with type   coeff <- coeff,
        theory Coeff <- Coeff.
 
-import Coeff BigPoly BigCf.
-
-(* -------------------------------------------------------------------- *)
-clone import IdealComRing as PIdeal with
-    type t               <- BasePoly.poly,
-  theory IComRing        <- BasePoly.PolyComRing,
-      op BigDom.BAdd.big <- BasePoly.BigPoly.PCA.big<:'a>,
-      op BigDom.BMul.big <- BasePoly.BigPoly.PCM.big<:'a>
-
-  remove abbrev BigDom.BAdd.bigi
-  remove abbrev BigDom.BMul.bigi.
+import Coeff BigPoly BigCf PIdeal.
 
 import PCA.
 
