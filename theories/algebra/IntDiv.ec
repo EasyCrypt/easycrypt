@@ -1469,3 +1469,138 @@ case: (y = 0) => [->|nz_y] /=; first by rewrite divz0.
 case/dvdzP => [q ->]; rewrite mulzK //.
 by rewrite fromintM RField.mulrK // eq_fromint.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma modzXm (m d k : int) : 0 <= k => (m %% d) ^ k %% d = m ^ k %% d.
+proof.
+elim: k => [|k ge0_k ih]; first by rewrite !expr0.
+by rewrite !exprS // -(modzMmr (m %% d)) ih modzMmr modzMml.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Multiplicative order of a modulo n: the least k > 0 such that        *)
+(* a ^ k %% n = 1 (meaningful when such a k exists).                    *)
+op mulorder (a n : int) =
+  argmin (fun k => k + 1) (fun k => a ^ k %% n = 1) + 1.
+
+lemma mulorder_spec (a n k0 : int) : 0 < k0 => a ^ k0 %% n = 1 =>
+     0 < mulorder a n
+  /\ a ^ mulorder a n %% n = 1
+  /\ forall k, 0 < k < mulorder a n => a ^ k %% n <> 1.
+proof.
+move=> gt0_k0 h.
+have [#] := argminP_r (fun k => k + 1) (fun k => a ^ k %% n = 1) (k0 - 1) _ _ => //=.
+- by smt().
+rewrite /mulorder => ge0_m hm hmin; do! split => //.
+- by smt().
+by move=> k [gt0_k lt_k]; have := hmin (k - 1) _ => /#.
+qed.
+
+lemma mulorder_gt0 (a n k0 : int) : 0 < k0 => a ^ k0 %% n = 1 => 0 < mulorder a n.
+proof. by move=> gt0_k0 h; have [#] := mulorder_spec a n k0 gt0_k0 h. qed.
+
+lemma expz_mulorder (a n k0 : int) : 0 < k0 => a ^ k0 %% n = 1 =>
+  a ^ mulorder a n %% n = 1.
+proof. by move=> gt0_k0 h; have [#] := mulorder_spec a n k0 gt0_k0 h. qed.
+
+lemma mulorder_dvdz (a n k0 k : int) : 0 < k0 => a ^ k0 %% n = 1 => 0 <= k =>
+  (mulorder a n %| k <=> a ^ k %% n = 1).
+proof.
+move=> gt0_k0 h ge0_k; have [# gt0_o ho omin] := mulorder_spec a n k0 gt0_k0 h.
+pose o := mulorder a n; have mod1 : 1 %% n = 1 by rewrite -h modz_mod.
+have ge0_q : 0 <= k %/ o by smt(divz_ge0).
+have [ge0_r lt_r] : 0 <= k %% o < o by smt(modz_ge0 ltz_pmod).
+have -> : a ^ k %% n = a ^ (k %% o) %% n.
+- rewrite {1}(divz_eq k o) exprD_nneg 1:/# //.
+  by rewrite (mulrC (k %/ o)) exprM -modzMml -modzXm // ho expr1z mod1 mul1r.
+rewrite dvdzE; split => [->|]; first by rewrite expr0.
+by apply: contraLR => nz_r; apply: omin; smt().
+qed.
+
+lemma mulorder_dvd_pred (a p : int) : prime p => ! (p %| a) =>
+  mulorder a p %| (p - 1).
+proof.
+move=> prime_p Ndvd; have gt1_p := gt1_prime p prime_p.
+have h : a ^ (p - 1) %% p = 1.
+- have := Fermat_little p a prime_p Ndvd.
+  by rewrite eqz_mod_dvd => ->; rewrite modz_small; smt().
+by rewrite (mulorder_dvdz a p (p - 1)) 1,3:/#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma pdivP (n : int) : 1 < n => exists p, prime p /\ p %| n.
+proof.
+move=> gt1_n; have ge0_n : 0 <= n by smt().
+elim/sintind: n ge0_n gt1_n => n ge0_n ih gt1_n.
+case: (prime n) => [pn|]; first by exists n; rewrite pn dvdzz.
+rewrite /prime gt1_n /= negb_forall => -[q] /=; rewrite negb_imply negb_or.
+case=> dvd_qn [nq1 nqn]; have := dvdz_le q n _ dvd_qn; 1: smt().
+have nz_q : q <> 0 by apply: contraL dvd_qn => ->; rewrite dvd0z /#.
+move=> le_qn; case: (ih `|q| _ _) => [| |p [pp dvd_pq]]; 1,2: smt().
+by exists p; split => //; apply: (dvdz_trans `|q|) => //; rewrite dvdz_norml.
+qed.
+
+lemma primePns (n : int) :
+  ! prime n <=> (n < 2 \/ exists p, prime p /\ p ^ 2 <= n /\ p %| n).
+proof.
+split=> [npr_n|]; last first.
+- case=> [lt2_n|[p [pr_p [le_p2n dvd_pn]]]]; first by smt(gt1_prime).
+  apply/negP => pr_n; have := pr_n; rewrite /prime => -[gt1_n /(_ p dvd_pn)].
+  have := gt1_prime p pr_p; move: le_p2n; rewrite expr2 => le_p2n gt1_p.
+  by have := ltr_pmul2l p _ 1 p; smt().
+case: (n < 2) => [lt2_n|ge2_n]; first by left.
+right; have gt1_n : 1 < n by smt().
+move: npr_n; rewrite /prime gt1_n /= negb_forall => -[q] /=.
+rewrite negb_imply negb_or => -[dvd_qn [nq1 nqn]].
+have le_qn := dvdz_le q n _ dvd_qn; 1: smt().
+have nz_q : q <> 0 by apply: contraL dvd_qn => ->; rewrite dvd0z /#.
+pose d := `|q|; pose e := n %/ d.
+have dvd_dn : d %| n by rewrite dvdz_norml.
+have de : e * d = n by rewrite divzK.
+have [gt1_d gt1_e] : 1 < d /\ 1 < e by smt().
+pose m := min d e; have dvd_mn : m %| n.
+- rewrite /m /min; case: (d < e) => _ //.
+  by rewrite -{1}de; apply/dvdz_mulr/dvdzz.
+have mm : m * m <= n by rewrite -de; apply: ler_pmul => /#.
+case: (pdivP m _) => [/#|p [pp dvd_pm]].
+have := dvdz_le p m _ dvd_pm; 1: smt().
+move=> le_pm; exists p; split => //; rewrite expr2; split.
+- have := gt1_prime p pp => gt1_p.
+  by apply: (ler_trans (m * m)) => //; apply: ler_pmul => /#.
+exact: (dvdz_trans m).
+qed.
+
+(* ==================================================================== *)
+(* Computable modular arithmetic: reduction rules in the hint databases *)
+(* [powmod] and [gcd], used as [cbv delta hint +powmod +gcd].           *)
+(* -------------------------------------------------------------------- *)
+(* Modular exponentiation by squaring, as reduction rules.              *)
+op powmod (a n x : int) = a ^ x %% n.
+
+lemma powmod0 a n : powmod a n 0 = 1 %% n.
+proof. by rewrite /powmod expr0. qed.
+
+lemma powmodE a n x : 0 < x =>
+  powmod a n x =
+    let p = powmod a n (x %/ 2) in let p2 = p * p %% n in
+    if x %% 2 = 1 then p2 * a %% n else p2.
+proof.
+move=> gt0_x; rewrite /powmod /=.
+have ge0_h : 0 <= x %/ 2 by smt(divz_ge0).
+have ex : a ^ x = a ^ (x %/ 2) * a ^ (x %/ 2) * a ^ (x %% 2).
+- rewrite -!exprD_nneg //; 1,2: smt(modz_ge0).
+  by congr; smt(divz_eq).
+rewrite ex; case: (x %% 2 = 1) => [->|ne1].
+- by rewrite expr1 modzMml eq_sym -(modzMml (_ %% n * _)) modzMm modzMml.
+have -> : x %% 2 = 0 by smt(modz_ge0 ltz_pmod).
+by rewrite expr0 mulr1 modzMm.
+qed.
+
+hint simplify in powmod : powmod0, powmodE.
+
+(* -------------------------------------------------------------------- *)
+(* Euclid's algorithm.                                                  *)
+lemma gcdE a b : gcd a b = if b = 0 then `|a| else gcd b (a %% b).
+proof. by case: (b = 0) => [->|nz_b]; rewrite ?gcdz0 // gcd_modr gcdC. qed.
+
+hint simplify in gcd : gcdE.
