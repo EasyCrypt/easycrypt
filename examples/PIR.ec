@@ -265,7 +265,9 @@ proof.
 
   + wp;rnd predT;skip => /> &hr.
     smt (dbool_ll oflist_cons is_restrS is_restr_addS).
-  move=> z;auto=> />;smt (dbool_ll).
+  + move=> z;auto=> />;smt (dbool_ll).
+  move=> &hr [hj _]; case: (oflist PIR.s{hr} = restr x j{hr}) => _ //=.
+  by rewrite invr_le1 ?expr_gt0 // ?expf_eq0 // exprn_ege1 /#.
 qed.
 
 lemma Pr_PIR_s' i0 &m x :
@@ -339,7 +341,9 @@ proof.
     by move=> &hr /> ?????;rewrite -exprS 1:/#;congr;congr;ring.
   + wp;rnd predT;skip => &hr.
     smt (dbool_ll oflist_cons is_restrS is_restr_addS).
-  move=> z;auto=> />;smt (dbool_ll).
+  + move=> z;auto=> />;smt (dbool_ll).
+  move=> &hr [hj _]; case: (oflist PIR.s'{hr} = restr x j{hr}) => _ //=.
+  by rewrite invr_le1 ?expr_gt0 // ?expf_eq0 // exprn_ege1 /#.
 qed.
 
 lemma PIR_secuity_s_bypr i1 i2 &m1 &m2 x:
