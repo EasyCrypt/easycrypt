@@ -139,6 +139,7 @@ module Loader : sig
 
   val addidir : ?namespace:namespace -> ?recursive:bool -> string -> loader -> unit
   val aslist  : loader -> ((namespace option * string) * idx_t) list
+  val setidirs : ((namespace option * string) * idx_t) list -> loader -> unit
   val locate  : ?namespaces:namespace option list -> string ->
                   loader -> (namespace option * string * kind) option
 
@@ -199,6 +200,9 @@ end = struct
   let aslist (ld : loader) =
     EcLoader.aslist ld.ld_core
 
+  let setidirs (idirs : ((namespace option * string) * idx_t) list) (ld : loader) =
+    EcLoader.setidirs idirs ld.ld_core
+
   let locate ?namespaces (path : string) (ld : loader) =
     EcLoader.locate ?namespaces path ld.ld_core
 
@@ -227,6 +231,122 @@ end
 
 (* -------------------------------------------------------------------- *)
 type loader = Loader.loader
+
+(* -------------------------------------------------------------------- *)
+(* Elaborated theories, kept across the scope rebuilds a reload does.
+
+   [EcScope] already declines to read a theory twice: [Theory.require]
+   consults the scope's [sc_loaded] before it runs a loader. But that
+   table is part of the scope, and a front-end that reloads a file by
+   rebuilding the scope from nothing -- the LLM REPL's LOAD, [pragma
+   restart.] -- starts from an empty one and re-reads every theory the
+   file requires. On a development of any size that *is* the reload: on
+   the goldbach sources, [require import Goldbach.] alone is 49s where
+   the file's own 470 lines are milliseconds, and none of it is proofs
+   ([require] already reads with checking off, which is the same
+   mechanism LOAD -noproof borrows).
+
+   So the theories are kept here as well, outside the scope, and a
+   rebuilt scope is seeded with the ones the sources still describe.
+   Still describe is decided by digest, transitively: a theory is
+   served from here only if the file it was read from digests to what
+   it did then, and if every theory it required is served too -- an
+   edit to a file five requires down invalidates everything above it,
+   which is the whole point of checking the closure rather than the
+   file. The load path is the other half of the key, since under a
+   different one the same name may name a different file; rather than
+   work out which names moved, a reload that starts from a different
+   load path drops the table whole.
+
+   Off unless a front-end asks for it. The batch compiler reads each
+   file once, in a process of its own, so it has nothing to gain here
+   and no reason to carry the risk of an entry that outlives its
+   source. *)
+module ThCache : sig
+  val enable : unit -> unit
+
+  (* Take the theory [ri] names out of [scope], which must be the scope
+     [Theory.require] returned for it, and file it under [file]. *)
+  val record : file:string -> EcScope.required_info -> EcScope.scope -> unit
+
+  (* Seed a freshly built scope with the entries that are still good
+     under [loadpath]. Both stamps are taken at the same point of a
+     reload, so they compare. *)
+  val seed :
+       loadpath:((Loader.namespace option * string) * Loader.idx_t) list
+    -> EcScope.scope -> EcScope.scope
+end = struct
+  type entry = {
+    ce_file   : string;             (* the file the theory was read from *)
+    ce_digest : Digest.t;           (* ... and its digest, as read *)
+    ce_deps   : EcScope.required;   (* the theories reading it required *)
+    ce_th     : EcScope.thloaded;
+  }
+
+  let enabled : bool ref = ref false
+
+  let table : (EcSymbols.symbol, entry) Hashtbl.t = Hashtbl.create 97
+
+  let stamp :
+    (((Loader.namespace option * string) * Loader.idx_t) list) option ref =
+    ref None
+
+  let enable () = enabled := true
+
+  let record ~(file : string) (ri : EcScope.required_info) scope =
+    if !enabled then
+      EcScope.Theory.loaded scope ri.EcScope.rqd_name
+        |> oiter (fun (th, deps) ->
+             Hashtbl.replace table ri.EcScope.rqd_name
+               { ce_file   = file;
+                 ce_digest = ri.EcScope.rqd_digest;
+                 ce_deps   = deps;
+                 ce_th     = th; })
+
+  (* Drop the entries the sources have moved out from under, and return
+     the names of those left. The recursion is memoized, and answers
+     [false] for a name it is still deciding: requires are acyclic
+     ([process_th_require1] refuses a cycle), and a cycle that got in
+     all the same must not be served. *)
+  let prune () =
+    let verdict : (EcSymbols.symbol, bool) Hashtbl.t = Hashtbl.create 97 in
+
+    let rec live (name : EcSymbols.symbol) =
+      match Hashtbl.find_opt verdict name with
+      | Some b -> b
+      | None ->
+        Hashtbl.replace verdict name false;
+        let b =
+          match Hashtbl.find_opt table name with
+          | None -> false
+          | Some e ->
+               (try Digest.file e.ce_file = e.ce_digest
+                with Sys_error _ -> false)
+            && List.for_all
+                 (fun (d : EcScope.required_info) -> live d.EcScope.rqd_name)
+                 e.ce_deps
+        in Hashtbl.replace verdict name b; b
+    in
+
+    let names = Hashtbl.fold (fun name _ acc -> name :: acc) table [] in
+    let (keep, drop) = List.partition live names in
+    List.iter (Hashtbl.remove table) drop;
+    keep
+
+  let seed ~loadpath scope =
+    if not !enabled then scope else begin
+      if !stamp <> Some loadpath then Hashtbl.reset table;
+      stamp := Some loadpath;
+      EcScope.Theory.seed_loaded scope
+        (List.map
+           (fun name ->
+              let e = Hashtbl.find table name in
+              (name, (e.ce_th, e.ce_deps)))
+           (prune ()))
+    end
+end
+
+let enable_theory_cache = ThCache.enable
 
 (* -------------------------------------------------------------------- *)
 let process_search scope qs =
@@ -442,8 +562,24 @@ let check_opname_validity (scope : EcScope.scope) (x : string) =
       "operator `%s' cannot be used in infix mode" x
 
 (* -------------------------------------------------------------------- *)
+(* Where [print] renders. The batch compiler and the interactive
+   terminals want the process's stdout, which is what this defaults to.
+   A front-end that frames its replies ([llm], [mcp]) cannot let the
+   engine write outside the frame, so it installs a formatter of its
+   own -- [search] and [locate] already come back through the notifier,
+   and this is what puts [print] on the same footing. Routing it
+   through the notifier instead would have been the smaller patch, but
+   the notifier drops `Info under the batch compiler's log level, so
+   `ec compile' would have stopped printing altogether. *)
+let print_formatter = ref Format.std_formatter
+
+let set_print_formatter (fmt : Format.formatter) =
+  print_formatter := fmt
+
 let process_print scope p =
-  process_pr Format.std_formatter scope p
+  let fmt = !print_formatter in
+  process_pr fmt scope p;
+  Format.pp_print_flush fmt ()
 
 (* -------------------------------------------------------------------- *)
 let process_expect scope (expected, p) =
@@ -638,6 +774,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       in
 
       let scope = EcScope.Theory.require scope (name, kind) loader in
+      ThCache.record ~file:filename name scope;
           match io with
           | None         -> scope
           | Some `Export -> EcScope.Theory.export scope ([], name.EcScope.rqd_name)
@@ -916,6 +1053,21 @@ let addidir ?namespace ?recursive (idir : string) =
 let loadpath () =
   List.map fst (Loader.aslist loader)
 
+(* The include path lives in this one process-global loader and only
+   ever grows: [addidir] never removes anything, and [initialize] --
+   [~restart:true] included -- does not rebuild it. A front-end that
+   loads unrelated files one after another therefore needs a way back,
+   or each loaded file's own directory stays searchable for every later
+   load. The batch compiler loads one file and exits, so it never wants
+   this. *)
+type loadpath_mark = ((Loader.namespace option * string) * Loader.idx_t) list
+
+let loadpath_mark () : loadpath_mark =
+  Loader.aslist loader
+
+let loadpath_reset (mark : loadpath_mark) =
+  Loader.setidirs mark loader
+
 let set_current_path (path : string) =
   Loader.set_current_path path loader
 
@@ -941,12 +1093,18 @@ let initial ~checkmode ~boot ~checkproof =
     EcScope.Prover.po_quorum    = checkmode.cm_quorum;
   } in
 
+  (* Taken before [loader] is shadowed by its system-only view below:
+     the stamp the cache is keyed on is the whole include path, which
+     is what a reload of a file from another project changes. *)
+  let lpstamp = Loader.aslist loader in
+
   let perv    = (None, (mk_loc _dummy EcCoreLib.i_Pervasive, None), Some `Export) in
   let tactics = (None, (mk_loc _dummy "Tactics", None), Some `Export) in
   let prelude = (None, (mk_loc _dummy "Logic", None), Some `Export) in
   let loader  = Loader.forsys loader in
   let gstate  = EcGState.from_flags [("profile", profile)] in
   let scope   = EcScope.empty gstate in
+  let scope   = ThCache.seed ~loadpath:lpstamp scope in
   let scope   = process_th_require1 loader scope perv in
   let scope   = if boot then scope else
                   List.fold_left (process_th_require1 loader)
@@ -1000,6 +1158,69 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
+(* Rotate the focus of the currently active proof so that the goal at
+   1-based index [k] becomes the focused one. The change is persisted
+   in the context with a new uuid so UNDO/REVERT can roll it back.
+   Returns the new number of open goals on success, or an error
+   message on failure. *)
+let focus_goal (k : int) : (int, string) result =
+  match !context with
+  | None -> Error "no active context"
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> Error "no active proof"
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> Error "no active proof"
+      | Some (pac, pct) ->
+        match pac.EcScope.puc_jdg with
+        | EcScope.PSNoCheck -> Error "proof is in no-check mode"
+        | EcScope.PSCheck pf ->
+          let n = List.length (EcCoreGoal.all_hd_opened pf) in
+          if n = 0 then Error "no open goals"
+          else if k < 1 || k > n then
+            Error (Printf.sprintf
+              "focus: index %d out of range (1..%d)" k n)
+          else if k = 1 then Ok n
+          else begin
+            let pf = EcCoreGoal.rotate_focus k pf in
+            let pac = { pac with EcScope.puc_jdg = EcScope.PSCheck pf } in
+            let puc =
+              { puc with EcScope.puc_active = Some (pac, pct) } in
+            let scope = EcScope.set_xgoal ctxt.ct_current puc in
+            context := Some (push_context scope ctxt);
+            Ok n
+          end
+
+(* Disable bullet enforcement for REPL-driven phrases. Drops the global
+   pragma so newly-opened proofs have no bullet stack, and clears the
+   stack on any currently active proof so REPL phrases are not checked
+   against it. Idempotent. Does not advance the undo level. Returns
+   the stack that was in place (if any) at the moment the active
+   proof's bullets were first cleared; returns [None] on idempotent
+   calls (where the stack is already gone). Callers use the returned
+   stack to drive bullet-character selection in [COMMIT]. *)
+let disable_repl_bullets () : EcBullets.stack option =
+  pragma_strict_bullets false;
+  match !context with
+  | None -> None
+  | Some ctxt ->
+    match EcScope.xgoal ctxt.ct_current with
+    | None -> None
+    | Some puc ->
+      match puc.EcScope.puc_active with
+      | None -> None
+      | Some (pac, pct) ->
+        match pac.EcScope.puc_bullets with
+        | None -> None
+        | Some _ as prior ->
+          let pac = { pac with EcScope.puc_bullets = None } in
+          let puc = { puc with EcScope.puc_active = Some (pac, pct) } in
+          let scope = EcScope.set_xgoal ctxt.ct_current puc in
+          context := Some { ctxt with ct_current = scope };
+          prior
+
+(* -------------------------------------------------------------------- *)
 let initialize ~restart ~undo ~boot ~checkmode ~checkproof =
   assert (restart || EcUtils.is_none !context);
   if restart then Pragma.set dpragma;
@@ -1038,6 +1259,27 @@ let apply_pragma_option (x : string) =
   else apply_pragma x
 
 (* -------------------------------------------------------------------- *)
+(* Proof checking on/off, on the *current* scope. Reading and writing it
+   is how LOAD skips the proofs it was asked to skip: [`Off] is the mode
+   a [require]d file is already read in, so the lemmas it declares are
+   admitted as they stand. Both the current scope and the root are
+   updated, so the setting survives the undo stack the way a pragma
+   does -- an [undo] back into the skipped region must not resurrect a
+   checking mode the caller has since turned off. *)
+let check_mode () : EcScope.Prover.check_mode =
+  EcScope.Prover.get_check_mode (oget !context).ct_current
+
+let set_check_mode (mode : EcScope.Prover.check_mode) =
+  let ct = oget !context in
+  context := Some { ct with
+    ct_current = EcScope.Prover.set_check_mode ct.ct_current mode;
+    ct_root    = EcScope.Prover.set_check_mode ct.ct_root mode;
+    ct_stack   =
+      Option.map
+        (List.map (fun sc -> EcScope.Prover.set_check_mode sc mode))
+        ct.ct_stack; }
+
+(* -------------------------------------------------------------------- *)
 let uuid () : int =
   (oget !context).ct_level
 
@@ -1054,6 +1296,21 @@ let undo (olduuid : int) =
     for _ = (uuid ()) - 1 downto olduuid do
       context := Some (pop_context (oget !context))
     done
+
+(* -------------------------------------------------------------------- *)
+(* [undo] only pops, so it cannot undo an [undo]: input that lowered the
+   uuid before failing leaves it at the wrong state, not the one it
+   started from. A caller that has to put the engine back *exactly*
+   where it was takes a mark first. The context is an immutable record
+   -- current scope, undo stack, uuid -- so this is a snapshot, not a
+   replay: restoring it moves forward as readily as backward. *)
+type undo_mark = context
+
+let undo_mark () : undo_mark =
+  oget !context
+
+let undo_restore (mark : undo_mark) =
+  context := Some mark
 
 (* -------------------------------------------------------------------- *)
 let doc_comment (doc : [`Global | `Item] * string) : unit =
@@ -1139,8 +1396,50 @@ let pp_current_goal ?(all = false) stream =
   end
 
 (* -------------------------------------------------------------------- *)
+let in_proof () =
+  Option.is_some (S.xgoal (current ()))
+
+(* Return the list of open-goal handles at the top level of the active
+   proof, focused-first, or [] if no proof is active. *)
+let open_handles () : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.all_hd_opened pf
+  | _ -> []
+
+(* The proof environment of the active proof, or [None] if no proof is
+   active. A [proofenv] is immutable and cumulative, so a snapshot taken
+   while the proof was open keeps answering DAG queries after [qed] has
+   discarded the active proof. *)
+let current_proofenv () : EcCoreGoal.proofenv option =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    Some (EcCoreGoal.proofenv_of_proof pf)
+  | _ -> None
+
+(* Direct DAG children of [h] in the active proof. [] if no proof. *)
+let children_of (h : EcCoreGoal.handle) : EcCoreGoal.handle list =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.children_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> []
+
+(* Parent of [h] in the active proof's DAG, or [None] if [h] is the
+   root or no proof is active. *)
+let parent_of (h : EcCoreGoal.handle) : EcCoreGoal.handle option =
+  match S.xgoal (current ()) with
+  | Some { S.puc_active =
+             Some ({ S.puc_jdg = S.PSCheck pf }, _) } ->
+    EcCoreGoal.parent_of_handle
+      (EcCoreGoal.proofenv_of_proof pf) h
+  | _ -> None
+
 let pp_current_goal_or_noproof ?(all = false) stream =
-  if Option.is_some (S.xgoal (current ())) then
+  if in_proof () then
     pp_current_goal ~all stream
   else
     Format.fprintf stream "No active proof.@\n%!"
@@ -1177,4 +1476,37 @@ let pp_all_goals () =
         Buffer.contents buffer) goals
   end
 
+  | _ -> []
+
+(* -------------------------------------------------------------------- *)
+type goal_entry = {
+  ge_index   : int;
+  ge_focused : bool;
+  ge_text    : string;
+}
+
+(* Render the open goals of the active proof, focused first. *)
+let pp_tree ?(all = false) () : goal_entry list =
+  let scope = current () in
+  match S.xgoal scope with
+  | Some { S.puc_active = Some ({ puc_jdg = S.PSCheck pf }, _) } -> begin
+    match EcCoreGoal.opened pf with
+    | None -> []
+    | Some _ ->
+      let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+      let goals = EcCoreGoal.all_opened pf in
+      List.mapi (fun i { EcCoreGoal.g_hyps; EcCoreGoal.g_concl } ->
+        let text =
+          if all then
+            let buf = Buffer.create 256 in
+            let hc  = (EcEnv.LDecl.tohyps g_hyps, g_concl) in
+            Format.fprintf
+              (Format.formatter_of_buffer buf)
+              "%a@?" (EcPrinting.pp_goal1 ppe) hc;
+            Buffer.contents buf
+          else
+            Format.asprintf "%a" (EcPrinting.pp_form ppe) g_concl
+        in
+        { ge_index = i + 1; ge_focused = i = 0; ge_text = text; }) goals
+  end
   | _ -> []

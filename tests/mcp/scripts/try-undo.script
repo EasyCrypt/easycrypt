@@ -1,0 +1,14 @@
+# exit: 0
+# ec_try rolls back input that moved the engine *down*. The proof is
+# closed at uuid 6; the phrase then runs `undo 3.' before failing, so
+# the rollback has to move forward again -- which the old `undo pre'
+# could not do, leaving the session three states back while reporting
+# reverted true. The ec_goals and ec_commit that follow prove the
+# closed proof and its transcript are both back.
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ec_load","arguments":{"file":"../llm/fixtures/simple.ec","line":6}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ec_step","arguments":{"phrase":"split. trivial. trivial."}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ec_try","arguments":{"phrase":"undo 3. apply nosuchlemma."}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ec_goals","arguments":{}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"ec_commit","arguments":{}}}

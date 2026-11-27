@@ -1,0 +1,18 @@
+READY [uuid:0]
+<END>
+ERROR [uuid:0]
+LOAD: missing filename
+No active proof.
+<END>
+ERROR [uuid:0]
+LOAD: no such file: fixtures/nosuch.ec
+No active proof.
+<END>
+ERROR [uuid:0]
+unknown file extension: .txt
+No active proof.
+<END>
+ERROR [uuid:0]
+LOAD: unexpected arguments
+No active proof.
+<END>

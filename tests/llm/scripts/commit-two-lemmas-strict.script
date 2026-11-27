@@ -1,0 +1,19 @@
+# exit: 0
+# The same, but the first proof continues the LOAD prefix's own bullet
+# stack (fixtures/strict.ec, under `pragma +strict_bullets`). The
+# second lemma opens no such frame, so it must start again at depth 0
+# with the first token, not inherit the prefix's depth or its tokens.
+LOAD "fixtures/strict.ec"
+QUIET ON
+trivial.
+trivial.
+trivial.
+qed.
+lemma strict_two : 3 = 3 /\ 4 = 4.
+proof.
+split.
+trivial.
+trivial.
+qed.
+QUIET OFF
+COMMIT

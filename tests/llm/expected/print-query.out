@@ -1,0 +1,47 @@
+READY [uuid:0]
+<END>
+OK [uuid:4] [loaded:fixtures/midproof.ec:8] [focus: 1/2]
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:4] [focus: 1/2]
+* In [operators, predicates or exceptions]:
+
+(* Int.b2i (shorten name: b2i) *)
+op b2i (b : bool) : int = if b then 1 else 0.
+
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:4] [focus: 1/2]
+In section [operators]
+
+ - Int.b2i (shorten name: b2i)
+
+Current goal (remaining: 2)
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+1 = 1
+<END>
+OK [uuid:4]
+<END>
+OK [uuid:5]
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:6]
+<END>
+OK [uuid:6]
+- trivial.
+- trivial.
+<END>
